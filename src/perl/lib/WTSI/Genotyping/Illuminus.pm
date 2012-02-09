@@ -1,0 +1,166 @@
+
+package WTSI::Genotyping;
+
+use strict;
+use warnings;
+use Carp;
+
+use WTSI::Genotyping::DelimitedFiles;
+
+
+sub read_it_column_names {
+  my $fh = shift;
+
+  my @names = read_column_names($fh, "\t");
+
+  my @annotation_columns = qw(SNP Coor Alleles);
+  for (my $i = 0; $i < scalar @annotation_columns; ++$i) {
+    my $annot = $annotation_columns[$i];
+    unless ($names[$i] eq $annot) {
+       croak "Malformed column header line (missing the '$annot' column)\n";
+    }
+  }
+
+  @names = @names[3..$#names];
+
+  return \@names;
+}
+
+sub update_it_columns {
+  my ($in, $out, $indices, $value) = @_;
+
+  my @annotation_columns = qw(SNP Coor Alleles);
+  my %index_lookup = map { $_ => 1} @$indices;
+
+  my $num_lines = 0;
+  while (my $line = <$in>) {
+    chomp($line);
+    my @fields = split(/\t/, $line);
+
+    for (my $i = 0; $i < scalar @annotation_columns; ++$i) {
+      my $annot = shift @fields;
+      print $out "$annot\t";
+    }
+
+    for (my $i = 0; $i < scalar @fields; ++$i) {
+      if (exists $index_lookup{$i}) {
+        $fields[$i] = $value;
+      }
+    }
+    print $out join("\t", @fields), "\n";
+
+    ++$num_lines;
+  }
+
+  return $num_lines;
+}
+
+
+=head2 read_gt_column_names
+
+  Arg [1]    : filehandle
+  Example    : $names = read_gt_column_names($fh);
+  Description: Reads the column names from a filehandle of genotype call format
+               data.
+  Returntype : arrayref
+  Caller     : general
+
+=cut
+
+sub read_gt_column_names {
+  my $fh = shift;
+
+  my @names = read_column_names($fh, "\t");
+
+  unless ($names[0] eq '') {
+    croak "Malformed column header line (missing the empty left column)\n";
+  }
+
+  @names = @names[1..$#names];
+
+  return \@names;
+}
+
+=head2 filter_gt_columns
+
+  Arg [1]    : input filehandle
+  Arg [2]    : output filehandle
+  Arg [3]    : column separator
+  Arg [4]    : column offset (0-based)
+  Arg [5]    : column group (number of data per column)
+  Arg [6]    : arrayref of column indices
+  Arg [7]    : operation to perform on the selected columns, either 'include'
+               or 'exclude'
+  Example    : @filtered =
+                 filter_columns(["a", "b", "c", "d"], [0, 3], 'include')
+  Description: Retains or removes the indicated columns from an array of columns
+               of genotype call or probability format data.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub filter_gt_columns {
+  my ($in, $out, $col_separator, $col_offset,
+      $col_group, $indices, $op) = @_;
+
+  my $num_lines = 0;
+  while (my $line = <$in>) {
+    chomp($line);
+    my @fields = split(/$col_separator/, $line);
+
+    for (my $i = 0; $i < $col_offset; ++$i) {
+      my $annotation_col = shift @fields;
+      print $out "$annotation_col$col_separator";
+    }
+
+    # Handle probability data which come in adjacent groups of columns
+    # that correspond to a single column of genotype data.
+    my @groups;
+    if ($col_group == 1) {
+      @groups = @fields;
+    } else {
+      for (my $i = 0; $i < scalar @fields; $i += $col_group) {
+
+        my @group;
+        for (my $j = 0; $j < $col_group; ++$j) {
+          push(@group, $fields[$i + $j]);
+        }
+
+        push(@groups, join($col_separator, @group));
+      }
+    }
+
+    my @selected = filter_columns(\@groups, $indices, $op);
+
+    print $out join($col_separator, @selected), "\n";
+
+    ++$num_lines;
+  }
+
+  return $num_lines;
+}
+
+1;
+
+__END__
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
