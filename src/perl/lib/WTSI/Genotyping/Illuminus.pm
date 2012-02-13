@@ -170,6 +170,82 @@ sub filter_gt_columns {
   return $num_lines;
 }
 
+=head2 write_gt_calls
+
+  Arg [1]    : input filehandle (raw calls))
+  Arg [2]    : input filehandle (raw probabilities)
+  Arg [3]    : output filehandle
+  Example    : $num_records = write_gt_calls($cin, $pin, \*STDOUT)
+  Description: Writes genotype call format data to a filehandle, given streams
+               of raw Illuminus results (calls codes and probabilities)
+  Returntype : integer
+  Caller     : general
+
+=cut
+
+sub write_gt_calls {
+  my ($calls_in, $probs_in, $out) = @_;
+
+  my $num_records = 0;
+  my $calls_str = <$calls_in>;
+  my $probs_str = <$probs_in>;
+
+  if (defined $calls_str && defined $probs_str) {
+    chomp($calls_str);
+    chomp($probs_str);
+
+    my ($call_name, $call_pos, $call_alleles, @calls) = split(/\t/, $calls_str);
+    my ($prob_name, $prob_pos, $prob_alleles, @probs) = split(/\t/, $probs_str);
+
+    unless ($call_name eq $prob_name &&
+            $call_pos == $prob_pos &&
+            $call_alleles eq $prob_alleles) {
+      croak "Illuminus calls and probabilities are out of sync: " .
+        "$call_name/$prob_name " .
+          "$call_pos/$prob_pos " .
+            "$call_alleles/$prob_alleles\n"
+    }
+
+    my $num_calls = scalar @calls;
+    my $num_probs = scalar @probs;
+
+    unless ($num_calls * 4 == $num_calls) {
+      croak "Illuminus calls and probabilities are out of sync: " .
+        "$num_calls calls, $num_probs probabilities, " .
+          "# probabilities was not equal to  4 * # calls\n";
+    }
+
+    my ($allele_a, $allele_b) = (substr($call_alleles, 0, 1),
+                                 substr($call_alleles, 1, 1));
+    my @genotypes = ($allele_a . $allele_a,
+                     $allele_a . $allele_b,
+                     $allele_b . $allele_b,
+                     "NN");
+
+    print $out "$call_name\t";
+    for (my $i = 0, my $j = 0; $i < $num_calls; ++$i, $j += 4) {
+      # The call is an integer code that indicates which genotype has
+      # been chosen and which of the 4 probabilities to include in the
+      # output
+      my $k = $calls[$i] - 1;
+      print $out "\t", $genotypes[$k], ";", $probs[$j + $k];
+    }
+    print $out "\n";
+
+    ++$num_records;
+  }
+  elsif ($calls_str && ! defined $probs_str) {
+    chomp($calls_str);
+    croak "Illuminus call data is missing probabilites: '$calls_str'\n";
+  }
+  elsif ($probs_str && ! defined $calls_str) {
+    chomp($probs_str);
+    croak "Illuminus probabilities found withhout call data: '$probs_str'\n";
+  }
+
+  return $num_records;
+}
+
 1;
 
 __END__
