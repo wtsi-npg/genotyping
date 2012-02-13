@@ -8,6 +8,18 @@ use Carp;
 use WTSI::Genotyping::DelimitedFiles;
 
 
+=head2 read_it_column_names
+
+  Arg [1]    : filehandle
+  Example    : @names = read_it_column_names(\*STDIN, "\t")
+  Description: This function is designed to read sample column name headers
+               from an Illuminus intensity format file. The annotation columns
+               are ignored.
+  Returntype : arrayref
+  Caller     : general
+
+=cut
+
 sub read_it_column_names {
   my $fh = shift;
 
@@ -25,6 +37,23 @@ sub read_it_column_names {
 
   return \@names;
 }
+
+=head2 update_it_columns
+
+  Arg [1]    : filehandle
+  Arg [2]    : filehandle
+  Arg [3]    : arrayref of column indices
+  Arg [4]    : value to insert
+  Example    : $n = update_it_columns(\*STDIN, \*STDOUT, [0, 1], 'NaN')
+  Description: Reads Illuminus intensity format data from $in and writes
+               it to $out, having changed the intensity values in columns
+               denoted by the indices to contain the specified value. The
+               column indices count from the first sample column. i.e. the
+               annotation columns are ignored (but are written unchanged).
+  Returntype : arrayref
+  Caller     : general
+
+=cut
 
 sub update_it_columns {
   my ($in, $out, $indices, $value) = @_;

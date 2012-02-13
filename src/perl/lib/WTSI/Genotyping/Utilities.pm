@@ -5,6 +5,20 @@ use strict;
 use warnings;
 use Carp;
 
+=head2 common_stem
+
+  Arg [1]    : string
+  Arg [2]    : string
+  Example    : $stem = common_stem("foo13240a", "foo199")
+  Description: Returns the common part of the two arguments, starting
+               from the left (index 0). If one or more of the arguments
+               are empty strings, or the arguments differ at the first
+               character, an empty string is returned.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub common_stem {
   my ($str1, $str2) = @_;
   my $stem = '';
