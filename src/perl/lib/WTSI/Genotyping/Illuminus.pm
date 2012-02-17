@@ -194,8 +194,10 @@ sub write_gt_calls {
     chomp($calls_str);
     chomp($probs_str);
 
-    my ($call_name, $call_pos, $call_alleles, @calls) = split(/\t/, $calls_str);
-    my ($prob_name, $prob_pos, $prob_alleles, @probs) = split(/\t/, $probs_str);
+    my ($call_name, $call_pos, $call_alleles, @calls) =
+      split(/\s+/, $calls_str);
+    my ($prob_name, $prob_pos, $prob_alleles, @probs) =
+      split(/\s+/, $probs_str);
 
     unless ($call_name eq $prob_name &&
             $call_pos == $prob_pos &&
@@ -209,7 +211,7 @@ sub write_gt_calls {
     my $num_calls = scalar @calls;
     my $num_probs = scalar @probs;
 
-    unless ($num_calls * 4 == $num_calls) {
+    unless ($num_calls * 4 == $num_probs) {
       croak "Illuminus calls and probabilities are out of sync: " .
         "$num_calls calls, $num_probs probabilities, " .
           "# probabilities was not equal to  4 * # calls\n";
