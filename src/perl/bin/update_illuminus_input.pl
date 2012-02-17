@@ -128,12 +128,12 @@ Options:
   --columns   A text file of column names, one per line, corresponding to
               the sample name prefix of column names in the intensity file.
               The order of the lines is not meaningful.
-  --input     The Illuminus intensity file to be read.
-  --output    The Illuminus intensity file to be written.
   --help      Display help.
+  --input     The Illuminus intensity file to be read.
   --operation The operation to carry out on the selected columns. The value
               maye be either 'include' or 'exclude' (case-insensitive).
               Optional, defaults to 'include'.
+  --output    The Illuminus intensity file to be written.
   --value     The new value to replace the existing values where indicated.
   --verbose   Print messages while processing. Optional.
 

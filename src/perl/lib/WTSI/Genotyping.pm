@@ -6,10 +6,19 @@ use vars qw($VERSION @ISA @EXPORT_OK);
 
 use Exporter;
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(maybe_stdin maybe_stdout read_fon common_stem
-                read_column_names find_column_indices filter_columns
-                read_gt_column_names filter_gt_columns
-                read_it_column_names update_it_columns
+@EXPORT_OK = qw(
+                common_stem
+                filter_columns
+                filter_gt_columns
+                find_column_indices
+                maybe_stdin
+                maybe_stdout
+                read_column_names
+                read_fon
+                read_gt_column_names
+                read_it_column_names
+                update_it_columns
+                write_gt_calls
               );
 
 use WTSI::Genotyping::DelimitedFiles;
