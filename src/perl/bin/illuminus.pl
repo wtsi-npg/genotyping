@@ -216,6 +216,7 @@ Options:
              defaults to STDOUT.
   --start    The 1-based index of the first SNP in the range to be
              analysed. Optional.
+  --wga      Assume that the sample is whole genome amplified.
   --verbose  Print messages while processing. Optional.
 
 =head1 DESCRIPTION
