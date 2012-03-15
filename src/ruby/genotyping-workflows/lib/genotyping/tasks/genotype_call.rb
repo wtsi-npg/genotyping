@@ -24,31 +24,65 @@ module Genotyping::Tasks
     system("which #{GENOTYPE_CALL} >/dev/null 2>&1")
   end
 
-  def genotype_call_gtc_to_sim(gtc_files, manifest, output, args = {}, async = {})
-    work_dir, log_dir = process_task_args(args)
+  module GenotypeCall
+    include Genotyping::Tasks
 
-    if args_available?(gtc_files, manifest, output, work_dir)
-      unless absolute_path?(output)
-        output = absolute_path(output, work_dir)
+    def mock_study(study_name, num_samples, num_snps, args = {}, async ={})
+      work_dir, log_dir = process_task_args(args)
+
+      if args_available?(study_name, num_samples, num_snps, work_dir)
+        manifest_file = File.join(work_dir, "#{study_name}.bpm.csv")
+        sample_file = File.join(work_dir, "#{study_name}.txt")
+        gtc_files = (0...num_samples).collect do |i|
+          File.join(work_dir, sprintf("%s_%04d.gtc", study_name, i))
+        end
+
+        cli_args = {:study_name => study_name,
+                    :num_samples => num_samples,
+                    :num_snps => num_snps,
+                    :manifest => manifest_file}
+        margs = [cli_args, work_dir]
+        task_id = task_identity(:mock_study, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        command =[GENOTYPE_CALL, 'mock-study',
+                  cli_arg_map(cli_args,
+                              :prefix => '--') { |key| key.gsub(/_/, '-') }].flatten.join(' ')
+        expected = [manifest_file, sample_file, gtc_files].flatten
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { [manifest_file, sample_file, gtc_files] },
+                   :async => async)
       end
-
-      cli_args = {}
-      cli_args[:chromosome] = args[:chromosome]
-      cli_args[:manifest] = manifest
-      cli_args[:output] = output
-
-      margs = [work_dir, cli_args, gtc_files]
-      task_id = task_identity(:genotype_call_gtc_to_sim, *margs)
-      log = File.join(log_dir, task_id + '.log')
-
-      command = [GENOTYPE_CALL, 'gtc-to-sim',
-                 cli_arg_map(cli_args,
-                             :prefix => '--'), *gtc_files].flatten.join(' ')
-
-      async_task(margs, command, work_dir, log,
-                 :post => lambda { ensure_files([output], :error => false) },
-                 :result => lambda { output },
-                 :async => async)
     end
+
+    def gtc_to_sim(gtc_files, manifest, output, args = {}, async = {})
+      work_dir, log_dir = process_task_args(args)
+
+      if args_available?(gtc_files, manifest, output, work_dir)
+        unless absolute_path?(output)
+          output = absolute_path(output, work_dir)
+        end
+
+        cli_args = {:chromosome => args[:chromosome],
+                    :manifest => manifest,
+                    :output => output}
+
+        margs = [cli_args, gtc_files, work_dir]
+        task_id = task_identity(:gtc_to_sim, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        command = [GENOTYPE_CALL, 'gtc-to-sim',
+                   cli_arg_map(cli_args,
+                               :prefix => '--'), *gtc_files].flatten.join(' ')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files([output], :error => false) },
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
+
   end
 end
