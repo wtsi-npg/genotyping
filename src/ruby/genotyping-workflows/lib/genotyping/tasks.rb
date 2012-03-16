@@ -28,20 +28,25 @@ module Genotyping::Tasks
   end
 
   # Returns an Array of Ranges which are indices for chunked
-  # data processing. Given a total number of elements and a chunk size,
+  # data processing. Given a start index, end index and a chunk size,
   # returns the relevant indices.
-  def make_ranges(num_elementsl, chunk_size)
-    num_ranges, partial_range = num_elementsl.divmod(chunk_size)
+  def make_ranges(from, to, chunk_size)
+    unless to >= from
+      raise ArgumentError, "'to' (#{to}) was not > 'from' (#{from})"
+    end
+    num_elements = to - from
+
+    num_ranges, partial_range = num_elements.divmod(chunk_size)
     ranges = num_ranges.times.collect do |n|
-       1 + (n * chunk_size) .. (n * chunk_size + chunk_size)
+       (n * chunk_size) .. (n * chunk_size + chunk_size)
     end
 
     if num_ranges.zero?
-      ranges << (1 .. partial_range)
+      ranges << (0 .. partial_range)
     elsif partial_range.nonzero?
-      ranges << (1+ ranges.last.end .. ranges.last.end + partial_range)
+      ranges << (ranges.last.end .. ranges.last.end + partial_range)
     end
 
-    ranges
+    ranges.collect { |range| Range.new(range.begin + from, range.end + from)  }
   end
 end

@@ -43,7 +43,8 @@ class TestIlluminusTasks < Test::Unit::TestCase
 
   def setup
     Percolate.log = Logger.new(File.join(data_path, 'test_illuminus_tasks.log'))
-    Percolate.asynchronizer = SystemAsynchronizer.new
+    Percolate.asynchronizer =
+        LSFAsynchronizer.new(:job_arrays_dir => data_path)
   end
 
   def data_path
@@ -82,7 +83,8 @@ class TestIlluminusTasks < Test::Unit::TestCase
                       {:work_dir =>  work_dir,
                        :log_dir => log_dir,
                        :start => 1000,
-                       :end => 2000})
+                       :end => 2000},
+                      :queue => :small)
       end
 
       assert(File.exist?(call_file1))
@@ -96,4 +98,39 @@ class TestIlluminusTasks < Test::Unit::TestCase
     end
   end
 
+  def test_call_from_sim_p
+    run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim_p") do
+      work_dir = make_work_dir('test_call_from_sim_p', data_path)
+
+      manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
+        mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
+                                           :log_dir => log_dir})
+      end
+
+      sim_file = wait_for('gtc_to_sim', 60, 5) do
+        gtc_to_sim(gtc_files, manifest_file, 'mock_study.sim',
+                   {:work_dir =>  work_dir,
+                    :log_dir => log_dir})
+      end
+
+      call_files1 = wait_for('test_call_from_sim_p', 120, 5) do
+        call_from_sim_p(sim_file, manifest_file, sample_file, 'mock_study1.call',
+                        {:work_dir =>  work_dir,
+                         :log_dir => log_dir,
+                         :start => 0,
+                         :end => 2000,
+                         :size => 100},
+                        :queue => :small)
+      end
+
+      assert_equal(20, call_files1.size)
+      call_files1.each do |file|
+        assert(File.exist?(file))
+        assert_equal(101 , File.open(file) { |f| f.readlines.size })
+      end
+
+      Percolate.log.close
+      remove_work_dir(work_dir)
+    end
+  end
 end

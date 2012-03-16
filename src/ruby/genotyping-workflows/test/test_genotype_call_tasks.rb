@@ -79,7 +79,7 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
 
       manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
-                                            :log_dir => log_dir})
+                                          :log_dir => log_dir})
       end
 
       sim_file = wait_for('test_gtc_to_sim', 60, 5) do

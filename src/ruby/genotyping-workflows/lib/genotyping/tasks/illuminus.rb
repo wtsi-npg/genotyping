@@ -46,19 +46,19 @@ module Genotyping::Tasks
           output = absolute_path(output, work_dir)
         end
 
-        #start_snp = args[:start] || 0
-        #end_snp = args[:end]
-        #unless start_snp.is_a?(Fixnum)
-        #  raise TaskArgumentError.new(":start must be an integer",
-        #                              :argument => :start, :value => start_snp)
-        #end
-        #unless end_snp.is_a?(Fixnum)
-        #  raise TaskArgumentError.new(":end must be an integer",
-        #                              :argument => :end, :value => end_snp)
-        #end
-        #unless (0 <= start_snp) && (start_snp <= end_snp)
-        #  raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
-        #end
+        start_snp = args[:start] || 0
+        end_snp = args[:end]
+        unless start_snp.is_a?(Fixnum)
+          raise TaskArgumentError.new(":start must be an integer",
+                                      :argument => :start, :value => start_snp)
+        end
+        unless end_snp.is_a?(Fixnum)
+          raise TaskArgumentError.new(":end must be an integer",
+                                      :argument => :end, :value => end_snp)
+        end
+        unless (0 <= start_snp) && (start_snp <= end_snp)
+          raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
+        end
 
         chunk_size = args[:size] || (end_snp - start_snp)
         unless chunk_size.is_a?(Fixnum)
@@ -66,20 +66,52 @@ module Genotyping::Tasks
                                       :argument => :size, :value => chunk_size)
         end
 
-        # Calculate the chunks from start/end/chunk-size
+        snp_ranges = make_ranges(start_snp, end_snp, chunk_size)
+        genotype_call_args = snp_ranges.collect do |range|
+          {:input => sim_file,
+           :output => 'stdout',
+           :manifest => manifest,
+           :start => range.begin,
+           :end => range.end}
+        end
 
+        illuminus_wrap_args = partitions(output, snp_ranges.size).collect do |part|
+          {:columns => names,
+           :output => part}
+        end
 
+        commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
+          [GENOTYPE_CALL, 'sim-to-illuminus',
+                   cli_arg_map(gca, :prefix => '--'),
+                   '|', ILLUMINUS_WRAPPER,
+                   cli_arg_map(iwa, :prefix => '--')].flatten.join(' ')
+        end
 
-        async_task_array(margs_arrays, commands, work_dir, log, args = {})
+        # Job memoization keys, i corresponds to the partition index
+        margs_arrays = genotype_call_args.zip(illuminus_wrap_args).collect { |gca, iwa|
+          [work_dir, gca, iwa]
+        }.each_with_index.collect { |elt, i| [i] + elt }
+
+        # Expected call files
+        call_partitions = illuminus_wrap_args.collect { |args| args[:output] }
+
+        task_id = task_identity(:call_from_sim_p, *margs_arrays)
+        log = File.join(log_dir, task_id + '.%I.log')
+
+        async_task_array(margs_arrays, commands, work_dir, log,
+                         :post => lambda { |i| ensure_files([call_partitions[i]],
+                                                            :error => false)},
+                         :result => lambda { |i| call_partitions[i] },
+                         :async => async)
       end
     end
 
-    def call_from_sim(sim_file, manifest, names, output, args = {}, async = {})
+    def call_from_sim(sim_file, manifest, names, call_file, args = {}, async = {})
       work_dir, log_dir = process_task_args(args)
 
-      if args_available?(sim_file, manifest, names, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
+      if args_available?(sim_file, manifest, names, call_file, work_dir)
+        unless absolute_path?(call_file)
+          call_file = absolute_path(call_file, work_dir)
         end
 
         start_snp = args[:start] || 0
@@ -104,7 +136,7 @@ module Genotyping::Tasks
                               :end => end_snp}
 
         illuminus_wrap_args = {:columns => names,
-                               :output => output}
+                               :output => call_file}
 
         command = [GENOTYPE_CALL, 'sim-to-illuminus',
                    cli_arg_map(genotype_call_args,
@@ -117,8 +149,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files([output], :error => false) },
-                   :result => lambda { output },
+                   :post => lambda { ensure_files([call_file], :error => false) },
+                   :result => lambda { call_file },
                    :async => async)
       end
     end
