@@ -119,7 +119,8 @@ class TestIlluminusTasks < Test::Unit::TestCase
                          :log_dir => log_dir,
                          :start => 0,
                          :end => 2000,
-                         :size => 100},
+                         :size => 100,
+                         :group_size => 5},
                         :queue => :small)
       end
 

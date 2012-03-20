@@ -18,6 +18,10 @@
 
 module Genotyping::Tasks
 
+  # The default value for the number of file partitions to create in a single
+  # directory
+  DEFAULT_GROUP_SIZE = 100
+
   def process_task_args(args, defaults = {})
     args = defaults.merge(args)
     work_dir = args.delete(:work_dir)
@@ -48,5 +52,15 @@ module Genotyping::Tasks
     end
 
     ranges.collect { |range| Range.new(range.begin + from, range.end + from)  }
+  end
+
+  def partition_group(partition, group_size = 100)
+    partition_index(partition).div(group_size)
+  end
+
+   def partition_group_path(partition, group_size = 100)
+     dir = File.dirname(partition)
+     file = File.basename(partition)
+     File.join(dir, partition_group(partition, group_size).to_s, file)
   end
 end

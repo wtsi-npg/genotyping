@@ -75,9 +75,15 @@ module Genotyping::Tasks
            :end => range.end}
         end
 
+        group_size = args[:group_size] || DEFAULT_GROUP_SIZE
+
         illuminus_wrap_args = partitions(output, snp_ranges.size).collect do |part|
+          grouped_part = partition_group_path(part, group_size)
+          grouped_dir = File.dirname(grouped_part)
+          Dir.mkdir(grouped_dir) unless File.exist?(grouped_dir)
+
           {:columns => names,
-           :output => part}
+           :output => grouped_part}
         end
 
         commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
