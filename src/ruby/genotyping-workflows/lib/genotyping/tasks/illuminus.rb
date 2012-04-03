@@ -21,6 +21,7 @@ module Genotyping::Tasks
   ILLUMINUS = 'illuminus'
   ILLUMINUS_WRAPPER = 'illuminus.pl'
 
+  # Returns true if the Illuminus executable is available.
   def illuminus_available?()
     system("which #{ILLUMINUS} >/dev/null 2>&1")
   end
@@ -29,15 +30,25 @@ module Genotyping::Tasks
     include Genotyping
     include Genotyping::Tasks
 
-    ## We need a way of producing a tree of directories for chunked parallel jobs
-    ## to run in, so that only 100-ish files are in each directory.
+    # Runs an Illuminus analysis on intensity data for a range of SNPs in a SIM
+    # file. The range (e.g. spanning a chromsome) is broken into chunks of equal
+    # size which are run in parallel as batch jobs.
     #
-    # E.g. 10000 parallel jobs:
+    # Arguments:
+    # - sim_file (String): The SIM file name.
+    # - manifest (String): The BeadPool manifest file name.
+    # - names (String): The sample names file name.
+    # - output (String): The output files base name.
+    # - args (Hash): Arguments for the operation.
     #
-    #  lv1 10 dirs x lv2 10 dirs x 100 files
+    #   :start (Fixnum): The 0-based, half-open SNP index at which to start.
+    #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
+    #   :size (Fixnum): The number of SNPs in the range to process in on job.
     #
-    # You can calculate the file bin (directory) from the job index
-
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - An array of Illuminus output file paths.
     def call_from_sim_p(sim_file, manifest, names, output, args = {}, async = {})
       work_dir, log_dir = process_task_args(args)
 
@@ -112,12 +123,29 @@ module Genotyping::Tasks
       end
     end
 
-    def call_from_sim(sim_file, manifest, names, call_file, args = {}, async = {})
+    # Runs an Illuminus analysis on intensity data for a range of SNPs in a SIM
+    # file.
+    #
+    # Arguments:
+    # - sim_file (String): The SIM file name.
+    # - manifest (String): The BeadPool manifest file name.
+    # - names (String): The sample names file name.
+    # - output (String): The output file name.
+    # - args (Hash): Arguments for the operation.
+    #
+    #   :start (Fixnum): The 0-based, half-open SNP index at which to start.
+    #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
+    #
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - An Illuminus output file path.
+    def call_from_sim(sim_file, manifest, names, output, args = {}, async = {})
       work_dir, log_dir = process_task_args(args)
 
-      if args_available?(sim_file, manifest, names, call_file, work_dir)
-        unless absolute_path?(call_file)
-          call_file = absolute_path(call_file, work_dir)
+      if args_available?(sim_file, manifest, names, output, work_dir)
+        unless absolute_path?(output)
+          output = absolute_path(output, work_dir)
         end
 
         start_snp = args[:start] || 0
@@ -142,7 +170,7 @@ module Genotyping::Tasks
                               :end => end_snp}
 
         illuminus_wrap_args = {:columns => names,
-                               :output => call_file}
+                               :output => output}
 
         command = [GENOTYPE_CALL, 'sim-to-illuminus',
                    cli_arg_map(genotype_call_args,
@@ -155,8 +183,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files([call_file], :error => false) },
-                   :result => lambda { call_file },
+                   :post => lambda { ensure_files([output], :error => false) },
+                   :result => lambda { output },
                    :async => async)
       end
     end
