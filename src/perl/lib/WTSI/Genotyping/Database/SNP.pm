@@ -92,6 +92,7 @@ sub insert_sequenom_calls {
   return $count;
 }
 
+1;
 
 __END__
 
