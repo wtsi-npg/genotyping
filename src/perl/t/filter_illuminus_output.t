@@ -1,4 +1,9 @@
 
+# Tests functions used by filter_illuminus_ouput.pl
+
+use strict;
+use warnings;
+
 use Test::More tests => 13;
 
 use WTSI::Genotyping qw(read_fon find_column_indices filter_columns
@@ -67,6 +72,7 @@ my $pr_col_group = 4; # Probability data comes in groups of 4 columns per sample
 
 
 # Test genotype include filter
+my $gto;
 open($gt, "<$test_genotypes") or die "Failed to open '$test_genotypes'\n";
 open($gto, ">$gt_tmp_inc") or die "Failed to open '$gt_tmp_inc' for writing\n";
 $op = 'include';
@@ -95,6 +101,7 @@ unlink($gt_tmp_inc);
 
 # Test probabilities include filter
 my $pr;
+my $pro;
 open($pr, "<$test_probabilites") or die "Failed to open '$test_probabilites'\n";
 open($pro, ">$pr_tmp_inc") or die "Failed to open '$pr_tmp_inc' for writing\n";
 my $num_probs =

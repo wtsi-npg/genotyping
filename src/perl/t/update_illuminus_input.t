@@ -1,4 +1,9 @@
 
+# Tests functions used by update_illuminus_input.pl
+
+use strict;
+use warnings;
+
 use Test::More tests => 22;
 
 use WTSI::Genotyping qw(read_it_column_names update_it_columns);
@@ -27,6 +32,8 @@ close($it);
 my $it_tmp = "$test_intensities." . $$;
 
 # Test intensity update
+my $ii;
+my $io;
 open($ii, "<$test_intensities") or die "Failed to open '$test_intensities'\n";
 open($io, ">$it_tmp") or die "Failed to open '$it_tmp' for writing\n";
 
