@@ -18,19 +18,34 @@
 
 module Genotyping
 
+  # A SIM object represents a single Simple Intensity Matrix (SIM) format file.
   class SIM
     MAGIC_NUMBER = 'sim'
     NUMBER_FORMATS = [0, 1]
 
+    # The name of the original file.
     attr_reader :sim_file
+    # The SIM format ID.
     attr_reader :id
+    # The SIM format version.
     attr_reader :version
+    # The size of sample names in this file.
     attr_reader :sample_name_size
+    # The number of samples in this file.
     attr_reader :num_samples
+    # The number of probes in this file.
     attr_reader :num_probes
+    # The number of channels per probe.
     attr_reader :num_channels
+    # The number format ID of all channels.
     attr_reader :number_format
 
+    # Creates a SIM object for a file by reading the file header. This class
+    # provides read-only access to the header metadata. It does not provide
+    # read or write access to the data itself.
+    #
+    # Arguments:
+    # - sim_file (String): The SIM file name.
     def initialize(sim_file)
       open(sim_file, 'rb') do |sim|
         @sim_file = sim_file
