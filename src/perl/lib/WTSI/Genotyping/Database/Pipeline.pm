@@ -17,6 +17,21 @@ our $relations_ini = 'relations.ini';
 our $snpsets_ini = 'snpsets.ini';
 our $states_ini = 'states.ini';
 
+
+=head2 populate
+
+  Arg [1]    : None
+  Example    : $db->populate
+  Description: Populates the dictionary tables of a database from the
+               default .ini files located in the 'inipath' path given
+               in the database configuration (See
+               WTSI::Genotyping::Database::configure). May be called
+               safely multiple times on the same .ini data.
+  Returntype : WTSI::Genotyping::Database::Pipeline
+  Caller     : general
+
+=cut
+
 sub populate {
   my $self = shift;
 
@@ -54,9 +69,16 @@ sub connect {
   return $self;
 }
 
-sub schema {
- my $self = shift;
- return $self->{_schema};
+
+=head2 disconnect
+
+  See WTSI::Genotyping::Database.
+
+=cut
+
+sub disconnect {
+  my $self = shift;
+  $self->schema->disconnect;
 }
 
 
@@ -74,16 +96,104 @@ sub dbh {
 }
 
 
-=head2 disconnect
+=head2 schema
 
-  See WTSI::Genotyping::Database.
+  Arg [1]    : None
+  Example    : $db->schema
+  Description: Returns the current database schema object.
+  Returntype : WTSI::Genotyping::Schema
+  Caller     : general
 
 =cut
 
-sub disconnect {
-  my $self = shift;
-  $self->schema->disconnect;
+sub schema {
+ my $self = shift;
+ return $self->{_schema};
 }
+
+
+=head2 address
+
+Returns a DBIx::Class::ResultSet for the registered source 'address'.
+
+=cut
+
+=head2 dataset
+
+Returns a DBIx::Class::ResultSet for the registered source 'dataset'.
+
+=cut
+
+
+=head2 datasupplier
+
+Returns a DBIx::Class::ResultSet for the registered source 'datasupplier'.
+
+=cut
+
+
+=head2 gender
+
+Returns a DBIx::Class::ResultSet for the registered source 'gender'.
+
+=cut
+
+
+=head2 method
+
+Returns a DBIx::Class::ResultSet for the registered source 'method'.
+
+=cut
+
+
+=head2 piperun
+
+Returns a DBIx::Class::ResultSet for the registered source 'piperun'.
+
+=cut
+
+
+=head2 plate
+
+Returns a DBIx::Class::ResultSet for the registered source 'plate'.
+
+=cut
+
+
+=head2 result
+
+Returns a DBIx::Class::ResultSet for the registered source 'result'.
+
+=cut
+
+
+=head2 snp
+
+Returns a DBIx::Class::ResultSet for the registered source 'snp'.
+
+=cut
+
+
+=head2 snpset
+
+Returns a DBIx::Class::ResultSet for the registered source 'snpset'.
+
+=cut
+
+
+=head2 state
+
+Returns a DBIx::Class::ResultSet for the registered source 'state'.
+
+=cut
+
+
+=head2 well
+
+Returns a DBIx::Class::ResultSet for the registered source 'well'.
+
+=cut
+
 
 # Populates plate well addresses dictionary with the two styles of
 # address label used.
@@ -216,3 +326,33 @@ sub AUTOLOAD {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+WTSI::Genotyping::Database::Pipeline
+
+=head1 DESCRIPTION
+
+A class for accessing the genotyping pipeline analysis database.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

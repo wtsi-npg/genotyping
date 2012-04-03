@@ -64,7 +64,6 @@ sub find_infinium_plate {
 
 1;
 
-
 __END__
 
 =head1 NAME

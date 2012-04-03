@@ -167,7 +167,6 @@ sub find_project_samples {
 
 1;
 
-
 __END__
 
 =head1 NAME

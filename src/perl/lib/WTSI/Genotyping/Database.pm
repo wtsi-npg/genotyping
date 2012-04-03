@@ -14,7 +14,7 @@ use DBI;
   Arg [1]    : name => string
   Arg [2]    : inifile => string
   Example    : WTSI::Genotyping::Database::<some class>->new
-                 (name => 'my_database', inifile => 'may_database.ini')
+                 (name => 'my_database', inifile => 'my_database.ini')
   Description: Returns a new database handle configured from an
                .ini-style file.
   Returntype : WTSI::Genotyping::Database
@@ -37,7 +37,7 @@ sub new {
   Arg [1]    : name => string
   Arg [2]    : inifile => string
   Example    : $db->configure(name => 'my_database',
-                              inifile => 'may_database.ini')
+                              inifile => 'my_database.ini')
   Description: Configures an exisiting database handle from an
                .ini-style file.
   Returntype : WTSI::Genotyping::Database
@@ -239,7 +239,6 @@ sub password {
 }
 
 1;
-
 
 __END__
 
