@@ -68,7 +68,9 @@ sub create {
     croak "Failed to create database: sql_path declaration is missing from " .
       $self->inifile, "\n";
   }
-
+  unless (-e $sql_path) {
+    croak "Failed to create database: DDL file '$sql_path' is missing\n";
+  }
   unless ($sqlite) {
     croak "Failed to create database: sqlite declaration is missing from " .
       $self->inifile, "\n";
@@ -87,17 +89,17 @@ sub create {
     $self->data_source($base . $self->dbfile);
   }
 
-  if (-e $file) {
-    if ($self->{_overwrite}) {
-      unlink($file);
-    }
-    else {
-      croak "Database file '$file' exists (not overwriting)\n";
-    }
+  if (-e $file && $self->{_overwrite}) {
+    unlink($file);
   }
 
-  system("$sqlite $file < $sql_path") == 0
-    or die "Failed to create SQLite database '$file': $?";
+  if (-e $file) {
+    # We use the existing database
+  }
+  else {
+    system("$sqlite $file < $sql_path") == 0
+      or croak "Failed to create SQLite database '$file': $?";
+  }
 
   return $self;
 }
@@ -174,7 +176,7 @@ sub is_connected {
 
 sub disconnect {
   my $self = shift;
-  $self->schema->disconnect;
+  $self->schema->storage->disconnect;
 }
 
 
@@ -236,9 +238,9 @@ sub in_transaction {
   if ($@) {
     my $error = $@;
     if ($error =~ /Rollback failed/) {
-      croak "Rollback failed after error: $error\n";
+      croak "$error.\nRollback failed!\nWARNING: data may be inconsistent.\n";
     } else {
-      croak "Rollback successful after error: $error\n";
+      croak "$error.\nRollback successful\n";
     }
   };
 
