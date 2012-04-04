@@ -3,6 +3,7 @@ package WTSI::Genotyping::Database::Infinium;
 
 use strict;
 use warnings;
+use Carp;
 
 use WTSI::Genotyping::Database;
 
@@ -51,11 +52,11 @@ sub find_project_chip_design {
   }
 
   unless (@chip_designs) {
-    die "No chip design was found for project '$project_name'\n";
+    croak "No chip design was found for project '$project_name'\n";
   }
 
   if (scalar @chip_designs > 1) {
-    die ">1 chip design found for project '$project_name': [" .
+    croak ">1 chip design found for project '$project_name': [" .
       join(", ", @chip_designs) . "]\n";
   }
 
@@ -159,7 +160,7 @@ sub find_project_samples {
   }
 
   unless (@samples) {
-    die "No samples were found for project '$project_name'\n";
+    croak "No samples were found for project '$project_name'\n";
   }
 
   return \@samples;

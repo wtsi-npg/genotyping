@@ -3,6 +3,7 @@ package WTSI::Genotyping::Database::Warehouse;
 
 use strict;
 use warnings;
+use Carp;
 
 use WTSI::Genotyping::Database;
 
@@ -21,7 +22,7 @@ our @ISA = qw(WTSI::Genotyping::Database);
                  barcode_prefix   => <SequenceScape barcode prefix string>,
                  barcode          => <SequenceScape barcode integer>,
                  map              => <SequenceScape well address string
-                                      without 0-pad e.g A1>
+                                      without 0-pad e.g A1> }
   Returntype : hashref
   Caller     : general
 
@@ -56,7 +57,7 @@ sub find_infinium_plate {
   }
 
   unless (%plate) {
-    die "No samples were found for plate '$plate_name'\n";
+    # croak "No samples were found for plate '$plate_name'\n";
   }
 
   return \%plate;
