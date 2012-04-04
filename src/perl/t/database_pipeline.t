@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 16;
+use Test::More tests => 21;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::Schema'); }
@@ -12,42 +12,54 @@ require_ok('WTSI::Genotyping::Schema');
 
 use WTSI::Genotyping::Database::Pipeline;
 
-my $sqlite = 'sqlite3';
-my $sql_path = './sql';
 my $ini_path = './etc';
-
-system("$sqlite t/genotyping.db < $sql_path/genotyping_ddl.sql") == 0
-  or die "Failed to create test database: $?\n";
+my $dbfile = 't/pipeline.db';
+unlink($dbfile);
 
 my $db = WTSI::Genotyping::Database::Pipeline->new
   (name => 'pipeline',
-   inifile => "$ini_path/pipeline.ini");
-ok($db);
+   inifile => "$ini_path/pipeline.ini",
+   dbfile => $dbfile);
+ok($db, 'A pipeline Database');
+ok(-e $dbfile);
+
+dies_ok {
+  WTSI::Genotyping::Database::Pipeline->new
+    (name => 'pipeline',
+     inifile => "$ini_path/pipeline.ini",
+     dbfile => $dbfile)
+  } 'Expected overwrite to fail';
+
+ok(WTSI::Genotyping::Database::Pipeline->new
+   (name => 'pipeline',
+    inifile => "$ini_path/pipeline.ini",
+    dbfile => $dbfile,
+    overwrite => 1), 'A database file overwrite');
 
 dies_ok { $db->snpset->all }
   'Expected AUTOLOAD to fail when unconnected';
 
 my $schema  = $db->connect(RaiseError => 1,
                            on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-ok($schema);
+ok($schema, 'A database Schema');
 
 dies_ok { $db->should_not_autoload_this_method->all }
   'Expected AUTOLOAD to fail on invalid method';
 
 $db->populate;
-is(18, scalar $db->snpset->all);
-is(3, scalar $db->method->all);
-is(2, scalar $db->relation->all);
-is(1, scalar $db->state->all);
+is(18, scalar $db->snpset->all, 'The snpset dictionary');
+is(3, scalar $db->method->all, 'The method dictionary');
+is(2, scalar $db->relation->all, 'The relation dictionary');
+is(1, scalar $db->state->all, 'The state dictionary');
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
 
-ok($supplier);
+ok($supplier, 'A supplier inserted');
 
 my $run = $db->piperun->find_or_create({name => 'test',
                                         start_time => time()});
-ok($run);
+ok($run, 'A run inserted');
 
 my $project_base = 'test_project';
 my $snpset = $db->snpset->find({name => 'HumanOmni2.5-8v1'});
@@ -58,18 +70,39 @@ foreach my $i (1..3) {
     $run->add_to_datasets({if_project => sprintf("%s_%d", $project_base, $i),
                            datasupplier => $supplier,
                            snpset => $snpset});
-  ok($dataset);
+  ok($dataset, 'A dataset inserted');
   push @datasets, $dataset;
 }
 
 my $sample_base = 'test_sample';
 my $good = $db->state->find({name => 'Good'});
-foreach my $i (1..1000) {
-  my $sample = $datasets[0]->add_to_samples({name => sprintf("%s_%d",
-                                                             $sample_base, $i),
-                                             state => $good,
-                                             beadchip => 'ABC123456',
-                                             include => 1});
-}
 
-is(1000, scalar $datasets[0]->samples);
+$db->in_transaction(sub {
+                      foreach my $i (1..1000) {
+                        my $sample = $datasets[0]->add_to_samples
+                          ({name => sprintf("%s_%d", $sample_base, $i),
+                            state => $good,
+                            beadchip => 'ABC123456',
+                            include => 1});
+                      }
+                    });
+
+is(1000, scalar $datasets[0]->samples, 'Expected samples found');
+
+dies_ok {
+  $db->in_transaction(sub {
+                        foreach my $i (1001..2000) {
+                          my $sample = $datasets[0]->add_to_samples
+                            ({name => sprintf("%s_%d", $sample_base, $i),
+                              state => $good,
+                              beadchip => 'ABC123456',
+                              include => 1});
+
+                          if ($i == 1900) {
+                            die "Test error at $i\n";
+                          }
+                        }
+                      });
+} 'Expected transaction to fail';
+
+is(1000, scalar $datasets[0]->samples, 'Successful rollback');

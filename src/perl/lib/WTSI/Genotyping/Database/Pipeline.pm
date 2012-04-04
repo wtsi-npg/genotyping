@@ -17,6 +17,90 @@ our $relations_ini = 'relations.ini';
 our $snpsets_ini = 'snpsets.ini';
 our $states_ini = 'states.ini';
 
+=head2 new
+
+  Arg [1]    : name => string
+  Arg [2]    : inifile => string
+  Arg [3]    : dbfile => string
+  Arg [3]    : overwrite => boolean
+  Example    : WTSI::Genotyping::Database::Pipeline->new
+                 (name => 'my_database', inifile => 'my_database.ini',
+                  dbfile => 'pipeline.db', overwite => 1)
+  Description: Returns a new database handle configured from an
+               .ini-style file.
+  Returntype : WTSI::Genotyping::Database
+  Caller     : general
+
+=cut
+
+sub new {
+   my $class = shift;
+   my %args = @_;
+
+   my $self = $class->SUPER::new(%args);
+   $self->{_dbfile} = $args{dbfile};
+   $self->{_overwrite} = $args{overwrite};
+   bless($self, $class);
+   $self->create;
+   return $self;
+}
+
+=head2 create
+
+  Arg [1]    : None
+  Example    : $db->create
+  Description: Writes the SQLite database file. This is called automatically
+               by the constructor, but may be called at any time to re-write
+               the database file.
+  Returntype : WTSI::Genotyping::Database::Pipeline
+  Caller     : constructor, general
+
+=cut
+
+sub create {
+  my $self = shift;
+
+  my $ini = Config::IniFiles->new(-file => $self->inifile);
+  my $sql_path = $ini->val($self->name, 'sqlpath');
+  my $sqlite = $ini->val($self->name, 'sqlite');
+
+  unless ($sql_path) {
+    croak "Failed to create database: sql_path declaration is missing from " .
+      $self->inifile, "\n";
+  }
+
+  unless ($sqlite) {
+    croak "Failed to create database: sqlite declaration is missing from " .
+      $self->inifile, "\n";
+  }
+
+  my $ds = $self->data_source;
+  my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+  unless ($base && $file) {
+    croak "Failed to parse datasource string '$ds' in " . $self->inifile, "\n";
+  }
+
+  # Override the default data source if a database file was given in
+  # the constructor
+  if ($self->dbfile) {
+    $file = $self->dbfile;
+    $self->data_source($base . $self->dbfile);
+  }
+
+  if (-e $file) {
+    if ($self->{_overwrite}) {
+      unlink($file);
+    }
+    else {
+      croak "Database file '$file' exists (not overwriting)\n";
+    }
+  }
+
+  system("$sqlite $file < $sql_path") == 0
+    or die "Failed to create SQLite database '$file': $?";
+
+  return $self;
+}
 
 =head2 populate
 
@@ -70,6 +154,18 @@ sub connect {
 }
 
 
+=head2 is_connected
+
+  See WTSI::Genotyping::Database.
+
+=cut
+
+sub is_connected {
+  my $self = shift;
+  return defined $self->dbh && $self->dbh->ping;
+}
+
+
 =head2 disconnect
 
   See WTSI::Genotyping::Database.
@@ -91,8 +187,62 @@ sub disconnect {
 sub dbh {
   my $self = shift;
   if ($self->schema) {
-    return $self->{_schema}->storage->dbh;
+    return $self->schema->storage->dbh;
   }
+}
+
+
+=head2 dbfile
+
+  Arg [1]    : None
+  Example    : $db->dbfile
+  Description: Returns the current database file.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub dbfile {
+  my $self = shift;
+  return $self->{_dbfile};
+}
+
+=head2 in_transaction
+
+  Arg [1]    : Subroutine reference
+  Arg [n]    : Subroutine arguments
+  Example    : $db->in_transaction(sub {  my $ds = shift;
+                                          my @sm = @_;
+                                          foreach (@sm) {
+                                            $ds->add_to_samples($_);
+                                          }
+                                        }, $dataset, @samples);
+  Description: Executes a subroutine in the context of a transaction
+               which will rollback on error.
+  Returntype : As subroutine.
+  Caller     : general
+
+=cut
+
+sub in_transaction {
+  my ($self, $code, @args) = @_;
+
+  my @result;
+
+  eval {
+    @result = $self->schema->txn_do($code, @args);
+  };
+
+  if ($@) {
+    my $error = $@;
+    if ($error =~ /Rollback failed/) {
+      croak "Rollback failed after error: $error\n";
+    } else {
+      croak "Rollback successful after error: $error\n";
+    }
+  };
+
+  return wantarray ? @result : $result[0];
 }
 
 
@@ -271,6 +421,7 @@ sub _insert_from_ini {
 
   return \@objects;
 }
+
 
 # Autoloads methods corresponding to the Schema->sources. By default,
 # you can do this if you have any Result instance. E.g.
