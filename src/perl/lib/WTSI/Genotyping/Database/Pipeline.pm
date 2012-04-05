@@ -25,7 +25,7 @@ our $states_ini = 'states.ini';
   Arg [3]    : overwrite => boolean
   Example    : WTSI::Genotyping::Database::Pipeline->new
                  (name => 'my_database', inifile => 'my_database.ini',
-                  dbfile => 'pipeline.db', overwite => 1)
+                  dbfile => 'pipeline.db', overwrite => 1)
   Description: Returns a new database handle configured from an
                .ini-style file.
   Returntype : WTSI::Genotyping::Database
@@ -89,14 +89,13 @@ sub create {
     $self->data_source($base . $self->dbfile);
   }
 
-  if (-e $file && $self->{_overwrite}) {
-    unlink($file);
+  if (-e $file) {
+    if ($self->{_overwrite}) {
+      unlink($file);
+    }
   }
 
-  if (-e $file) {
-    # We use the existing database
-  }
-  else {
+  if (! -e $file) {
     system("$sqlite $file < $sql_path") == 0
       or croak "Failed to create SQLite database '$file': $?";
   }
@@ -123,6 +122,10 @@ sub populate {
 
   my $ini = Config::IniFiles->new(-file => $self->inifile);
   my $ini_path = $ini->val($self->name, 'inipath');
+
+  unless ($self->is_connected) {
+    croak "Failed to populate database: not connected\n";
+  }
 
   $self->_populate_addresses;
   $self->_populate_genders("$ini_path/$genders_ini");
@@ -176,7 +179,11 @@ sub is_connected {
 
 sub disconnect {
   my $self = shift;
-  $self->schema->storage->disconnect;
+  if ($self->is_connected) {
+    $self->schema->storage->disconnect;
+  }
+
+  return $self;
 }
 
 
