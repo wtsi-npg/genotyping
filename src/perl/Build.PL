@@ -1,4 +1,6 @@
 
+use utf8;
+
 use strict;
 use warnings;
 use lib qw(. lib);
@@ -14,6 +16,5 @@ my $build = Module::Build->new(module_name => 'WTSI::Genotyping',
                                              'Test::More' => 0,
                                              'Test::Exception' => 0,
                                              'DBIx::Class' => 0,
-                                             'DBD::SQLite' => 0,
                                              'Config::IniFiles' => 0 });
 $build->create_build_script;

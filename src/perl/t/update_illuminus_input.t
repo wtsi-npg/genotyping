@@ -1,6 +1,8 @@
 
 # Tests functions used by update_illuminus_input.pl
 
+use utf8;
+
 use strict;
 use warnings;
 

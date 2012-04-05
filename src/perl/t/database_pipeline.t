@@ -1,6 +1,8 @@
 
 # Tests WTSI::Genotyping::Database::Pipeline
 
+use utf8;
+
 use strict;
 use warnings;
 

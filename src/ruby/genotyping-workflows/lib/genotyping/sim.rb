@@ -1,4 +1,4 @@
-#--
+#-- encoding: UTF-8
 #
 # Copyright (c) 2012 Genome Research Ltd. All rights reserved.
 #

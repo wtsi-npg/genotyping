@@ -1,5 +1,7 @@
 #!/software/bin/perl
 
+use utf8;
+
 package main;
 
 use strict;

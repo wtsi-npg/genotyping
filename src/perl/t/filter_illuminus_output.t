@@ -1,6 +1,8 @@
 
 # Tests functions used by filter_illuminus_ouput.pl
 
+use utf8;
+
 use strict;
 use warnings;
 

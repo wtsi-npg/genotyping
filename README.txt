@@ -1,4 +1,6 @@
 
-Components of the WTSI genotype analysis pipeline. This software is
-based in part on work by the WTSI Variation Informatics group,
-heavily refactored and with the addition of tests.
+Components of the WTSI genotype analysis pipeline.
+
+This pipeline is designed to process large volumes of raw genotyping
+data into genotype calls. The platform supported is Illumina Infinium
+genotyping microarrays, supplemented with Sequenom genotyping.
