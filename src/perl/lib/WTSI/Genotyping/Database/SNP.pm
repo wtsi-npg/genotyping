@@ -68,24 +68,25 @@ sub insert_sequenom_calls {
 
   my $count = 0;
   foreach my $sample (@$samples) {
-    $sth->execute($sample->name);
+    if (defined $sample->sanger_sample_id) {
+      $sth->execute($sample->sanger_sample_id);
 
-    my $result = $sample->add_to_results({method => $method,
-                                          value => "NA"});
+      my $result = $sample->add_to_results({method => $method});
 
-    while (my ($name, $chromosome, $position, $genotype) =
-           $sth->fetchrow_array) {
-      $genotype .= $genotype if length($genotype) == 1;
+      while (my ($name, $chromosome, $position, $genotype) =
+             $sth->fetchrow_array) {
+        $genotype .= $genotype if length($genotype) == 1;
 
-      my $snp = $pipedb->snp->find_or_create
-        ({name => $name,
-          chromosome => $chromosome,
-          position => $position,
-          snpset => $snpset});
+        my $snp = $pipedb->snp->find_or_create
+          ({name => $name,
+            chromosome => $chromosome,
+            position => $position,
+            snpset => $snpset});
 
-      $result->add_to_snp_results({snp => $snp,
-                                   value => $genotype});
-      ++$count;
+        $result->add_to_snp_results({snp => $snp,
+                                     value => $genotype});
+        ++$count;
+      }
     }
   }
 

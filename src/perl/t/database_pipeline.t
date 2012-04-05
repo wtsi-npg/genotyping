@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 21;
+use Test::More tests => 24;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::Schema'); }
@@ -22,13 +22,14 @@ my $db = WTSI::Genotyping::Database::Pipeline->new
    dbfile => $dbfile);
 ok($db, 'A pipeline Database');
 ok(-e $dbfile);
+ok($db->disconnect);
+undef $db;
 
-dies_ok {
-  WTSI::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => "$ini_path/pipeline.ini",
-     dbfile => $dbfile)
-  } 'Expected overwrite to fail';
+$db = WTSI::Genotyping::Database::Pipeline->new
+  (name => 'pipeline',
+   inifile => "$ini_path/pipeline.ini",
+   dbfile => $dbfile);
+ok($db, 'A database file reopened.');
 
 ok(WTSI::Genotyping::Database::Pipeline->new
    (name => 'pipeline',
@@ -39,22 +40,21 @@ ok(WTSI::Genotyping::Database::Pipeline->new
 dies_ok { $db->snpset->all }
   'Expected AUTOLOAD to fail when unconnected';
 
-my $schema  = $db->connect(RaiseError => 1,
-                           on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
+my $schema = $db->connect(RaiseError => 1,
+                          on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
 ok($schema, 'A database Schema');
 
 dies_ok { $db->should_not_autoload_this_method->all }
   'Expected AUTOLOAD to fail on invalid method';
 
 $db->populate;
-is(18, scalar $db->snpset->all, 'The snpset dictionary');
-is(3, scalar $db->method->all, 'The method dictionary');
-is(2, scalar $db->relation->all, 'The relation dictionary');
-is(1, scalar $db->state->all, 'The state dictionary');
+is(18, $db->snpset->count, 'The snpset dictionary');
+is(3, $db->method->count, 'The method dictionary');
+is(2, $db->relation->count, 'The relation dictionary');
+is(1, $db->state->count, 'The state dictionary');
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
-
 ok($supplier, 'A supplier inserted');
 
 my $run = $db->piperun->find_or_create({name => 'test',
@@ -62,7 +62,8 @@ my $run = $db->piperun->find_or_create({name => 'test',
 ok($run, 'A run inserted');
 
 my $project_base = 'test_project';
-my $snpset = $db->snpset->find({name => 'HumanOmni2.5-8v1'});
+my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+ok($snpset, 'A snpset found');
 
 my @datasets;
 foreach my $i (1..3) {
@@ -76,6 +77,7 @@ foreach my $i (1..3) {
 
 my $sample_base = 'test_sample';
 my $good = $db->state->find({name => 'Good'});
+ok($good, 'A state found');
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {

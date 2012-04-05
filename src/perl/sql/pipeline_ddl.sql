@@ -104,7 +104,7 @@ DROP TABLE IF EXISTS result;
 CREATE TABLE result (
 id_sample INTEGER NOT NULL REFERENCES sample(id_sample),
 id_method INTEGER REFERENCES method(id_method) NOT NULL,
-value TEXT NOT NULL,
+value TEXT,
 id_result INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
@@ -114,6 +114,7 @@ DROP TABLE IF EXISTS sample;
 CREATE TABLE sample (
 id_sample INTEGER PRIMARY KEY AUTOINCREMENT,
 name TEXT NOT NULL UNIQUE,
+sanger_sample_id TEXT,
 beadchip TEXT NOT NULL,
 id_dataset INTEGER NOT NULL REFERENCES dataset(id_dataset),
 id_state INTEGER NOT NULL REFERENCES state(id_state),

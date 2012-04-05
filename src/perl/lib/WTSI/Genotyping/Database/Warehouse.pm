@@ -56,10 +56,6 @@ sub find_infinium_plate {
     $plate{$row->{map}} = $row;
   }
 
-  unless (%plate) {
-    # croak "No samples were found for plate '$plate_name'\n";
-  }
-
   return \%plate;
 }
 
