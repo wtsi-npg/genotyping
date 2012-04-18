@@ -49,17 +49,13 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def log_dir
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'logs'))
-  end
-
   def test_mock_study
     run_test_if(method(:genotype_call_available?), "Skipping test_mock_study") do
       work_dir = make_work_dir('test_mock_study', data_path)
 
       manifest_file, sample_file, gtc_files = wait_for('test_mock_study', 60, 5) do
         mock_study('a_mock_study', 5, 100, {:work_dir =>  work_dir,
-                                            :log_dir => log_dir})
+                                            :log_dir => work_dir})
       end
 
       assert(File.exist?(manifest_file))
@@ -79,13 +75,13 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
 
       manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
-                                          :log_dir => log_dir})
+                                          :log_dir => work_dir})
       end
 
       sim_file = wait_for('test_gtc_to_sim', 60, 5) do
         gtc_to_sim(gtc_files, manifest_file, 'mock_study.sim',
                    {:work_dir =>  work_dir,
-                    :log_dir => log_dir})
+                    :log_dir => work_dir})
       end
 
       sim = SIM.new(sim_file)
