@@ -6,13 +6,16 @@ require 'rake/rdoctask'
 require 'rake/testtask'
 require 'rcov/rcovtask'
 
+require 'lib/genotyping/version'
+
 spec = Gem::Specification.new do |spec|
   spec.name = 'genotyping-workflows'
-  spec.version = '0.1keith.0'
+  spec.version = Genotyping::VERSION
   spec.add_dependency('percolate', '>= 0.9.0')
   spec.extra_rdoc_files = ['README', 'LICENSE']
-  spec.summary = 'Genotyping Workflows.'
-  spec.description = spec.summary
+  spec.summary = 'WTSI genotyping workflows.'
+  spec.description = 'WTSI genotyping workflows for the Illumina Infinium' +
+      'platform.'
   spec.author = 'Keith James'
   spec.email = 'kdj@sanger.ac.uk'
   spec.executables = []
