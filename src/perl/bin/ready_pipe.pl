@@ -52,9 +52,8 @@ ready_pipe
 
 =head1 SYNOPSIS
 
-ready_pipe [--config <database .ini file>] --dbfile <SQLite file> \
-   [--namespace <sample namespace>] --project <project name> \
-   --run_name <pipeline run name> --supplier <supplier name> [--verbose]
+ready_pipe [--config <database .ini file>] [--dbfile <SQLite file>] \
+   [--overwrite] [--verbose]
 
 Options:
 
