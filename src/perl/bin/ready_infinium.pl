@@ -238,7 +238,7 @@ ready_infinium
 
 =head1 SYNOPSIS
 
-ready_infinium [--config <database .ini file>] --dbfile <SQLite file> \
+ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
    [--namespace <sample namespace>] --project <project name> \
    --run_name <pipeline run name> --supplier <supplier name> [--verbose]
 
@@ -246,7 +246,8 @@ Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file.
+  --dbfile    The SQLite database file. If not supplied, defaults to the
+              value given in the configuration .ini file.
   --help      Display help.
   --namespace The namespace for the imported sample names. Optional,
               defaults to 'wtsi'.

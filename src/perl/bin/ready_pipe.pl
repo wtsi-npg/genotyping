@@ -59,7 +59,8 @@ Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file.
+  --dbfile    The SQLite database file. If not supplied, defaults to the
+              value given in the configuration .ini file.
   --help      Display help.
   --overwrite Overwrite any existing file, otherwise data dictionaries will
               be updated with new entries only.
