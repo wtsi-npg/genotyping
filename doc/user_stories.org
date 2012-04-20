@@ -1,0 +1,24 @@
+
+
+* Analysis
+
+** Adding Samples
+
+   - As an Analyst, I want to add samples from multiple internal (to
+     WTSI) and/or external (to WTSI) studies to any single analysis. I
+     want to add most, but not all samples from each.
+
+   - As an Analyst, I want add samples whose data are in GTC (Illumina
+     Genotype Call) format and/or IDAT (Illumina raw intensity) format
+     to any single analysis.
+
+   - As an Analyst, I want to accept samples from different suppliers
+     that may have clashing sample identifiers, or no sample
+     identifiers, to any single analysis while being able to
+     distinguish their results.
+
+   - As an Analyst, I want to accept samples from suppliers external
+     (to WTSI) whose sample identifiers may contain non-ASCII
+     characters and/or non-printable or ASCII control characters
+     without the need to spend time renaming them.
+
