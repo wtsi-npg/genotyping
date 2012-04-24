@@ -60,7 +60,6 @@ __PACKAGE__->has_many('related_samples',
 
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
 
-
 sub uri {
   my $self = shift;
 
@@ -69,6 +68,26 @@ sub uri {
   my $uri = URI->new("$nid:$nss", 'URN');
 
   return $uri->canonical;
+}
+
+sub gtc {
+  my $self = shift;
+  my $method = shift;
+
+  my $file;
+  my $result = $self->results->find({'method.name' =>'Infinium'},
+                                    {join => 'method'});
+
+  if ($result && $result->value) {
+    # Munge the windows path into the correspoding NFS mount
+    $file = $result->value;
+    $file =~ s|\\|/|g;
+    $file =~ s|//|/|;
+    $file =~ s|netapp6[ab]/illumina|nfs/new_illumina|;
+    $file =~ s|geno(\d)|geno0$1|;
+  }
+
+  return $file;
 }
 
 1;
