@@ -189,6 +189,5 @@ module Genotyping::Tasks
       end
     end
 
-  end
-
-end
+  end # module Illuminus
+end # module Genotyping

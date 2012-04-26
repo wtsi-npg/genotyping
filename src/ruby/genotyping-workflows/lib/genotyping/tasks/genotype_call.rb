@@ -31,8 +31,8 @@ module Genotyping::Tasks
       work_dir, log_dir = process_task_args(args)
 
       if args_available?(study_name, num_samples, num_snps, work_dir)
-        manifest_file = File.join(work_dir, "#{study_name}.bpm.csv")
-        sample_file = File.join(work_dir, "#{study_name}.txt")
+        manifest = File.join(work_dir, "#{study_name}.bpm.csv")
+        sample_json = File.join(work_dir, "#{study_name}.json")
         gtc_files = (0...num_samples).collect do |i|
           File.join(work_dir, sprintf("%s_%04d.gtc", study_name, i))
         end
@@ -40,7 +40,7 @@ module Genotyping::Tasks
         cli_args = {:study_name => study_name,
                     :num_samples => num_samples,
                     :num_snps => num_snps,
-                    :manifest => manifest_file}
+                    :manifest => manifest}
         margs = [cli_args, work_dir]
         task_id = task_identity(:mock_study, *margs)
         log = File.join(log_dir, task_id + '.log')
@@ -48,34 +48,47 @@ module Genotyping::Tasks
         command =[GENOTYPE_CALL, 'mock-study',
                   cli_arg_map(cli_args,
                               :prefix => '--') { |key| key.gsub(/_/, '-') }].flatten.join(' ')
-        expected = [manifest_file, sample_file, gtc_files].flatten
+        expected = [manifest, sample_json, gtc_files].flatten
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
-                   :result => lambda { [manifest_file, sample_file, gtc_files] },
+                   :result => lambda { [manifest, sample_json, gtc_files] },
                    :async => async)
       end
     end
 
-    def gtc_to_sim(gtc_files, manifest, output, args = {}, async = {})
-      work_dir, log_dir = process_task_args(args)
+    # Collates intensity data from multiple GTC format files into a single SIM
+    # format file.
+    #
+    # Arguments:
+    # - input (String): A JSON file specifying sample URIs and GTC file paths.
+    # - manifest (String): The BeadPool manifest file name.
+    # - output (String): The SIM file name.
+    # - args (Hash): Arguments for the operation.
+    #
+    #   :chromosome (String): Limit the operation to SNPs on one chromosome, as
+    #   named in the BeadPool manifest.
+    #
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - The SIM file path.
+    def gtc_to_sim(input, manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
 
-      if args_available?(gtc_files, manifest, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
-        end
-
+      if args_available?(input, manifest, output, work_dir)
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
         cli_args = {:chromosome => args[:chromosome],
+                    :input => input,
                     :manifest => manifest,
                     :output => output}
 
-        margs = [cli_args, gtc_files, work_dir]
+        margs = [cli_args, input, work_dir]
         task_id = task_identity(:gtc_to_sim, *margs)
         log = File.join(log_dir, task_id + '.log')
 
         command = [GENOTYPE_CALL, 'gtc-to-sim',
-                   cli_arg_map(cli_args,
-                               :prefix => '--'), *gtc_files].flatten.join(' ')
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files([output], :error => false) },
@@ -84,5 +97,29 @@ module Genotyping::Tasks
       end
     end
 
-  end
-end
+    def gtc_to_bed(input, manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(input, manifest, output, work_dir)
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        cli_args = {:chromosome => args[:chromosome],
+                    :input => input,
+                    :manifest => manifest,
+                    :output => output}
+
+        margs = [cli_args, input, work_dir]
+        task_id = task_identity(:gtc_to_bed, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        command = [GENOTYPE_CALL, 'gtc-to-bed',
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files([output], :error => false) },
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
+
+  end # module GenotypeCall
+end # module Genotyping
