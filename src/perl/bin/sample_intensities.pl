@@ -23,6 +23,7 @@ sub run {
   my $all;
   my $config;
   my $dbfile;
+  my $output;
   my $run_name;
   my $verbose;
 
@@ -30,6 +31,7 @@ sub run {
              'config=s' => \$config,
              'dbfile=s'=> \$dbfile,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'output=s' => \$output,
              'run=s' => \$run_name,
              'verbose' => \$verbose);
 
@@ -62,8 +64,16 @@ sub run {
                    result => $sample->gtc};
   }
 
-  print to_json(\@output, {utf8 => 1, pretty => 1});
+  if ($output) {
+    open(OUT, ">$output") or die "Failed to open '$output' for writing: $!\n";
+    print OUT to_json(\@output, {utf8 => 1, pretty => 1});
+    close(OUT);
+  }
+  else {
+    print to_json(\@output, {utf8 => 1, pretty => 1});
+  }
 }
+
 
 
 __END__
@@ -75,7 +85,7 @@ sample_intensities
 =head1 SYNOPSIS
 
 sample_intensities [--config <database .ini file>] [--dbfile <SQLite file>] \
-   --run <analysis run name> [--verbose]
+   [--output <JSON file>] --run <analysis run name> [--verbose]
 
 Options:
 
@@ -86,6 +96,8 @@ Options:
   --dbfile    The SQLite database file. If not supplied, defaults to the
               value given in the configuration .ini file.
   --help      Display help.
+  --output    The file to which output will be written. Optional, defaults
+              to STDOUT.
   --run       The name of a pipe run defined previously using the
               ready_infinium script.
   --verbose   Print messages while processing. Optional.
@@ -129,10 +141,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.1.1
 
 =head1 CHANGELOG
 
-Tue Apr 24 15:25:47 BST 2012 -- Initial version 0.1.0
+0.1.1
+
+  Added --output command line option.
+
+0.1.0
+
+  Initial version 0.1.0
 
 =cut
