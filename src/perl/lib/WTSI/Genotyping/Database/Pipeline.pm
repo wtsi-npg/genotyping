@@ -42,40 +42,14 @@ sub new {
    $self->{_dbfile} = $args{dbfile};
    $self->{_overwrite} = $args{overwrite};
    bless($self, $class);
-   $self->create;
-   return $self;
+
+   return $self->initialize;
 }
 
-=head2 create
-
-  Arg [1]    : None
-  Example    : $db->create
-  Description: Writes the SQLite database file. This is called automatically
-               by the constructor, but may be called at any time to re-write
-               the database file.
-  Returntype : WTSI::Genotyping::Database::Pipeline
-  Caller     : constructor, general
-
-=cut
-
-sub create {
+sub initialize {
   my $self = shift;
 
   my $ini = Config::IniFiles->new(-file => $self->inifile);
-  my $sql_path = $ini->val($self->name, 'sqlpath');
-  my $sqlite = $ini->val($self->name, 'sqlite');
-
-  unless ($sql_path) {
-    croak "Failed to create database: sql_path declaration is missing from " .
-      $self->inifile, "\n";
-  }
-  unless (-e $sql_path) {
-    croak "Failed to create database: DDL file '$sql_path' is missing\n";
-  }
-  unless ($sqlite) {
-    croak "Failed to create database: sqlite declaration is missing from " .
-      $self->inifile, "\n";
-  }
 
   my $ds = $self->data_source;
   my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
@@ -93,10 +67,52 @@ sub create {
   if (-e $file) {
     if ($self->{_overwrite}) {
       unlink($file);
+      $self->create($file, $ini);
     }
   }
+  else {
+    $self->create($file, $ini);
+  }
 
-  if (! -e $file) {
+  return $self;
+}
+
+
+=head2 create
+
+  Arg [1]    : Database file
+  Arg [2]    : Config::IniFiles ini file
+  Example    : $db->create($file, $ini)
+  Description: Writes the SQLite database file. This is called automatically
+               by the constructor, but may be called at any time to re-write
+               the database file.
+  Returntype : WTSI::Genotyping::Database::Pipeline
+  Caller     : constructor, general
+
+=cut
+
+sub create {
+  my ($self, $file, $ini) = @_;
+
+  my $sql_path = $ini->val($self->name, 'sqlpath');
+  my $sqlite = $ini->val($self->name, 'sqlite');
+
+  unless ($sql_path) {
+    croak "Failed to create database: sql_path declaration is missing from " .
+      $self->inifile, "\n";
+  }
+  unless (-e $sql_path) {
+    croak "Failed to create database: DDL file '$sql_path' is missing\n";
+  }
+  unless ($sqlite) {
+    croak "Failed to create database: sqlite declaration is missing from " .
+      $self->inifile, "\n";
+  }
+
+  if (-e $file) {
+    croak "Failed to create database: database '$file' already exists\n";
+  }
+  else {
     system("$sqlite $file < $sql_path") == 0
       or croak "Failed to create SQLite database '$file': $?";
   }
