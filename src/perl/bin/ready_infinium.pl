@@ -59,6 +59,8 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
   if ($verbose) {
+    my $name = $dbfile;
+    $name ||= "configured database";
     print STDERR "Updating $dbfile using config from $config\n";
   }
 
@@ -299,10 +301,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.1.1
 
 =head1 CHANGELOG
 
-Thu Apr  5 12:52:31 BST 2012 -- Initial version 0.1.0
+0.1.1
+
+  Fixed missing value in verbose printing when --dbfile was not specified
+
+0.1.0
+
+  Initial version 0.1.0
 
 =cut
