@@ -65,7 +65,7 @@ sub uri {
 
   my $nid = $self->dataset->datasupplier->namespace;
   my $nss = $self->name;
-  my $uri = URI->new("$nid:$nss", 'URN');
+  my $uri = URI->new("urn:$nid:$nss", 'URN');
 
   return $uri->canonical;
 }
