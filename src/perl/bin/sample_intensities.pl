@@ -48,32 +48,37 @@ sub run {
        (RaiseError => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
-  my $where = {'piperun.name' => $run_name,
+  my $run = $pipedb->piperun->find({name => $run_name});
+  unless ($run) {
+    die "Run '$run_name' does not exist. Valid runs are: [" .
+      join(", ", map { $_->name } $pipedb->piperun->all) . "]\n";
+  }
+
+  my $where = {'piperun.name' => $run->name,
                'method.name' => 'Infinium'};
   unless ($all) {
     $where->{'me.include'} = 1;
   }
 
-  my @output;
+  my @samples;
   foreach my $sample ($pipedb->sample->search($where,
                                               {join => [{dataset => 'piperun'},
                                                         {results => 'method'}],
                                                order_by => 'me.id_sample'})) {
-    push @output, {sanger_sample_id => $sample->sanger_sample_id,
-                   uri => $sample->uri->as_string,
-                   result => $sample->gtc};
+    push @samples, {sanger_sample_id => $sample->sanger_sample_id,
+                    uri => $sample->uri->as_string,
+                    result => $sample->gtc};
   }
 
   if ($output) {
     open(OUT, ">$output") or die "Failed to open '$output' for writing: $!\n";
-    print OUT to_json(\@output, {utf8 => 1, pretty => 1});
+    print OUT to_json(\@samples, {utf8 => 1, pretty => 1});
     close(OUT);
   }
   else {
-    print to_json(\@output, {utf8 => 1, pretty => 1});
+    print to_json(\@samples, {utf8 => 1, pretty => 1});
   }
 }
-
 
 
 __END__
