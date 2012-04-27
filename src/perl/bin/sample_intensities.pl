@@ -12,6 +12,7 @@ use Pod::Usage;
 use JSON;
 
 use WTSI::Genotyping::Database::Pipeline;
+use WTSI::Genotyping qw(maybe_stdout);
 
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -70,14 +71,9 @@ sub run {
                     result => $sample->gtc};
   }
 
-  if ($output) {
-    open(OUT, ">$output") or die "Failed to open '$output' for writing: $!\n";
-    print OUT to_json(\@samples, {utf8 => 1, pretty => 1});
-    close(OUT);
-  }
-  else {
-    print to_json(\@samples, {utf8 => 1, pretty => 1});
-  }
+  my $fh = maybe_stdout($output);
+  print $fh to_json(\@samples, {utf8 => 1, pretty => 1});
+  close($fh);
 }
 
 
