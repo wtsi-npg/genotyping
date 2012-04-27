@@ -48,14 +48,12 @@ module Genotyping::Tasks
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
-    # - An array of Illuminus output file paths.
+    # - An array of Illuminus output file paths.call_genotype_illuminus
     def call_from_sim_p(sim_file, manifest, names, output, args = {}, async = {})
-      work_dir, log_dir = process_task_args(args)
+      args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(sim_file, manifest, names, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
-        end
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
 
         start_snp = args[:start] || 0
         end_snp = args[:end]
@@ -110,7 +108,7 @@ module Genotyping::Tasks
         }.each_with_index.collect { |elt, i| [i] + elt }
 
         # Expected call files
-        call_partitions = illuminus_wrap_args.collect { |args| args[:output] }
+        call_partitions = illuminus_wrap_args.collect { |wargs| wargs[:output] }
 
         task_id = task_identity(:call_from_sim_p, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
@@ -141,12 +139,10 @@ module Genotyping::Tasks
     # Returns:
     # - An Illuminus output file path.
     def call_from_sim(sim_file, manifest, names, output, args = {}, async = {})
-      work_dir, log_dir = process_task_args(args)
+      args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(sim_file, manifest, names, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
-        end
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
 
         start_snp = args[:start] || 0
         end_snp = args[:end]

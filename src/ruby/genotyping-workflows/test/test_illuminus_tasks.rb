@@ -55,7 +55,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim") do
       work_dir = make_work_dir('test_call_from_sim', data_path)
 
-      manifest, sample_json, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
                                            :log_dir => work_dir})
       end
@@ -98,7 +98,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim_p") do
       work_dir = make_work_dir('test_call_from_sim_p', data_path)
 
-      manifest, sample_json, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
                                            :log_dir => work_dir})
       end

@@ -54,14 +54,14 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     run_test_if(method(:genotype_call_available?), "Skipping test_mock_study") do
       work_dir = make_work_dir('test_mock_study', data_path)
 
-      manifest, manifest, gtc_files = wait_for('test_mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('test_mock_study', 60, 5) do
         mock_study('a_mock_study', 5, 100, {:work_dir =>  work_dir,
                                             :log_dir => work_dir})
       end
 
       assert(File.exist?(manifest))
-      assert(File.exist?(manifest))
-      assert_equal(5, JSON.parse(File.read(manifest)).size);
+      assert(File.exist?(sample_json))
+      assert_equal(5, JSON.parse(File.read(sample_json)).size);
       assert_equal(5, gtc_files.size)
 
       gtc_files.each { |file| assert(File.exist?(file)) }
@@ -75,13 +75,13 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     run_test_if(method(:genotype_call_available?), "Skipping test_gtc_to_sim") do
       work_dir = make_work_dir('test_gtc_to_sim', data_path)
 
-      manifest, manifest, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
                                           :log_dir => work_dir})
       end
 
       sim_file = wait_for('test_gtc_to_sim', 60, 5) do
-        gtc_to_sim(manifest, manifest, 'mock_study.sim',
+        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
                     :log_dir => work_dir})
       end

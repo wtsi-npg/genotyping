@@ -27,8 +27,23 @@ module Genotyping::Tasks
   module GenotypeCall
     include Genotyping::Tasks
 
+    # Builds mock study data consisting of sample metadata (JSON), a SNP
+    # manifest and GTC files.
+    #
+    # Arguments:
+    # - study_name (String): The study name
+    # - num_samples (Fixnum): The number of sample to generate.
+    # - num_snps (Fixnum): The number of SNPs on the array.
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - An Array containing:
+    #  - sample metadata (JSON) file name.
+    #  - SNP manifest file name.
+    #  - Array of GTC format file names.
     def mock_study(study_name, num_samples, num_snps, args = {}, async ={})
-      work_dir, log_dir = process_task_args(args)
+      args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(study_name, num_samples, num_snps, work_dir)
         manifest = File.join(work_dir, "#{study_name}.bpm.csv")
@@ -48,11 +63,11 @@ module Genotyping::Tasks
         command =[GENOTYPE_CALL, 'mock-study',
                   cli_arg_map(cli_args,
                               :prefix => '--') { |key| key.gsub(/_/, '-') }].flatten.join(' ')
-        expected = [manifest, sample_json, gtc_files].flatten
+        expected = [sample_json, manifest, gtc_files].flatten
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
-                   :result => lambda { [manifest, sample_json, gtc_files] },
+                   :result => lambda { [sample_json, manifest, gtc_files] },
                    :async => async)
       end
     end

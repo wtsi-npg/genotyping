@@ -62,9 +62,7 @@ class TestFetchSampleData < Test::Unit::TestCase
     assert(result)
 
     Percolate.log.close
-    if result
-      FileUtils.rm_rf(run_path)
-    end
+    remove_work_dir(work_dir)
   end
 end
 
