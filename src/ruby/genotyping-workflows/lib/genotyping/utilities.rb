@@ -24,8 +24,12 @@ module Genotyping
 
   # Returns args after ensuring that only elements with keys in the expected
   # Array are present.
-  def ensure_valid_args(args, *expected)
-    invalid = args.reject { |key, val| expected.include?(key) }
+  def ensure_valid_args(args, *valid_keys)
+    unless args.is_a?(Hash)
+      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+    end
+
+    invalid = args.reject { |key, val| valid_keys.include?(key) }
     unless invalid.empty?
       raise ArgumentError, "invalid arguments: #{invalid.inspect}"
     end
@@ -37,6 +41,10 @@ module Genotyping
   # the keys :work_dir and :log_dir. Returns an Array of 3 elements: args,
   # the :work_dir value and the :log_dir value.
   def process_task_args(args, defaults = {})
+    unless args.is_a?(Hash)
+      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+    end
+
     args = defaults.merge(args)
     work_dir = args.delete(:work_dir)
     log_dir = args.delete(:log_dir)
@@ -46,6 +54,10 @@ module Genotyping
   end
 
   def lsf_args(args, lsf_defaults, *lsf_keys)
+    unless args.is_a?(Hash)
+      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+    end
+
     lsf_args = args.reject { |k, v| !lsf_keys.include?(k) }
     lsf_defaults = lsf_defaults.merge(lsf_args)
 
@@ -60,8 +72,7 @@ module Genotyping
   # valid working directory) or raises an error.
   def ensure_valid_work_dir(work_dir)
     unless work_dir.is_a?(String)
-      raise ArgumentError,
-            "invalid work_dir '#{work_dir}'; must be a String"
+      raise ArgumentError, "invalid work_dir '#{work_dir}'; must be a String"
     end
 
     unless absolute_path?(work_dir) && File.directory?(work_dir)
