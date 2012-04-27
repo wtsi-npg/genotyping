@@ -15,7 +15,7 @@ use JSON;
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(maybe_stdout write_gt_calls);
+use WTSI::Genotyping qw(maybe_stdout read_sample_json write_gt_calls);
 
 $|=1;
 
@@ -59,7 +59,6 @@ $input ||= '/dev/stdin';
 my $out = maybe_stdout($output);
 
 # Construct output header
-# my $column_names = read_value_list($columns);
 my @column_names = map { $_->{'uri'} } read_sample_json($columns);
 write_gt_header($out, \@column_names);
 
@@ -181,20 +180,6 @@ sub read_value_list {
   return $values;
 }
 
-sub read_sample_json {
-  my $filename = shift;
-  my $str = '';
-
-  open(FH, "<$filename")
-    or die "Failed to open JSON file '$filename' for reading: $!\n";
-  while (my $line = <FH>) {
-    $str .= $line;
-  }
-  close(FH);
-
-  return @{from_json($str, {utf8 => 1})};
-}
-
 sub make_fifo {
   my $filename = shift;
 
@@ -268,10 +253,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.2.0
 
 =head1 CHANGELOG
 
-Thu Feb 16 17:05:03 GMT 2012 -- Initial version 0.1.0
+  0.2.0
+
+    Changed to read sample names from JSON input.
+
+  0.1.0
+
+    Initial version 0.1.0
 
 =cut

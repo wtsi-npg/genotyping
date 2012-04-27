@@ -1,4 +1,4 @@
-SNP	Coor	Alleles	sample_00A	sample_00B	sample_01A	sample_01B	sample_02A	sample_02B	sample_03A	sample_03B	sample_04A	sample_04B
+SNP	Coor	Alleles	urn:wtsi:sample_00A	urn:wtsi:sample_00B	urn:wtsi:sample_01A	urn:wtsi:sample_01B	urn:wtsi:sample_02A	urn:wtsi:sample_02B	urn:wtsi:sample_03A	urn:wtsi:sample_03B	urn:wtsi:sample_04A	urn:wtsi:sample_04B
 200087	16153665	AC	0.034	0.075	0.034	0.075	0.034	0.075	0.034	0.075	0.034	0.075
 200070	16174099	CG	0.181	0.046	0.181	0.046	0.181	0.046	0.181	0.046	0.181	0.046
 200091	16188655	AC	1.068	0.009	1.068	0.009	1.068	0.009	1.068	0.009	1.068	0.009
