@@ -1,4 +1,4 @@
-#--
+#-- encoding: UTF-8
 #
 # Copyright (c) 2012 Genome Research Ltd. All rights reserved.
 #
@@ -55,19 +55,19 @@ class TestIlluminusTasks < Test::Unit::TestCase
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim") do
       work_dir = make_work_dir('test_call_from_sim', data_path)
 
-      manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
                                            :log_dir => work_dir})
       end
 
       sim_file = wait_for('gtc_to_sim', 60, 5) do
-        gtc_to_sim(gtc_files, manifest_file, 'mock_study.sim',
+        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
                     :log_dir => work_dir})
       end
 
       call_file1 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, manifest_file, sample_file, 'mock_study1.call',
+        call_from_sim(sim_file, sample_json, manifest, 'mock_study1.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
                        :start => 0,
@@ -75,7 +75,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
       end
 
       call_file2 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, manifest_file, sample_file, 'mock_study2.call',
+        call_from_sim(sim_file, sample_json, manifest, 'mock_study2.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
                        :start => 1000,
@@ -98,19 +98,19 @@ class TestIlluminusTasks < Test::Unit::TestCase
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim_p") do
       work_dir = make_work_dir('test_call_from_sim_p', data_path)
 
-      manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
                                            :log_dir => work_dir})
       end
 
       sim_file = wait_for('gtc_to_sim', 60, 5) do
-        gtc_to_sim(gtc_files, manifest_file, 'mock_study.sim',
+        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
                     :log_dir => work_dir})
       end
 
       call_files1 = wait_for('test_call_from_sim_p', 120, 5) do
-        call_from_sim_p(sim_file, manifest_file, sample_file, 'mock_study1.call',
+        call_from_sim_p(sim_file, sample_json, manifest, 'mock_study1.call',
                         {:work_dir =>  work_dir,
                          :log_dir => work_dir,
                          :start => 0,

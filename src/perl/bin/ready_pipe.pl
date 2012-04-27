@@ -52,15 +52,15 @@ ready_pipe
 
 =head1 SYNOPSIS
 
-ready_pipe [--config <database .ini file>] --dbfile <SQLite file> \
-   [--namespace <sample namespace>] --project <project name> \
-   --run_name <pipeline run name> --supplier <supplier name> [--verbose]
+ready_pipe [--config <database .ini file>] [--dbfile <SQLite file>] \
+   [--overwrite] [--verbose]
 
 Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file.
+  --dbfile    The SQLite database file. If not supplied, defaults to the
+              value given in the configuration .ini file.
   --help      Display help.
   --overwrite Overwrite any existing file, otherwise data dictionaries will
               be updated with new entries only.

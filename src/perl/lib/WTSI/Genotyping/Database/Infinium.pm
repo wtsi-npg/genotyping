@@ -94,7 +94,7 @@ sub find_project_samples {
          samplei.item AS [sample],
          chipi.item AS [beadchip],
          statusav.appvalue AS [status],
-         parentdir.path + '\' + appfile.file_name AS [path]
+         parentdir.path + '\\' + appfile.file_name AS [path]
      FROM
         project project
         INNER JOIN item projecti

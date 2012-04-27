@@ -59,6 +59,8 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
   if ($verbose) {
+    my $name = $dbfile;
+    $name ||= "configured database";
     print STDERR "Updating $dbfile using config from $config\n";
   }
 
@@ -238,7 +240,7 @@ ready_infinium
 
 =head1 SYNOPSIS
 
-ready_infinium [--config <database .ini file>] --dbfile <SQLite file> \
+ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
    [--namespace <sample namespace>] --project <project name> \
    --run_name <pipeline run name> --supplier <supplier name> [--verbose]
 
@@ -246,7 +248,8 @@ Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file.
+  --dbfile    The SQLite database file. If not supplied, defaults to the
+              value given in the configuration .ini file.
   --help      Display help.
   --namespace The namespace for the imported sample names. Optional,
               defaults to 'wtsi'.
@@ -298,10 +301,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.1.1
 
 =head1 CHANGELOG
 
-Thu Apr  5 12:52:31 BST 2012 -- Initial version 0.1.0
+0.1.1
+
+  Fixed missing value in verbose printing when --dbfile was not specified
+
+0.1.0
+
+  Initial version 0.1.0
 
 =cut

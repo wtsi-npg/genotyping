@@ -1,4 +1,4 @@
-#--
+#-- encoding: UTF-8
 #
 # Copyright (c) 2012 Genome Research Ltd. All rights reserved.
 #
@@ -26,6 +26,7 @@ end
 
 require 'genotyping/version'
 require 'genotyping/exceptions'
+require 'genotyping/utilities'
 
 require 'genotyping/tasks'
 require 'genotyping/sim'
@@ -33,3 +34,6 @@ require 'genotyping/workflows'
 
 require 'genotyping/tasks/genotype_call'
 require 'genotyping/tasks/illuminus'
+require 'genotyping/tasks/database'
+
+require 'genotyping/workflows/fetch_sample_data'

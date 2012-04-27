@@ -14,6 +14,7 @@ use Exporter;
                 find_column_indices
                 maybe_stdin
                 maybe_stdout
+                read_sample_json
                 read_column_names
                 read_fon
                 read_gt_column_names
