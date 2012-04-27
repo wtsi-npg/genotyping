@@ -8,10 +8,11 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
+use JSON;
 use Pod::Usage;
 
 use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
-                        read_fon find_column_indices filter_columns
+                        read_sample_json find_column_indices filter_columns
                         read_it_column_names update_it_columns);
 
 run() unless caller();
@@ -51,14 +52,7 @@ sub run {
               -exitval => 2);
   }
 
-
-  my $col;
-  open($col, "<$columns")
-    or die "Failed to open column file '$columns' for reading: $!\n";
-  my $column_names = read_fon($col);
-  close($col);
-
-  my @samples_to_replace = @$column_names;
+  my @samples_to_replace = map { $_->{'uri'} } read_sample_json($columns);
 
   my $in = maybe_stdin($input);
   my $out = maybe_stdout($output);
@@ -119,7 +113,7 @@ files by sample column.
 
 =head1 SYNOPSIS
 
-update_illuminus_input --columns <column name file> \
+update_illuminus_input --columns <filename> \
    [--operation include|exclude] \
    --input <intensity input file> --output <intensity output file> \
    --value <intensity value>
@@ -127,9 +121,8 @@ update_illuminus_input --columns <column name file> \
 
 Options:
 
-  --columns   A text file of column names, one per line, corresponding to
-              the sample name prefix of column names in the intensity file.
-              The order of the lines is not meaningful.
+  --columns   A JSON file of sample annotation use to determine column names.
+              The order of the sample annotations is not meaningful.
   --help      Display help.
   --input     The Illuminus intensity file to be read.
   --operation The operation to carry out on the selected columns. The value
@@ -173,10 +166,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.2.0
 
 =head1 CHANGELOG
 
-Thu Feb  9 10:58:12 GMT 2012 -- Initial version 0.1.0
+  0.2.0
+
+    Changed to read sample names from JSON input.
+
+  0.1.0
+
+    Initial version 0.1.0
 
 =cut

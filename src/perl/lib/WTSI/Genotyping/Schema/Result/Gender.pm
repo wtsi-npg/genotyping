@@ -4,6 +4,7 @@ package WTSI::Genotyping::Schema::Result::Gender;
 
 use strict;
 use warnings;
+use Carp;
 
 use base 'DBIx::Class::Core';
 
@@ -14,10 +15,14 @@ __PACKAGE__->add_columns
                   is_auto_increment => 1,
                   is_nullable => 0 },
    'name',      { data_type => 'text',
-                  is_nullable => 0 });
+                  is_nullable => 0 },
+   'code',      { data_type => 'integer',
+                  is_nullable => 0 }
+);
 
 __PACKAGE__->set_primary_key('id_gender');
 __PACKAGE__->add_unique_constraint(['name']);
+__PACKAGE__->add_unique_constraint(['code']);
 
 __PACKAGE__->has_many('sample_genders',
                       'WTSI::Genotyping::Schema::Result::SampleGender',

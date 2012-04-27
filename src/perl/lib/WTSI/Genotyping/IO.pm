@@ -5,6 +5,7 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use JSON;
 
 =head2 maybe_stdin
 
@@ -60,12 +61,36 @@ sub maybe_stdout {
 
   my $fh;
   if (defined $file) {
-    open($fh, ">$file") or croak "Failed to open $file: $!\n";
+    open($fh, ">$file") or croak "Failed to open '$file': $!\n";
   } else {
     $fh = \*STDOUT;
   }
 
   return $fh;
+}
+
+=head2 read_sample_json
+
+  Arg [1]    : filename
+  Example    : @samples = read_sample_json($file)
+  Description: Returns sample metadata hashes, one per sample, from a JSON file.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub read_sample_json {
+  my $file = shift;
+
+  my $str = '';
+  open(FH, "<$file")
+    or die "Failed to open JSON file '$file' for reading: $!\n";
+  while (my $line = <FH>) {
+    $str .= $line;
+  }
+  close(FH);
+
+  return @{from_json($str, {utf8 => 1})};
 }
 
 1;

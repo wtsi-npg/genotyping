@@ -21,8 +21,8 @@ open($it, "<$test_intensities") or die "Failed to open '$test_intensities'\n";
 
 my @it_cols;
 foreach my $i (0..4) {
-  push(@it_cols, sprintf("sample_%02dA", $i));
-  push(@it_cols, sprintf("sample_%02dB", $i));
+  push(@it_cols, sprintf("urn:wtsi:sample_%02dA", $i));
+  push(@it_cols, sprintf("urn:wtsi:sample_%02dB", $i));
 }
 
 is_deeply(\@it_cols, read_it_column_names($it),

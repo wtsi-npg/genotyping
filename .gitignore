@@ -1,3 +1,6 @@
 Build
 _build
 blib
+.idea
+*.iml
+*~
