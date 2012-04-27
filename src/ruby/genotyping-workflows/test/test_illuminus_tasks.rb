@@ -67,7 +67,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
       end
 
       call_file1 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, manifest, sample_json, 'mock_study1.call',
+        call_from_sim(sim_file, sample_json, manifest, 'mock_study1.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
                        :start => 0,
@@ -75,7 +75,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
       end
 
       call_file2 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, manifest, sample_json, 'mock_study2.call',
+        call_from_sim(sim_file, sample_json, manifest, 'mock_study2.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
                        :start => 1000,
@@ -110,7 +110,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
       end
 
       call_files1 = wait_for('test_call_from_sim_p', 120, 5) do
-        call_from_sim_p(sim_file, manifest, sample_json, 'mock_study1.call',
+        call_from_sim_p(sim_file, sample_json, manifest, 'mock_study1.call',
                         {:work_dir =>  work_dir,
                          :log_dir => work_dir,
                          :start => 0,

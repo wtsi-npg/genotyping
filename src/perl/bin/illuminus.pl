@@ -11,10 +11,11 @@ use File::Temp qw(tempdir);
 use File::Spec::Functions qw(catfile);
 use Getopt::Long;
 use IO::ScalarArray;
+use JSON;
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(maybe_stdout read_fon write_gt_calls);
+use WTSI::Genotyping qw(maybe_stdout write_gt_calls);
 
 $|=1;
 
@@ -58,8 +59,9 @@ $input ||= '/dev/stdin';
 my $out = maybe_stdout($output);
 
 # Construct output header
-my $column_names = read_value_list($columns);
-write_gt_header($out, $column_names);
+# my $column_names = read_value_list($columns);
+my @column_names = map { $_->{'uri'} } read_sample_json($columns);
+write_gt_header($out, \@column_names);
 
 # These are what Illuminus will call its output files
 my $fifo_dir = tempdir(CLEANUP => 1);
@@ -75,7 +77,7 @@ if ($start && $end) {
 }
 
 if ($genders) {
-  check_genders(read_value_list($genders), $column_names);
+  check_genders(read_value_list($genders), \@column_names);
   push(@command, '-x', $genders);
 }
 
@@ -179,6 +181,20 @@ sub read_value_list {
   return $values;
 }
 
+sub read_sample_json {
+  my $filename = shift;
+  my $str = '';
+
+  open(FH, "<$filename")
+    or die "Failed to open JSON file '$filename' for reading: $!\n";
+  while (my $line = <FH>) {
+    $str .= $line;
+  }
+  close(FH);
+
+  return @{from_json($str, {utf8 => 1})};
+}
+
 sub make_fifo {
   my $filename = shift;
 
@@ -201,10 +217,11 @@ illuminus --columns <filename> \
 
 Options:
 
-  --columns  A text file of column names, one per line, corresponding
-             to the order of the intensity pairs in the intensity
-             file. The order is important because these names are used
-             to annotate the columns in the genotype output file.
+  --columns  A JSON file of sample annotation use to determine column
+             names, corresponding to the order of the intensity pairs
+             in the intensity file. The order is important because these
+             names are used to annotate the columns in the genotype output
+             file.
   --end      The 1-based index of the last SNP in the range to be
              analysed. Optional.
   --genders  File of gender codes corresponding to the samples being
