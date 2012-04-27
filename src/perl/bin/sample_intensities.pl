@@ -24,6 +24,7 @@ sub run {
   my $all;
   my $config;
   my $dbfile;
+  my $gender_method;
   my $output;
   my $run_name;
   my $verbose;
@@ -31,12 +32,14 @@ sub run {
   GetOptions('all' => \$all,
              'config=s' => \$config,
              'dbfile=s'=> \$dbfile,
+             'gender_method=s' => \$gender_method,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'output=s' => \$output,
              'run=s' => \$run_name,
              'verbose' => \$verbose);
 
   $config ||= $DEFAULT_INI;
+  $gender_method ||= 'Supplied';
 
   unless ($run_name) {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
@@ -66,9 +69,20 @@ sub run {
                                               {join => [{dataset => 'piperun'},
                                                         {results => 'method'}],
                                                order_by => 'me.id_sample'})) {
+    my $gender = $pipedb->gender->find
+      ({'sample.id_sample' => $sample->id_sample,
+        'method.name' => $gender_method},
+       {join => {'sample_genders' => ['method', 'sample']}},
+       {prefetch =>  {'sample_genders' => ['method', 'sample']} });
+
+    my $gender_name = defined $gender ? $gender->name : undef;
+    my $gender_code = defined $gender ? $gender->code : undef;
+
     push @samples, {sanger_sample_id => $sample->sanger_sample_id,
                     uri => $sample->uri->as_string,
-                    result => $sample->gtc};
+                    result => $sample->gtc,
+                    gender =>  $gender_name,
+                    gender_code => $gender_code};
   }
 
   my $fh = maybe_stdout($output);
@@ -112,7 +126,9 @@ order. Each element of the array describes one sample as a JSON object:
   {
      "sanger_sample_id" : <WTSI sample identifier>,
      "result" : <absolute path to the GTC format data file>,
-     "uri" : <sample URI>
+     "uri" : <sample URI>,
+     "gender" : <gender name string>,
+     "gender_code" : <gender code integer>
   }
 
 Only records for samples marked in the pipeline database for inclusion

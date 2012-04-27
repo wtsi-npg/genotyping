@@ -5,6 +5,7 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use JSON;
 
 =head2 maybe_stdin
 
