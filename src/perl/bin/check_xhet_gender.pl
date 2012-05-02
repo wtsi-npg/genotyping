@@ -9,8 +9,8 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use QCPlotShared; # must have path to QCPlot* modules in PERL5LIB
-use QCPlotTests;
+use WTSI::Genotyping::QC::QCPlotShared; # must have path to WTSI directory in PERL5LIB
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($inDir, $outDir, $title, $help, $prefix, $clip, $trials, $sanityCancel, $sanityOpt);
 
@@ -62,10 +62,11 @@ my $plotPath = $outDir.$prefix.'.png';
 if ($sanityCancel) { $sanityOpt='FALSE'; }
 else { $sanityOpt='TRUE'; }
 my $summaryPath = $outDir.$prefix.'_summary.txt';
-my $cmd = join(' ', ($QCPlotShared::RScriptPath, $QCPlotShared::parentDir.'/check_xhet_gender.R',
+my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptPath, 
+		     $WTSI::Genotyping::QC::QCPlotShared::parentDir.'/check_xhet_gender.R',
 		     $inPath, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
 # $cmd uses csh redirect
 my ($tests, $failures) = (0,0);
-($tests, $failures) = QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
 if ($failures == 0) { exit(0); }
 else { exit(1); }

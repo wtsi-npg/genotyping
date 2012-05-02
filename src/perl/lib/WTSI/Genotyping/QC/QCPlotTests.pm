@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use Cwd qw /getcwd abs_path/;
 use XML::Parser;
-use QCPlotShared;  # must have path to QCPlotShared in PERL5LIB
+use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
 
 
 sub diffGlobs {
