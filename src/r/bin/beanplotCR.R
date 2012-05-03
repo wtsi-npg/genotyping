@@ -17,8 +17,7 @@ qmax = 40 # max CR quality for plot
 q <- -10*log10(1 - data$V2) # call rate, converted to phred scale
 q[q>qmax] <- qmax # truncate call rate if > Q40 (!)
 png(outpath, height=800, width=800, pointsize=18)
-#library(beanplot)
-library(beanplot, lib.loc="/nfs/users/nfs_i/ib5/R/i686-pc-linux-gnu-library/2.11/")
+library(beanplot)
 beanplot(q~plate, horizontal=TRUE, las=1, col=c(3,1), ylim=c(0,40), xlab="Call rate (Phred scale)", main=paste("Sample CR by plate: ", title, "\n\n" )) # extra "\n\n" is a hack to correct spacing; TODO fix this properly
 axis(3, at=c(0,10,20,30,40), labels=c('No data', '90%', '99%', '99.9%', '99.99%')) # alternate scale on top
 dev.off()
