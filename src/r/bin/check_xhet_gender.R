@@ -89,7 +89,6 @@ consensus.model <- function(xhet.train, trials) {
     loglikes[[i]] <- m$loglik
   }
   loglikes <- signif(loglikes, 10) # avoid rounding errors
-  #loglikes[0:2] <- 0 # hack for testing
   freqs <- table(loglikes) # construct frequency table
   loglik.consensus <- names(freqs)[which.max(freqs)]
   m <- NA
@@ -144,7 +143,7 @@ if (clip>0 & total >= 100) { # clip away high values; female population has most
 }
 
 # import "mixtools" package and train mixture model
-library(mixtools, lib.loc="/nfs/users/nfs_i/ib5/R/x86_64-unknown-linux-gnu-library/2.11/")
+library(mixtools)
 cat("Constructing 2-component mixture model.\n")
 #m = normalmixEM(xhet.train, k=2) # old version
 m <- consensus.model(xhet.train, trials)
