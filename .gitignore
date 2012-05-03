@@ -4,3 +4,4 @@ blib
 .idea
 *.iml
 *~
+*.pyc # compiled Python files
