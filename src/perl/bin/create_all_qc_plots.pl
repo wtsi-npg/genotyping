@@ -9,6 +9,7 @@ use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to prod
 use strict;
 use warnings;
 use Getopt::Long;
+use FindBin qw($Bin);
 use QCPlotShared; # qcPlots module to define constants
 use QCPlotTests;
 
@@ -78,7 +79,7 @@ Options:
 --input_dir=PATH    Location of input files; defaults to current working directory.
 --output_dir=PATH   Location of output files; defaults to 'qcPlots' in input directory.
 --ref_dir=PATH      Reference directory containing previous output for testing; only relevant in test mode.
---script_dir=PATH   Location of QC plotting scripts; defaults to $QCPlotShared::scriptDir.
+--script_dir=PATH   Location of QC plotting scripts; defaults to location of main script.
 --test              Test mode: Run tests on commands and output, and print results to standard output.  
 --test_log=PATH     Write test results to given PATH. (Automatically enables --test mode.)
 --help              Print this help text and exit
@@ -88,7 +89,7 @@ Unspecified options will receive default values.
 }
 
 if ($testLogPath) { $test = 1; } # enable test mode if test log path supplied
-$scriptDir ||= $QCPlotShared::scriptDir;
+$scriptDir ||= $Bin.'/';
 $inputDir ||= '.';
 $outDir ||= $inputDir.'/qcPlots';
 if ($noSequenom) { $noSequenom = 1; }
@@ -125,7 +126,7 @@ my $doHeatPlot = 1; # switch to enable/disable generation of plate heatmap plots
 ##########################
 ### plate heatmap plots ##
 if ($doHeatPlot) {
-    my $heatMapScript = $scriptDir.'/create_plate_heatmap_plots';
+    my $heatMapScript = $scriptDir.'/plate_heatmap_plots.pl';
     my $hmOut = $outDir.'/'.$QCPlotShared::plateHeatmapDir; # output heatmaps to subdirectory of main output 
     unless (-e $hmOut) { mkdir($hmOut) || die "Cannot create heatmap directory $hmOut: $!" }
     if ($test) { $tests++; print $testFH "OK\tFound plate heatmap subdirectory.\n"; }
@@ -137,7 +138,7 @@ if ($doHeatPlot) {
 	$cmd = join(' ', ('cat', $xyDiffPath, '|', 'perl', $heatMapScript, '--mode=xydiff', '--out_dir='.$hmOut));
 	($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
     }
-    my $indexScript = $scriptDir.'/create_plate_heatmap_index';
+    my $indexScript = $scriptDir.'/plate_heatmap_index.pl';
     my $indexName = $QCPlotShared::plateHeatmapIndex;
     $cmd = "perl $indexScript $title $hmOut $indexName";
     ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
@@ -145,7 +146,7 @@ if ($doHeatPlot) {
 
 ################
 ### boxplots ###
-my $boxPlotScript = $scriptDir.'/create_boxplot';
+my $boxPlotScript = $scriptDir.'/plot_box_bean.pl';
 my @modes = ('cr', 'het', 'xydiff');
 my @inputs = ($crHetPath, $crHetPath, $xyDiffPath);
 for (my $i=0; $i<@modes; $i++) {
@@ -157,21 +158,21 @@ for (my $i=0; $i<@modes; $i++) {
 
 ######################################################################
 ### global cr/het density plots: heatmap, scatterplot & histograms ###
-my $globalCrHetScript = $scriptDir.'/create_cr_het_density_plots';
+my $globalCrHetScript = $scriptDir.'/plot_cr_het_density.pl';
 my $prefix = $outDir.'/crHetDensity';
 $cmd = join(' ', ('cat', $crHetPath, '|', 'perl', $globalCrHetScript, "--title=".$title, "--out_dir=".$outDir));
 ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
 ################################
 ### failure cause breakdowns ###
-my $failPlotScript = $scriptDir."/plot_fail_causes";
+my $failPlotScript = $scriptDir."/plot_fail_causes.pl";
 $cmd = join(' ', ('perl', $failPlotScript, "--input_dir=".$inputDir, "--output_dir=".$outDir, "--title=".$title));
 if ($noSequenom) { $cmd .= ' --no_sequenom'; }
 ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
 ################################
 ### html index for all plots ###
-my $plotIndexScript = $scriptDir.'/create_plot_index';
+my $plotIndexScript = $scriptDir.'/main_plot_index.pl';
 $cmd = join(' ', ('perl', $plotIndexScript, $title, $outDir));
 ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
