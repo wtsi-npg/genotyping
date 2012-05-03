@@ -9,6 +9,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use FindBin qw($Bin);
 use WTSI::Genotyping::QC::QCPlotShared; # must have path to WTSI directory in PERL5LIB
 use WTSI::Genotyping::QC::QCPlotTests;
 
@@ -62,8 +63,8 @@ my $plotPath = $outDir.$prefix.'.png';
 if ($sanityCancel) { $sanityOpt='FALSE'; }
 else { $sanityOpt='TRUE'; }
 my $summaryPath = $outDir.$prefix.'_summary.txt';
-my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptPath, 
-		     $WTSI::Genotyping::QC::QCPlotShared::parentDir.'/check_xhet_gender.R',
+my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec, 
+		     $Bin.'/'.$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative.'/check_xhet_gender.R',
 		     $inPath, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
 # $cmd uses csh redirect
 my ($tests, $failures) = (0,0);

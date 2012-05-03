@@ -11,6 +11,10 @@ $RScriptPath = "/software/R-2.11.1/bin/Rscript";
 # location of qcPlots scripts; trailing / may be assumed by code which uses this variable!
 $parentDir = '/nfs/users/nfs_i/ib5/mygit/genotype_qc/';
 $scriptDir = $parentDir.'qcPlots/'; 
+# WARNING above paths are obsolete!
+
+$RScriptExec = "/software/R-2.11.1/bin/Rscript";
+$RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scripts
 
 # file and directory names
 $sampleCrHet = 'sample_cr_het.txt'; # main source of input
