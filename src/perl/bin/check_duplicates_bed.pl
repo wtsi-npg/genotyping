@@ -115,11 +115,13 @@ foreach my $chr (keys %snps) {
 	}
     }
 }
-print LOG scalar(@use_snps), " available SNPs\n";
+open LOG, "> $log" or die $!;
+print LOG scalar(@use_snps), " available SNPs found for duplicate check\n";
 if (@use_snps > $max_snps) {
     @use_snps = @use_snps[0 .. $max_snps - 1]; # truncate @use_snps if too large
 }
 print LOG "Using ", scalar(@use_snps), " SNPs\n";
+close LOG;
 
 # write @use_snps to temp file
 my $snp_file = new File::Temp; 
