@@ -1,0 +1,26 @@
+Loading required package: boot
+Loading required package: MASS
+mixtools package version 0.4.4   Released June 2010 
+Type help(package="mixtools") to get started.
+This package is based upon work supported by the National Science Foundation under Grant No. SES-0518772.
+Constructing 2-component mixture model.
+Finding consensus model from 1 independent training runs.
+number of iterations= 13 
+summary of normalmixEM object:
+           comp 1    comp 2
+lambda 0.53535351 0.4646465
+mu     0.00995472 0.2446206
+sigma  0.00179436 0.0437221
+loglik at estimate:  270.2514 
+loglik_final 270.25141 
+Max_xhet_M 0.01534 
+Min_xhet_F 0.1135 
+Performing sanity checks on model.
+Simulated model error: 0 
+Sanity checks passed.
+### Gender model results ###
+Total_samples 100 
+Ambiguities 1 
+Ambiguity_rate 0.01
+Conflicts 2 
+Conflict_rate 0.02
