@@ -6,7 +6,6 @@
 # create beanplot of call rate for all plates
 # arguments: input path, output path,  title (eg. experiment/analysis),
 # requires beanplot package from CRAN to have been installed
-# TODO replace hard-coded library path with argument
 
 args <- commandArgs(TRUE)
 data <- read.table(args[1])

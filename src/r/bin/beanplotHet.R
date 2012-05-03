@@ -5,7 +5,6 @@
 
 # create beanplot of het rate for all plates
 # arguments: input path, title (eg. experiment/analysis), output path
-# TODO replace hard-coded library path with argument
 
 args <- commandArgs(TRUE)
 data <- read.table(args[1])
