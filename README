@@ -32,3 +32,9 @@ Pipeline components:
  Illuminus              https://github.com/wtsi-npg/Illuminus
  Gftools                https://github.com/wtsi-npg/Gftools
  genotype-call          https://github.com/wtsi-npg/genotype-call
+
+
+Environment variables:
+
+ PERL5LIB   Should include path to genotyping/src/perl/lib/
+ R_LIBS     Should include path to mixtools library installation
