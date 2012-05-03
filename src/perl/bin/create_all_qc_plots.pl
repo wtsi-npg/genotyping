@@ -5,13 +5,12 @@
 
 # 'main' script to generate plots for a given genotype analysis directory
 
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
-use QCPlotShared; # qcPlots module to define constants
-use QCPlotTests;
+use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my $start = time(); 
 my ($tests, $failures) = (0,0);
@@ -22,9 +21,9 @@ sub getInputs {
     # warn if xydiff path missing; error if crhet path missing
     my $inputDir = shift;
     if ($inputDir !~ /\/$/) { $inputDir .= '/'; }
-    my $crHetPath = $inputDir.$QCPlotShared::sampleCrHet;
+    my $crHetPath = $inputDir.$WTSI::Genotyping::QC::QCPlotShared::sampleCrHet;
     if (not -r $crHetPath) { die "ERROR: Cannot read sample cr/het path $crHetPath: $!"; }
-    my @globResults = glob($inputDir.$QCPlotShared::xyDiffExpr); # input file of the form CHIPNAME_XYdiff.txt
+    my @globResults = glob($inputDir.$WTSI::Genotyping::QC::QCPlotShared::xyDiffExpr); #  CHIPNAME_XYdiff.txt
     my $xyDiffPath = shift(@globResults);
     if (not(defined $xyDiffPath)) {
 	print STDERR "WARNING: XYdiff path not found. (XYdiff calculation not applied to this analysis?)\n"; 
@@ -127,21 +126,21 @@ my $doHeatPlot = 1; # switch to enable/disable generation of plate heatmap plots
 ### plate heatmap plots ##
 if ($doHeatPlot) {
     my $heatMapScript = $scriptDir.'/plate_heatmap_plots.pl';
-    my $hmOut = $outDir.'/'.$QCPlotShared::plateHeatmapDir; # output heatmaps to subdirectory of main output 
+    my $hmOut = $outDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir; # output heatmaps to subdirectory of main output 
     unless (-e $hmOut) { mkdir($hmOut) || die "Cannot create heatmap directory $hmOut: $!" }
     if ($test) { $tests++; print $testFH "OK\tFound plate heatmap subdirectory.\n"; }
     foreach my $mode ('cr', 'het') { # assumes $crHetPath exists and is readable
 	$cmd = join(' ', ('cat', $crHetPath, '|', 'perl', $heatMapScript, '--mode='.$mode, '--out_dir='.$hmOut));
-	($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+	($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
     }
     if ($xyDiffPath) { # repeat for xydiff input (if any)
 	$cmd = join(' ', ('cat', $xyDiffPath, '|', 'perl', $heatMapScript, '--mode=xydiff', '--out_dir='.$hmOut));
-	($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+	($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
     }
     my $indexScript = $scriptDir.'/plate_heatmap_index.pl';
-    my $indexName = $QCPlotShared::plateHeatmapIndex;
+    my $indexName = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
     $cmd = "perl $indexScript $title $hmOut $indexName";
-    ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+    ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 }
 
 ################
@@ -153,7 +152,7 @@ for (my $i=0; $i<@modes; $i++) {
     unless (defined($inputs[$i]) && -r $inputs[$i]) { next; } # skip undefined inputs; xydiffpath may not exist
     $cmd = join(' ', ('cat', $inputs[$i], '|', 'perl', $boxPlotScript, '--mode='.$modes[$i], 
 		      '--out_dir='.$outDir, '--title='.$title));
-    ($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+    ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 }
 
 ######################################################################
@@ -161,28 +160,28 @@ for (my $i=0; $i<@modes; $i++) {
 my $globalCrHetScript = $scriptDir.'/plot_cr_het_density.pl';
 my $prefix = $outDir.'/crHetDensity';
 $cmd = join(' ', ('cat', $crHetPath, '|', 'perl', $globalCrHetScript, "--title=".$title, "--out_dir=".$outDir));
-($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
 ################################
 ### failure cause breakdowns ###
 my $failPlotScript = $scriptDir."/plot_fail_causes.pl";
 $cmd = join(' ', ('perl', $failPlotScript, "--input_dir=".$inputDir, "--output_dir=".$outDir, "--title=".$title));
 if ($noSequenom) { $cmd .= ' --no_sequenom'; }
-($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
 ################################
 ### html index for all plots ###
 my $plotIndexScript = $scriptDir.'/main_plot_index.pl';
 $cmd = join(' ', ('perl', $plotIndexScript, $title, $outDir));
-($tests, $failures) = QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, $testFH, $tests, $failures);
 
 #################################################################
 ### check intermediate text output against reference (if any) ###
 if ($test && $refDir) {
-    ($tests, $failures) = QCPlotTests::diffGlobs($refDir, $outDir, $testFH, $tests, $failures);
+    ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, $outDir, $testFH, $tests, $failures);
     if ($doHeatPlot) {
-	my $hm = $QCPlotShared::plateHeatmapDir;
-	($tests, $failures) = QCPlotTests::diffGlobs($refDir.'/'.$hm, $outDir.'/'.$hm, $testFH, $tests, $failures);
+	my $hm = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir;
+	($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir.'/'.$hm, $outDir.'/'.$hm, $testFH, $tests, $failures);
     }
 }
 
