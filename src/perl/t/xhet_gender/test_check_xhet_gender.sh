@@ -17,6 +17,13 @@ OUTPUTDIR="./testGenderOutput"
 REFDIR="."
 CMD="perl ${SCRIPTDIR}${SCRIPTNAME} --input_dir=${INPUTDIR} --output_dir=${OUTPUTDIR}"
 echo $CMD
+# check for required input
+if [[ ! -e $INPUTDIR/sample_xhet_gender.txt ]]
+then
+    echo "Input sample_xhet_gender.txt not found!"
+    exit 1
+fi
+
 $CMD
 # did perl script run successfully?
 if [ $? -eq 0 ]; then 
