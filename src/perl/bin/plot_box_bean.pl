@@ -12,12 +12,12 @@
 # * writes to file for R input
 # * runs R scripts to create plot
 
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use strict;
 use warnings;
 use Getopt::Long;
-use QCPlotShared; # qcPlots module to define constants
-use QCPlotTests;
+use FindBin qw($Bin);
+use WTSI::Genotyping::QC::QCPlotShared; 
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($mode, $RScriptPath, $outDir, $title, $help, $test);
 
@@ -48,10 +48,12 @@ Unspecified options will receive default values, with output written to: ./plate
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-$RScriptPath ||= $QCPlotShared::RScriptPath;
+$RScriptPath ||=  $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
 $outDir ||= 'testBoxPlots';
 $title ||= "UNTITLED";
 $test ||= 1; # test mode is on by default
+
+my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
 
 sub parsePlate {
     # parse plate from sample name, assuming usual PLATE_WELL_ID format
@@ -83,14 +85,13 @@ sub runBeanPlot {
     my $pngOutPath = $outDir."/".$mode."_beanplot.png";
     my @args = ($RScriptPath, $plotScripts{$mode}, $textPath, $title);
     my @outputs = ($pngOutPath,);
-    my $result = QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    my $result = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
     return $result;
 }
 
 sub run {
     # mode = cr, het or xydiff
-    my ($mode, $RScriptPath, $outDir, $title, $test) = @_;
-    my $scriptDir = $QCPlotShared::scriptDir;
+    my ($mode, $RScriptPath, $scriptDir, $outDir, $title, $test) = @_;
     my %plotScripts = ( # R plotting scripts for each mode
 	cr     => $scriptDir.'boxplotCR.R',
 	het    => $scriptDir.'boxplotHet.R', 
@@ -108,12 +109,12 @@ sub run {
     my @args = ($RScriptPath, $plotScripts{$mode}, $textOutPath, $title);
     my @outputs = ($pngOutPath,);
     if ($mode eq 'cr') { push(@outputs, $outDir."/platePopulationSizes.png"); }
-    my $plotsOK = QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
     my $result = runBeanPlot($mode, $RScriptPath, $outDir, $title, $scriptDir, $textOutPath, $test);
     if ($test && $result==0) { $plotsOK = 0; }
     return $plotsOK;
 }
 
-my $ok = run($mode, $RScriptPath, $outDir, $title, $test);
+my $ok = run($mode, $RScriptPath, $scriptDir, $outDir, $title, $test);
 if ($ok) { exit(0); }
 else { exit(1); }

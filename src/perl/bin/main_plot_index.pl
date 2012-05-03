@@ -7,10 +7,9 @@
 
 use strict;
 use warnings;
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
-use QCPlotShared;
-use QCPlotTests;
+use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotTests;
 
 sub writeHeatMapLinkTable {
     # write table with link to heatmap index, and thumbnail examples of first 3 heatmaps
@@ -90,7 +89,7 @@ my %descriptions = (
 my $experiment = shift(@ARGV); # experiment name
 my $plotDir = shift(@ARGV); # input/output directory path
 chdir($plotDir); # find and link to relative paths wrt plotdir
-my $outPath = $QCPlotShared::mainIndex;
+my $outPath = $WTSI::Genotyping::QC::QCPlotShared::mainIndex;
 my @png = glob('*.png');
 @png = sort(@png);
 open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
@@ -106,7 +105,7 @@ if (-r $totalsPath) { writeSummaryTable($totalsPath, \*OUT); }
 print OUT p('&nbsp;'); # spacer before next table
 # link to heatmap index (if available)
 my $heatMapDir = 'plate_heatmaps'; # TODO move these names into QCPlotsShared
-my $heatMapIndex = $heatMapDir."/".$QCPlotShared::plateHeatmapIndex;
+my $heatMapIndex = $heatMapDir."/".$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
 if (-r $heatMapIndex) {  
     writeHeatMapLinkTable($heatMapIndex, $heatMapDir, \*OUT);
 }
@@ -135,5 +134,5 @@ close OUT;
 
 # test output for XML validity
 open my $fh, "< $outPath";
-if (QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
+if (WTSI::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
 else { close $fh; exit(1); } # error found

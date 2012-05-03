@@ -7,12 +7,12 @@
 # create a heatmap of cr vs. het on a log scale; also do scatterplot & histograms of cr and het rate
 # do plotting with R
 
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use strict;
 use warnings;
 use Getopt::Long;
-use QCPlotShared; # qcPlots module to define constants
-use QCPlotTests;
+use FindBin qw($Bin);
+use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($RScriptPath, $outDir, $title, $help);
 
@@ -33,11 +33,11 @@ Unspecified options will receive default values, with output written to current 
     exit(0);
 }
 
-$RScriptPath ||= $QCPlotShared::RScriptPath;
+$RScriptPath ||= $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
 $outDir ||= '.';
 $title ||= 'Unknown';
 
-my $scriptDir = $QCPlotShared::scriptDir;
+my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
 my $test = 1;
 
 sub getBinCounts {
@@ -120,7 +120,7 @@ sub run {
     close $output;
     @args = ($RScriptPath, $heatPlotScript, $heatText, $title, $hetMin, $hetMax);
     @outputs = ($heatPng,);
-    my $plotsOK = QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
     ### do scatterplot & histograms ###
     open $output, "> $scatterText" || die "Cannot open output path $scatterText: $!";
     writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
@@ -128,7 +128,7 @@ sub run {
     my $scatterPlotScript = $scriptDir."plotCrHetDensity.R";
     @args = join(' ', $RScriptPath, $scatterPlotScript, $scatterText, $title);
     @outputs = ($scatterPng, $crHist, $hetHist);
-    $plotsOK = QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
     return $plotsOK;    
 }
 

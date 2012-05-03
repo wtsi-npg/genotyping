@@ -8,12 +8,12 @@
 # POSITION is in the form H10 for x=8, y=10
 # writes small .txt files containing input values for each plot (in case needed for later reference)
 
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use strict;
 use warnings;
+use FindBin qw($Bin);
 use Getopt::Long;
-use QCPlotShared; # qcPlots module to define constants
-use QCPlotTests;
+use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($mode, $RScriptPath, $outDir, $help);
 
@@ -42,10 +42,10 @@ Unspecified options will receive default values, with output written to: ./plate
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-$RScriptPath ||= $QCPlotShared::RScriptPath;
+$RScriptPath ||= $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
 $outDir ||= 'platePlots';
 
-my $scriptDir = $QCPlotShared::scriptDir;
+my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -81,7 +81,7 @@ sub makePlots {
 	my @args = ($RScriptPath, $plotScript, $path, $plate);
 	if ($minMaxArgs) { push(@args, ($comments{'PLOT_MIN'}, $comments{'PLOT_MAX'})); }
 	my @outputs = ($outPath, );
-	my $plotsOK = QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+	my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
 	if ($plotsOK==0) { $allPlotsOK = 0; }
     } 
     return $allPlotsOK;

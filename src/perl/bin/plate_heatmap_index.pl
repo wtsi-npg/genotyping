@@ -9,10 +9,9 @@
 
 use strict;
 #use warnings; # raises warning for $fileGlob expression in getPlateInfo, but this is actually OK
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
 use Cwd;
-use QCPlotTests;
+use WTSI::Genotyping::QC::QCPlotTests;
 
 sub getLinkThumbnail {
     # get thumbnail link HTML for given image path; optionally supply height & width in pixels
@@ -123,5 +122,5 @@ close OUT;
 
 # test output for XML validity
 open my $fh, "< $outPath";
-if (QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
+if (WTSI::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
 else { close $fh; exit(1); } # error found

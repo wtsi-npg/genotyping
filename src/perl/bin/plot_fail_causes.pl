@@ -14,12 +14,12 @@
 
 # write .txt input for R plotting scripts, then execute scripts (using test wrapper)
 
-use lib '/nfs/users/nfs_i/ib5/mygit/genotype_qc/qcPlots/'; # TODO change to production dir (or find dynamically?)
 use strict;
 use warnings;
 use Getopt::Long;
-use QCPlotShared;
-use QCPlotTests;
+use FindBin qw($Bin);
+use WTSI::Genotyping::QC::QCPlotShared;
+use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($inputDir, $outputDir, $gender, $identity, $duplicate, $crHet, $help, $failText, $comboText, $causeText, 
     $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $noSequenom, $sequenom, $title);
@@ -72,6 +72,8 @@ foreach my $name (@inputNames) { push(@inputPaths, $inputDir.$name); }
 my @outNames = ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng);
 if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
+
+my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
 
 sub findFailedCrHet {
     # find cr/het metrics for failed samples
@@ -319,7 +321,7 @@ sub writeHash {
 
 sub run {
     # find failure causes and write input for R scripts
-    my ($inputsRef, $outputsRef, $minCR, $maxHetSd, $title, $sequenom) = @_;
+    my ($inputsRef, $outputsRef, $minCR, $maxHetSd, $title, $sequenom, $scriptDir) = @_;
     my ($crHetPath, $duplicatePath, $identityPath, $genderPath) = @$inputsRef;
     my ($totalText, $comboText, $causeText, $comboPng, $causePng, $failCrHetPath, $scatterPng, 
 	$detailPng) = @$outputsRef;
@@ -330,27 +332,27 @@ sub run {
     # do barplots of individual and combined failure causes
     writeFailCounts($namesRef, $causesRef, $comboText, $causeText);
     my $allPlotsOK = 1;
-    my @args = ($QCPlotShared::RScriptPath, $QCPlotShared::scriptDir.'/plotIndividualFails.R', 
+    my @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec, $scriptDir.'/plotIndividualFails.R', 
 		$causeText, $totalFails, $title);
     my @outputs = ($causePng,);
-    my $ok = QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { $allPlotsOK = 0; }
-    @args = ($QCPlotShared::RScriptPath, $QCPlotShared::scriptDir.'/plotCombinedFails.R', 
+    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,, $scriptDir.'/plotCombinedFails.R', 
 	     $comboText, $title);
     @outputs = ($comboPng,);
-    $ok = QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { $allPlotsOK = 0; }
     # now do scatterplot of failed samples in cr/het plane
     writeFailedCrHet($crHetRef, $causesRef, $hetStatsRef, $failCrHetPath);
     my ($mean, $sd, $maxDist) = @$hetStatsRef;
-    @args = ($QCPlotShared::RScriptPath, $QCPlotShared::scriptDir.'/scatterPlotFails.R',
+    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,, $scriptDir.'/scatterPlotFails.R',
 	     $failCrHetPath, $mean, $maxDist, $minCR, $title);
     @outputs = ($scatterPng, $detailPng);
-    $ok = QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { $allPlotsOK = 0; }
     return $allPlotsOK;
 }
 
-my $allPlotsOK = run(\@inputPaths, \@outputPaths, $minCR, $maxHetSd, $title, $sequenom);
+my $allPlotsOK = run(\@inputPaths, \@outputPaths, $minCR, $maxHetSd, $title, $sequenom, $scriptDir);
 if ($allPlotsOK) { exit(0); }
 else { exit(1); }
