@@ -15,9 +15,10 @@ use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
     # use where reference file sample names column has been scrubbed
-    my ($path1, $path2, $indicesRef, $verbose, $sep) = @_;
+    my ($path1, $path2, $indicesRef, $verbose, $sep, $commentPattern) = @_;
     $sep = '\s+';
     $verbose ||= 0;
+    $commentPattern ||= "^#";
     my $match = 1;
     my @indices = @$indicesRef; # column indices to check
     my ($line1, $line2);
@@ -38,6 +39,8 @@ sub columnsMatch {
 	    if ($verbose) {print STDERR "Warning: File lengths of $path1 and $path2 differ.\n";}
 	    $match = 0;
 	    last;
+	} elsif ($line1=~$commentPattern && $line2=~$commentPattern) {
+	    next;
 	} else {
 	    chomp $line1;
 	    chomp $line2;
@@ -67,10 +70,8 @@ sub diffGlobs {
     $tests ||= 0;
     $failures ||= 0;
     $globExpr ||= '*.txt';
-    my @cols;
-    if ($colsRef) { @cols = @$colsRef; }
-    else { @cols = (); }
-    print $fh "###\tStarting diff tests: $refDir $outDir $globExpr\n";
+    my $colString = join(":", @$colsRef); 
+    print $fh "###\tStarting diff tests: $refDir $outDir $globExpr $colString\n";
     my $startDir = getcwd();
     $outDir = abs_path($outDir);
     chdir($refDir);
@@ -81,7 +82,7 @@ sub diffGlobs {
 	my $outPath = $outDir.'/'.$name;
 	if (not(-r $outPath)) { 
 	    print $fh "FAIL\tdiff $name (output file missing)\n"; $failures++; 
-	} elsif (@cols && !(columnsMatch($name, $outPath, @cols))) {
+	} elsif ($colsRef && !(columnsMatch($name, $outPath, $colsRef))) {
 	    print $fh "FAIL\tdiff $name (columns differ)\n"; $failures++;
 	} elsif (filesDiffer($name, $outPath)) { 
 	    print $fh "FAIL\tdiff $name (files differ)\n"; $failures++; 
