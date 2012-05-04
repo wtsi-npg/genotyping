@@ -12,14 +12,64 @@ use XML::Parser;
 use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
 
 
+sub columnsMatch {
+    # check for difference in specific columns (of space-delimited files, can also do for other separators)
+    # use where reference file sample names column has been scrubbed
+    my ($path1, $path2, $indicesRef, $verbose, $sep) = @_;
+    $sep = '\s+';
+    $verbose ||= 1;
+    my $match = 1;
+    my @indices = @$indicesRef; # column indices to check
+    my ($line1, $line2);
+    open(IN1, $path1) || die "Cannot open $path1: $!";
+    open(IN2, $path2) || die "Cannot open $path2: $!";
+    my $j = 0; # line count
+    while (1) {
+	$line1 = readline(IN1);
+	$line2 = readline(IN2);
+	if ($line1) {chomp $line1;}
+	if ($line2) {chomp $line2;}
+	if (!($line1) && !($line2)) {
+	    # both files ended
+	    if ($verbose) {print STDERR "No difference found!\n"; }
+	    last;
+	} elsif (!($line1) || !($line2)) {
+	    # only one file ended; file lengths differ
+	    if ($verbose) {print STDERR "Warning: File lengths of $path1 and $path2 differ.\n";}
+	    $match = 0;
+	    last;
+	} else {
+	    chomp $line1;
+	    chomp $line2;
+	    my @words1 = split(/$sep/, $line1);
+	    my @words2 = split(/$sep/, $line2);
+	    foreach my $i (@indices) {
+		if ($words1[$i] ne $words2[$i]) {
+		    if ($verbose) {print STDERR "Warning: Difference in column index $i at line index $j.\n";}
+		    $match = 0;
+		    last;
+		}
+	    }
+	    $j++;
+	    if (not $match) { last; }
+	}
+    }
+    close IN1;
+    close IN2;
+    return $match;
+}
+
 sub diffGlobs {
     # glob for files in output and reference directories
     # want files to be identical
     # if output file differs or is missing, record as failure
-    my ($refDir, $outDir, $fh, $tests, $failures, $globExpr) = @_;
-    $tests ||=0;
-    $failures ||=0;
+    my ($refDir, $outDir, $fh, $tests, $failures, $globExpr, $colsRef) = @_;
+    $tests ||= 0;
+    $failures ||= 0;
     $globExpr ||= '*.txt';
+    my @cols;
+    if ($colsRef) { @cols = @$colsRef; }
+    else { @cols = (); }
     print $fh "###\tStarting diff tests: $refDir $outDir $globExpr\n";
     my $startDir = getcwd();
     $outDir = abs_path($outDir);
@@ -29,9 +79,15 @@ sub diffGlobs {
     foreach my $name (@ref) {
 	$tests++;
 	my $outPath = $outDir.'/'.$name;
-	if (not(-r $outPath)) { print $fh "FAIL\tdiff $name (output file missing)\n"; $failures++; }
-	elsif (filesDiffer($name, $outPath)) { print $fh "FAIL\tdiff $name (files differ)\n"; $failures++; }
-	else { print $fh "OK\tdiff $name\n"; }
+	if (not(-r $outPath)) { 
+	    print $fh "FAIL\tdiff $name (output file missing)\n"; $failures++; 
+	} elsif (@cols && !(columnsMatch($name, $outPath, @cols))) {
+	    print $fh "FAIL\tdiff $name (columns differ)\n"; $failures++;
+	} elsif (filesDiffer($name, $outPath)) { 
+	    print $fh "FAIL\tdiff $name (files differ)\n"; $failures++; 
+	} else { 
+	    print $fh "OK\tdiff $name\n"; 
+	}
     }
     chdir($startDir);
     return ($tests, $failures);
