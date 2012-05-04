@@ -17,7 +17,7 @@ sub columnsMatch {
     # use where reference file sample names column has been scrubbed
     my ($path1, $path2, $indicesRef, $verbose, $sep) = @_;
     $sep = '\s+';
-    $verbose ||= 1;
+    $verbose ||= 0;
     my $match = 1;
     my @indices = @$indicesRef; # column indices to check
     my ($line1, $line2);
