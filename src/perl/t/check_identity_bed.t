@@ -9,9 +9,9 @@ use warnings;
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my $inputDir = "/nfs/users/nfs_i/ib5/data/genotype_project_examples/Native_American_Population_Genetics_NAPG/illuminus1/"; # TODO find a better location for input test data; 16 MB PLINK files a little big to check into git
+my $inputDir = "/nfs/gapi/users/ib5/genotype_qc_test_data/identity_test/illuminus1/";
 my $outputDirName = "check_identity_output";
-my $prefix = "HumanOmni1-Quad_v1-0_B.bpm_2012-02-08_native_american_population_genetics_napg";
+my $prefix = WTSI::Genotyping::QC::QCPlotTests::readPrefix($inputDir."/../../prefix.txt");
 my $cmd = "perl ${Bin}/../bin/check_identity_bed.pl ".$prefix;
 chdir($inputDir);
 my ($tests, $failures) = (0,0);
