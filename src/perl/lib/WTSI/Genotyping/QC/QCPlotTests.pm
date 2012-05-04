@@ -82,9 +82,13 @@ sub diffGlobs {
 	my $outPath = $outDir.'/'.$name;
 	if (not(-r $outPath)) { 
 	    print $fh "FAIL\tdiff $name (output file missing)\n"; $failures++; 
-	} elsif ($colsRef && !(columnsMatch($name, $outPath, $colsRef))) {
-	    print $fh "FAIL\tdiff $name (columns differ)\n"; $failures++;
-	} elsif (filesDiffer($name, $outPath)) { 
+	} elsif ($colsRef) { # diff on specific columns only
+	    if (!(columnsMatch($name, $outPath, $colsRef))) {
+		print $fh "FAIL\tdiff $name (columns differ)\n"; $failures++;
+	    } else {
+		print $fh "OK\tdiff $name\n"; 
+	    }
+	} elsif (filesDiffer($name, $outPath)) { # diff entire files
 	    print $fh "FAIL\tdiff $name (files differ)\n"; $failures++; 
 	} else { 
 	    print $fh "OK\tdiff $name\n"; 
@@ -120,6 +124,23 @@ sub pngOK {
 	}
     }
     return $ok;
+}
+
+sub readPrefix {
+    # read PLINK file prefix from a suitable .txt file; prefix is first non-comment line
+    # use to anonymise test data (name of chip/project not visible)
+    my $inPath = shift;
+    open IN, "< $inPath" || die "Cannot open input file $inPath: $!";
+    my $prefix = 0;
+    while (<IN>) {
+	unless (/^#/) { # comments start with #
+	    chomp;
+	    $prefix = $_;
+	    last;
+	}
+    }
+    close IN;
+    return $prefix;
 }
 
 sub testPlotRScript {
