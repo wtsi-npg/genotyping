@@ -15,7 +15,9 @@ use JSON;
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(maybe_stdout read_sample_json write_gt_calls);
+use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
+                        read_sample_json find_column_indices filter_columns
+                        read_it_column_names update_it_columns write_gt_calls);
 
 $|=1;
 
@@ -68,7 +70,6 @@ if (defined $plink && !defined $output) {
 
 $chromosome = uc($chromosome);
 $executable = 'illuminus';
-$input ||= '/dev/stdin';
 
 # Sample information
 my @samples = read_sample_json($samples);
@@ -77,7 +78,7 @@ my @samples = read_sample_json($samples);
 my $tmp_dir = tempdir(CLEANUP => 1);
 my $gender_file = $tmp_dir . '/' . 'gender_codes';
 
-my @command = ($executable, '-in', $input);
+my @command = ($executable, '-in /dev/stdin');
 if ($start && $end) {
   push(@command, '-s', $start, $end);
 }
@@ -99,7 +100,17 @@ if ($plink) {
   }
 
   my $command = join(" ", @command);
-  system($command) == 0 or die "Failed to execute '$command'\n";
+  if ($verbose) {
+    print STDERR "Executing '$command'\n";
+  }
+
+  if ($chromosome eq 'Y') {
+    nullify_females($input, $command, \@samples);
+  }
+  else {
+    system($command) == 0 or die "Failed to execute '$command'\n";
+  }
+
   exit(0);
 }
 else {
@@ -155,7 +166,17 @@ else {
     }
 
     my $command = join(" ", @command);
-    system($command) == 0 or die "Failed to execute '$command'\n";
+    if ($verbose) {
+      print STDERR "Executing '$command'\n";
+    }
+
+    if ($chromosome eq 'Y') {
+      nullify_females($input, $command, \@samples, $verbose);
+    }
+    else {
+      system($command) == 0 or die "Failed to execute '$command'\n";
+    }
+
     exit;
   }
 
@@ -206,6 +227,66 @@ sub make_fifo {
   return $filename;
 }
 
+sub find_female_columns {
+  my ($col_names, $samples) = @_;
+
+  my @females = grep { $_->{'gender'} eq 'Female'} @samples;
+  my @to_replace = map { $_->{'uri'} } @females;
+
+  my @col_names = @$col_names;
+  unless (@col_names % 2 == 0) {
+    die "Intensity data contained an odd number of data columns\n";
+  }
+
+  # Calculate the real sample names from the intensity data column
+  # names
+  my @sample_names;
+  for (my $i = 0; $i < scalar @col_names; $i += 2) {
+    push(@sample_names, common_stem($col_names[$i], $col_names[$i + 1]));
+  }
+
+  # Validate the input
+  my %sample_lookup = map { $_ => 1 } @sample_names;
+  for (my $i = 0; $i < scalar @to_replace; ++$i) {
+    my $x = $to_replace[$i];
+    unless (exists $sample_lookup{$x}) {
+      die "Intensity data did not contain data columns for '$x'\n";
+    }
+  }
+
+  # Calculate the intensity data column indices on which to operate
+  my %col_lookup = map { $_ => 1 } @to_replace;
+  my @indices;
+  for (my $i = 0, my $j = 0; $i < scalar @sample_names; ++$i, $j += 2) {
+    my $y = $sample_names[$i];
+
+    if (exists $col_lookup{$y}) {
+      push(@indices, $j, $j + 1);
+    }
+  }
+
+  return \@indices;
+}
+
+# Run with all female data set to inetnsity 1.0 in both channels
+sub nullify_females {
+  my ($input, $command, $samples, $verbose) = @_;
+
+  my $in = maybe_stdin($input);
+  open(ILN, "| $command") or die "Failed to open pipe to '$command'\n";
+  my $col_names = read_it_column_names($in);
+  my $females = find_female_columns($col_names, $samples);
+
+  if ($verbose) {
+    print STDERR "Nullifying intensities for females in columns: [",
+      join(", ")
+  }
+
+  print ILN join("\t", qw(SNP Coor Alleles), @$col_names), "\n";
+  update_it_columns($in, \*ILN, $females, 1.0);
+  close(ILN);
+}
+
 
 __END__
 
@@ -215,7 +296,7 @@ illuminus - run the Illuminus genotype caller
 
 =head1 SYNOPSIS
 
-illuminus --chromsome X --samples <filename> \
+illuminus --chr X --samples <filename> \
   [--start <n>] [--end <m>] < intensities > genotypes
 
 Options:
@@ -270,14 +351,18 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.3.0
+  0.4.0
 
 =head1 CHANGELOG
+
+  0.4.0
+
+    Added handling of female samples when calling the Y chromosome.
 
   0.3.0
 
     Removed --gender option; genders are now handled internally.
-    Added --chromsome option.
+    Added --chr option.
     Added --plink option to write Plink BED format.
 
   0.2.0
