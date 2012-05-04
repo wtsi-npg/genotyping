@@ -18,5 +18,15 @@ my ($tests, $failures) = (0,0);
 ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
 # run diff on reference and output files
 my $refDir = $Bin.'/'.$outputDirName;
-($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, $inputDir, \*STDOUT, 
-								   $tests, $failures);
+my @cols = (1,2,3,4);
+my $pattern = "identity_check_results.txt";
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, ".", \*STDOUT, $tests, $failures, 
+								   $pattern, \@cols);
+@cols = (2,3);
+$pattern = "identity_check_gt.txt";
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, ".", \*STDOUT, $tests, $failures, 
+								   $pattern, \@cols);
+@cols = ();
+$pattern = "identity_check_fail*";
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, ".", \*STDOUT, $tests, $failures, 
+								   $pattern, \@cols);
