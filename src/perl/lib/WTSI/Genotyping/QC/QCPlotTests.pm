@@ -70,7 +70,9 @@ sub diffGlobs {
     $tests ||= 0;
     $failures ||= 0;
     $globExpr ||= '*.txt';
-    my $colString = join(":", @$colsRef); 
+    my $colString;
+    if ($colsRef) { $colString = join(":", @$colsRef); }
+    else { $colString = "ALL_COLS"; }
     print $fh "###\tStarting diff tests: $refDir $outDir $globExpr $colString\n";
     my $startDir = getcwd();
     $outDir = abs_path($outDir);
