@@ -18,10 +18,12 @@ chdir($inputDir);
 my ($tests, $failures) = (0,0);
 ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
 my $output = "duplicate_full.txt";
-my $ref = "${Bin}/${outputDirName}/duplicate_full_ref.txt";
-$cmd = "diff --brief $output $ref";
-($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
-$output = "duplicate.log";
-$ref = "${Bin}/${outputDirName}/duplicate_log_ref.txt";
-$cmd = "diff --brief $output $ref";
-($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
+my $refDir = "${Bin}/${outputDirName}/";
+my @cols = (3,4);
+my $pattern = "*.txt";
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, ".", \*STDOUT, $tests, $failures, 
+								   $pattern, \@cols);
+@cols = ();
+$pattern = "*.log";
+($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::diffGlobs($refDir, ".", \*STDOUT, $tests, $failures, 
+								   $pattern, \@cols);
