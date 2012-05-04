@@ -18,20 +18,24 @@
 
 module Genotyping::Workflows
 
-  class FetchSampleData < Percolate::Workflow
+  class GenotypeIlluminus < Percolate::Workflow
     include Genotyping
     include Genotyping::Tasks::Database
     include Genotyping::Tasks::GenotypeCall
+    include Genotyping::Tasks::Illuminus
+    include Genotyping::Tasks::Plink
 
     description <<-DESC
-    Collates the normalized intensity values and GenCall genotype calls for the
+Collates the normalized intensity values and GenCall genotype calls for the
 samples in one named pipeline run. The former are written into a single SIM
-format file, the latter into a Plink BED format file. Requires a populated
-pipeline database.
+format file, the latter into a Plink BED format file. Calls genotypes using
+Illuminus and writes them to an additional Plink BED format file.
+
+Requires a populated pipeline database.
     DESC
 
     usage <<-USAGE
-FetchSampleData args
+GenotypeIlluminus args
 
 Arguments:
 
@@ -49,7 +53,7 @@ Arguments:
 e.g.
 
  library: genotyping
- workflow: Genotyping::Workflows::FetchSampleData
+ workflow: Genotyping::Workflows::GenotypeIlluminus
  arguments:
      - /work/my_project/my_analysis.db
      - sample_batch_1
@@ -81,6 +85,7 @@ Returns:
       cjname = run_name + '.chr.json'
       smname = run_name + '.sim'
       gcname = run_name + '.gencall.bed'
+      ilname = run_name + '.illuminus.bed'
 
       sjson = sample_intensities(dbfile, run_name, sjname, args)
 
@@ -88,8 +93,36 @@ Returns:
       smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, async)
       gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
 
-      [smfile, gcfile].all?
+      ilfile =
+          if cjson
+            chunks = chromosome_bounds(cjson).collect do |cspec|
+              chr = cspec["chromosome"]
+              start_snp = cspec["start"]
+              end_snp = cspec["end"]
+              befile = run_name + '.' + chr
+
+              call_from_sim_p(smfile, sjson, manifest, befile,
+                              {:work_dir =>  work_dir,
+                               :log_dir => work_dir,
+                               :chromosome => chr,
+                               :start => start_snp,
+                               :end => end_snp,
+                               :size => 10000,
+                               :group_size => 50,
+                               :plink => true}, async)
+            end
+
+            merge_bed(chunks.flatten, ilname, {:work_dir => work_dir}, async)
+          end
+
+      [gcfile, ilfile].all?
+    end
+
+    :private
+    def chromosome_bounds(cjson)
+      if cjson
+        chrs = JSON.parse(File.read(cjson))
+      end
     end
   end
-
 end
