@@ -37,8 +37,8 @@ sub readNamesXhetJson {
     # read sample names and xhet from .json file
     # TODO may need to change $nameKey, $xhetKey defaults
     my ($inPath, $nameKey, $xhetKey) = @_;
-    $nameKey ||= "sample_name";
-    $xhetKey ||= "sample_xhet";
+    $nameKey ||= "sample";
+    $xhetKey ||= "xhet";
     my @records = read_sample_json($inPath);
     my @names = ();
     my @xhets = ();
@@ -125,6 +125,5 @@ my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
 # $cmd uses csh redirect
 my ($tests, $failures) = (0,0);
 ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
-system("rm $tempName");
-if ($failures == 0) { exit(0); }
-else { exit(1); }
+if ($failures == 0) { system("rm $tempName"); exit(0); }
+else { exit(1); } # error; keep tempfile for debugging
