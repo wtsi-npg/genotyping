@@ -12,15 +12,15 @@
 # construct command-line options and run check_xhet_gender script
 SCRIPTDIR="../../bin/"
 SCRIPTNAME="check_xhet_gender.pl"
-INPUTDIR="."
+INPATH="./sample_xhet_gender.txt"
 OUTPUTDIR="./testGenderOutput"
 REFDIR="."
-CMD="perl ${SCRIPTDIR}${SCRIPTNAME} --input_dir=${INPUTDIR} --output_dir=${OUTPUTDIR}"
+CMD="perl ${SCRIPTDIR}${SCRIPTNAME} --input=$INPATH --output_dir=${OUTPUTDIR}"
 echo $CMD
 # check for required input
-if [[ ! -e $INPUTDIR/sample_xhet_gender.txt ]]
+if [[ ! -e $INPATH ]]
 then
-    echo "Input sample_xhet_gender.txt not found!"
+    echo "Input $INPATH not found!"
     exit 1
 fi
 
@@ -32,7 +32,7 @@ else
     echo -e "ERROR\tcheck_xhet_gender\tExecution test"
 fi
 # do new output and reference output differ?  (Tests sample gender assignment, not detailed model params.)
-OLD_GENDER=${REFDIR}/sample_xhet_gender_model.txt
+OLD_GENDER=${REFDIR}/sample_xhet_gender_model_ref.txt
 NEW_GENDER=${OUTPUTDIR}/sample_xhet_gender_model.txt
 diff --brief $OLD_GENDER $NEW_GENDER #&> /dev/null
 if [ $? -eq 0 ]; then 
