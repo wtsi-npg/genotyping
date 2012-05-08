@@ -177,7 +177,9 @@ cat("### Gender model results ###\n")
 gender <- rep(0, times=total) # 'blank' vector of genders
 gender[data$xhet<=m.max] <- 1
 gender[data$xhet>=f.min] <- 2
-data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender,'supplied'=data$supplied)
+#data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender,'supplied'=data$supplied)
+# also need a 'supplied' column for sample_xhet_gender.txt format; can add this in another script
+data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender)
 
 # output summary to stdout and new table to file
 ambig <- length(subset(gender, gender==0))
