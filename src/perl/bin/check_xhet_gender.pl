@@ -8,14 +8,68 @@
 
 use strict;
 use warnings;
+use File::Temp qw(tempfile);
 use Getopt::Long;
 use FindBin qw($Bin);
+use WTSI::Genotyping qw(read_sample_json);
 use WTSI::Genotyping::QC::QCPlotShared; # must have path to WTSI directory in PERL5LIB
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($inDir, $outDir, $title, $help, $prefix, $clip, $trials, $sanityCancel, $sanityOpt);
+sub readNamesXhetText {
+    # read sample_xhet_gender.txt file; tab-delimited, first two columns are name and xhet, first line is header
+    my $inPath = shift;
+    open IN, "< $inPath" || die "Cannot open input file $inPath: $!";
+    my $line = 0;
+    my @names = ();
+    my @xhets = ();
+    while (<IN>) {
+	if ($line==0) { $line++; next; } # first line is header
+	chomp;
+	my @words = split;
+	push(@names, $words[0]);
+	push(@xhets, $words[1]);
+    }
+    close IN;
+    return (\@names, \@xhets);
+}
 
-GetOptions("input_dir=s"            =>  \$inDir,
+sub readNamesXhetJson {
+    # read sample names and xhet from .json file
+    # TODO may need to change $nameKey, $xhetKey defaults
+    my ($inPath, $nameKey, $xhetKey) = @_;
+    $nameKey ||= "sample_name";
+    $xhetKey ||= "sample_xhet";
+    my @records = read_sample_json($inPath);
+    my @names = ();
+    my @xhets = ();
+    foreach my $recordRef (@records) {
+	my %record = %$recordRef;
+	push(@names, $record{$nameKey});
+	push(@xhets, $record{$xhetKey});
+    }
+    return (\@names, \@xhets);
+}
+
+sub writeSampleXhet {
+    # write given sample names and xhets to temporary file
+    my ($namesRef, $xhetRef) = @_;
+    my ($fh, $filename) = tempfile();
+    my @names = @$namesRef;
+    my @xhets = @$xhetRef;
+    my $total = @names;
+    if ($total != @xhets) { die "Name and xhet list arguments of different length: $!";  }
+    my $header = "sample\txhet\n";
+    print $fh $header;
+    for (my $i=0;$i<$total;$i++) {
+	print $fh "$names[$i]\t$xhets[$i]\n";
+    }
+    close $fh;
+    return $filename;
+}
+
+my ($inPath, $outDir, $title, $help, $prefix, $clip, $trials, $sanityCancel, $sanityOpt, $namesRef, $xhetRef);
+
+GetOptions("input=s"                =>  \$inPath,
 	   "output_dir=s"           =>  \$outDir,
 	   "title=s"                =>  \$title,
 	   "file_prefix=s"          =>  \$prefix,
@@ -29,7 +83,7 @@ if ($help) {
 Script to do improved gender check by fitting a mixture model to xhet data.
 
 Options:
---input_dir=PATH      Input directory containing sample_xhet_gender.txt file
+--input=PATH          Input file in .json or sample_xhet_gender.txt format
 --output_dir=PATH     Output directory 
 --title=TITLE         Title for model summary plot
 --file_prefix=NAME    Prefix for output file names
@@ -41,23 +95,25 @@ Unspecified options will receive default values.
     exit(0);
 }
 
-$inDir  ||= '.';
-$outDir ||= $inDir;
+$inPath ||= './sample_xhet_gender.txt';
+$outDir ||= '.';
 $title  ||= "Untitled";
 $prefix ||= "sample_xhet_gender_model";
 $clip   ||= 0.01; # proportion of high xhet values to clip; default to 1%
 $trials ||= 1;
 $sanityCancel ||= 0;
 
-if ($inDir !~ /\/$/) { $inDir .= '/'; }
-if ($outDir !~ /\/$/) { $outDir .= '/'; }
-
-my $inPath = $inDir.'sample_xhet_gender.txt';
-if ((not -r $inDir)||(not -d $inDir)) {
-    die "ERROR: Input directory $inDir not accessible: $!";
-} elsif (not -r $inPath) {
-    die "ERROR: Cannot read input path $inPath: $!";
+# read sample names and xhet values from given input
+if ($inPath =~ /\.txt$/) {
+    ($namesRef, $xhetRef) = readNamesXhetText($inPath);
+} elsif ($inPath =~ /\.json$/) {
+    ($namesRef, $xhetRef) = readNamesXhetJson($inPath);
+} else {
+    die "ERROR: Illegal filename extension on $inPath: $!";
 }
+my $tempName = writeSampleXhet($namesRef, $xhetRef);  # write input for R script
+
+if ($outDir !~ /\/$/) { $outDir .= '/'; }
 my $textPath = $outDir.$prefix.'.txt';
 my $plotPath = $outDir.$prefix.'.png';
 if ($sanityCancel) { $sanityOpt='FALSE'; }
@@ -65,9 +121,10 @@ else { $sanityOpt='TRUE'; }
 my $summaryPath = $outDir.$prefix.'_summary.txt';
 my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec, 
 		     $Bin.'/'.$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative.'/check_xhet_gender.R',
-		     $inPath, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
+		     $tempName, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
 # $cmd uses csh redirect
 my ($tests, $failures) = (0,0);
 ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
+system("rm $tempName");
 if ($failures == 0) { exit(0); }
 else { exit(1); }
