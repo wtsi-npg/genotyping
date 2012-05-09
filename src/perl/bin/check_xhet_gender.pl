@@ -100,7 +100,7 @@ $outDir ||= '.';
 $title  ||= "Untitled";
 $prefix ||= "sample_xhet_gender_model";
 $clip   ||= 0.01; # proportion of high xhet values to clip; default to 1%
-$trials ||= 1;
+$trials ||= 20;
 $sanityCancel ||= 0;
 
 # read sample names and xhet values from given input
