@@ -26,7 +26,7 @@ module Genotyping
   # Array are present.
   def ensure_valid_args(args, *valid_keys)
     unless args.is_a?(Hash)
-      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+      raise ArgumentError, "invalid args '#{args.inspect}'; must be a Hash"
     end
 
     invalid = args.reject { |key, val| valid_keys.include?(key) }
@@ -42,7 +42,7 @@ module Genotyping
   # the :work_dir value and the :log_dir value.
   def process_task_args(args, defaults = {})
     unless args.is_a?(Hash)
-      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+      raise ArgumentError, "invalid args '#{args.inspect}'; must be a Hash"
     end
 
     args = defaults.merge(args)
@@ -55,14 +55,15 @@ module Genotyping
 
   def lsf_args(args, lsf_defaults, *lsf_keys)
     unless args.is_a?(Hash)
-      raise ArgumentError, "invalid args '#{args.to_s}'; must be a Hash"
+      raise ArgumentError, "invalid args '#{args.inspect}'; must be a Hash"
     end
 
     lsf_args = args.reject { |k, v| !lsf_keys.include?(k) }
     lsf_defaults = lsf_defaults.merge(lsf_args)
+    queue = lsf_defaults[:queue]
 
-    if lsf_defaults[:queue] && lsf_defaults[:queue].respond_to?(:intern)
-      lsf_defaults[:queue] = lsf_defaults[:queue].intern
+    if queue && queue.respond_to?(:intern)
+      lsf_defaults[:queue] = queue.intern
     end
 
     lsf_defaults
@@ -89,6 +90,22 @@ module Genotyping
       work_dir
     else
       ensure_valid_work_dir(work_dir)
+    end
+  end
+
+  def change_extname(file_name, ext)
+    dir = File.dirname(file_name)
+    base = File.basename(file_name, File.extname(file_name))
+
+    if base.start_with?(".")
+      raise ArgumentError,
+            "invalid file name '#{file_name}'; cannot change the extname of dotfiles"
+    end
+
+    if dir == '.'
+      base + ext
+    else
+      File.join(dir, base) + ext
     end
   end
 

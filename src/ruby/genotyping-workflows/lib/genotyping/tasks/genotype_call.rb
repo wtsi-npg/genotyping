@@ -73,7 +73,7 @@ module Genotyping::Tasks
     end
 
     # Collates intensity data from multiple GTC format files into a single SIM
-    # format file.
+    # format file with JSON annotation of chromosome boundaries.
     #
     # Arguments:
     # - input (String): A JSON file specifying sample URIs and GTC file paths.
@@ -87,16 +87,27 @@ module Genotyping::Tasks
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
-    # - The SIM file path.
+    # - An Array containing
+    #   - The SIM file path.
+    #   - The JSON chromosome annotation path.
     def gtc_to_sim(input, manifest, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(input, manifest, output, work_dir)
         output = absolute_path(output, work_dir) unless absolute_path?(output)
+        expected = [output]
+
         cli_args = {:chromosome => args[:chromosome],
                     :input => input,
                     :manifest => manifest,
                     :output => output}
+
+        if args.has_key?(:metadata)
+          chr_json = args[:metadata]
+          chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
+          cli_args[:metadata] = chr_json
+          expected << chr_json
+        end
 
         margs = [cli_args, input, work_dir]
         task_id = task_identity(:gtc_to_sim, *margs)
@@ -106,21 +117,48 @@ module Genotyping::Tasks
                    cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files([output], :error => false) },
-                   :result => lambda { output },
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { expected },
                    :async => async)
       end
     end
 
+    # Collates GenCall genotype call data from multiple GTC format files into a
+    # single Plink BED format file.
+    #
+    # Arguments:
+    # - input (String): A JSON file specifying sample URIs and GTC file paths.
+    # - manifest (String): The BeadPool manifest file name.
+    # - output (String): The BED file name.
+    # - args (Hash): Arguments for the operation.
+    #
+    #   :chromosome (String): Limit the operation to SNPs on one chromosome, as
+    #   named in the BeadPool manifest.
+    #
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - An Array containing
+    #   - The BED file path.
+    #   - The JSON chromosome annotation path.
     def gtc_to_bed(input, manifest, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(input, manifest, output, work_dir)
         output = absolute_path(output, work_dir) unless absolute_path?(output)
+        expected = [output]
+
         cli_args = {:chromosome => args[:chromosome],
                     :input => input,
                     :manifest => manifest,
                     :output => output}
+
+        if args.has_key?(:metadata)
+          chr_json = args[:metadata]
+          chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
+          cli_args[:metadata] = chr_json
+          expected << chr_json
+        end
 
         margs = [cli_args, input, work_dir]
         task_id = task_identity(:gtc_to_bed, *margs)
@@ -130,11 +168,11 @@ module Genotyping::Tasks
                    cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files([output], :error => false) },
-                   :result => lambda { output },
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { expected },
                    :async => async)
       end
     end
 
   end # module GenotypeCall
-end # module Genotyping
+end # module Genotyping::Tasks

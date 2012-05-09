@@ -25,45 +25,49 @@ $:.unshift(libpath) unless $:.include?(libpath)
 require 'rubygems'
 require 'test/unit'
 require 'fileutils'
-require 'json'
 
 require 'genotyping'
 require File.join(testpath, 'test_helper')
 
-class TestFetchSampleData < Test::Unit::TestCase
+class TestPlinkTasks < Test::Unit::TestCase
   include TestHelper
   include Genotyping
+  include Genotyping::Tasks::Plink
 
   def initialize(name)
     super(name)
-    @msg_host = 'hgs3b'
-    @msg_port = 11301
+    @msg_host = Socket.gethostname
+    @msg_port = 11300
+  end
+
+  def setup
+    Percolate.log = Logger.new(File.join(data_path, 'test_plink_tasks.log'))
+    Percolate.asynchronizer = SystemAsynchronizer.new
   end
 
   def data_path
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_fetch_sample_data
-    name = "test_fetch_sample_data_" + $$.to_s
-    run_path = File.join(data_path, name)
-    FileUtils.mkdir_p(run_path) unless File.exists?(run_path)
+  def test_merge_bed
+    run_test_if(method(:plink_available?), "Skipping test_merge_bed") do
+      work_dir = make_work_dir('test_merge_bed', data_path)
 
-    dbfile = File.join(data_path, 'genotyping.db')
-    manifest_path = '/nfs/wtccc/data5/genotyping/chip_descriptions/Illumina_Infinium/current'
-    manifest = File.join(manifest_path, 'Human670-QuadCustom_v1_A.bpm.csv')
-    run_name = 'run1'
+      bed_files = (0..4).collect { |i| File.join(data_path, "mock_study1.part.#{i}.bed")  }
 
-    args = [dbfile, run_name, run_path, {:manifest => manifest}]
-    timeout = 720
-    log = 'percolate.log'
-    result = test_workflow(name, Genotyping::Workflows::FetchSampleData,
-                           timeout, run_path, log, args)
-    assert(result)
+      merged = wait_for('test_merge_bed', 120, 5) do
+        merge_bed(bed_files, 'mock_study1.bed', :work_dir => work_dir,
+                  :log_dir => work_dir)
+      end
 
-    Percolate.log.close
-    remove_work_dir(run_path)
+      assert_equal(3, merged.size)
+      merged.each do |file|
+        assert(File.exist?(file))
+      end
+
+      Percolate.log.close
+      remove_work_dir(work_dir)
+    end
   end
+
 end
-
-

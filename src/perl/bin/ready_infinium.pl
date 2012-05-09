@@ -27,6 +27,7 @@ sub run {
   my $dbfile;
   my $project_name;
   my $run_name;
+  my $maximum;
   my $namespace;
   my $supplier_name;
   my $verbose;
@@ -35,6 +36,7 @@ sub run {
              'dbfile=s'=> \$dbfile,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'run=s' => \$run_name,
+             'maximum=i' => \$maximum,
              'namespace=s' => \$namespace,
              'project=s' => \$project_name,
              'supplier=s' => \$supplier_name,
@@ -124,7 +126,8 @@ sub run {
        my %cache;
        my @samples;
 
-       foreach my $if_sample (@{$ifdb->find_project_samples($project_name)}) {
+     SAMPLE: foreach my $if_sample (@{$ifdb->find_project_samples
+                                        ($project_name)}) {
          my $if_chip = $if_sample->{beadchip};
          my $gtc_path = $if_sample->{path};
          my $if_barcode = $if_sample->{'plate'};
@@ -174,6 +177,8 @@ sub run {
          my $result = $sample->add_to_results({method => $infinium,
                                                value => $gtc_path});
          push @samples, $sample;
+
+         last SAMPLE if defined $maximum && scalar @samples == $maximum;
        }
 
        unless (@samples) {
@@ -241,7 +246,7 @@ ready_infinium
 =head1 SYNOPSIS
 
 ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--namespace <sample namespace>] --project <project name> \
+   [--namespace <sample namespace>] [--maximum <n>] --project <project name> \
    --run_name <pipeline run name> --supplier <supplier name> [--verbose]
 
 Options:
@@ -251,6 +256,7 @@ Options:
   --dbfile    The SQLite database file. If not supplied, defaults to the
               value given in the configuration .ini file.
   --help      Display help.
+  --maximum   Import samples up to a maximum number. Optional.
   --namespace The namespace for the imported sample names. Optional,
               defaults to 'wtsi'.
   --project   The name of the Infinium LIMS project to import.

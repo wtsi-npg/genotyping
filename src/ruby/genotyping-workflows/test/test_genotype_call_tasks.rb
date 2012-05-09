@@ -55,7 +55,7 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
       work_dir = make_work_dir('test_mock_study', data_path)
 
       sample_json, manifest, gtc_files = wait_for('test_mock_study', 60, 5) do
-        mock_study('a_mock_study', 5, 100, {:work_dir =>  work_dir,
+        mock_study('a_mock_study', 5, 100, {:work_dir => work_dir,
                                             :log_dir => work_dir})
       end
 
@@ -80,10 +80,11 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
                                           :log_dir => work_dir})
       end
 
-      sim_file = wait_for('test_gtc_to_sim', 60, 5) do
+      sim_file, metadata = wait_for('test_gtc_to_sim', 60, 5) do
         gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
-                    :log_dir => work_dir})
+                    :log_dir => work_dir,
+                    :metadata => 'chr.json'})
       end
 
       sim = SIM.new(sim_file)

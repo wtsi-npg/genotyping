@@ -24,16 +24,21 @@ module Genotyping
   include Utilities
 end
 
-require 'genotyping/version'
+require 'json'
+
+require 'genotyping/chromosomes'
 require 'genotyping/exceptions'
 require 'genotyping/utilities'
+require 'genotyping/version'
+require 'genotyping/sim'
 
 require 'genotyping/tasks'
-require 'genotyping/sim'
 require 'genotyping/workflows'
 
+require 'genotyping/tasks/database'
 require 'genotyping/tasks/genotype_call'
 require 'genotyping/tasks/illuminus'
-require 'genotyping/tasks/database'
+require 'genotyping/tasks/plink'
 
 require 'genotyping/workflows/fetch_sample_data'
+require 'genotyping/workflows/genotype_illuminus'
