@@ -89,6 +89,7 @@ consensus.model <- function(xhet.train, trials) {
     loglikes[[i]] <- m$loglik
   }
   loglikes <- signif(loglikes, 10) # avoid rounding errors
+  cat("Final log-likelihood of trained models:", loglikes, "\n")
   freqs <- table(loglikes) # construct frequency table
   loglik.consensus <- names(freqs)[which.max(freqs)]
   m <- NA
