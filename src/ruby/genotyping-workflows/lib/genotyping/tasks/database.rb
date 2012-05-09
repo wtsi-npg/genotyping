@@ -34,7 +34,7 @@ module Genotyping::Tasks
     # - args (Hash): Arguments for the operation. Currently none.
     #
     # Returns:
-    # - The SIM file path.
+    # - The result file path.
     def sample_intensities(dbfile, run_name, output, args = {})
       args, work_dir, log_dir = process_task_args(args)
 

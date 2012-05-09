@@ -70,16 +70,20 @@ class TestIlluminusTasks < Test::Unit::TestCase
         call_from_sim(sim_file, sample_json, manifest, 'mock_study1.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
+                       :chromosome => "1",
                        :start => 0,
-                       :end => 1000})
+                       :end => 1000,
+                       :plink => false})
       end
 
       call_file2 = wait_for('test_call_from_sim', 120, 5) do
         call_from_sim(sim_file, sample_json, manifest, 'mock_study2.call',
                       {:work_dir =>  work_dir,
                        :log_dir => work_dir,
+                       :chromosome => "1",
                        :start => 1000,
-                       :end => 2000},
+                       :end => 2000,
+                       :plink => false},
                       :queue => :small)
       end
 
@@ -99,24 +103,26 @@ class TestIlluminusTasks < Test::Unit::TestCase
       work_dir = make_work_dir('test_call_from_sim_p', data_path)
 
       sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
-        mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
+        mock_study('mock_study', 5, 2000, {:work_dir => work_dir,
                                            :log_dir => work_dir})
       end
 
       sim_file = wait_for('gtc_to_sim', 60, 5) do
         gtc_to_sim(sample_json, manifest, 'mock_study.sim',
-                   {:work_dir =>  work_dir,
+                   {:work_dir => work_dir,
                     :log_dir => work_dir})
       end
 
       call_files1 = wait_for('test_call_from_sim_p', 120, 5) do
         call_from_sim_p(sim_file, sample_json, manifest, 'mock_study1.call',
-                        {:work_dir =>  work_dir,
+                        {:work_dir => work_dir,
                          :log_dir => work_dir,
+                         :chromosome => "1",
                          :start => 0,
                          :end => 2000,
                          :size => 100,
-                         :group_size => 5},
+                         :group_size => 5,
+                         :plink=> false},
                         :queue => :small)
       end
 
