@@ -64,6 +64,7 @@ module Genotyping::Tasks
         end_snp = args[:end]
         wga = args[:wga]
         plink = args[:plink]
+        debug = args.delete(:debug)
 
         unless start_snp.is_a?(Fixnum)
           raise TaskArgumentError.new(":start must be an integer",
@@ -108,9 +109,10 @@ module Genotyping::Tasks
         end
 
         commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
-          [GENOTYPE_CALL, 'sim-to-illuminus', cli_arg_map(gca, :prefix => '--'),
-           '|', ILLUMINUS_WRAPPER,
-           cli_arg_map(iwa, :prefix => '--')].flatten.join(' ')
+          cmd = [GENOTYPE_CALL, 'sim-to-illuminus', cli_arg_map(gca, :prefix => '--')]
+          cmd += ['|', 'tee', iwa[:output] + '.iln'] if debug
+          cmd += ['|', ILLUMINUS_WRAPPER, cli_arg_map(iwa, :prefix => '--')]
+          cmd.flatten.join(' ')
         end
 
         # Job memoization keys, i corresponds to the partition index
