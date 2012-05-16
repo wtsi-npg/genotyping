@@ -46,7 +46,7 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
-    memory: <integer> number of Mb to request.
+    memory: <integer> number of Mb to request for Illuminus.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
 
@@ -72,14 +72,16 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-
-      args = ensure_valid_args(args, :config, :manifest, :queue)
+      args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
       args[:work_dir] = maybe_work_dir(work_dir)
-      manifest = args.delete(:manifest) # TODO: find manifest automatically
 
       async_defaults = {:memory => 500,
                         :queue => :normal}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      prep_async = lsf_args(args, async_defaults, :queue)
+      call_async = lsf_args(args, async_defaults, :memory, :queue)
+
+      manifest = args.delete(:manifest) # TODO: find manifest automatically
+      args.delete(:memory)
 
       sjname = run_name + '.sample.json'
       cjname = run_name + '.chr.json'
@@ -87,11 +89,16 @@ Returns:
       gcname = run_name + '.gencall.bed'
       ilname = run_name + '.illuminus.bed'
 
+      log_dir = File.join(work_dir, 'log')
+      Dir.mkdir(log_dir) unless File.exist?(log_dir)
+
       sjson = sample_intensities(dbfile, run_name, sjname, args)
 
-      smargs = {:metadata => cjname}.merge(args)
-      smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
+      smargs = {:metadata => cjname, :log_dir => log_dir}.merge(args)
+      bdargs = {:log_dir => log_dir}.merge(args)
+
+      smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
+      gcfile, * = gtc_to_bed(sjson, manifest, gcname, bdargs, prep_async)
 
       ilfile =
           if cjson
@@ -103,19 +110,20 @@ Returns:
 
               call_from_sim_p(smfile, sjson, manifest, befile,
                               {:work_dir =>  work_dir,
-                               :log_dir => work_dir,
+                               :log_dir => log_dir,
                                :chromosome => chr,
                                :start => start_snp,
                                :end => end_snp,
                                :size => 10000,
                                :group_size => 50,
-                               :plink => true}, async)
+                               :plink => true}, call_async)
             end
 
-            merge_bed(chunks.flatten, ilname, {:work_dir => work_dir}, async)
+            merge_bed(chunks.flatten, ilname, {:work_dir => work_dir,
+                                               :log_dir => log_dir}, call_async)
           end
 
-      [gcfile, ilfile].all?
+      [gcfile, ilfile] if [gcfile, ilfile].all?
     end
 
     :private
