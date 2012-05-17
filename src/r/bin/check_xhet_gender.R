@@ -170,11 +170,11 @@ zero.thresholds <- function(xhet, boundary.sd) {
 find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials) {
   # find appropriate m.max, f.min thresholds for xhet
   zero.boundary.sd <- 5
-  zeroCount <- length(xhet.train[xhet.train==0])
+  zeroCount <- length(xhet.train[xhet.train<=0.001]) # 'zeroes' could have a very small number of xhet hits
   smallCount <- length(xhet.train[xhet.train<=0.05])
   total <- length(xhet.train)
   if (zeroCount/total >= 0.1 & (smallCount-zeroCount)/total <= 0.1) {
-    # large population with xhet exactly zero and few close outliers; mixture model won't work
+    # large population with xhet (almost) zero and few close outliers; mixture model won't work
     cat(paste(signif(zeroCount/total, 4), "of samples have zero xhet; omitting mixture model.\n"))
     thresholds <- zero.thresholds(xhet.train, zero.boundary.sd)
   } else { # train and apply mixture model
