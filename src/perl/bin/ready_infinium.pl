@@ -61,9 +61,9 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
   if ($verbose) {
-    my $name = $dbfile;
-    $name ||= "configured database";
-    print STDERR "Updating $dbfile using config from $config\n";
+    my $db = $dbfile;
+    $db ||= 'configured database';
+    print STDERR "Updating $db using config from $config\n";
   }
 
   my $pipedb = WTSI::Genotyping::Database::Pipeline->new
