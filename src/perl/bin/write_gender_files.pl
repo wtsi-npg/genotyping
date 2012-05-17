@@ -10,6 +10,7 @@
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use FindBin qw($Bin);
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 
@@ -149,7 +150,7 @@ sub run {
     my %hetRates = findHetRates($pb, \@sampleNames);
     my $tempPath = $tempdir."/sample_xhet.txt";
     writeHetRates(\%hetRates, \@sampleNames, $tempPath);
-    my $cmd = "perl ./check_xhet_gender.pl --input=$tempPath --output_dir=$outDir";
+    my $cmd = "perl $Bin/check_xhet_gender.pl --input=$tempPath --output_dir=$outDir";
     print $cmd."\n";
     system($cmd);
 }
