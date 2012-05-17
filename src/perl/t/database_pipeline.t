@@ -53,7 +53,7 @@ $db->populate;
 is(18, $db->snpset->count, 'The snpset dictionary');
 is(3, $db->method->count, 'The method dictionary');
 is(2, $db->relation->count, 'The relation dictionary');
-is(1, $db->state->count, 'The state dictionary');
+is(2, $db->state->count, 'The state dictionary');
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});

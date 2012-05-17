@@ -95,6 +95,7 @@ sub run {
   my $infinium = $pipedb->method->find({name => 'Infinium'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
   my $good = $pipedb->state->find({name => 'Good'});
+  my $withdrawn = $pipedb->state->find({name => 'ConsentWithdrawn'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_name})) {
@@ -105,6 +106,7 @@ sub run {
   # information. It enables the data to be imported without removing
   # NOT NULL UNIQUE constraints.
   my $num_untracked_samples = 0;
+  my $num_consent_withdrawn_samples = 0;
   my $num_untracked_plates = 0;
   my %untracked_plates;
 
@@ -159,12 +161,25 @@ sub run {
          }
 
          my $ss_gender = $ss_sample->{gender};
+         my $ss_consent_withdrawn = $ss_sample->{consent_withdrawn};
          my $gender = $pipedb->gender->find({name => $ss_gender}) || $gender_na;
+         my $state = $good;
+         my $include = 1;
+
+         # If consent has been withdrawn, do not analyse and do not
+         # look in SNP for Sequenom genotypes
+         if ($ss_consent_withdrawn) {
+           ++$num_consent_withdrawn_samples;
+           $gender = $gender_na;
+           $state = $withdrawn;
+           $include = 0;
+         }
+
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                state => $good,
-                                                include => 1});
+                                                state => $state,
+                                                include => $include});
          $sample->add_to_genders($gender, {method => $supplied});
 
          my $plate = $pipedb->plate->find_or_create
@@ -174,21 +189,26 @@ sub run {
          my $well = $plate->add_to_wells({address => $address,
                                           sample  => $sample});
 
-         my $result = $sample->add_to_results({method => $infinium,
-                                               value => $gtc_path});
-         push @samples, $sample;
+         if ($include) {
+           my $result = $sample->add_to_results({method => $infinium,
+                                                 value => $gtc_path});
+           push @samples, $sample;
+         }
 
          last SAMPLE if defined $maximum && scalar @samples == $maximum;
        }
 
        unless (@samples) {
+         print_post_report($pipedb, $project_name, $num_untracked_plates,
+                           $num_consent_withdrawn_samples);
          die "Failed to find any samples for project '$project_name'\n";
        }
 
        $snpdb->insert_sequenom_calls($pipedb, \@samples);
      });
 
-  print_post_report($pipedb, $project_name, $num_untracked_plates) if $verbose;
+  print_post_report($pipedb, $project_name, $num_untracked_plates,
+                    $num_consent_withdrawn_samples) if $verbose;
 }
 
 sub validate_snpset {
@@ -217,7 +237,7 @@ sub print_pre_report {
 }
 
 sub print_post_report {
-  my ($pipedb, $project_name, $untracked) = @_;
+  my ($pipedb, $project_name, $untracked, $unconsented) = @_;
 
   my $ds = $pipedb->dataset->find({if_project => $project_name});
   my $proj = $ds->if_project;
@@ -233,7 +253,7 @@ sub print_post_report {
 
   print STDERR "Added dataset for '$proj':\n";
   print STDERR "  $num_plates plates ($untracked missing from Warehouse)\n";
-  print STDERR "  $num_samples samples\n";
+  print STDERR "  $num_samples samples ($unconsented consent withdrawn)\n";
   print STDERR "  $num_calls Sequenom SNP calls\n";
 }
 

@@ -17,13 +17,14 @@ our @ISA = qw(WTSI::Genotyping::Database);
   Example    : $db->find_infinium_plate('Infinium LIMS plate barcode')
   Description: Returns plate details for an Infinium LIMS plate barcode
                as a hashref with the following keys and values:
-               { sanger_sample_id => <WTSI sample name string>,
-                 uuid             => <SequenceScape UUID string>,
-                 gender           => <Supplier gender string>,
-                 barcode_prefix   => <SequenceScape barcode prefix string>,
-                 barcode          => <SequenceScape barcode integer>,
-                 map              => <SequenceScape well address string
-                                      without 0-pad e.g A1> }
+               { sanger_sample_id  => <WTSI sample name string>,
+                 uuid              => <SequenceScape UUID blob as hexidecimal>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 gender            => <Supplier gender string>,
+                 barcode_prefix    => <SequenceScape barcode prefix string>,
+                 barcode           => <SequenceScape barcode integer>,
+                 map               => <SequenceScape well address string
+                                       without 0-pad e.g A1> }
   Returntype : hashref
   Caller     : general
 
@@ -37,7 +38,8 @@ sub find_infinium_plate {
   my $query =
     "SELECT
        sm.sanger_sample_id,
-       sm.uuid,
+       sm.consent_withdrawn,
+       HEX(sm.uuid),
        sm.gender,
        pl.barcode_prefix,
        pl.barcode,
