@@ -148,16 +148,39 @@ mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanity
     f.min <- midpoint+0.1*dist
     m.max <- midpoint-0.1*dist
   }
-  cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
-  cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
   mix.plot(m, plotPath, title, m.max, f.min, i.m, i.f) # write plot of mixture model
   if (sanityCheck) {
-    n = 10000
+    n <- 10000
     max.err <- 0.025
     min.weight <- 0.15
     sanity.check(m, n, min.weight, max.err)
   }
   return(c(m.max, f.min))
+}
+
+zero.thresholds <- function(xhet, boundary.sd) {
+  # find thresholds for high population with xhet exactly zero
+  m.max <- 0.05 # corresponds to a 5% calling error in male samples which "should" have zero xhet
+  non.male <- xhet[xhet>=m.max]
+  f.min <- mean(non.male) - boundary.sd*sd(non.male)
+  if (f.min < m.max) { f.min <- m.max }
+  return(c(m.max, f.min))
+}
+
+find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials) {
+  # find appropriate m.max, f.min thresholds for xhet
+  zero.boundary.sd <- 5
+  zeroCount <- length(xhet.train[xhet.train==0])
+  smallCount <- length(xhet.train[xhet.train<=0.05])
+  total <- length(xhet.train)
+  if (zeroCount/total >= 0.1 & (smallCount-zeroCount)/total <= 0.1) {
+    # large population with xhet exactly zero and few close outliers; mixture model won't work
+    cat(paste(signif(zeroCount/total, 4), "of samples have zero xhet; omitting mixture model.\n"))
+    thresholds <- zero.thresholds(xhet.train, zero.boundary.sd)
+  } else { # train and apply mixture model
+    thresholds <- mixmodel.thresholds(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials)
+  }
+  return(thresholds)
 }
 
 ########################################################
@@ -172,9 +195,11 @@ clip <- as.numeric(args[6]) # proportion of high values to clip; can be zero; re
 trials <- as.numeric(args[7])  #10 # number of trials for consensus; TODO read from command line args
 boundary.sd <- 3 # number of standard deviations for max male / min female boundaries
 
-thresholds <- mixmodel.thresholds(data$xhet, boundary.sd, plotPath, title, sanityCheck, clip, trials)
+thresholds <- find.thresholds(data$xhet, boundary.sd, plotPath, title, sanityCheck, clip, trials)
 m.max <- thresholds[1]
 f.min <- thresholds[2]
+cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
+cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
 
 ### compute gender assignments for all input xhet values ###
 cat("### Gender model results ###\n")
