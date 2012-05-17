@@ -84,6 +84,7 @@ consensus.model <- function(xhet.train, trials) {
   models <- c()
   loglikes <- c()
   for (i in seq(1, trials)) {
+    cat(paste("\t", i, "\n"))
     m <- normalmixEM(xhet.train, k=2)
     models[[i]] <- m
     loglikes[[i]] <- m$loglik
@@ -122,6 +123,43 @@ sanity.check <- function(m, n, min.weight, max.err) {
   }
 }
 
+mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials) {
+  # construct mixture model and find m.max, f.min thresholds
+  total <- length(xhet.train)
+  if (clip>0 & total >= 100) { # clip away high values; female has mostly low xhet for some chips (eg. exome)
+    xhet.train <- sort(xhet.train)
+    remove <- round(total*clip)
+    xhet.train <- xhet.train[0:(total-remove)] # do not update total; xhet.train used for model training only
+  }
+  # import "mixtools" package and train mixture model
+  library(mixtools)
+  cat("Constructing 2-component mixture model.\n")
+  m <- consensus.model(xhet.train, trials)
+  cat(summary(m))
+  cat(paste("loglik_final", signif(m$loglik, 8), "\n")) # use to parse loglikelihood from output
+  # infer male/female boundaries from model
+  i.m <- which.min(m$mu) # indices for male, female components
+  i.f <- which.max(m$mu)
+  m.max <- m$mu[i.m] + boundary.sd*m$sigma[i.m]
+  f.min <- m$mu[i.f] - boundary.sd*m$sigma[i.f]
+  if (f.min < m.max) { # SD regions overlap; use midpoint +/- 10%
+    dist <- m$mu[i.f]-m$mu[i.m]
+    midpoint <- m$mu[i.m]+dist/2 # midpoint between population means
+    f.min <- midpoint+0.1*dist
+    m.max <- midpoint-0.1*dist
+  }
+  cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
+  cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
+  mix.plot(m, plotPath, title, m.max, f.min, i.m, i.f) # write plot of mixture model
+  if (sanityCheck) {
+    n = 10000
+    max.err <- 0.025
+    min.weight <- 0.15
+    sanity.check(m, n, min.weight, max.err)
+  }
+  return(c(m.max, f.min))
+}
+
 ########################################################
 
 args <- commandArgs(TRUE)
@@ -132,54 +170,19 @@ title <- args[4]
 sanityCheck <- as.logical(args[5]) # convert string 'TRUE' or 'FALSE' to boolean value
 clip <- as.numeric(args[6]) # proportion of high values to clip; can be zero; recommend 0.5%
 trials <- as.numeric(args[7])  #10 # number of trials for consensus; TODO read from command line args
-
 boundary.sd <- 3 # number of standard deviations for max male / min female boundaries
 
-xhet.train <- data$xhet # training data
-total <- length(xhet.train) # total number of samples
-if (clip>0 & total >= 100) { # clip away high values; female population has mostly low xhet for some chips (eg. exome)
-  xhet.train <- sort(xhet.train)
-  remove <- round(total*clip)
-  xhet.train <- xhet.train[0:(total-remove)] # do not update total; xhet.train variable is for model training only
-}
+thresholds <- mixmodel.thresholds(data$xhet, boundary.sd, plotPath, title, sanityCheck, clip, trials)
+m.max <- thresholds[1]
+f.min <- thresholds[2]
 
-# import "mixtools" package and train mixture model
-library(mixtools)
-cat("Constructing 2-component mixture model.\n")
-#m = normalmixEM(xhet.train, k=2) # old version
-m <- consensus.model(xhet.train, trials)
-cat(summary(m))
-cat(paste("loglik_final", signif(m$loglik, 8), "\n")) # use to parse loglikelihood from output
-# infer male/female boundaries from model
-i.m <- which.min(m$mu) # indices for male, female components
-i.f <- which.max(m$mu)
-m.max <- m$mu[i.m] + boundary.sd*m$sigma[i.m]
-f.min <- m$mu[i.f] - boundary.sd*m$sigma[i.f]
-if (f.min < m.max) { # SD regions overlap; use midpoint +/- 10%
-  dist <- m$mu[i.f]-m$mu[i.m]
-  midpoint <- m$mu[i.m]+dist/2 # midpoint between population means
-  f.min <- midpoint+0.1*dist
-  m.max <- midpoint-0.1*dist
-}
-cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
-cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
-mix.plot(m, plotPath, title, m.max, f.min, i.m, i.f) # plot mixture model
-
-if (sanityCheck) {
-  n = 10000
-  max.err <- 0.025
-  min.weight <- 0.15
-  sanity.check(m, n, min.weight, max.err)
-}
-
-### if model passes any sanity checks, compute gender assignments ###
-# assign for all input xhet values (including outliers excluded from model training)
+### compute gender assignments for all input xhet values ###
 cat("### Gender model results ###\n")
+total <- length(data$xhet) # total number of samples
 gender <- rep(0, times=total) # 'blank' vector of genders
 gender[data$xhet<=m.max] <- 1
 gender[data$xhet>=f.min] <- 2
-#data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender,'supplied'=data$supplied)
-# also need a 'supplied' column for sample_xhet_gender.txt format; can add this in another script
+# old sample_xhet_gender.txt format has a 'supplied' column after 'inferred'; can add elsewhere
 data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender)
 
 # output summary to stdout and new table to file
