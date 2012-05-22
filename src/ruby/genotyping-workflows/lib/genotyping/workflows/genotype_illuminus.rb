@@ -46,7 +46,7 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
-    memory: <integer> number of Mb to request for Illuminus.
+    memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
 
@@ -77,13 +77,14 @@ Returns:
 
       async_defaults = {:memory => 500,
                         :queue => :normal}
-      prep_async = lsf_args(args, async_defaults, :queue)
+      prep_async = lsf_args(args, async_defaults, :memory, :queue)
       call_async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       args.delete(:memory)
 
       sjname = run_name + '.sample.json'
+      njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       smname = run_name + '.sim'
       gcname = run_name + '.gencall.bed'
@@ -94,10 +95,12 @@ Returns:
 
       sjson = sample_intensities(dbfile, run_name, sjname, args)
 
-      smargs = {:metadata => cjname, :log_dir => log_dir}.merge(args)
+      smargs = {:chromosome_meta => cjname,
+                :snp_meta => njname,
+                :log_dir => log_dir}.merge(args)
       bdargs = {:log_dir => log_dir}.merge(args)
 
-      smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
+      smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
       gcfile, * = gtc_to_bed(sjson, manifest, gcname, bdargs, prep_async)
 
       ilfile =
@@ -116,11 +119,13 @@ Returns:
                                :end => end_snp,
                                :size => 10000,
                                :group_size => 50,
-                               :plink => true}, call_async)
+                               :plink => true,
+                               :snps => njson}, call_async)
             end
 
+            merge_async = call_async
             merge_bed(chunks.flatten, ilname, {:work_dir => work_dir,
-                                               :log_dir => log_dir}, call_async)
+                                               :log_dir => log_dir}, merge_async)
           end
 
       [gcfile, ilfile] if [gcfile, ilfile].all?

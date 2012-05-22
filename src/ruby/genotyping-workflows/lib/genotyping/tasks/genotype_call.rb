@@ -62,7 +62,8 @@ module Genotyping::Tasks
 
         command =[GENOTYPE_CALL, 'mock-study',
                   cli_arg_map(cli_args,
-                              :prefix => '--') { |key| key.gsub(/_/, '-') }].flatten.join(' ')
+                              :prefix => '--') { |key|
+                    key.gsub(/_/, '-') }].flatten.join(' ')
         expected = [sample_json, manifest, gtc_files].flatten
 
         async_task(margs, command, work_dir, log,
@@ -102,11 +103,18 @@ module Genotyping::Tasks
                     :manifest => manifest,
                     :output => output}
 
-        if args.has_key?(:metadata)
-          chr_json = args[:metadata]
+        if args.has_key?(:chromosome_meta)
+          chr_json = args[:chromosome_meta]
           chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:metadata] = chr_json
+          cli_args[:chromosome_meta] = chr_json
           expected << chr_json
+        end
+
+        if args.has_key?(:snp_meta)
+          snp_json = args[:snp_meta]
+          snp_json = absolute_path(snp_json, work_dir) unless absolute_path?(snp_json)
+          cli_args[:snp_meta] = snp_json
+          expected << snp_json
         end
 
         margs = [cli_args, input, work_dir]
@@ -114,7 +122,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         command = [GENOTYPE_CALL, 'gtc-to-sim',
-                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
@@ -153,10 +162,10 @@ module Genotyping::Tasks
                     :manifest => manifest,
                     :output => output}
 
-        if args.has_key?(:metadata)
-          chr_json = args[:metadata]
+        if args.has_key?(:chromosome_meta)
+          chr_json = args[:chromosome_meta]
           chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:metadata] = chr_json
+          cli_args[:chromosome_meta] = chr_json
           expected << chr_json
         end
 
@@ -165,7 +174,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         command = [GENOTYPE_CALL, 'gtc-to-bed',
-                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },

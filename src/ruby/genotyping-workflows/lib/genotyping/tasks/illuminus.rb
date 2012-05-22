@@ -59,7 +59,7 @@ module Genotyping::Tasks
 
       if args_available?(sim_file, sample_json, manifest, chromosome , output, work_dir)
         output = absolute_path(output, work_dir) unless absolute_path?(output)
-        chromosome = args[:chromosome]
+        snp_json = args[:snps]
         start_snp = args[:start] || 0
         end_snp = args[:end]
         wga = args[:wga]
@@ -102,6 +102,7 @@ module Genotyping::Tasks
 
           {:samples => sample_json,
            :chr => chromosome,
+           :snps => snp_json,
            :wga => wga,
            :output => grouped_part,
            :plink => plink,
