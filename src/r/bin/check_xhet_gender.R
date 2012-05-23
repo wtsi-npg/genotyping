@@ -175,7 +175,7 @@ find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityChec
   total <- length(xhet.train)
   if (zeroCount/total >= 0.1 & (smallCount-zeroCount)/total <= 0.1) {
     # large population with xhet (almost) zero and few close outliers; mixture model won't work
-    cat(paste(signif(zeroCount/total, 4), "of samples have zero xhet; omitting mixture model.\n"))
+    cat(paste(signif(zeroCount/total, 4), "of samples have negligible xhet; omitting mixture model.\n"))
     thresholds <- zero.thresholds(xhet.train, zero.boundary.sd)
   } else { # train and apply mixture model
     thresholds <- mixmodel.thresholds(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials)
