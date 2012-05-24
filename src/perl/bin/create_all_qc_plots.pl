@@ -5,6 +5,8 @@
 
 # 'main' script to generate plots for a given genotype analysis directory
 
+### 2012-05-24 OBSOLETE -- use run_qc.pl instead. This script should still work, but not necessarily supported. ###
+
 use strict;
 use warnings;
 use Getopt::Long;
