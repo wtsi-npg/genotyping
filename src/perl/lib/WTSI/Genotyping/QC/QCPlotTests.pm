@@ -8,6 +8,7 @@ package WTSI::Genotyping::QC::QCPlotTests;
 use strict;
 use warnings;
 use Cwd qw /getcwd abs_path/;
+use POSIX qw(strftime);
 use XML::Parser;
 use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
 
@@ -182,6 +183,13 @@ sub testPlotRScript {
     return $allOK;
 }
 
+sub timeNow {
+    # return a string representing the present (local) time
+    my $tf = shift;
+    $tf ||= "%Y-%m-%d_%H:%M:%S";
+    return strftime($tf, localtime());
+}
+
 sub wrapCommand {
     # generic wrapper for a system call; assume non-zero return value indicates an error
     # if given a filehandle, execute command in test mode and print result; otherwise just run command
@@ -198,6 +206,35 @@ sub wrapCommand {
     } else {
 	system($cmd);
     }
+    return ($tests, $failures);
+}
+
+sub wrapCommandList {
+    # wrap multiple commands in a list
+    my ($cmdsRef, $tests, $failures, $verbose, $omitRef, $logPath) = @_;
+    my @cmds = @$cmdsRef;
+    my $total = @cmds;
+    my @omits;
+    if ($omitRef) { @omits = @$omitRef; }
+    else { for (my $i=0;$i<$total;$i++) { push(@omits, 0); } }
+    my $fh;
+    my $start = time();
+    if ($logPath) { open $fh, "> $logPath" || die "Cannot open log $logPath: $!"; }
+    else { $fh = *STDOUT; }
+    if ($verbose) { print timeNow()." Command list started.\n"; }
+    for (my $i=0;$i<$total;$i++) {
+	if ($omits[$i]) { 
+	    if ($verbose) { print timeNow()." Omitting $cmds[$i]\n"; } 
+	} else {
+	    ($tests, $failures) = wrapCommand($cmds[$i], $fh, $tests, $failures);
+	    if ($verbose) { print timeNow()." Finished command ".($i+1)." of $total.\n"; }
+	}
+    }
+    if ($verbose) {
+	my $duration = time() - $start;
+	print "Command list finished. Duration: $duration s\n";
+    }
+    if ($logPath) { close $fh; }
     return ($tests, $failures);
 }
 
