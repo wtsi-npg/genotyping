@@ -129,8 +129,8 @@ sub writeInputFiles {
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
 		"perl $Bin/write_gender_files.pl --qc-output=sample_xhet_gender.txt --plots-dir=. $plinkPrefix"
 	);
-    #my @omits = (0,0,0,0);
-    my @omits = (1,1,1,1);
+    my @omits = (0,0,0,0);
+    #my @omits = (1,1,1,1);
     if ($verbose) { print WTSI::Genotyping::QC::QCPlotTests::timeNow()." Starting QC checks.\n"; }
     WTSI::Genotyping::QC::QCPlotTests::wrapCommandList(\@cmds, $tests, $failures, $verbose, \@omits);
     chdir($startDir);
