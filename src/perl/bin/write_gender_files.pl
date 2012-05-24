@@ -95,11 +95,13 @@ sub countCallsHets {
 sub extractChromData {
     # write plink binary data to given directory, for given chromosome only (defaults to X)
     # return plink_binary object for reading data
-    my ($plinkPrefix, $outDir, $chrom, $outPrefix) = @_;
+    my ($plinkPrefix, $outDir, $chrom, $outPrefix, $verbose) = @_;
     $chrom ||= "X";
     $outPrefix ||= "plink_temp_chrom$chrom";
+    $verbose ||= 0;
     my $outArg = $outDir."/$outPrefix";
     my $cmd = "/software/bin/plink --bfile $plinkPrefix --chr $chrom --out $outArg --make-bed";
+    unless ($verbose) { $cmd .= " > /dev/null"; } # suppress stdout from plink
     system($cmd);
     my $pb = new plink_binary::plink_binary($outArg);
     return $pb;
