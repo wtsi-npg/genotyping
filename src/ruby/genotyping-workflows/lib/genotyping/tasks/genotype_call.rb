@@ -99,6 +99,7 @@ module Genotyping::Tasks
         expected = [output]
 
         cli_args = {:chromosome => args[:chromosome],
+                    :normalize => args[:normalize],
                     :input => input,
                     :manifest => manifest,
                     :output => output}
@@ -183,6 +184,44 @@ module Genotyping::Tasks
                    :async => async)
       end
     end
+
+    # Creates a SNP annotation file suitable for use with GenoSNP. Note the
+    # caveats elsewhere regarding BeadpoolId versus the "magic" numbers actually
+    # written into this file.
+    #
+    # Arguments:
+    # - manifest (String): The BeadPool manifest file name.
+    # - output (String): The output file name.
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    #   - The annotation file path.
+    def bpm_to_genosnp(manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(manifest , output, work_dir)
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        expected = [output]
+
+        cli_args = {:manifest => manifest,
+                    :output => output}
+
+        command = [GENOTYPE_CALL, 'bpm-to-genosnp',
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
+
+        margs = [cli_args, work_dir]
+        task_id = task_identity(:bpm_to_genosnp, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
+
 
   end # module GenotypeCall
 end # module Genotyping::Tasks

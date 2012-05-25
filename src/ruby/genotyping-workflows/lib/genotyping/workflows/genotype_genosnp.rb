@@ -18,24 +18,23 @@
 
 module Genotyping::Workflows
 
-  class GenotypeIlluminus < Percolate::Workflow
+  class GenotypeGenoSNP < Percolate::Workflow
     include Genotyping
     include Genotyping::Tasks::Database
     include Genotyping::Tasks::GenotypeCall
-    include Genotyping::Tasks::Illuminus
+    include Genotyping::Tasks::GenoSNP
     include Genotyping::Tasks::Plink
 
     description <<-DESC
-Collates the normalized intensity values and GenCall genotype calls for the
-samples in one named pipeline run. The former are written into a single SIM
-format file, the latter into a Plink BED format file. Calls genotypes using
-Illuminus and writes them to an additional Plink BED format file.
+    Collates the raw intensity values for the samples in one named pipeline run
+to a single SIM format file. Calls genotypes using GenoSNP and writes them to a
+Plink BED format file.
 
 Requires a populated pipeline database.
     DESC
 
     usage <<-USAGE
-GenotypeIlluminus args
+    GenotypeGenoSNP args
 
 Arguments:
 
@@ -53,7 +52,7 @@ Arguments:
 e.g.
 
  library: genotyping
- workflow: Genotyping::Workflows::GenotypeIlluminus
+ workflow: Genotyping::Workflows::GenotypeGenoSNP
  arguments:
      - /work/my_project/my_analysis.db
      - sample_batch_1
@@ -74,9 +73,10 @@ Returns:
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
 
-      async_defaults = {:memory => 1024,
+      async_defaults = {:memory => 500,
                         :queue => :normal}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      prep_async = lsf_args(args, async_defaults, :memory, :queue)
+      call_async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       args.delete(:memory)
@@ -88,48 +88,36 @@ Returns:
               :log_dir => log_dir}.merge(args)
 
       sjname = run_name + '.sample.json'
-      njname = run_name + '.snp.json'
-      cjname = run_name + '.chr.json'
-      smname = run_name + '.illuminus.sim'
-      gcname = run_name + '.gencall.bed'
-      ilname = run_name + '.illuminus.bed'
+      gsname = run_name + '.snp.txt'
+      smname = run_name + '.genosnp.sim'
+      txname = run_name + '.genosnp.txt'
 
       sjson = sample_intensities(dbfile, run_name, sjname, args)
+      num_samples = count_samples(sjson)
 
-      smargs = {:normalize => true,
-                :chromosome_meta => cjname,
-                :snp_meta => njname}.merge(args)
+      smargs = {:normalize => false}.merge(args)
 
-      smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
+      smfile = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
+      gsfile = bpm_to_genosnp(manifest, gsname, args, prep_async)
+      gsargs = {:start => 0,
+                :end => num_samples,
+                :size => 20,
+                :group_size => 50}.merge(args)
 
-      ilargs = {:size => 10000,
-                :group_size => 50,
-                :plink => true,
-                :snps => njson}.merge(args)
+      chunks = call_from_sim_p(smfile, gsfile, manifest, txname, gsargs, call_async)
 
-      chunks = chromosome_bounds(cjson).collect do |cspec|
-        chr = cspec["chromosome"]
-        pargs = {:chromosome => chr,
-                 :start => cspec["start"],
-                 :end => cspec["end"]}
+      # FIXME: when GenoSNP writes Plink format, merge these chunks
+      # merge_async = call_async
+      # merge_bed(chunks.flatten, gsfile, {:work_dir => work_dir,
+      #                                    :log_dir => log_dir}, merge_async)
 
-        call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
-                        ilargs.merge(pargs), async)
-      end
-
-      ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
-
-      [gcfile, ilfile] if [gcfile, ilfile].all?
+      chunks && chunks.flatten.all?
     end
 
     :private
-    def chromosome_bounds(cjson)
-      if cjson
-        JSON.parse(File.read(cjson))
-      else
-        []
-      end
+    def count_samples(sjson)
+      JSON.parse(File.read(sjson)).size if sjson
     end
+
   end
 end

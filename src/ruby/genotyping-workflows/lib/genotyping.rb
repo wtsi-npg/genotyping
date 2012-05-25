@@ -39,6 +39,8 @@ require 'genotyping/tasks/database'
 require 'genotyping/tasks/genotype_call'
 require 'genotyping/tasks/illuminus'
 require 'genotyping/tasks/plink'
+require 'genotyping/tasks/genosnp'
 
 require 'genotyping/workflows/fetch_sample_data'
 require 'genotyping/workflows/genotype_illuminus'
+require 'genotyping/workflows/genotype_genosnp'
