@@ -1,0 +1,7 @@
+
+Components of the WTSI genotype analysis pipeline.
+
+This is the perl Genotyping module, a component of the WTSI genotype
+analysis pipeline which provides command-line applications. These
+applications may be run manually or within a pipeline defined by the
+Ruby Genotyping module.

@@ -31,7 +31,7 @@ use WTSI::Genotyping::Illuminus;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Utilities;
 
-$VERSION = '0.1.0';
+$VERSION = '0.2.0';
 
 1;
 
@@ -66,10 +66,6 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
-
-=head1 CHANGELOG
-
-Fri Feb  3 13:35:00 GMT 2012 -- Initial version 0.1.0
+  0.2.0
 
 =cut
