@@ -62,7 +62,8 @@ module Genotyping::Tasks
 
         command =[GENOTYPE_CALL, 'mock-study',
                   cli_arg_map(cli_args,
-                              :prefix => '--') { |key| key.gsub(/_/, '-') }].flatten.join(' ')
+                              :prefix => '--') { |key|
+                    key.gsub(/_/, '-') }].flatten.join(' ')
         expected = [sample_json, manifest, gtc_files].flatten
 
         async_task(margs, command, work_dir, log,
@@ -98,15 +99,23 @@ module Genotyping::Tasks
         expected = [output]
 
         cli_args = {:chromosome => args[:chromosome],
+                    :normalize => args[:normalize],
                     :input => input,
                     :manifest => manifest,
                     :output => output}
 
-        if args.has_key?(:metadata)
-          chr_json = args[:metadata]
+        if args.has_key?(:chromosome_meta)
+          chr_json = args[:chromosome_meta]
           chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:metadata] = chr_json
+          cli_args[:chromosome_meta] = chr_json
           expected << chr_json
+        end
+
+        if args.has_key?(:snp_meta)
+          snp_json = args[:snp_meta]
+          snp_json = absolute_path(snp_json, work_dir) unless absolute_path?(snp_json)
+          cli_args[:snp_meta] = snp_json
+          expected << snp_json
         end
 
         margs = [cli_args, input, work_dir]
@@ -114,7 +123,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         command = [GENOTYPE_CALL, 'gtc-to-sim',
-                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
@@ -153,10 +163,10 @@ module Genotyping::Tasks
                     :manifest => manifest,
                     :output => output}
 
-        if args.has_key?(:metadata)
-          chr_json = args[:metadata]
+        if args.has_key?(:chromosome_meta)
+          chr_json = args[:chromosome_meta]
           chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:metadata] = chr_json
+          cli_args[:chromosome_meta] = chr_json
           expected << chr_json
         end
 
@@ -165,7 +175,8 @@ module Genotyping::Tasks
         log = File.join(log_dir, task_id + '.log')
 
         command = [GENOTYPE_CALL, 'gtc-to-bed',
-                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
@@ -173,6 +184,44 @@ module Genotyping::Tasks
                    :async => async)
       end
     end
+
+    # Creates a SNP annotation file suitable for use with GenoSNP. Note the
+    # caveats elsewhere regarding BeadpoolId versus the "magic" numbers actually
+    # written into this file.
+    #
+    # Arguments:
+    # - manifest (String): The BeadPool manifest file name.
+    # - output (String): The output file name.
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    #   - The annotation file path.
+    def bpm_to_genosnp(manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(manifest , output, work_dir)
+        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        expected = [output]
+
+        cli_args = {:manifest => manifest,
+                    :output => output}
+
+        command = [GENOTYPE_CALL, 'bpm-to-genosnp',
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
+
+        margs = [cli_args, work_dir]
+        task_id = task_identity(:bpm_to_genosnp, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
+
 
   end # module GenotypeCall
 end # module Genotyping::Tasks

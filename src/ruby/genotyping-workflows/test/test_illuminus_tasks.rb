@@ -51,53 +51,6 @@ class TestIlluminusTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_call_from_sim
-    run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim") do
-      work_dir = make_work_dir('test_call_from_sim', data_path)
-
-      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
-        mock_study('mock_study', 5, 2000, {:work_dir =>  work_dir,
-                                           :log_dir => work_dir})
-      end
-
-      sim_file = wait_for('gtc_to_sim', 60, 5) do
-        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
-                   {:work_dir =>  work_dir,
-                    :log_dir => work_dir})
-      end
-
-      call_file1 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, sample_json, manifest, 'mock_study1.call',
-                      {:work_dir =>  work_dir,
-                       :log_dir => work_dir,
-                       :chromosome => "1",
-                       :start => 0,
-                       :end => 1000,
-                       :plink => false})
-      end
-
-      call_file2 = wait_for('test_call_from_sim', 120, 5) do
-        call_from_sim(sim_file, sample_json, manifest, 'mock_study2.call',
-                      {:work_dir =>  work_dir,
-                       :log_dir => work_dir,
-                       :chromosome => "1",
-                       :start => 1000,
-                       :end => 2000,
-                       :plink => false},
-                      :queue => :small)
-      end
-
-      assert(File.exist?(call_file1))
-      assert_equal(1001 , File.open(call_file1) { |file| file.readlines.size })
-
-      assert(File.exist?(call_file2))
-      assert_equal(1001 , File.open(call_file2) { |file| file.readlines.size })
-
-      Percolate.log.close
-      remove_work_dir(work_dir)
-    end
-  end
-
   def test_call_from_sim_p
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim_p") do
       work_dir = make_work_dir('test_call_from_sim_p', data_path)
