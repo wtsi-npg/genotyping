@@ -82,18 +82,41 @@ sub maybe_stdout {
 sub read_sample_json {
   my $file = shift;
 
-  my $str = '';
   open(FH, "<$file")
     or die "Failed to open JSON file '$file' for reading: $!\n";
-  while (my $line = <FH>) {
-    $str .= $line;
-  }
+  my $str = do { local $/ = undef; <FH> };
   close(FH);
 
   return @{from_json($str, {utf8 => 1})};
 }
 
 1;
+
+=head2 read_snp_json
+
+  Arg [1]    : filename
+  Example    : @snps = read_snp_json($file)
+  Description: Returns SNP metadata hashes, one per SNP, from a JSON file.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub read_snp_json {
+  my $file = shift;
+
+  open(FH, "<$file")
+    or die "Failed to open JSON file '$file' for reading: $!\n";
+  my $str = do { local $/ = undef; <FH> };
+  close(FH);
+
+  return @{from_json($str, {utf8 => 1})};
+}
+
+1;
+
+
+
 
 __END__
 
