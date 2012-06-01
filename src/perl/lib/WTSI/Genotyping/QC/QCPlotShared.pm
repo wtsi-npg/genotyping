@@ -12,7 +12,8 @@ $RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scri
 
 # file and directory names
 $sampleCrHet = 'sample_cr_het.txt'; # main source of input
-$xyDiffExpr = "/*XYdiff.txt"; # use to glob for xydiff input
+$xyDiffExpr = "/*XYdiff.txt"; # use to glob for xydiff input (old pipeline output only; now read from .sim file)
+$xydiff = "xydiff.txt"; # xydiff output file in new qc
 $mainIndex = 'index.html';
 $plateHeatmapDir = 'plate_heatmaps';
 $plateHeatmapIndex = 'index.html'; # written to $plateHeatmapDir, not main output directory
