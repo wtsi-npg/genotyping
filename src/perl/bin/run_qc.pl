@@ -12,16 +12,20 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use Cwd;
+use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($help, $outDir, $plinkPrefix, $verbose);
+my ($help, $outDir, $simPath, $title, $plinkPrefix, $noWrite, $noPlate, $noPlots, $verbose);
 
-GetOptions("help"         => \$help,
-	   "output_dir=s" => \$outDir,
-	   "verbose"      => \$verbose
+GetOptions("help"           => \$help,
+	   "output_dir=s"   => \$outDir,
+	   "sim=s"          => \$simPath,
+	   "title=s"        => \$title,
+	   "no-data-write"  => \$noWrite,
+	   "no-plots"       => \$noPlots,
+	   "verbose"        => \$verbose
     );
 
 if ($help) {
@@ -29,6 +33,11 @@ if ($help) {
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension)
 Options:
 --output-dir        Directory for QC output
+--sim               Path to SIM intensity file for xydiff calculation
+--title             Title for this analysis; will appear in plots
+--no-data-write     Do not write text input files for plots (plotting will fail unless files already exist)
+--no-plate          Do not create plate heatmap plots
+--no-plots          Do not create any plots
 --help              Print this help text and exit
 --verbose           Print additional output to stdout
 ";
@@ -40,10 +49,16 @@ if (not -e $outDir) { mkdir($outDir); }
 
 $plinkPrefix = $ARGV[0];
 unless ($plinkPrefix) { die "ERROR: Must supply a PLINK filename prefix!"; }
+# disassemble prefix to find absolute path to directory
+my @terms = split("/", $plinkPrefix);
+my $filePrefix = pop(@terms);
+if (@terms) { 
+    my $plinkDir = abs_path(join("/", @terms));
+    $plinkPrefix = $plinkDir."/".$filePrefix;
+}
+run($plinkPrefix, $simPath, $outDir, $title, $noWrite, $noPlate, $noPlots);
 
-run($plinkPrefix, $outDir);
-
-sub checkInputs {
+sub checkPlinkInputs {
     # check that PLINK binary files exist and are readable
     my $plinkPrefix = shift;
     my @suffixes = qw(.bed .bim .fam);
@@ -57,13 +72,14 @@ sub checkInputs {
 
 sub createPlots {
     # create plots from QC files
-    my ($plinkPrefix, $outDir, $tests, $failures, $title, $verbose) = @_;
+    my ($plinkPrefix, $outDir, $tests, $failures, $title, $noPlate, $verbose) = @_;
     $tests ||= 0;
     $failures ||= 0;
     my $startDir = getcwd;
     chdir($outDir);
-    my @cmds = getPlotCommands(".", $title);
-    my @omits = ();
+    my @cmds = getPlotCommands(".", $title, $noPlate);
+    my @omits = (0) x ($#cmds+1); 
+    #@omits = (1,1,0,0,0,0,0,0,0); ### hack for testing
     if ($verbose) { print WTSI::Genotyping::QC::QCPlotTests::timeNow()." Starting plot generation.\n"; }
     ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommandList(\@cmds, $tests, $failures, 
 									     $verbose, \@omits);
@@ -73,33 +89,43 @@ sub createPlots {
 
 sub getPlotCommands {
     # generate commands to create plots; assume commands will be run from plots directory
-    my $outDir = shift;
-    my $title = shift;
+    my ($outDir, $title, $noPlate) = @_;
     my @cmds = ();
     my $cmd;
     ### plate heatmaps ###
     my $crHetPath = $WTSI::Genotyping::QC::QCPlotShared::sampleCrHet;
-    my $heatMapScript = "$Bin/plate_heatmap_plots.pl";
-    my $hmOut = $outDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir; # heatmaps in subdirectory
-    unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
-    foreach my $mode ('cr', 'het') { # assumes $crHetPath exists and is readable
-	$cmd = join(' ', ('cat', $crHetPath, '|', 'perl', $heatMapScript, '--mode='.$mode, '--out_dir='.$hmOut));
-	push(@cmds, $cmd);
+    my $xydiffPath = $WTSI::Genotyping::QC::QCPlotShared::xydiff;
+    unless ($noPlate) {
+	# creating heatmap plots can take several minutes; may wish to omit for testing
+	my $heatMapScript = "$Bin/plate_heatmap_plots.pl";
+	my $hmOut = $outDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir; # heatmaps in subdirectory
+	unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
+	my @modes = ('cr', 'het');
+	foreach my $mode (@modes) { # assumes $crHetPath exists and is readable
+	    $cmd = join(' ', ('cat', $crHetPath, '|', 'perl', $heatMapScript,'--mode='.$mode,'--out_dir='.$hmOut));
+	    push(@cmds, $cmd);
+	}
+	if  (-r $xydiffPath) { # silently omit xydiff plots if input not available
+	    $cmd = join(' ', ('cat', $xydiffPath, '|', 'perl',$heatMapScript,'--mode=xydiff','--out_dir='.$hmOut));
+	    push(@cmds, $cmd);
+	}
+	my $indexScript = "$Bin/plate_heatmap_index.pl";
+	my $indexName = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
+	push (@cmds, "perl $indexScript $title $hmOut $indexName");
     }
-    # TODO add xydiff command; get data from .sim file and pipe to plotting script?
-    my $indexScript = "$Bin/plate_heatmap_index.pl";
-    my $indexName = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
-    push (@cmds, "perl $indexScript $title $hmOut $indexName");
     ### boxplots ###
     my $boxPlotScript = "$Bin/plot_box_bean.pl";
     my @modes = ('cr', 'het');
     my @inputs = ($crHetPath, $crHetPath);
+    if (-r $xydiffPath) { # silently omit xydiff plots if input not available
+	push(@modes, 'xydiff');
+	push(@inputs, $xydiffPath);
+    }
     for (my $i=0; $i<@modes; $i++) {
 	 $cmd = join(' ', ('cat', $inputs[$i], '|', 'perl', $boxPlotScript, '--mode='.$modes[$i], 
 			   '--out_dir='.$outDir, '--title='.$title));
 	 push(@cmds, $cmd);
     }
-    # TODO add xydiff box/bean plots
     ### global cr/het density plots: heatmap, scatterplot & histograms ###
     my $globalCrHetScript = "$Bin/plot_cr_het_density.pl";
     my $prefix = $outDir.'/crHetDensity';
@@ -118,7 +144,7 @@ sub getPlotCommands {
 
 sub writeInputFiles {
     # read PLINK output and write text files for input to QC.
-    my ($plinkPrefix, $outDir, $tests, $failures, $verbose) = @_;
+    my ($plinkPrefix, $simPath, $outDir, $tests, $failures, $verbose) = @_;
     $tests ||= 0;
     $failures ||= 0;
     my $crStatsExecutable = "/nfs/users/nfs_i/ib5/mygit/github/Gftools/snp_af_sample_cr_bed"; # TODO current path is a temporary measure for testing; needs to be made portable for production
@@ -129,24 +155,36 @@ sub writeInputFiles {
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
 		"perl $Bin/write_gender_files.pl --qc-output=sample_xhet_gender.txt --plots-dir=. $plinkPrefix"
 	);
-    my @omits = (0,0,0,0);
-    #my @omits = (1,1,1,1);
+    if ($simPath) {
+	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
+    }
+    my @omits = (0) x ($#cmds+1); 
+    #@omits = (1,1,1,1,0); ### hack for testing
     if ($verbose) { print WTSI::Genotyping::QC::QCPlotTests::timeNow()." Starting QC checks.\n"; }
-    WTSI::Genotyping::QC::QCPlotTests::wrapCommandList(\@cmds, $tests, $failures, $verbose, \@omits);
+    ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommandList(\@cmds, $tests, $failures, 
+									     $verbose, \@omits);
     chdir($startDir);
     return ($tests, $failures);
 }
 
 sub run {
     # main method to run script
-    my ($plinkPrefix, $outDir, $title, $verbose) = @_;
+    my ($plinkPrefix, $simPath, $outDir, $title, $noWrite, $noPlate, $noPlots, $verbose) = @_;
     $title ||= "Untitled";
     $verbose ||= 1;
-    my $inputsOK = checkInputs($plinkPrefix);
-    if (not $inputsOK) { die "Cannot read PLINK inputs for $plinkPrefix; exiting"; }
-    elsif ($verbose) { print "PLINK input files found.\n"; }
+    if (not -d $outDir || not -w $outDir) { die "Output directory $outDir not writable: $!"; }
     my ($tests, $failures) = (0,0);
-    ($tests, $failures) = writeInputFiles($plinkPrefix, $outDir, $tests, $failures, $verbose);
-    ($tests, $failures) = createPlots($plinkPrefix, $outDir, $tests, $failures, $title, $verbose);
+    unless ($noWrite) {
+	my $inputsOK = checkPlinkInputs($plinkPrefix);
+	if (not $inputsOK) { die "Cannot read PLINK inputs for $plinkPrefix; exiting"; }
+	elsif ($verbose) { print "PLINK input files found.\n"; }
+	if (not $simPath) { print "Path to .sim intensity file not supplied; omitting xydiff calculation.\n"; }
+	elsif (not -r $simPath) { die "Cannot read .sim input path $simPath: $!"; }
+	elsif ($verbose) { print ".sim input file found.\n"; }
+	($tests, $failures) = writeInputFiles($plinkPrefix, $simPath, $outDir, $tests, $failures, $verbose);
+    }
+    unless ($noPlots) {
+	($tests, $failures) = createPlots($plinkPrefix, $outDir, $tests, $failures, $title, $noPlate, $verbose);
+    }
     if ($verbose) { print "Finished.\nTotal steps: $tests\nTotal failures: $failures\n"; }
 }
