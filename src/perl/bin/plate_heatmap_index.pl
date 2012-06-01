@@ -27,10 +27,11 @@ sub getLinkThumbnail {
 
 sub getPlateName {
     # extract plate name from plot filename
-    # assume plot filenames are in the form PREFIX_PLATE.png 
-    # prefix may contain _'s, plate may contain .'s (but not _'s)
+    # assume plot filenames are in the form plot_PREFIX_PLATE.png 
+    # prefix may *not* contain _'s, plate may contain .'s and _'s)
     my @items = split(/_/, $_[0]);
-    my $tail = pop(@items);
+    my @tail = splice(@items, 2);
+    my $tail = join('_', @tail);
     @items = split(/\./, $tail);
     my $name = shift(@items);
     return $name;
