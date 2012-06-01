@@ -103,19 +103,33 @@ sub readData {
     # read from a filehandle
     # get data values by plate
     my ($inputRef, $index, $mode) = @_;
-    my (%results, @allResults, $plotMin, $plotMax);
-    my ($xMax, $yMax) = (0,0);
+    my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
+    my ($xMax, $yMax, $duplicates) = (0,0,0);
     while (<$inputRef>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
 	my ($plate, $x, $y) = parseSampleName($words[0]);
 	unless ($plate) {die "Cannot get plate from $words[0]: $!";} 
+	# clean up plate name by removing illegal characters; plate name used as filename component
+	if (not $plateNames{$plate}) {
+	    # first time plate is encountered
+	    $name = $plate;
+	    $name =~ s/[-\W]/_/g;
+	    if ($names{$name}) {  # plate name not unique after cleanup
+		$duplicates++;
+		$name .= '_'.$duplicates; # *not* guaranteed unique, but should be ok except in pathological cases
+	    }
+	    $names{$name} = 1;
+	    $plateNames{$plate} = $name;
+	} else {
+	    $name = $plateNames{$plate};
+	}
 	if ($x > $xMax) { $xMax = $x; }
 	if ($y > $yMax) { $yMax = $y; }
 	my $result = $words[$index];
 	push(@allResults, $result);
-	$results{$plate}{$x}{$y} = $result;
+	$results{$name}{$x}{$y} = $result;
     }
     @allResults = sort {$a<=>$b} @allResults; # sort numerically
     if ($mode eq 'xydiff') { # special plot range for xydiff
