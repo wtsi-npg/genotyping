@@ -86,7 +86,7 @@ sub readWriteXYDiffs {
     # find xydiffs for each sample in input; write to output
     # can correctly handle large input files (.sim files can be >> 1G)
     my ($in, $out, $useProbes, $verbose) = @_;
-    $verbose ||= 1;
+    $verbose ||= 0;
     my @header = readHeader($in);
     my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @header;
     if ($channels!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
@@ -98,9 +98,9 @@ sub readWriteXYDiffs {
     my @means;
     my $maxBlocks = 50;
     while (!eof($in)) {
-	#my @block = readBlock($in, $i, \@header);
 	my @block = readBlockFast($in, $nameLength, $numberFormat, $numberBytes, $i, $blockSize, $numericToRead);
 	my $name = $block[0];
+	unless ($name) { last; } # empty line at end of file
 	$name =~ s/\0//g; # strip off null padding
 	push(@samples, $name);
 	my $sampleMean = mean(xyDiffs(@block));
@@ -110,7 +110,6 @@ sub readWriteXYDiffs {
 	    # print buffers to output filehandle
 	    for (my $j=0;$j<@samples;$j++) {
 		$name = $samples[$j];
-		unless ($name) { last; } # avoid processing empty line at end-of-file
 		if ($verbose) { print $name."\n"; }
 		print $out "$name\t$means[$j]\n";
 	    }
@@ -150,7 +149,6 @@ sub xyDiffs {
     while (@block) {
 	my ($xint, $yint) = splice(@block, 0, 2);
 	push(@diffs, ($yint-$xint));
-	#print "$xint\t$yint\t".($yint-$xint)."\n";
     }
     return @diffs;
 }
