@@ -14,6 +14,7 @@ use Exporter;
                 find_column_indices
                 maybe_stdin
                 maybe_stdout
+                read_snp_json
                 read_sample_json
                 read_column_names
                 read_fon
@@ -21,14 +22,16 @@ use Exporter;
                 read_it_column_names
                 update_it_columns
                 write_gt_calls
+                update_snp_locations
               );
 
 use WTSI::Genotyping::DelimitedFiles;
 use WTSI::Genotyping::IO;
 use WTSI::Genotyping::Illuminus;
+use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Utilities;
 
-$VERSION = '0.1.0';
+$VERSION = '0.2.0';
 
 1;
 
@@ -63,10 +66,6 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
-
-=head1 CHANGELOG
-
-Fri Feb  3 13:35:00 GMT 2012 -- Initial version 0.1.0
+  0.2.0
 
 =cut

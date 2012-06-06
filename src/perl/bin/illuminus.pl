@@ -7,6 +7,8 @@ package main;
 use strict;
 use warnings;
 use Cwd;
+use File::Basename;
+use File::Copy;
 use File::Temp qw(tempdir);
 use File::Spec::Functions qw(catfile);
 use Getopt::Long;
@@ -16,7 +18,8 @@ use POSIX qw(mkfifo);
 use Pod::Usage;
 
 use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
-                        read_sample_json find_column_indices filter_columns
+                        read_snp_json read_sample_json update_snp_locations
+                        find_column_indices filter_columns
                         read_it_column_names update_it_columns write_gt_calls);
 
 $|=1;
@@ -28,6 +31,7 @@ my $executable;
 my $output;
 my $plink;
 my $samples;
+my $snps;
 my $start;
 my $verbose;
 my $whole_genome_amplified;
@@ -39,6 +43,7 @@ GetOptions('chr=s' => \$chromosome,
            'output=s' => \$output,
            'plink' => \$plink,
            'samples=s' => \$samples,
+           'snps=s' => \$snps,
            'start=i' => \$start,
            'verbose' => \$verbose,
            'wga' => \$whole_genome_amplified);
@@ -110,6 +115,7 @@ if ($plink) {
   else {
     system($command) == 0 or die "Failed to execute '$command'\n";
   }
+  update_plink_annotation($output, $snps) if $snps;
 
   exit(0);
 }
@@ -268,7 +274,7 @@ sub find_female_columns {
   return \@indices;
 }
 
-# Run with all female data set to inetnsity 1.0 in both channels
+# Run with all female data set to intensity 1.0 in both channels
 sub nullify_females {
   my ($input, $command, $samples, $verbose) = @_;
 
@@ -279,12 +285,37 @@ sub nullify_females {
 
   if ($verbose) {
     print STDERR "Nullifying intensities for females in columns: [",
-      join(", ")
+      join(", "), "]";
   }
 
   print ILN join("\t", qw(SNP Coor Alleles), @$col_names), "\n";
   update_it_columns($in, \*ILN, $females, 1.0);
   close(ILN);
+}
+
+# Illuminus is incapable of writing complete Plink output, so we have
+# to fix it here by adding SNP chromosomes and positions
+sub update_plink_annotation {
+  my ($output, $snps) = @_;
+
+  # SNP information
+  my @snps = read_snp_json($snps);
+
+  my ($base, $path, $suffix) = fileparse($output, '.bed');
+  my $bim_file = $path . '/' . $base . '.bim';
+  my $tmp_bim = $tmp_dir . $base . '.bim';
+  my $in = maybe_stdin($bim_file);
+  my $out = maybe_stdout($tmp_bim);
+
+  my %locations;
+  foreach my $snp (@snps) {
+    $locations{$snp->{name}} = [$snp->{chromosome}, $snp->{position}];
+  }
+  update_snp_locations($in, $out, \%locations);
+  close($in);
+  close($out);
+  move($tmp_bim, $bim_file) or die "Failed to move $tmp_bim: $!\n";
+  unlink($tmp_bim);
 }
 
 
@@ -296,12 +327,14 @@ illuminus - run the Illuminus genotype caller
 
 =head1 SYNOPSIS
 
-illuminus --chr X --samples <filename> \
-  [--start <n>] [--end <m>] < intensities > genotypes
+illuminus --chr X --samples <filename> [--snps <filename>] \
+  [--start <n>] [--end <m>] [--plink] < intensities > genotypes
 
 Options:
 
   --chr      The name of the chromsome being analysed. Required.
+  --snps     A JSON file of SNP annotation used to populate Plink output
+             annotatio. Only useful in combination with the --plink option.
   --samples  A JSON file of sample annotation use to determine column
              names, corresponding to the order of the intensity pairs
              in the intensity file. The order is important because these

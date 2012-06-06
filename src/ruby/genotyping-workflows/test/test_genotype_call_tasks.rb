@@ -91,7 +91,7 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
       assert_equal(sim_file, sim.sim_file)
       assert_equal(1, sim.version)
       assert_equal(255, sim.sample_name_size)
-      assert_equal(0, sim.number_format)
+      assert_equal(1, sim.number_format) # unnormalized, uint16
       assert_equal(100, sim.num_probes)
       assert_equal(2, sim.num_channels)
       assert_equal(5, sim.num_samples)
