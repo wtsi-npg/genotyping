@@ -231,7 +231,15 @@ sub write_gt_calls {
       # been chosen and which of the 4 probabilities to include in the
       # output
       my $k = $calls[$i] - 1;
-      print $out "\t", $genotypes[$k], ";", $probs[$j + $k];
+      my $g = $genotypes[$k];
+      my $p = $probs[$j + $k];
+
+      # If we have no call, we are certain that we have none
+      if ($g eq 'NN') {
+        $p = 1;
+      }
+
+      print $out "\t$g;$p";
     }
     print $out "\n";
 
