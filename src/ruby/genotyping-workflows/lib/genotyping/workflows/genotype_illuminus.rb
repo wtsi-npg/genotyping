@@ -80,6 +80,7 @@ Returns:
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       args.delete(:memory)
+      args.delete(:queue)
 
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')

@@ -13,7 +13,6 @@ use File::Temp qw(tempdir);
 use File::Spec::Functions qw(catfile);
 use Getopt::Long;
 use IO::ScalarArray;
-use JSON;
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
@@ -73,6 +72,11 @@ if (defined $plink && !defined $output) {
             -exitval => 2);
 }
 
+if (defined $plink && !defined $snps) {
+  pod2usage(-msg => "An --snps argument must be given if --plink is specified",
+            -exitval => 2);
+}
+
 $chromosome = uc($chromosome);
 $executable = 'illuminus';
 
@@ -115,7 +119,7 @@ if ($plink) {
   else {
     system($command) == 0 or die "Failed to execute '$command'\n";
   }
-  update_plink_annotation($output, $snps) if $snps;
+  update_plink_annotation($output, $snps, $tmp_dir) if $snps;
 
   exit(0);
 }
@@ -296,7 +300,7 @@ sub nullify_females {
 # Illuminus is incapable of writing complete Plink output, so we have
 # to fix it here by adding SNP chromosomes and positions
 sub update_plink_annotation {
-  my ($output, $snps) = @_;
+  my ($output, $snps, $tmp_dir) = @_;
 
   # SNP information
   my @snps = read_snp_json($snps);
@@ -327,14 +331,14 @@ illuminus - run the Illuminus genotype caller
 
 =head1 SYNOPSIS
 
-illuminus --chr X --samples <filename> [--snps <filename>] \
-  [--start <n>] [--end <m>] [--plink] < intensities > genotypes
+illuminus --chr X --samples <filename> [--start <n>] [--end <m>] \
+  [--plink --snps <filename>] < intensities > genotypes
 
 Options:
 
   --chr      The name of the chromsome being analysed. Required.
   --snps     A JSON file of SNP annotation used to populate Plink output
-             annotatio. Only useful in combination with the --plink option.
+             annotation. Required in combination with the --plink option.
   --samples  A JSON file of sample annotation use to determine column
              names, corresponding to the order of the intensity pairs
              in the intensity file. The order is important because these
@@ -384,9 +388,13 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.4.0
+  0.5.0
 
 =head1 CHANGELOG
+
+  0.5.0
+
+    Require --snps argument for Plink output.
 
   0.4.0
 
