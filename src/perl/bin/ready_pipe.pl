@@ -39,7 +39,9 @@ sub run {
         on_connect_do => 'PRAGMA foreign_keys = ON')->populate->disconnect;
 
   if ($verbose) {
-    print STDERR "Created $dbfile using config from $config\n";
+    my $db = $dbfile;
+    $db ||= 'configured database';
+    print STDERR "Created $db using config from $config\n";
   }
 }
 
