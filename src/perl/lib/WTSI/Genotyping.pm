@@ -23,9 +23,11 @@ use Exporter;
                 update_it_columns
                 write_gt_calls
                 update_snp_locations
+                write_gs_snps
               );
 
 use WTSI::Genotyping::DelimitedFiles;
+use WTSI::Genotyping::GenoSNP;
 use WTSI::Genotyping::IO;
 use WTSI::Genotyping::Illuminus;
 use WTSI::Genotyping::Plink;
