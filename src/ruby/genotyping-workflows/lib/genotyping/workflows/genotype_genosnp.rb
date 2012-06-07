@@ -80,6 +80,7 @@ Returns:
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       args.delete(:memory)
+      args.delete(:queue)
 
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
@@ -88,30 +89,33 @@ Returns:
               :log_dir => log_dir}.merge(args)
 
       sjname = run_name + '.sample.json'
-      gsname = run_name + '.snp.txt'
+      njname = run_name + '.snp.json'
       smname = run_name + '.genosnp.sim'
-      txname = run_name + '.genosnp.txt'
+      gsname = run_name + '.genosnp.bed'
 
       sjson = sample_intensities(dbfile, run_name, sjname, args)
       num_samples = count_samples(sjson)
 
-      smargs = {:normalize => false}.merge(args)
+      smargs = {:normalize => false,
+                :snp_meta => njname}.merge(args)
 
-      smfile = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
-      gsfile = bpm_to_genosnp(manifest, gsname, args, prep_async)
-      gsargs = {:start => 0,
+      smfile, njson = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
+
+      chunk_size = 20
+      gsargs = {:snps => njson,
+                :start => 0,
                 :end => num_samples,
-                :size => 20,
-                :group_size => 50}.merge(args)
+                :size => chunk_size,
+                :group_size => 50,
+                :plink => true}.merge(args)
 
-      chunks = call_from_sim_p(smfile, gsfile, manifest, txname, gsargs, call_async)
+      chunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
+                               gsargs, call_async) || []
 
-      # FIXME: when GenoSNP writes Plink format, merge these chunks
-      # merge_async = call_async
-      # merge_bed(chunks.flatten, gsfile, {:work_dir => work_dir,
-      #                                    :log_dir => log_dir}, merge_async)
-
-      chunks && chunks.flatten.all?
+      merge_async = call_async
+      chunks.empty? ? nil : merge_bed(chunks.flatten, gsname,
+                                      {:work_dir => work_dir,
+                                       :log_dir => log_dir}, merge_async)
     end
 
     :private
