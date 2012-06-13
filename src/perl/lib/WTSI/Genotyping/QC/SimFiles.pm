@@ -20,6 +20,8 @@ sub mean {
 }
 
 sub readHeader {
+    # read and unpack .sim format header
+    # header fields are: ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
     my $fh = shift;
     my $header;
     read($fh, $header, 16); # header = first 16 bytes
@@ -27,57 +29,48 @@ sub readHeader {
     return @fields;
 }
 
-sub processHeader {
-    # calculate useful quantities from header
-    my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @_;
-    my ($numberFormat, $numberBytes);
-    if ($numberType==0) { $numberFormat = "V"; $numberBytes = 4; } # little-endian 32-bit unsigned integer
-    elsif ($numberType==1) { $numberFormat = "v";  $numberBytes = 2; } # little-endian 16-bit unsigned integer
-    my $blockSize = $nameLength + ($probes * $channels * $numberBytes);
-    my $numericEntries = $probes * $channels;
-    return ($numberFormat, $numberBytes, $blockSize, $numericEntries);
+sub blockSizeFromHeader {
+    # input an unpacked .sim header; size = name_length + (probes * channels * numeric_bytes)
+    my $numberBytes = numericBytesByFormat($_[6]);
+    my $blockSize = $_[2] + ($_[4] * $_[5] * $numberBytes);
+    return $blockSize;
+}
+
+sub numericBytesByFormat {
+    # return number of bytes used for each numeric entry, for .sim format code
+    my $format = shift;
+    if ($format==0) { return 4; }
+    elsif ($format==1) { return 2; }
+    else { die "Unknown .sim numeric format code: $format : $!"; }
 }
 
 sub readBlock {
-    # read genotyping result for a particular sample
-    # TODO check that number format for intensity measurements is correct -- may need conversion subroutine
-    my ($fh, $blockOffset, $headerRef) = @_;
-    my @header = @$headerRef;
-    my ($nameLength, $probeTotal, $channels, $numberFormat, $numberBytes, $data);
-    $nameLength = $header[2];
-    $probeTotal = $header[4];
-    $channels = $header[5];
-    # find block size and read data
-    if ($header[6]==0) { $numberFormat = "V"; $numberBytes = 4; } # little-endian 32-bit unsigned integer
-    elsif ($header[6]==1) { $numberFormat = "v";  $numberBytes = 2; } # little-endian 16-bit unsigned integer
-    else { die "Unknown format code in header: $!"; }
-    my $blockSize = $nameLength + ($probeTotal * $channels * $numberBytes);
-    my $start = 16 + $blockOffset*$blockSize;
-    seek($fh, $start, 0);
-    my $dataLength = read($fh, $data, $blockSize);
-    my @block = ();
-    if ($dataLength > 0) { # unpack binary data chunk into usable format
-	my $numericEntries = $probeTotal * $channels;
-	my $format = "a$nameLength $numberFormat$numericEntries";
-	#print "### ".$start." ".$blockSize." ".$dataLength." FORMAT: ".$format."\n";
-	@block = unpack($format, $data);
-    }
-    return @block;
-}
-
-sub readBlockFast {
-    # as for readBlock, but does not parse header, and can read only some SNPs for each sample
+    # read block of .sim data from a filehandle; can read only some SNPs for each sample
     # $numericToRead is total numeric entries to read in each record
-    my ($fh, $nameLength, $numberFormat, $numericBytes, $blockOffset, $blockSize, $numericToRead) = @_;
-    my $data;
+    my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $numericToRead) = @_;
+    my ($data, @block, @unPackCodes, $numericBytes);
+    $numericBytes = numericBytesByFormat($numberType);
+    if ($numberType==0) { @unPackCodes = qw(V L f); } 
+    elsif ($numberType==1) { @unPackCodes = qw(v); }
     my $start = 16 + $blockOffset*$blockSize;
     seek($fh, $start, 0);
     my $size = $nameLength + $numericToRead * $numericBytes;
     my $dataLength = read($fh, $data, $size);
-    my @block = ();
     if ($dataLength > 0) { # unpack binary data chunk into usable format
-	my $format = "a$nameLength $numberFormat$numericToRead";
+	my $format = "a$nameLength $unPackCodes[0]$numericToRead";
 	@block = unpack($format, $data);
+	my $name = shift(@block);
+	for (my $i=0;$i<@block;$i++) { # additional processing to convert from .sim formats to native Perl float
+	    if ($numberType==0) { 
+		# pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
+		# simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
+		$block[$i] = pack($unPackCodes[1], $block[$i]);
+		$block[$i] = unpack($unPackCodes[2], $block[$i]);
+	    } elsif ($numberType==1) {
+		$block[$i] = $block[$i] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
+	    }
+	}
+	unshift(@block, $name);
     }
     return @block;
 }
@@ -85,20 +78,24 @@ sub readBlockFast {
 sub readWriteXYDiffs {
     # find xydiffs for each sample in input; write to output
     # can correctly handle large input files (.sim files can be >> 1G)
+    # use the first $useProbes probes, or all probes, whichever is less
     my ($in, $out, $useProbes, $verbose) = @_;
     $verbose ||= 0;
     my @header = readHeader($in);
-    my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @header;
-    if ($channels!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
+    if ($header[5]!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
+    my $nameLength = $header[2];
+    my $probes = $header[4];
+    my $channels = $header[5];
+    my $numberType = $header[6];
     if (not $useProbes || $useProbes > $probes) { $useProbes = $probes; } # number of probes to use for xydiff
     my $numericToRead = $useProbes * $channels;
-    my ($numberFormat, $numberBytes, $blockSize, $numericEntries) = processHeader(@header);
+    my $blockSize = blockSizeFromHeader(@header);
     my $i = 0;
     my @samples;
     my @means;
     my $maxBlocks = 50;
     while (!eof($in)) {
-	my @block = readBlockFast($in, $nameLength, $numberFormat, $numberBytes, $i, $blockSize, $numericToRead);
+	my @block = readBlock($in, $nameLength, $numberType, $i, $blockSize, $numericToRead);
 	my $name = $block[0];
 	unless ($name) { last; } # empty line at end of file
 	$name =~ s/\0//g; # strip off null padding
@@ -111,7 +108,7 @@ sub readWriteXYDiffs {
 	    for (my $j=0;$j<@samples;$j++) {
 		$name = $samples[$j];
 		if ($verbose) { print $name."\n"; }
-		print $out "$name\t$means[$j]\n";
+		printf($out "%s\t%.8f\n", ($name, $means[$j]));
 	    }
 	    if ($verbose) { print $i." samples read.\n"; }
 	    @samples = ();
