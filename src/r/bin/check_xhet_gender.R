@@ -207,15 +207,15 @@ total <- length(data$xhet) # total number of samples
 gender <- rep(0, times=total) # 'blank' vector of genders
 gender[data$xhet<=m.max] <- 1
 gender[data$xhet>=f.min] <- 2
-# old sample_xhet_gender.txt format has a 'supplied' column after 'inferred'; can add elsewhere
-data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender)
+data.new <- data.frame('sample'=data$sample,'xhet'=round(data$xhet,8),'inferred'=gender,'supplied'=data$'supplied_gender')
 
 # output summary to stdout and new table to file
 ambig <- length(subset(gender, gender==0))
 cat(paste('Total_samples', total, "\n"))
 cat(paste('Ambiguities', ambig, "\n"))
 cat(paste('Ambiguity_rate ', signif(ambig/total,4), "\n", sep=''))
-conflict <- length(subset(data.new$inferred, data.new$inferred!=data.new$supplied))
+# conflict = male sample labelled as female or vice versa, excludes ambiguous cases
+conflict <- length(subset(data.new$inferred, data.new$inferred!=data.new$supplied & gender!=0))
 cat(paste('Conflicts', conflict, "\n"))
 cat(paste('Conflict_rate ', signif(conflict/total,4), "\n", sep=''))
 write.table(data.new, textPath, sep="\t", quote=FALSE, row.names=FALSE)
