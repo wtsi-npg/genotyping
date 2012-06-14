@@ -20,7 +20,7 @@ use WTSI::Genotyping::QC::QCPlotTests;
 my ($help, $outDir, $simPath, $title, $plinkPrefix, $noWrite, $noPlate, $noPlots, $verbose);
 
 GetOptions("help"           => \$help,
-	   "output_dir=s"   => \$outDir,
+	   "output-dir=s"   => \$outDir,
 	   "sim=s"          => \$simPath,
 	   "title=s"        => \$title,
 	   "no-data-write"  => \$noWrite,
