@@ -4,6 +4,7 @@ use strict;
 use WrapDBI;
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
+use WTSI::Genotyping::QC::QCPlotShared;
 
 # Check identity of genotyped data against sequenom
 # Input: files of genotypes in tab-delimited format, one row per SNP
@@ -52,8 +53,8 @@ $outputFail ||= 'identity_check_fail.txt';
 $outputFailedPairs ||= 'identity_check_failed_pairs.txt';
 $outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
 $log ||= 'identity_check.log';
-$minCheckedSNPs ||= 10;
-$minIdent ||= 0.9;
+$minCheckedSNPs ||=  $WTSI::Genotyping::QC::QCPlotShared::minSnpsForIdent;
+$minIdent ||= $WTSI::Genotyping::QC::QCPlotShared::minIdentity;
 
 run($outputGT, $outputResults,  $outputFail, $outputFailedPairs, $outputFailedPairsMatch, 
     $minCheckedSNPs, $minIdent, $log);
