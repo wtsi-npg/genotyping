@@ -14,8 +14,13 @@ open $fh, "< $ARGV[0]";
 my @fields = WTSI::Genotyping::QC::SimFiles::readHeader($fh);
 foreach my $field (@fields) { print $field."\n"; }
 print "#####\n";
+my $blockSize =  WTSI::Genotyping::QC::SimFiles::blockSizeFromHeader(@fields);
+my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @fields;
+my $numericToRead = $probes * $channels;
+if ($numericToRead > 20) { $numericToRead = 20; }
 foreach my $i (0..4) {
-    my @items = WTSI::Genotyping::QC::SimFiles::readBlock($fh, $i, \@fields);
-    print join(' # ', @items)."\n";
+    my @items = WTSI::Genotyping::QC::SimFiles::readBlock($fh, $nameLength, $numberType, $i, $blockSize, 
+							  $numericToRead);
+    print join(',', @items)."\n";
 }
 close $fh;
