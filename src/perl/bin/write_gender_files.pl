@@ -232,6 +232,6 @@ sub run {
     if ($qcOutput) { writeQcOutput($namesRef, $xhetsRef, $modelGendersRef, $gendersRef, $qcOutput); }
     if ($plotsDir) { 
 	my @plots = glob($tempDir."/*.png"); # cleaner than doing cp with the shell expansion
-	foreach my $plot (@plots) { system("cp $plot $plotsDir"); }
+	system("cp ".join(' ', $plots)." $plotsDir"); 
     }
 }
