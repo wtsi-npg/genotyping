@@ -18,3 +18,10 @@ $mainIndex = 'index.html';
 $plateHeatmapDir = 'plate_heatmaps';
 $plateHeatmapIndex = 'index.html'; # written to $plateHeatmapDir, not main output directory
 
+# standard qc thresholds
+$minCR = 0.95;
+$maxHetSd = 3;
+$maxXydiffSd = 3;
+$minSnpsForIdent = 10;
+$minIdentity = 0.9;
+# duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
