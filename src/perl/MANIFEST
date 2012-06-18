@@ -1,4 +1,5 @@
 bin/filter_illuminus_output.pl
+bin/genosnp.pl
 bin/illuminus.pl
 bin/ready_infinium.pl
 bin/ready_pipe.pl
@@ -17,8 +18,10 @@ lib/WTSI/Genotyping/Database/Pipeline.pm
 lib/WTSI/Genotyping/Database/SNP.pm
 lib/WTSI/Genotyping/Database/Warehouse.pm
 lib/WTSI/Genotyping/DelimitedFiles.pm
+lib/WTSI/Genotyping/GenoSNP.pm
 lib/WTSI/Genotyping/Illuminus.pm
 lib/WTSI/Genotyping/IO.pm
+lib/WTSI/Genotyping/Plink.pm
 lib/WTSI/Genotyping/Schema.pm
 lib/WTSI/Genotyping/Schema/Result/Address.pm
 lib/WTSI/Genotyping/Schema/Result/Dataset.pm
@@ -40,7 +43,7 @@ lib/WTSI/Genotyping/Schema/Result/State.pm
 lib/WTSI/Genotyping/Schema/Result/Well.pm
 lib/WTSI/Genotyping/Utilities.pm
 MANIFEST			This list of files
-META.yml
+README
 sql/pipeline_ddl.sql
 t/database_infinium.t
 t/database_pipeline.t
@@ -54,4 +57,6 @@ t/pipeline.db
 t/update_illuminus_input.t
 t/update_illuminus_input/columns.json
 t/update_illuminus_input/illuminus_intensities.txt
+t/update_snp_locations.t
+t/update_snp_locations/input.bim
 t/wtsi_genotyping.t
