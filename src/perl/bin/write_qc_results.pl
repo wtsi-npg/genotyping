@@ -4,16 +4,12 @@
 # June 2012
 
 # identify genotyping QC failures and record in a text format (tab or comma delimited)
-# consider metrics; threshold may be "NA" (eg. for gender and identity checks, which are a "black box" pass/fail)
+# evaluate metrics; threshold may be "NA" (eg. for gender and identity checks, which are a "black box" pass/fail)
 # read inputs, compare to threshold (if any), compute pass/fail
 # header: QC metrics and thresholds used
 # body: sample name, pass/fail, metric values; record as (pass/fail, value) pairs?
 
-# typical metrics: CR, het, duplicate, identity, gender, xydiff (optional?)
-# 1. read data from input paths (text files written by previous qc)
-# 2. apply checks (with appropriate thresholds, if any)
-# 3. write generic output
-# 4. write specialist output for R scripts
+# typical metrics: CR, het, duplicate, identity, gender, xydiff
 
 use strict;
 use warnings;
@@ -30,8 +26,9 @@ GetOptions("input-dir=s"   => \$inputDir,
 if ($help) {
     print STDERR "Usage: $0 [ options ] 
 Options:
+--input-dir         Directory containing input files (defaults to current working directory)
+--output-dir        Output directory (defaults to input directory)
 --help              Print this help text and exit
-Unspecified options will receive default values.
 ";
     exit(0);
 }
@@ -41,23 +38,15 @@ $outputDir ||= $inputDir;
 my $outPath = $outputDir.'/qc_results.txt';
 
 my $null = "NA";
-#my $null = 0;
-my @metrics = ('CR', 'Het', 'Duplicate', 'Identity', 'Gender');
+my @metrics = ('CR', 'Het', 'Duplicate', 'Identity', 'Gender', 'Xydiff');
 my @thresholds = ($WTSI::Genotyping::QC::QCPlotShared::minCR, 
 		  $WTSI::Genotyping::QC::QCPlotShared::maxHetSd, 
 		  $null,
 		  $WTSI::Genotyping::QC::QCPlotShared::minIdentity,
 		  $null, 
+		  $WTSI::Genotyping::QC::QCPlotShared::maxXydiffSd,
     );
 
-#my @metrics = ('CR', 'Het', 'Duplicate', 'Identity', 'Gender', 'Xydiff');
-#my @thresholds = ($WTSI::Genotyping::QC::QCPlotShared::minCR,
-#		  $WTSI::Genotyping::QC::QCPlotShared::maxHetSd,
-#		  $null,
-#		  $WTSI::Genotyping::QC::QCPlotShared::minIdentity,
-#		  $null,
-#		  $WTSI::Genotyping::QC::QCPlotShared::maxXydiffSd,
- #   );
 my $sampleCrHet = $WTSI::Genotyping::QC::QCPlotShared::sampleCrHet;
 my $duplicates = 'duplicate_summary.txt';
 my $idents = 'identity_check_results.txt'; 
@@ -231,24 +220,9 @@ sub resultsGender {
 
 sub resultsHet {
     # find autosome het rate and pass/fail status of each sample
-    # threshold expressed in standard deviations; first need to find absolute thresholds
     my ($threshold, $inPath) = @_;
-    my (@samples, @hets, $pass, %results);
-    my @data = readSampleData($inPath);
-    foreach my $ref (@data) {
-	my @fields = @$ref;
-	push(@samples, $fields[0]);
-	push(@hets, $fields[2]);
-    }
-    my ($mean, $sd) = meanSd(@hets);
-    my $min = $mean - $threshold*$sd;
-    my $max = $mean + $threshold*$sd;
-    for (my $i=0;$i<@samples;$i++) {
-	if ($hets[$i] >= $min && $hets[$i] <= $max) { $pass = 1; }
-	else { $pass = 0; }
-	$results{$samples[$i]} = [$pass, $hets[$i]];
-    }
-    return %results;
+    my $index = 2;
+    return resultsMetricSd($threshold, $index, $inPath);
 }
 
 sub resultsIdentity {
@@ -268,8 +242,33 @@ sub resultsIdentity {
     return %results;
 }
 
-sub resultsXydiff {
+sub resultsMetricSd {
+    # find results for given field, fail samples too far from the mean; use for het rate, xydiff
+    # threshold expressed in standard deviations; first need to find absolute thresholds
+    my ($threshold, $index, $inPath) = @_;
+    my (@samples, @values, $pass, %results);
+    my @data = readSampleData($inPath);
+    foreach my $ref (@data) {
+	my @fields = @$ref;
+	push(@samples, $fields[0]);
+	push(@values, $fields[$index]);
+    }
+    my ($mean, $sd) = meanSd(@values);
+    my $min = $mean - $threshold*$sd;
+    my $max = $mean + $threshold*$sd;
+    for (my $i=0;$i<@samples;$i++) {
+	if ($values[$i] >= $min && $values[$i] <= $max) { $pass = 1; }
+	else { $pass = 0; }
+	$results{$samples[$i]} = [$pass, $values[$i]];
+	#if ($i % 100 == 0) { print join("\t", $i, $pass, $values[$i])."\n"; } ### test
+    }
+    return %results;
+}
 
+sub resultsXydiff {
+    my ($threshold, $inPath) = @_;
+    my $index = 1;
+    return resultsMetricSd($threshold, $index, $inPath);
 }
 
 sub writeHeader {
