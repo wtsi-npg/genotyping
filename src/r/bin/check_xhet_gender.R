@@ -3,16 +3,48 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # April 2012
 
-# want to infer sample gender from xhet (x chromosome heterozygosity)
+#
+# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+#########################################################
+# script to infer sample gender from xhet (x chromosome heterozygosity)
 # for mixed male/female samples, expect two distinct populations
 # fit a two-component Gaussian mixture model to the data; deduce xhet regions for male/female/ambiguous
 
-# requires mixtools package from CRAN to have been installed
-# TODO replace hard-coded library path with argument
+#########################################################
+# PREREQUISITES
+# mixtools package from CRAN must be installed, and specified in R_LIBS_USER environment variable
 
-# outputs: plot of mixture model, and revised gender_fails.txt file
-# summaries written to stdout/stderr, can be redirected to file
+# USAGE:  check_xhet_gender.R $INPUT_PATH $TEXT_OUTPUT $PNG_OUTPUT $TITLE $SANITY_CHECK $CLIP $TRIALS
+# arguments:
+#$INPUT_PATH input file in correct format (see below)
+#$TEXT_OUTPUT, $PNG_OUTPUT  Paths for text and graphics output, respectively
+#$TITLE  Title of analysis for plots (spaces must be escaped/quoted correctly)
+#$SANITY_CHECK  Must be TRUE or FALSE, recommend TRUE
+#$CLIP  Any number between 0 and 1, recommend 0.05
+#$TRIALS  Any positive integer, recommend 10
+# example:
+#check_xhet_gender.R ./sample_xhet_input.txt gender_check.txt gender_check.png my_project TRUE 0.05 10 
 
+# input format: tab-delimited text with first line containing headers (as usual for an R script)
+# columns headed 'sample' and 'xhet' contain sample names and X heterozygosity, respectively
+# other columns are ignored
+
+# outputs: plot of mixture model, and revised text output
 # gender codes for input/output: 0=ambiguous, 1=male, 2=female
 
 ########################################################
