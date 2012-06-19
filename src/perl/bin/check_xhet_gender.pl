@@ -88,7 +88,7 @@ Options:
 --title=TITLE         Title for model summary plot
 --file_prefix=NAME    Prefix for output file names
 --cancel_sanity_check Cancel sanity-checking on model
---trials=INTEGER      Number of trials used to obtain consensus mdoel
+--trials=INTEGER      Number of trials used to obtain consensus model
 --help                Print this help text and exit
 Unspecified options will receive default values.
 ";
