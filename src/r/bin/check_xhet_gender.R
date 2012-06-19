@@ -110,10 +110,8 @@ sanity.check <- function(m, n, min.weight, max.err) {
   # possible cause of failure is a set of samples from only one gender
   # if conditions not met, then exit
   cat("Performing sanity checks on model.\n") 
-  n = 100000 # number of points to sample for error assessment
   err <- mix.error(m, mix.sample(m, n))
   cat(paste("Simulated model error:", err, "\n"))
-  x <- seq(0,1,length.out=100000)
   if (err > max.err) {
     stop("Simulated model error rate is too high!")
   } else if (min(m$lambda) < min.weight) {
