@@ -6,8 +6,10 @@ use utf8;
 use strict;
 use warnings;
 
-use Test::More tests => 24;
+use Test::More tests => 26;
 use Test::Exception;
+
+use Data::Dumper;
 
 BEGIN { use_ok('WTSI::Genotyping::Schema'); }
 require_ok('WTSI::Genotyping::Schema');
@@ -81,26 +83,32 @@ my $sample_base = 'test_sample';
 my $good = $db->state->find({name => 'Good'});
 ok($good, 'A state found');
 
+my $bad = $db->state->find({name => 'Bad'});
+
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
                         my $sample = $datasets[0]->add_to_samples
                           ({name => sprintf("%s_%d", $sample_base, $i),
-                            state => $good,
                             beadchip => 'ABC123456',
                             include => 1});
+                        $sample->add_to_states($good);
                       }
                     });
 
-is(1000, scalar $datasets[0]->samples, 'Expected samples found');
+my @samples = $datasets[0]->samples;
+is(1000, scalar @samples, 'Expected samples found');
+my @states = $samples[0]->states;
+is(1, scalar @states);
+is('Good', $states[0]->name);
 
 dies_ok {
   $db->in_transaction(sub {
                         foreach my $i (1001..2000) {
                           my $sample = $datasets[0]->add_to_samples
                             ({name => sprintf("%s_%d", $sample_base, $i),
-                              state => $good,
                               beadchip => 'ABC123456',
                               include => 1});
+                          $sample->add_to_states($good);
 
                           if ($i == 1900) {
                             die "Test error at $i\n";

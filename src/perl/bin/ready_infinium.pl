@@ -163,9 +163,9 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                state => $good,
                                                 include => 1});
          $sample->add_to_genders($gender, {method => $supplied});
+         $sample->add_to_states($good);
 
          my $plate = $pipedb->plate->find_or_create
            ({if_barcode => $if_barcode,
