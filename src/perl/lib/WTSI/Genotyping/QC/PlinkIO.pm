@@ -21,54 +21,44 @@
 #
 
 # Module to read/write PLINK data
+# Initially for gender check, may have other uses
 
 use warnings;
 use strict;
 use plink_binary; # from gftools package
 
 sub countCallsHets {
-    # count successful calls, and het calls, for each snp in given plink binary
-    my ($pb, $sampleNamesRef, $verbose, $minCR) = @_;
+    # filter SNPs on call rate and PAR location; count successful calls, and het calls, for SNPs passing filters
+    my ($pb, $sampleNamesRef, $minCR, $log, $verbose, $includePar) = @_;
+    my ($snpTotal, $snpFail, $snpPar) = (0,0,0);
+    $includePar ||= 0; # remove SNPs from pseudoautosomal regions
+    $log ||= 0;
+    if ($log) { writeSnpLogHeader($log); }
+    my (%allHets, %allCalls);
     my @sampleNames = @$sampleNamesRef;
-    my %allHets = ();
-    my %allCalls = ();
     foreach my $name (@sampleNames) { $allHets{$name} = 0; }
-    my $snps = 0;
     my $snp = new plink_binary::snp;
     my $genotypes = new plink_binary::vectorstr;
-    my $snpFail = 0;
     while ($pb->next_snp($snp, $genotypes)) {
-	# get calls for each SNP; if call rate OK, update het count for each sample
-	my $snp_id = $snp->{"name"};
-	my $samples = 0;
-	my $noCalls = 0;
-	my %hets = ();
-	my %calls = ();
-	for my $i (0..$genotypes->size() - 1) { # calls for each sample on current snp
-	    my $call = $genotypes->get($i);
-	    $samples++;
-	    if ($call =~ /[N]{2}/) { 
-		$noCalls++;
-	    } else {
-		$calls{$sampleNames[$i]} = 1;
-		if (substr($call, 0, 1) ne substr($call, 1, 1)) { $hets{$sampleNames[$i]} = 1; }
-	    }
-	}
-	# update global call/het counts
-	if (1-($noCalls/$samples) >= $minCR) {
-	    foreach my $sample (keys(%calls)) { $allCalls{$sample}++; }
-	    foreach my $sample (keys(%hets)) { $allHets{$sample}++; }
-	    $snps++;
-	    my $cr = 1 - $noCalls/$samples;
-	    if ($verbose && $snps % 1000 == 0) { print $snps." ".$cr."\n"; }
-	} else {
-	    $snpFail++;
-	}
+	my ($callsRef, $hetsRef, $cr) = snpCallsHets($snp, $genotypes, $sampleNamesRef);
+	my $crPass;
+	if ($cr >= $minCR) { $crPass = 1; }
+	else { $crPass = 0; }
+	my $par = isXPAR($snp);
+	if ($log) { updateLog($log, $snp, $cr, $crPass, $par); }
+	if (!$crPass) { $snpFail++; next; }
+	elsif (!$includePar && $par) { $snpPar++; next; }
+	$snpTotal++;
+	my %calls = %$callsRef;
+	my %hets = %$hetsRef;
+	foreach my $sample (keys(%calls)) { $allCalls{$sample}++; }
+	foreach my $sample (keys(%hets)) { $allHets{$sample}++; }
     }
-    if ($snps==0) { die "ERROR: No valid SNPs found: $!"; } 
-    elsif ($verbose) { print "$snps SNPs passed, $snpFail failed\n"; }
-    return (\%allCalls, \%allHets, $snps);
+    if ($snpTotal==0) { die "ERROR: No valid SNPs found: $!"; } 
+    elsif ($verbose) { print "$snpTotal SNPs passed, $snpPar from PARs rejected, $snpFail failed CR check\n"; }
+    return (\%allCalls, \%allHets, $snpTotal);   
 }
+
 
 sub extractChromData {
     # write plink binary data to given directory, for given chromosome only (defaults to X)
@@ -88,10 +78,12 @@ sub extractChromData {
 sub findHetRates {
     # find het rates by sample for given plink binary and sample names
     # het rate defined as: successful calls / het calls for each sample, on snps satisfying min call rate
-    my ($pb, $sampleNamesRef, $verbose, $minCR) = @_;
-    my @sampleNames = @$sampleNamesRef;
+    my ($pb, $sampleNamesRef, $log, $verbose, $includePar, $minCR) = @_;
     $minCR ||= 0.95;
-    my ($allCallsRef, $allHetsRef, $snps) = countCallsHets($pb, $sampleNamesRef, $verbose, $minCR);
+    $log ||= 0;
+    my @sampleNames = @$sampleNamesRef;
+    if ($verbose) { print "Finding SNP evaluation set.\n"; }
+    my ($allCallsRef, $allHetsRef, $snps) = countCallsHets($pb, $sampleNamesRef,$minCR,$log,$verbose,$includePar);
     if ($verbose) { print $snps." SNPs found for het rate computation.\n"; }
     my %allCalls = %$allCallsRef;
     my %allHets = %$allHetsRef;
@@ -102,7 +94,7 @@ sub findHetRates {
 	if ($allCalls{$name} > 0) { $hetRate = $allHets{$name} / $allCalls{$name}; }
 	else { $hetRate = 0; }
 	$hetRates{$name} = $hetRate;
-	if ($verbose && $i % 100 == 0) {print $i." ".$sampleNames[$i]." ".$hetRate."\n"; }
+	if ($verbose && $i % 100 == 0) {print $i." ".$name." ".$hetRate."\n"; }
     }
     return %hetRates;
 }
@@ -118,11 +110,64 @@ sub getSampleNamesGenders {
 	my $gender = $pb->{"individuals"}->get($i)->{"sex"};
 	push(@sampleNames, $name);
 	push(@sampleGenders, $gender);
-	if ($verbose && $i % 100 == 0) {print $i." ".$name."\n"; }
     }
     return (\@sampleNames, \@sampleGenders);
 }
 
+sub isXPAR {
+    # does given SNP (plink_binary object) on x chromosome fall into pseudoautosomal region?
+    my $snp = shift;
+    my $chrom = $snp->{"chromosome"};
+    if ($chrom ne 'X' && $chrom!=23) { 
+	die "Non-X SNP supplied to X chromosome PAR check: Chromosome $snp->{\"chromosome\"}: $!"; 
+    }
+    my @xPars = ( # X chrom pseudoautosomal regions; from NCBI GRCh37 Patch Release 8 (GRCh37.p8), 2012-04-12
+	[60001,	2699520],
+	[154931044, 155260560],
+	);
+    my $snp_pos = $snp->{"physical_position"};
+    my $par = 0;
+    foreach my $pairRef (@xPars) {
+	my ($start, $end) = @$pairRef;
+	if ($snp_pos>=$start && $snp_pos <= $end) { $par = 1; last; }
+    }
+    return $par;
+}
+
+sub snpCallsHets {
+    # count calls/hets and find call rate for given (plink_binary) SNP & genotypes
+    my ($snp, $genotypes, $samplesRef) = @_;
+    my $noCalls = 0;
+    my %hets = ();
+    my %calls = ();
+    my $total = $genotypes->size();
+    my @sampleNames = @$samplesRef;
+    for (my $i=0;$i<$total;$i++) { # calls for each sample on current snp
+	my $call = $genotypes->get($i);
+	if ($call =~ /[N]{2}/) { 
+	    $noCalls++;
+	} else {
+	    $calls{$sampleNames[$i]} = 1;
+	    if (substr($call, 0, 1) ne substr($call, 1, 1)) { $hets{$sampleNames[$i]} = 1; }
+	}
+    }
+    my $cr = 1 - ($noCalls/$total);
+    return (\%calls, \%hets, $cr);
+}
+
+sub updateLog {
+    my ($log, $snp, $cr, $par) = @_;
+    my $snp_id = $snp->{"name"};
+    my $snp_chrom = $snp->{"chromosome"};
+    my $snp_pos = $snp->{"physical_position"};
+    printf $log "%s\t%s\t%s\t%.6f\t%s\n", ($snp_id, $snp_chrom, $snp_pos, $cr, $par);
+}
+
+sub writeSnpLogHeader {
+    my $log = shift;
+    my @headers = qw(SNP chromosome position CR is_PAR);
+    print $log join("\t", @headers)."\n";
+}
 
 
 return 1;
