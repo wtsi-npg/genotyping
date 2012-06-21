@@ -151,7 +151,9 @@ sub snpCallsHets {
 	    if (substr($call, 0, 1) ne substr($call, 1, 1)) { $hets{$sampleNames[$i]} = 1; }
 	}
     }
-    my $cr = 1 - ($noCalls/$total);
+    my $cr;
+    if ($total>0) { $cr = 1 - ($noCalls/$total); }
+    else $cr = undef;
     return (\%calls, \%hets, $cr);
 }
 
