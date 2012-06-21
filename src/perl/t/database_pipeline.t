@@ -55,7 +55,7 @@ $db->populate;
 is(18, $db->snpset->count, 'The snpset dictionary');
 is(3, $db->method->count, 'The method dictionary');
 is(2, $db->relation->count, 'The relation dictionary');
-is(1, $db->state->count, 'The state dictionary');
+is(10, $db->state->count, 'The state dictionary');
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
@@ -80,10 +80,10 @@ foreach my $i (1..3) {
 }
 
 my $sample_base = 'test_sample';
-my $good = $db->state->find({name => 'Good'});
-ok($good, 'A state found');
+my $pass = $db->state->find({name => 'autocall_pass'});
+ok($pass, 'A state found');
 
-my $bad = $db->state->find({name => 'Bad'});
+my $fail = $db->state->find({name => 'autocall_fail'});
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
@@ -91,7 +91,7 @@ $db->in_transaction(sub {
                           ({name => sprintf("%s_%d", $sample_base, $i),
                             beadchip => 'ABC123456',
                             include => 1});
-                        $sample->add_to_states($good);
+                        $sample->add_to_states($pass);
                       }
                     });
 
@@ -99,7 +99,7 @@ my @samples = $datasets[0]->samples;
 is(1000, scalar @samples, 'Expected samples found');
 my @states = $samples[0]->states;
 is(1, scalar @states);
-is('Good', $states[0]->name);
+is('autocall_pass', $states[0]->name);
 
 dies_ok {
   $db->in_transaction(sub {
@@ -108,7 +108,7 @@ dies_ok {
                             ({name => sprintf("%s_%d", $sample_base, $i),
                               beadchip => 'ABC123456',
                               include => 1});
-                          $sample->add_to_states($good);
+                          $sample->add_to_states($pass);
 
                           if ($i == 1900) {
                             die "Test error at $i\n";
