@@ -93,8 +93,10 @@ sub run {
 
   my $snpset = $pipedb->snpset->find({name => $chip_design});
   my $infinium = $pipedb->method->find({name => 'Infinium'});
+  my $autocall = $pipedb->method->find({name => 'Autocall'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
-  my $good = $pipedb->state->find({name => 'Good'});
+  my $autocall_pass = $pipedb->state->find({name => 'autocall_pass'});
+  my $autocall_fail = $pipedb->state->find({name => 'autocall_fail'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_name})) {
@@ -129,12 +131,20 @@ sub run {
      SAMPLE: foreach my $if_sample (@{$ifdb->find_project_samples
                                         ($project_name)}) {
          my $if_chip = $if_sample->{beadchip};
-         my $gtc_path = $if_sample->{path};
+         my $grn_path = $if_sample->{idat_grn_path};
+         my $red_path = $if_sample->{idat_red_path};
+         my $gtc_path = $if_sample->{gtc_path};
          my $if_barcode = $if_sample->{'plate'};
          my $if_well = $if_sample->{'well'};
          my $if_name = $if_sample->{'sample'};
          my $if_status = $if_sample->{'status'};
-         next unless $if_status && $if_status eq $AUTOCALL_PASS;
+
+         my $include = 1;
+         my $autocall_state = $autocall_pass;
+         unless ($if_status && $if_status eq $AUTOCALL_PASS) {
+            $include = 0;
+            $autocall_state = $autocall_fail;
+         }
 
          my $ss_plate;
          if (exists $cache{$if_sample->{'plate'}}) {
@@ -163,19 +173,24 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                include => 1});
+                                                include => $include});
          $sample->add_to_genders($gender, {method => $supplied});
-         $sample->add_to_states($good);
+         $sample->add_to_states($autocall_state);
 
          my $plate = $pipedb->plate->find_or_create
            ({if_barcode => $if_barcode,
              ss_barcode => $ss_barcode});
 
-         my $well = $plate->add_to_wells({address => $address,
-                                          sample  => $sample});
+         $plate->add_to_wells({address => $address,
+                               sample  => $sample});
 
-         my $result = $sample->add_to_results({method => $infinium,
-                                               value => $gtc_path});
+         $sample->add_to_results({method => $autocall,
+                                  value => $gtc_path});
+         $sample->add_to_results({method => $infinium,
+                                  value => $grn_path});
+         $sample->add_to_results({method => $infinium,
+                                  value => $red_path});
+
          push @samples, $sample;
 
          last SAMPLE if defined $maximum && scalar @samples == $maximum;

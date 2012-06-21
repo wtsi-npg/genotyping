@@ -76,7 +76,9 @@ sub find_project_chip_design {
                  sample   => <sample name string>,
                  beadchip => <chip name string>,
                  status   => <status string of 'Pass' for passed samples>,
-                 path     => <path string to GTC format result file>
+                 gtc_path => <path string of GTC format result file>,
+                 idat_grn_path => <path string of IDAT format result file>,
+                 idat_red_path => <path string of IDAT format result file> }
   Returntype : arrayref of hashrefs
   Caller     : general
 
@@ -94,7 +96,11 @@ sub find_project_samples {
          samplei.item AS [sample],
          chipi.item AS [beadchip],
          statusav.appvalue AS [status],
-         parentdir.path + '\\' + appfile.file_name AS [path]
+
+         parentdir1.path + '\' + callappfile.file_name AS [gtc_path],
+         parentdir2.path + '\' + redappfile.file_name AS [idat_red_path],
+         parentdir3.path + '\' + greenappfile.file_name AS [idat_grn_path]
+
      FROM
         project project
         INNER JOIN item projecti
@@ -133,20 +139,50 @@ sub find_project_samples {
           ON samplesect.bead_chip_id = chip.bead_chip_id
         INNER JOIN item chipi
           ON chip.itemid = chipi.itemid
+
         LEFT OUTER JOIN callfile callfile
           ON samplesect.sample_section_id = callfile.sample_section_id
-        LEFT OUTER JOIN applicationfile appfile
-          ON callfile.application_file_id = appfile.application_file_id
-        LEFT OUTER JOIN parentdirectory parentdir
-          ON parentdir.parent_directory_id = appfile.parent_directory_id
+        LEFT OUTER JOIN applicationfile callappfile
+          ON callfile.application_file_id = callappfile.application_file_id
+        LEFT OUTER JOIN parentdirectory parentdir1
+          ON parentdir1.parent_directory_id = callappfile.parent_directory_id
         LEFT OUTER JOIN appvalue statusav
           ON callfile.status_id = statusav.appvalueid
+
+        LEFT OUTER JOIN intensityfile redintensityfile
+          ON redintensityfile.imaging_event_id = callfile.imaging_event_id
+          AND redintensityfile.project_usage_id = projectuse.project_usage_id
+        LEFT OUTER JOIN appvalue redchannelav
+          ON redintensityfile.channel_id = redchannelav.appvalueid
+
+        LEFT OUTER JOIN applicationfile redappfile
+          ON redintensityfile.application_file_id = redappfile.application_file_id
+        LEFT OUTER JOIN parentdirectory parentdir2
+          ON parentdir2.parent_directory_id = redappfile.parent_directory_id
+
+        LEFT OUTER JOIN intensityfile greenintensityfile
+          ON greenintensityfile.imaging_event_id = callfile.imaging_event_id
+         AND greenintensityfile.project_usage_id = projectuse.project_usage_id
+        LEFT OUTER JOIN appvalue greenchannelav
+          ON greenintensityfile.channel_id = greenchannelav.appvalueid
+
+        LEFT OUTER JOIN applicationfile greenappfile
+          ON greenintensityfile.application_file_id = greenappfile.application_file_id
+        LEFT OUTER JOIN parentdirectory parentdir3
+         ON parentdir3.parent_directory_id = greenappfile.parent_directory_id
+
       WHERE
          projecti.item = ?
          AND projectav.appvaluetype = 'Project'
 	     AND sampleav.appvaluetype = 'Sample'
 	     AND containerav.appvaluetype = 'SamplePlate'
 	     AND sectionav.appvaluetype = 'SampleSection'
+
+         AND (redchannelav.appvaluetype = 'Red'
+              OR redchannelav.appvaluetype IS NULL)
+         AND (greenchannelav.appvaluetype = 'Green'
+              OR greenchannelav.appvaluetype IS NULL)
+
       ORDER BY
          platei.item,
          right(well.alpha_coordinate,2),
