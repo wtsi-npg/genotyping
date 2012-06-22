@@ -3,7 +3,7 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012
 
-# define shared constants for QC plot scripts (and subroutines, if ever needed)
+# define shared constants for QC plot scripts
 
 package WTSI::Genotyping::QC::QCPlotShared;
 
@@ -42,3 +42,33 @@ foreach my $name (@qcMetricNames) { $qcMetricNames{$name}=1; } # convenient for 
 
 # standard qc thresholds are in .json file
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
+
+sub meanSd {
+    # find mean and standard deviation of input list
+    # first pass -- mean
+    my $total = 0;
+    foreach my $x (@_) { $total+= $x; }
+    my $mean = $total / @_;
+    # second pass -- sd
+    $total = 0;
+    foreach my $x (@_) { $total += abs($x - $mean); }
+    my $sd = $total / @_;
+    return ($mean, $sd);
+}
+
+sub readThresholds {
+    # read QC metric thresholds from config path
+    my $configPath = shift;
+    open IN, "< $configPath";
+    my @lines = <IN>;
+    close IN;
+    my %config = %{decode_json(join('', @lines))};
+    my %thresholds = %{$config{"Metrics_thresholds"}};
+    foreach my $name (keys(%thresholds)) { # validate metric names
+	unless ($WTSI::Genotyping::QC::QCPlotShared::qcMetricNames{$name}) {
+	    die "Unknown QC metric name: $!";
+	}
+    }
+    return %thresholds;
+}
+

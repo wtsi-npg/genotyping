@@ -71,19 +71,6 @@ sub findMetricResults {
     return %results;
 }
 
-sub meanSd {
-    # find mean and standard deviation of input list
-    # first pass -- mean
-    my $total = 0;
-    foreach my $x (@_) { $total+= $x; }
-    my $mean = $total / @_;
-    # second pass -- sd
-    $total = 0;
-    foreach my $x (@_) { $total += abs($x - $mean); }
-    my $sd = $total / @_;
-    return ($mean, $sd);
-}
-
 sub readSampleNames {
     # read sample names from sample_cr_het.txt (or any other tab-delimited file with sample name as first field)
     my $inPath = shift;
@@ -124,22 +111,6 @@ sub readSampleData {
     }
     close IN;
     return @data;    
-}
-
-sub readThresholds {
-    # read metric thresholds from config path
-    my $configPath = shift;
-    open IN, "< $configPath";
-    my @lines = <IN>;
-    close IN;
-    my %config = %{decode_json(join('', @lines))};
-    my %thresholds = %{$config{"Metrics_thresholds"}};
-    foreach my $name (keys(%thresholds)) { # validate metric names
-	unless ($WTSI::Genotyping::QC::QCPlotShared::qcMetricNames{$name}) {
-	    die "Unknown QC metric name: $!";
-	}
-    }
-    return %thresholds;
 }
 
 sub resultsCr {
@@ -256,7 +227,7 @@ sub resultsMetricSd {
 	push(@samples, $fields[0]);
 	push(@values, $fields[$index]);
     }
-    my ($mean, $sd) = meanSd(@values);
+    my ($mean, $sd) = WTSI::Genotyping::QC::QCPlotShared::meanSd(@values);
     my $min = $mean - $threshold*$sd;
     my $max = $mean + $threshold*$sd;
     for (my $i=0;$i<@samples;$i++) {
@@ -297,7 +268,7 @@ sub run {
     my ($inputDir, $configPath, $outPath, $sep) = @_;
     $sep ||= "\t";
     my @samples = readSampleNames($inputDir."/".$WTSI::Genotyping::QC::QCPlotShared::sampleCrHet);
-    my %thresholds = readThresholds($configPath);
+    my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
     my @metrics = ();
     foreach my $metric (@WTSI::Genotyping::QC::QCPlotShared::qcMetricNames) { 
 	# use metrics with defined thresholds, preserving conventional order
