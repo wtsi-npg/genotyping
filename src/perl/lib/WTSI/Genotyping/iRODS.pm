@@ -12,45 +12,86 @@ use vars qw(@ISA @EXPORT_OK);
 use Exporter;
 @ISA = qw(Exporter);
 
-@EXPORT_OK = qw(ils
-                irm
-
+@EXPORT_OK = qw(ipwd
+                list_object
                 add_object
+                remove_object
                 add_object_meta
                 get_object_meta
                 remove_object_meta
 
+                list_collection
                 add_collection
+                remove_collection
                 add_collection_meta
                 get_collection_meta
                 remove_collection_meta);
 
-our $ILS = 'ils';
-our $IPUT = 'iput';
 our $IMETA = 'imeta';
 our $IMKDIR = 'imkdir';
+our $IPUT = 'iput';
+our $IQUEST = 'iquest';
 our $IRM = 'irm';
+our $IPWD = 'ipwd';
+
+sub ipwd {
+  my @wd = _run_command($IPWD);
+
+  return shift @wd;
+}
+
+sub list_object {
+  my ($object) = @_;
+
+  $object or croak "A non-empty object argument is required\n";
+
+  my ($data_name, $collection) = fileparse($object);
+  $collection =~ s!/$!!;
+
+  if ($collection eq '.') {
+      $collection = ipwd();
+  }
+
+  my @objects =
+    _run_command($IQUEST, '"%s"',
+                 "\"SELECT DATA_NAME WHERE DATA_NAME = '$data_name' AND " .
+                 "COLL_NAME = '$collection'\"");
+
+  return $objects[0] if @objects;
+}
 
 sub add_object {
   my ($file, $target) = @_;
 
+  $file or croak "A non-empty file argument is required\n";
+  $target or croak "A non-empty target (object) argument is required\n";
+
+  $target = _ensure_absolute($target);
   _run_command($IPUT, $file, $target);
 
   return $target;
 }
 
+sub remove_object {
+  my ($target) = @_;
+
+  $target or croak "A non-empty target (object) argument is required\n";
+
+  _irm($target);
+}
+
 sub get_object_meta {
   my ($object) = @_;
 
-  unless (ils($object)) {
-    croak "Object '$object' does not exist\n";
-  }
+  $object or croak "A non-empty object argument is required\n";
+  list_object($object) or croak "Object '$object' does not exist\n";
 
   return _parse_raw_meta(_run_command($IMETA, 'ls', '-d', $object))
 }
 
 sub add_object_meta {
   my ($object, $key, $value, $units) = @_;
+
   $units ||= '';
 
   if (meta_exists($key, $value, get_object_meta($object))) {
@@ -64,6 +105,10 @@ sub add_object_meta {
 
 sub remove_object_meta {
   my ($object, $key, $value, $units) = @_;
+
+  $object or croak "A non-empty object argument is required\n";
+  $key or croak "A non-empty key argument is required\n";
+  $value or croak "A non-empty value argument is required\n";
   $units ||= '';
 
   if (!meta_exists($key, $value, get_object_meta($object))) {
@@ -75,16 +120,48 @@ sub remove_object_meta {
   return ($key, $value, $units);
 }
 
-sub add_collection {
+sub list_collection {
   my ($collection) = @_;
-  $collection or croak "A non-empty collection argument is required\n";
 
+  $collection or croak "A non-empty collection argument is required\n";
+  $collection =~ s!/$!!;
+
+  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME)
+                                 WHERE COLL_NAME = '$collection'"),
+                             qq("SELECT DATA_NAME
+                                 WHERE COLL_NAME = '$collection'"));
+  my @collections = _safe_select(qq("SELECT COUNT(COLL_NAME)
+                                     WHERE COLL_PARENT_NAME = '$collection'"),
+                                 qq("SELECT COLL_NAME
+                                     WHERE COLL_PARENT_NAME = '$collection'"));
+
+  return (\@objects, \@collections);
+}
+
+sub add_collection {
+  my ($dir, $target) = @_;
+
+  $dir or croak "A non-empty dir argument is required\n";
+  $target or croak "A non-empty target (collection) argument is required\n";
+
+  $target = _ensure_absolute($target);
+  _run_command($IPUT, '-r', $dir, $target);
+
+  return $target;
+}
+
+sub remove_collection {
+  my ($target) = @_;
+
+  $target or croak "A non-empty target (object) argument is required\n";
+
+  _irm($target);
 }
 
 sub get_collection_meta {
   my ($collection) = @_;
 
-  # iRODS will not recognise a collection with trailing slash
+  $collection or croak "A non-empty collection argument is required\n";
   $collection =~ s!/$!!;
 
   return _parse_raw_meta(_run_command($IMETA, 'ls', '-C', $collection))
@@ -92,35 +169,53 @@ sub get_collection_meta {
 
 sub add_collection_meta {
   my ($collection, $key, $value, $units) = @_;
+
   $collection or croak "A non-empty collection argument is required\n";
   $key or croak "A non-empty key argument is required\n";
   $value or croak "A non-empty value argument is required\n";
-  $units ||= '';
 
-  # iRODS will not recognise a collection with trailing slash
+  $units ||= '';
   $collection =~ s!/$!!;
 
   _run_command($IMETA, 'add', '-C', $collection, $key, $value, $units);
+
+  return ($key, $value, $units);
 }
 
-sub ils {
-  my ($target) = @_;
+sub remove_collection_meta {
+  my ($collection, $key, $value, $units) = @_;
 
-  return _run_command($ILS, $target);
-}
+  $collection or croak "A non-empty collection argument is required\n";
+  $key or croak "A non-empty key argument is required\n";
+  $value or croak "A non-empty value argument is required\n";
 
-sub irm {
-  my ($target, @args) = @_;
+  $units ||= '';
+  $collection =~ s!/$!!;
 
-  _run_command($IRM, $target);
+  if (!meta_exists($key, $value, get_collection_meta($collection))) {
+    croak "Metadata pair '$key' -> '$value' does not exist for $collection\n";
+  }
 
-  return $target;
+  _run_command($IMETA, 'rm', '-C', $collection, $key, $value, $units);
+
+  return ($key, $value, $units);
 }
 
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
   exists $meta{$key} and grep { $value } @{$meta{$key}};
+}
+
+sub _ensure_absolute {
+  my ($target) = @_;
+
+  my $absolute = $target;
+  unless ($target =~ /^\//) {
+    $absolute = ipwd() . '/' . $absolute;
+  }
+
+  return $absolute;
 }
 
 sub _parse_raw_meta {
@@ -156,6 +251,27 @@ sub _parse_raw_meta {
   return %meta;
 }
 
+sub _safe_select {
+  my ($icount, $iquery) = @_;
+
+  my @result;
+
+  my @count = _run_command($IQUEST, '"%s"', $icount);
+  if (@count && $count[0] > 0) {
+    push(@result, _run_command($IQUEST, '"%s"', $iquery));
+  }
+
+  return @result;
+}
+
+sub _irm {
+  my (@args) = @_;
+
+  _run_command($IRM, '-r', join(" ", @args));
+
+  return @args;
+}
+
 sub _run_command {
   my @command = @_;
 
@@ -178,6 +294,5 @@ sub _run_command {
 
   return @result;
 }
-
 
 1;
