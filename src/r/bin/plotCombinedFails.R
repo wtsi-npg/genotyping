@@ -10,7 +10,8 @@ outPath <- args[3]
 combined.causes <- data$V1
 combined.counts <- data$V2
 total <- sum(combined.counts)
-cause.key <- c("C = Call_rate", "D = Duplicate", "G = Gender", "H = Heterozygosity", "I = Identity_with_Sequenom")
+cause.key <- c("C = Call_rate", "D = Duplicate", "G = Gender", "H = Heterozygosity", "I = Identity_with_Sequenom",
+               "X = XY_intensity_difference")
 png(outPath, width=800,height=800,pointsize=18)
 layout(matrix(c(1,2), 2, 1),  heights=c(3,1))
 par(mar=c(5.1, 4.1, 7.1, 2.1)) # increase top margin
