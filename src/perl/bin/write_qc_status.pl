@@ -47,6 +47,19 @@ my $outPath = $outputDir.'/qc_results.json';
 
 run($inputDir, $configPath, $outPath);
 
+sub convertResults {
+    # convert results from metric-major to sample-major ordering
+    my %metricResults = %{ shift() };
+    my %sampleResults = ();
+    foreach my $metric (keys(%metricResults)) {
+	my %resultsBySample = %{$metricResults{$metric}};
+	foreach my $sample (keys(%resultsBySample)) {
+	    my $resultRef = $resultsBySample{$sample};
+	    $sampleResults{$sample}{$metric} = $resultRef;
+	}	
+    }
+    return %sampleResults;
+}
 
 sub findMetricResults {
     # find input path(s) and QC results for given metric
@@ -73,6 +86,7 @@ sub findMetricResults {
 
 sub readSampleNames {
     # read sample names from sample_cr_het.txt (or any other tab-delimited file with sample name as first field)
+    # Now obsolete for this script! But may be useful to preserve sample order in human-readable output.
     my $inPath = shift;
     open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
     my $i = 0;
@@ -89,25 +103,19 @@ sub readSampleNames {
 
 sub readSampleData {
     # read data for given sample names from space-delimited file; return array of arrays of data read
-    my ($inPath, $startLine, $samplesRef) = @_;
+    # optional start, stop points counting from zero
+    my ($inPath, $startLine, $stopLine) = @_;
     $startLine ||= 0;
-    $samplesRef ||= 0;
-    my (%samples, $sampleTotal); # do we select a subset of samples?
-    if ($samplesRef) {
-	my @samples = @$samplesRef;
-	$sampleTotal = @samples;
-	foreach my $sample (@samples) { $samples{$sample} = 1; }
-    }
+    $stopLine ||= 0;
     my @data;
     open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
     my $line = 0;
     while (<IN>) {
 	$line++;
 	if (/^#/ || $line <= $startLine) { next; } # comments start with a #
+	elsif ($stopLine && $line+1 == $stopLine) { last; }
 	my @fields = split;
-	if ($samplesRef && !$samples{$fields[0]}) { next; } # skip samples not in list
 	push(@data, \@fields);
-	if ($samplesRef && @data==$sampleTotal) { last; } # all target samples read
     }
     close IN;
     return @data;    
@@ -249,17 +257,18 @@ sub resultsXydiff {
 sub writeResults {
     # find QC results and write to given filehandle in JSON format
     # assumes all results will fit in memory!  If not, will need to rethink I/O and file format.
-    my ($out, $sep, $inputDir, $samplesRef, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
+    my ($out, $sep, $inputDir, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
     my @metrics = @$metricsRef;
-    my @samples = @$samplesRef;
     my %thresholds = %$thresholdsRef;
     my %inputNames = %$inputNamesRef;
-    my %allResults;
+    my %metricResults;
     foreach my $metric (@metrics) {
 	my %results = findMetricResults($inputDir, $metric, $thresholds{$metric}, $inputNames{$metric});
-	$allResults{$metric} = \%results;
+	$metricResults{$metric} = \%results;
     }
-    my $resultString = encode_json(\%allResults);
+    # change from metric-major to sample-major ordering; simplifies later data processing
+    my %sampleResults = convertResults(\%metricResults);
+    my $resultString = encode_json(\%sampleResults);
     print $out $resultString;
 }
 
@@ -267,7 +276,6 @@ sub run {
     # main method to run script
     my ($inputDir, $configPath, $outPath, $sep) = @_;
     $sep ||= "\t";
-    my @samples = readSampleNames($inputDir."/".$WTSI::Genotyping::QC::QCPlotShared::sampleCrHet);
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
     my @metrics = ();
     foreach my $metric (@WTSI::Genotyping::QC::QCPlotShared::qcMetricNames) { 
@@ -277,7 +285,7 @@ sub run {
     my %inputNames = %WTSI::Genotyping::QC::QCPlotShared::qcMetricInputs;
     my $out;
     open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
-    writeResults($out, $sep, $inputDir, \@samples, \@metrics, \%thresholds, \%inputNames);
+    writeResults($out, $sep, $inputDir, \@metrics, \%thresholds, \%inputNames);
     close($out);
 }
 
