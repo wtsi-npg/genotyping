@@ -153,7 +153,7 @@ sub snpCallsHets {
     }
     my $cr;
     if ($total>0) { $cr = 1 - ($noCalls/$total); }
-    else $cr = undef;
+    else { $cr = undef; }
     return (\%calls, \%hets, $cr);
 }
 
