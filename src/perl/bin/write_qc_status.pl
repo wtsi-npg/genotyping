@@ -101,30 +101,11 @@ sub readSampleNames {
     return @samples;
 }
 
-sub readSampleData {
-    # read data for given sample names from space-delimited file; return array of arrays of data read
-    # optional start, stop points counting from zero
-    my ($inPath, $startLine, $stopLine) = @_;
-    $startLine ||= 0;
-    $stopLine ||= 0;
-    my @data;
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
-    my $line = 0;
-    while (<IN>) {
-	$line++;
-	if (/^#/ || $line <= $startLine) { next; } # comments start with a #
-	elsif ($stopLine && $line+1 == $stopLine) { last; }
-	my @fields = split;
-	push(@data, \@fields);
-    }
-    close IN;
-    return @data;    
-}
 
 sub resultsCr {
     # find call rate (CR) and pass/fail status of each sample
     my ($threshold, $inPath) = @_;
-    my @data = readSampleData($inPath);
+    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
 	my @fields = @$ref;
@@ -157,7 +138,7 @@ sub resultsDuplicate {
     close IN;
     # read call rates for duplicated samples
     my (%duplicateCR, @samples);
-    my @data = readSampleData($crHetPath);
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     foreach my $ref (@data) {
 	my @fields = @$ref;
 	my ($sample, $cr) = ($fields[0], $fields[1]);
@@ -187,7 +168,7 @@ sub resultsGender {
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
     my ($threshold, $inPath) = @_;
-    my @data = readSampleData($inPath, 1); # skip header on line 0
+    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
     my %results;
     foreach my $ref (@data) {
 	my @fields = @$ref;
@@ -210,7 +191,7 @@ sub resultsHet {
 sub resultsIdentity {
     # read results of concordance check with sequenom results
     my ($threshold, $inPath) = @_;
-    my @data = readSampleData($inPath);
+    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
 	my @fields = @$ref;
@@ -229,7 +210,7 @@ sub resultsMetricSd {
     # threshold expressed in standard deviations; first need to find absolute thresholds
     my ($threshold, $index, $inPath, $startLine) = @_;
     my (@samples, @values, $pass, %results);
-    my @data = readSampleData($inPath, $startLine);
+    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, $startLine);
     foreach my $ref (@data) {
 	my @fields = @$ref;
 	push(@samples, $fields[0]);
