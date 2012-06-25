@@ -4,15 +4,12 @@
 # March 2012
 
 # Plot frequencies of causes for samples failing QC
-#Possible failure causes:
-#* Gender check
-#* Identity check (vs. Sequenom)
-#* Duplicate check (vs. panel of 400 SNPs generated on-the-fly)
-#* Call rate (< 95%? )
-#* Heterozygosity rate of autosomes (+/- 2 sd from mean)
-#* (Any combination of the above!  This means 32 distinct combinations, ie. 2**[failures] )
+
+# Possible failure causes: CR, Het, Gender, Duplicate, Identity, XYdiff
+# Or any combination of the above!  This means 64 distinct combinations, ie. 2**[failure modes] 
 
 # write .txt input for R plotting scripts, then execute scripts (using test wrapper)
+# R scripts: plotCombinedFails.R, plotIndividualFails.R, scatterPlotFails.R
 
 use strict;
 use warnings;
@@ -21,28 +18,20 @@ use FindBin qw($Bin);
 use WTSI::Genotyping::QC::QCPlotShared;
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($inputDir, $outputDir, $gender, $identity, $duplicate, $crHet, $help, $failText, $comboText, $causeText, 
-    $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $noSequenom, $sequenom, $title);
+my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, $comboText, $causeText, 
+    $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $title);
 
-GetOptions("cr_het=s"      => \$crHet,
-	   "duplicate=s",  => \$duplicate,
-	   "gender=s"      => \$gender,
+GetOptions("config=s"      => \$configPath,
+           "input=s"       => \$inPath,
+	   "cr-het=s"      => \$crHetPath,
 	   "help"          => \$help,
-	   "input_dir=s"   => \$inputDir,
-	   "output_dir=s"  => \$outputDir,
-	   "min_cr=f",     => \$minCR,
-	   "max_het_sd=f", => \$maxHetSd,
+	   "output-dir=s"  => \$outputDir,
 	   "title=s",      => \$title,
-	   "no_sequenom"   => \$noSequenom,  # exclude sequenom identity check results
     );
 
-$inputDir   ||= '.';
-$crHet      ||= 'sample_cr_het.txt';
-$duplicate  ||= 'duplicate_summary.txt';
-$gender     ||= 'gender_fails.txt';
-$identity   ||= 'identity_fail.txt'; # Will be replaced by identity_check_fail.txt when using refactored script
-$minCR      ||= $WTSI::Genotyping::QC::QCPlotShared::minCR; # minimum sample call rate
-$maxHetSd   ||= $WTSI::Genotyping::QC::QCPlotShared::maxHetSd; # maximum standard deviations from het mean
+$inPath     ||= './qc_results.json';
+$configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+$crHetPath  ||= './sample_cr_het.txt';
 $failText   ||= 'failTotals.txt';
 $comboText  ||= 'failCombos.txt';
 $causeText  ||= 'failCauses.txt';
@@ -52,23 +41,21 @@ $causePng   ||= 'failsIndividual.png';
 $scatterPng ||= 'failScatterPlot.png';
 $detailPng  ||= 'failScatterDetail.png';
 $outputDir  ||= '.';
-$title      ||= 'Unknown_experiment';
-if ($noSequenom) { $sequenom = 0; }
-else { $sequenom = 1; } # use sequenom by default
+$title      ||= 'Untitled';
 
 if ($help) {
     print STDERR "Usage: $0 [ options ] 
 Options:
+--input=PATH        Path to input file; defaults to ./qc_results.json
+--output-dir=PATH   Path to output directory; defaults to current working directory
+--title=STRING      Title for experiment to display in plots
 --help              Print this help text and exit
 Unspecified options will receive default values.
 ";
     exit(0);
 }
 
-my (@inputPaths, @outputPaths);
-my @inputNames = ($crHet, $duplicate, $identity, $gender, );
-if ($inputDir !~ /\/$/) { $inputDir .= '/'; }
-foreach my $name (@inputNames) { push(@inputPaths, $inputDir.$name); }
+my @outputPaths;
 my @outNames = ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng);
 if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
@@ -92,115 +79,16 @@ sub findFailedCrHet {
     return %failedCrHet;
 }
 
-sub findFailedSamples {
-    # get samples failing under each possible criterion
-    # also want master list of all failed samples
-    my ($crHetPath, $identityPath, $genderPath, $duplicatePath, $minCR, $maxHetSd, $sequenom) = @_;
-    my %dFails = getFailsColumn($duplicatePath, 1);
-    my %gFails = getFailsColumn($genderPath);
-    my %iFails;
-    if ($sequenom) { %iFails = getFailsColumn($identityPath); }
-    else { %iFails = (); }
-    my ($namesRef, $crRef, $hetRef) = readSampleCrHet($crHetPath);
-    my @crStats = meanSd(@$crRef);
-    my %cFails = getCrFails($namesRef, $crRef, $minCR);
-    my ($hFailsRef, $mean, $sd, $maxDist) = getHetFails($namesRef, $hetRef, $maxHetSd);
-    my @hetStats = ($mean, $sd, $maxDist);
-    my @allFails = mergeKeys(\%dFails, \%gFails, \%iFails, \%cFails, $hFailsRef);
-    my %failCauses = (C => \%cFails, 
-		      D => \%dFails,
-		      G => \%gFails,
-		      H => $hFailsRef, 
-		      I => \%iFails,);
-    my $totalSamples = @$namesRef;
-    my $totalFails = @allFails;
-    # find CR/Het metrics for failed samples
-    my %failedCrHet = findFailedCrHet(\@allFails, $namesRef, $crRef, $hetRef);
-    return (\@allFails, \%failCauses, $totalSamples, $totalFails, \%failedCrHet, \@crStats, \@hetStats);
-}
-
-sub getCrFails {
-    # get names of samples below CR threshold
-    my @names = @{shift()};
-    my @cr = @{shift()};
-    my $minCR = shift;
-    my %fails;
-    for (my $i=0;$i<@names;$i++) {
-	if ($cr[$i] < $minCR) { $fails{$names[$i]}=1; }
-    }
-    return %fails;
-}
-
-sub getFailsColumn {
-    # read sample names from identity_fails.txt *or* gender_fails.txt; return dictionary
-    # silently return an empty dictionary if file is not readable
+sub findHetMeanSd {
+    # find mean and sd of autosome heterozygosity
     my $inPath = shift;
-    my $index = shift;
-    $index ||= 0;
-    my %fails = ();
-    if (-r $inPath) {
-	open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
-	while (<IN>) {
-	    if (/^#/) { next; } # ignore comments
-	    $fails{(split)[$index]}=1;
-	}
-	close IN;
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my @hets;
+    foreach my $fieldsRef (@data) {
+	my @fields = @$fieldsRef;
+	push(@hets, $fields[2]);
     }
-    return %fails;
-}
-
-sub getHetFails {
-    # get names of samples too far from het mean
-    my @names = @{shift()};
-    my @het = @{shift()};
-    my $maxSD = shift;
-    my ($mean, $sd) = meanSd(@het);
-    my $maxDist = $maxSD * $sd; # maximum distance from mean
-    my %fails;
-    for (my $i=0;$i<@names;$i++) {
-	if (abs($het[$i] - $mean) > $maxDist) { $fails{$names[$i]}=1; }
-    }
-    return (\%fails, $mean, $sd, $maxDist);
-}
-
-sub meanSd {
-    # find mean and standard deviation of input list
-    # first pass -- mean
-    my $total = 0;
-    foreach my $x (@_) { $total+= $x; }
-    my $mean = $total / @_;
-    # second pass -- sd
-    $total = 0;
-    foreach my $x (@_) { $total += abs($x - $mean); }
-    my $sd = $total / @_;
-    return ($mean, $sd);
-}
-
-sub mergeKeys {
-    # find set of all keys (without repetition) for given list of hash references
-    my @hashRefs = @_; 
-    my %allKeys;
-    foreach my $hashRef (@hashRefs) {
-	foreach my $key (keys(%$hashRef)) { $allKeys{$key} = 1; }
-    }
-    return sort(keys(%allKeys));
-}
-
-sub readSampleCrHet {
-    # read lists of sample name, CR and het rate from sample_cr_het.txt
-    my $inPath = shift;
-    my (@names, @cr, @het);
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
-    while (<IN>) {
-	if (/^#/) { next; } # ignore comments
-	chomp;
-	my ($name, $cr, $het) = split;
-	push(@names, $name);
-	push(@cr, $cr);
-	push(@het, $het);
-    }
-    close IN;
-    return (\@names, \@cr, \@het);
+    return WTSI::Genotyping::QC::QCPlotShared::meanSd(@hets);
 }
 
 sub sortFailCodes {
@@ -224,135 +112,114 @@ sub sortFailCodes {
     return @sorted;
 }
 
-sub writeFailedCrHet {
-    # write CR/het scores and failure cause breakdowns, for failed samples
-    # TODO Option to exclude Sequenom identity check from breakdown
-    my ($crHetRef, $causeRef, $hetStatsRef, $outPath) = @_;
-    my %failedCrHet = %$crHetRef;
-    my %causes = %$causeRef;
-    my @names = (sort(keys(%failedCrHet))); # names of failed samples
-    my @hetStats = @$hetStatsRef;
-    my @hetStatsTitles = qw/HET_MEAN HET_SD HET_FAIL_DISTANCE/;
-    my @headers = ('# failed_sample', 'cr', 'het', 'duplicate_fail', 'gender_fail', 'identity_fail');
-    open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
-    for (my $i=0;$i<@hetStats;$i++) {
-	print OUT join(" ", ('#', $hetStatsTitles[$i], $hetStats[$i]))."\n"; # record in case needed later
-    }
-    print OUT join("\t", @headers)."\n";
-    my @causeCodes = qw/D G I/;
-    my @items;
-    foreach my $name (@names) {
-	my ($cr, $het) = @{$failedCrHet{$name}};
-	@items = ($name, $cr, $het, );
-	foreach my $code (@causeCodes) { # append 1 if failure cause applies, 0 otherwise
-	    if ($causes{$code}{$name}) { push(@items, 1); }
-	    else { push(@items, 0); }
-	}
-	print OUT join("\t", @items)."\n";
-    }
-    close OUT || die "Cannot close output path $outPath: $!";
-}
-
 sub writeFailCounts {
-    # write counts of individual/combined failures
-    my ($namesRef, $causesRef, $comboPath, $causePath) = @_;
-    my @names = @$namesRef; # names of failed samples
-    my %causes = %$causesRef; # hashes of failed sample names, by single-letter cause code
-    my @causeNames = keys(%causes);
-    @causeNames = sort(@causeNames);
-    my (%comboCounts, %causeCounts);
-    # count individual and combined failure causes
-    foreach my $name (@names) {
-	my @failCodes;
-	foreach my $cause (@causeNames) {
-	    if ($causes{$cause}{$name}) { 
-		push (@failCodes, $cause); 
-		$causeCounts{$cause}++;
-	    }
+    # write counts of (individual and combined) failure causes
+    # return array of failed sample names
+    my ($qcResultsRef, $failText, $comboText) = @_;
+    my %results = %$qcResultsRef;
+    my (%singleFails, %combinedFails, @failedSamples);
+    foreach my $sample (keys(%results)) {
+	my %metricResults = %{$results{$sample}};
+	my @fails = ();
+	foreach my $metric (keys(%metricResults)) {
+	    my ($pass, $value) = @{$metricResults{$metric}};
+	    if ($pass) { next; }
+	    push(@fails, $WTSI::Genotyping::QC::QCPlotShared::qcMetricNamesShort{$metric} );
+	    $singleFails{$metric}++;
 	}
-	my $failCombo = join('', @failCodes);
-	$comboCounts{$failCombo}++;
-    }	
-    # write combined fails
-    my @sortedCodes = sortFailCodes(keys(%comboCounts));
-    writeHash(\%comboCounts, $comboPath, \@sortedCodes);
-    # write individual fails
-    my %longCauseCounts;
-    my %longNames = (C => "Call_rate", 
-		     D => "Duplicate",
-		     G => "Gender",
-		     H => "Heterozygosity", 
-		     I => "Identity_with_Sequenom",);
-    foreach my $key (keys(%causeCounts)) { $longCauseCounts{$longNames{$key}} = $causeCounts{$key} }
-    writeHash(\%longCauseCounts, $causePath);
-}
-
-sub writeFailTotals {
-    # write summary stats to text file; later use to write table in html output
-    my ($totalSamples, $totalFails, $crStatsRef, $hetStatsRef, $title, $sequenom, $outPath) = @_;
-    my ($crMean, $crSd) = @$crStatsRef;
-    my ($hetMean, $hetSd, $hetMaxDist) = @$hetStatsRef;
-    my %stuff = (
-	TITLE => $title,
-	TOTAL_SAMPLES => $totalSamples,
-	TOTAL_FAILURES => $totalFails,
-	CR_MEAN => $crMean,
-	CR_STANDARD_DEVIATION => $crSd,
-	HET_MEAN => $hetMean,
-	HET_STANDARD_DEVIATION => $hetSd,
-	HET_MAX_DIVERGENCE => $hetMaxDist,
-	USE_SEQUENOM => $sequenom,
-    );
-    writeHash(\%stuff, $outPath);
-}
-
-sub writeHash {
-    # write hash of key/value pairs to a tab-delimited file
-    # optionally, can specify order for keys
-    my ($hashRef, $outPath, $keysRef) = @_;
-    my %hash = %$hashRef;
-    my @keys;
-    if ($keysRef) { @keys = @$keysRef; }
-    else { @keys = sort(keys(%hash)); }
-    open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
-    foreach my $key (@keys) { print OUT "$key\t$hash{$key}\n"; }
+	my $combo = join('', sort(@fails));
+	if ($combo ne '') { 
+	    push(@failedSamples, $sample);
+	    $combinedFails{$combo}++;
+	};
+    }
+    open OUT, "> $failText" || die "Cannot open output file $failText: $!"; # individual failures
+    my @metrics = sort(keys(%singleFails));
+    foreach my $metric (@metrics) {
+	print OUT $metric."\t".$singleFails{$metric}."\n";
+    }
     close OUT;
+    my @failCombos = sort(keys(%combinedFails));
+    open OUT, "> $comboText" || die "Cannot open output file $failText: $!"; # combined failures
+    foreach my $combo (@failCombos) {
+	print OUT $combo."\t".$combinedFails{$combo}."\n";
+    }
+    close OUT;
+    return @failedSamples;
+}
+
+sub writeFailedCrHet {
+    # write cr, het, and pass/fail status by metric for failed samples
+    my ($failedSamplesRef, $qcResultsRef, $crHetPath, $outPath) = @_;
+    my %failedSamples;
+    foreach my $sample (@$failedSamplesRef) { $failedSamples{$sample} = 1; }
+    my %qcResults = %$qcResultsRef;
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
+    open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
+    my @header = qw(sample cr het);
+    my @keys = qw(duplicate gender identity xydiff);
+    push(@header, @keys);
+    print OUT join("\t", @header)."\n";
+    foreach my $fieldsRef (@data) {
+	my @fields = splice(@$fieldsRef, 0, 3);
+	my $sample = $fields[0];
+	unless ($failedSamples{$sample}) { next; }
+	# record duplicate, gender, identity, xydiff status
+	my %qcResult = %{$qcResults{$sample}};
+	foreach my $key (@keys) {
+	    my $result = $qcResult{$key};
+	    my $pass;
+	    if ($result) { $pass = shift(@{$result}); } 
+	    else { $pass = 1; } # may not have qc results for all (metric, sample) pairs
+	    push(@fields, $pass);
+	}
+	print OUT join("\t", @fields)."\n";
+    }
+    close OUT;  
 }
 
 sub run {
     # find failure causes and write input for R scripts
-    my ($inputsRef, $outputsRef, $minCR, $maxHetSd, $title, $sequenom, $scriptDir) = @_;
-    my ($crHetPath, $duplicatePath, $identityPath, $genderPath) = @$inputsRef;
-    my ($totalText, $comboText, $causeText, $comboPng, $causePng, $failCrHetPath, $scatterPng, 
-	$detailPng) = @$outputsRef;
-    my @failInputs = ($crHetPath, $identityPath, $genderPath, $duplicatePath, $minCR, $maxHetSd, $sequenom);
-    my ($namesRef, $causesRef, $totalSamples, $totalFails, $crHetRef, $crStatsRef, $hetStatsRef) 
-	= findFailedSamples(@failInputs);
-    writeFailTotals($totalSamples, $totalFails, $crStatsRef, $hetStatsRef, $title, $sequenom, $totalText);
-    # do barplots of individual and combined failure causes
-    writeFailCounts($namesRef, $causesRef, $comboText, $causeText);
-    my $allPlotsOK = 1;
-    my @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec, $scriptDir.'/plotIndividualFails.R', 
-		$causeText, $totalFails, $title);
+    my ($inputPath, $qcConfigPath, $outputsRef, $title, $scriptDir, $crHetPath) = @_;
+    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inputPath);
+    my ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng) 
+	= @$outputsRef;
+    my @failedSamples = writeFailCounts(\%qcResults, $failText, $comboText);
+    my $failTotal = @failedSamples;
+    writeFailedCrHet(\@failedSamples, \%qcResults, $crHetPath, $crHetFail);
+    # run R scripts to produce plots
+    # barplot individual failures
+    my @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
+		$Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."plotIndividualFails.R",
+		$failText, $failTotal, $title
+	);
     my @outputs = ($causePng,);
+    my $allOK = 1;
     my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allPlotsOK = 0; }
-    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,, $scriptDir.'/plotCombinedFails.R', 
-	     $comboText, $title);
+    unless ($ok) { $allOK = 0; }
+    # barplot combined failures
+    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
+	     $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."plotCombinedFails.R",
+	     $comboText, $title
+	);
     @outputs = ($comboPng,);
+    $allOK = 1;
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allPlotsOK = 0; }
-    # now do scatterplot of failed samples in cr/het plane
-    writeFailedCrHet($crHetRef, $causesRef, $hetStatsRef, $failCrHetPath);
-    my ($mean, $sd, $maxDist) = @$hetStatsRef;
-    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,, $scriptDir.'/scatterPlotFails.R',
-	     $failCrHetPath, $mean, $maxDist, $minCR, $title);
+    unless ($ok) { $allOK = 0; }
+    # scatterplots
+    my %thresholds =  WTSI::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
+    my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
+    my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
+    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
+	     $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."scatterPlotFails.R",
+	     $crHetFail, $hetMean, $hetMaxDist,  $thresholds{'call_rate'}, $title,
+	);
     @outputs = ($scatterPng, $detailPng);
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allPlotsOK = 0; }
-    return $allPlotsOK;
+    unless ($ok) { $allOK = 0; }
+    return $allOK;
 }
 
-my $allPlotsOK = run(\@inputPaths, \@outputPaths, $minCR, $maxHetSd, $title, $sequenom, $scriptDir);
+my $allPlotsOK = run($inPath, $configPath, \@outputPaths, $title, $scriptDir, $crHetPath);
 if ($allPlotsOK) { exit(0); }
 else { exit(1); }
