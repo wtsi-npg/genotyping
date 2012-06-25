@@ -260,7 +260,7 @@ sub run {
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
     my @metrics = ();
     foreach my $metric (@WTSI::Genotyping::QC::QCPlotShared::qcMetricNames) { 
-	# use metrics with defined thresholds, preserving conventional order
+	# use metrics with defined thresholds
 	if (defined($thresholds{$metric})) { push(@metrics, $metric); }
     } 
     my %inputNames = %WTSI::Genotyping::QC::QCPlotShared::qcMetricInputs;
