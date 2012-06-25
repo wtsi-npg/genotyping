@@ -3,9 +3,11 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012
 
-# define shared constants for QC plot scripts
+# define shared constants and subroutines for QC plot scripts
 
 package WTSI::Genotyping::QC::QCPlotShared;
+
+use JSON;
 
 $RScriptExec = "/software/R-2.11.1/bin/Rscript";
 $RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scripts
@@ -54,6 +56,37 @@ sub meanSd {
     foreach my $x (@_) { $total += abs($x - $mean); }
     my $sd = $total / @_;
     return ($mean, $sd);
+}
+
+sub readQCResultHash {
+    # read QC results data structure from JSON file
+    # assumes top-level structure is a hash
+    my $inPath = shift;
+    open IN, "< $inPath";
+    my @lines = <IN>;
+    close IN;
+    my %results = %{decode_json(join('', @lines))};
+    return %results;
+}
+
+sub readSampleData {
+    # read data for given sample names from space-delimited file; return array of arrays of data read
+    # optional start, stop points counting from zero
+    my ($inPath, $startLine, $stopLine) = @_;
+    $startLine ||= 0;
+    $stopLine ||= 0;
+    my @data;
+    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
+    my $line = 0;
+    while (<IN>) {
+	$line++;
+	if (/^#/ || $line <= $startLine) { next; } # comments start with a #
+	elsif ($stopLine && $line+1 == $stopLine) { last; }
+	my @fields = split;
+	push(@data, \@fields);
+    }
+    close IN;
+    return @data;    
 }
 
 sub readThresholds {
