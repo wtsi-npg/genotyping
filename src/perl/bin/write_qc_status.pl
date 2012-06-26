@@ -43,7 +43,7 @@ Options:
 $inputDir ||= '.';
 $outputDir ||= $inputDir;
 $configPath ||= $Bin."/../json/qc_threshold_defaults.json";
-my $outPath = $outputDir.'/qc_results.json';
+my $outPath = $outputDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::qcResults;
 
 run($inputDir, $configPath, $outPath);
 

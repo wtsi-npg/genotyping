@@ -22,6 +22,7 @@ $plateHeatmapIndex = 'index.html'; # written to $plateHeatmapDir, not main outpu
 $duplicates = 'duplicate_summary.txt';
 $idents = 'identity_check_results.txt'; 
 $genders = 'sample_xhet_gender.txt';
+$qcResults = 'qc_results.json';
 
 # set of allowed QC metric names (long and short versions)
 @qcMetricNames = qw(call_rate heterozygosity duplicate identity gender xydiff);
