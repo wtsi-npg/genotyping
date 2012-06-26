@@ -11,55 +11,85 @@ use CGI::Pretty qw/:standard *table/; # writes prettier html code
 use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
-sub writeHeatMapLinkTable {
-    # write table with link to heatmap index, and thumbnail examples of first 3 heatmaps
-    my $heatMapIndex = shift;
-    my $heatMapDir = shift;
-    my $output = shift;
-    print $output start_table({-border=>1, -cellpadding=>4},);
-    print $output Tr([ td({colspan=>3}, h2(a({href=>$heatMapIndex}, "Plate heatmap index"))) ]); 
-    my @examples = ();
-    foreach my $expr qw/cr het xydiff/ {
-	my @files = glob($heatMapDir.'/plot_'.$expr.'*');
-	@files = sort(@files);
-	push(@examples, $files[0]); # $files[0] may be undefined, if glob results were empty
-    }
-    print $output Tr([ th({colspan=>3}, 'Example heatmaps: Click for full display') ]); 
-    my ($height, $width) = (200,200);
-    my @links;
-    foreach my $png (@examples) { 
-	my $href;
-	if ($png) { # only link to defined files
-	    $href = a({href=>$heatMapIndex}, img({height=>$height, width=>$width, src=>$png, alt=>$png}));
-	    push(@links, $href); 
+
+sub getSummaryStats {
+    # read .json file of qc status and get summary values
+    # interesting stats: mean/sd of call rate, and overall pass/fail
+    my $inPath = shift;
+    my %allResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inPath);
+    my (@cr, $fails);
+    my @samples = keys(%allResults);
+    my $total = @samples;
+    foreach my $sample (@samples) {
+	my %results = %{$allResults{$sample}};
+	my $samplePass = 1;
+	foreach my $metric (keys(%results)) {
+	    my ($pass, $value) = @{$results{$metric}};
+	    if ($metric eq 'call_rate') { push(@cr, $value); }
+	    unless ($pass) { $samplePass = 0; }
 	}
-	if (@links==0) { push(@links, 'No plots available!'); }
+	unless ($samplePass) { $fails++; }
     }
-    print $output Tr([td(\@links)]);
-    print $output end_table();
+    my ($mean, $sd) = WTSI::Genotyping::QC::QCPlotShared::meanSd(@cr);
+    my $passRate = 1 - ($fails/$total);
+    return ($total, $fails, $passRate, $mean, $sd);
+}
+
+sub writePlotLinks {
+    # write index of QC plots in current directory
+    my ($out, $descsRef) = @_;
+    my %descs = %$descsRef; # output descriptions
+    my @png = sort(glob('*.png'));
+    my $plateDir = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir;
+    my $plateIndex = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
+    my $plateIndexPath = $plateDir."/".$plateIndex;
+    my @heatMapPng = sort(glob($plateDir."/*.png"));
+    my $heatMapExample = shift(@heatMapPng);
+    # write box for heatmap link
+    my ($height, $width) = (250,250); # thumbnail size
+    if ($heatMapExample && -r $plateIndexPath) {
+	my $link = h3(a({href=>$plateIndexPath}, "Plate heatmap index"));
+	my $png = $heatMapExample;
+	my $thumb = a({href=>$plateIndexPath}, img({height=>$height, width=>$width, src=>$png, alt=>$png}));
+	print $out start_table({-border=>1, -cellpadding=>4},);
+	print $out Tr(td({valign=>'top'}, $link));
+	print $out Tr(td({align=>'center'}, b("Example heatmap").br.$thumb));    
+	print $out end_table();
+	print $out p('&nbsp;'); # spacer 
+    }
+    # write other QC plots
+    my $contents = "contents";
+    print $out a({name=>$contents});
+    print $out h2("General QC Plots");
+    print $out start_table({-border=>1, -cellpadding=>4},);
+    print $out Tr( th("File"), th("Description"));
+    foreach my $png (@png) {
+	my $link = a({href=>"#".$png}, $png);
+	my $desc = $descs{$png};
+	$desc ||= "[No description]";
+	print $out Tr(td($link), td($desc));
+    }
+    print $out end_table();
+    print $out p('&nbsp;'); # spacer 
+    # print plots (actual size)
+    foreach my $png (@png) {
+	print $out a({name=>$png});
+	print $out img({src=>$png, alt=>$png});
+	print $out p(a({href=>"#".$contents}, "Back to contents"));
+    }
+    
 }
 
 sub writeSummaryTable {
-    # write table of basic QC stats
-    my $totalsPath = shift;
+    # write table of basic QC stats to given filehandle
+    my $qcResultsPath = shift;
     my $output = shift;
-    my %data;
-    open IN, "< $totalsPath" || die "Cannot open input file $totalsPath: $!";
-    while (<IN>) {
-	if (/^#/) { next; } # omit comments
-	my @words = split;
-	$data{$words[0]} = $words[1];
-    }
-    close IN || die "Cannot close input file $totalsPath: $!";
-    my $percentPass = (($data{'TOTAL_SAMPLES'} - $data{'TOTAL_FAILURES'}) / $data{'TOTAL_SAMPLES'})*100;
-    $percentPass = sprintf("%.1f", $percentPass)."%";
-    my @keys = ('Total samples', 'Total failures', 'Pass rate', 'Call rate mean (Phred)', 'Call rate mean/SD', 
-		'Het mean/SD', 'Het max divergence');
-    my $crScore = sprintf("%.0f", -10*(log(1 - $data{'CR_MEAN'})/log(10) ) );
-    my $cr = sprintf("%.4f", $data{'CR_MEAN'})." +/- ".sprintf("%.4f", $data{'CR_STANDARD_DEVIATION'});
-    my $het = sprintf("%.4f", $data{'HET_MEAN'})." +/- ".sprintf("%.4f", $data{'HET_STANDARD_DEVIATION'});
-    my @values = ($data{'TOTAL_SAMPLES'}, $data{'TOTAL_FAILURES'}, $percentPass, $crScore, $cr, $het, 
-		  sprintf("%.4f", $data{'HET_MAX_DIVERGENCE'}));
+    my ($total, $fails, $passRate, $crMean, $crSD) = getSummaryStats($qcResultsPath);
+    my $percentPass = sprintf("%.1f", 100*$passRate)."%";
+    my $crScore = sprintf("%.0f", -10*(log(1 - $crMean)/log(10))); # Phred score
+    my $cr = sprintf("%.4f", $crMean)." +/- ".sprintf("%.4f", $crSD);
+    my @keys = ('Total samples', 'Total failures', 'Pass rate', 'Call rate mean (Phred)', 'Call rate mean/SD');
+    my @values = ($total, $fails, $percentPass, $crScore, $cr);
     print $output start_table({-border=>1, -cellpadding=>4},);
     foreach (my $i=0;$i<@keys;$i++) {
 	print $output Tr( th({align=>"left"}, $keys[$i]), td($values[$i]) );
@@ -67,7 +97,7 @@ sub writeSummaryTable {
     print $output end_table();
 }
 
-
+# TODO split descriptions into categories for table of contents; eg. boxplot, histogram, pass/fail, other
 my %descriptions = (
     'cr_beanplot.png' => "CR beanplot",
     'cr_boxplot.png' => "CR boxplot",
@@ -82,53 +112,31 @@ my %descriptions = (
     'het_boxplot.png' => "Heterozygosity boxplot",
     'hetHistogram.png' => "Heterozygosity distribution histogram",
     'platePopulationSizes.png' => "Number of samples found per plate",
+    'sample_xhet_gender_model.png' => "Summary of gender model",
+    'xydiff.png' => "XYdiff histogram",
     'xydiff_beanplot.png' => 'XYdiff beanplot',
     'xydiff_boxplot.png' => 'XYdiff boxplot',
 );
 
-my $experiment = shift(@ARGV); # experiment name
 my $plotDir = shift(@ARGV); # input/output directory path
+my $qcStatus = shift(@ARGV); # .json file with qc status
+my $title = shift(@ARGV); # experiment name
+$title ||= 'Untitled Analysis';
 chdir($plotDir); # find and link to relative paths wrt plotdir
 my $outPath = $WTSI::Genotyping::QC::QCPlotShared::mainIndex;
 my @png = glob('*.png');
 @png = sort(@png);
 open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
 print OUT header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
-    start_html(-title=>"$experiment: Summary of results",
+    start_html(-title=>"$title: Summary of results",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',
 	       ),
-    h1($experiment), # level 1 header
+    h1($title.": QC Results"), # level 1 header
     ;
 # table of basic summary stats (if available)
-my $totalsPath = $plotDir.'/failTotals.txt';
-if (-r $totalsPath) { writeSummaryTable($totalsPath, \*OUT); }
+if (-r $qcStatus) { writeSummaryTable($qcStatus, \*OUT); }
 print OUT p('&nbsp;'); # spacer before next table
-# link to heatmap index (if available)
-my $heatMapDir = 'plate_heatmaps'; # TODO move these names into QCPlotsShared
-my $heatMapIndex = $heatMapDir."/".$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
-if (-r $heatMapIndex) {  
-    writeHeatMapLinkTable($heatMapIndex, $heatMapDir, \*OUT);
-}
-# table of contents for subsequent links
-print OUT h2("Summary Plots: Contents");
-my @pngRefs;
-foreach my $png (@png) { 
-    my $desc;
-    if ($descriptions{$png}) { $desc = $descriptions{$png}; }
-    else { $desc = $png; }
-    push (@pngRefs, a({href=>"#".$png}, $desc) ); 
-}
-print OUT ul( li(\@pngRefs) );
-# links to general-purpose overview plots (ie. any PNG file in the plots directory)
-print OUT start_table({-border=>1, -cellpadding=>4},);
-print OUT Tr([th('Summary Plots: Click for large version')]);
-my ($height, $width) = (400,400);
-foreach my $png (@png) {
-    print OUT Tr([td(a({name=>$png}),
-		     a({href=>$png}, img({height=>$height, width=>$width, src=>$png, alt=>$png})),
-		  )]);
-}
-print OUT end_table();
+writePlotLinks(\*OUT, \%descriptions);
 print OUT end_html();
 close OUT;
 
