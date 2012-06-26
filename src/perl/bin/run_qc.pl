@@ -143,7 +143,7 @@ sub getPlotCommands {
     push(@cmds, $cmd);
     ### html index for all plots ###
     my $plotIndexScript = "$Bin/main_plot_index.pl";
-    $cmd = join(' ', ('perl', $plotIndexScript, $title, $outDir));
+    $cmd = join(' ', ('perl', $plotIndexScript, $outDir, $WTSI::Genotyping::QC::QCPlotShared::qcResults, $title));
     push(@cmds, $cmd);
     return @cmds;
 }
