@@ -25,6 +25,7 @@ GetOptions("help"           => \$help,
 	   "sim=s"          => \$simPath,
 	   "title=s"        => \$title,
 	   "no-data-write"  => \$noWrite,
+	   "no-plate"       => \$noPlate,
 	   "no-plots"       => \$noPlots,
 	   "verbose"        => \$verbose
     );
@@ -49,8 +50,8 @@ Options:
 
 $outDir ||= "./qc";
 if (not -e $outDir) { mkdir($outDir); }
-
 $configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+$verbose ||= 0;
 
 $plinkPrefix = $ARGV[0];
 unless ($plinkPrefix) { die "ERROR: Must supply a PLINK filename prefix!"; }
@@ -61,7 +62,7 @@ if (@terms) {
     my $plinkDir = abs_path(join("/", @terms));
     $plinkPrefix = $plinkDir."/".$filePrefix;
 }
-run($plinkPrefix, $simPath, $configPath, $outDir, $title, $noWrite, $noPlate, $noPlots);
+run($plinkPrefix, $simPath, $configPath, $outDir, $title, $noWrite, $noPlate, $noPlots, $verbose);
 
 sub checkPlinkInputs {
     # check that PLINK binary files exist and are readable
