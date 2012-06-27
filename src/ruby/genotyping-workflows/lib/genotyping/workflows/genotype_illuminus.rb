@@ -9,11 +9,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
 module Genotyping::Workflows
@@ -32,7 +32,7 @@ format file, the latter into a Plink BED format file. Calls genotypes using
 Illuminus and writes them to an additional Plink BED format file.
 
 Requires a populated pipeline database.
-DESC
+    DESC
 
     usage <<-USAGE
 GenotypeIlluminus args
@@ -44,28 +44,28 @@ Arguments:
 - work_dir (String): The working directory, an absolute path.
 - other arguments (keys and values):
 
-config: <path> of custom pipeline database .ini file. Optional.
-manifest: <path> of the chip manifest file. Required.
-memory: <integer> number of Mb to request for jobs.
-queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
-'normal'.
+    config: <path> of custom pipeline database .ini file. Optional.
+    manifest: <path> of the chip manifest file. Required.
+    memory: <integer> number of Mb to request for jobs.
+    queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
+    'normal'.
 
 e.g.
 
-library: genotyping
-workflow: Genotyping::Workflows::GenotypeIlluminus
-arguments:
-- /work/my_project/my_analysis.db
-- sample_batch_1
-- /work/my_project/pipeline/
-- config: /work/my_project/pipeline/pipedb.ini
-queue: small
-manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
+ library: genotyping
+ workflow: Genotyping::Workflows::GenotypeIlluminus
+ arguments:
+     - /work/my_project/my_analysis.db
+     - sample_batch_1
+     - /work/my_project/pipeline/
+     - config: /work/my_project/pipeline/pipedb.ini
+       queue: small
+       manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
 
 Returns:
 
 - boolean.
-USAGE
+    USAGE
 
     version '0.1.0'
 
