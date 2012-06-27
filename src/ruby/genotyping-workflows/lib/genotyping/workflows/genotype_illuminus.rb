@@ -46,7 +46,7 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
-    memory: <integer> number of Mb to request.
+    memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
 
@@ -72,6 +72,7 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
+      args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
 
       args = ensure_valid_args(args, :config, :manifest, :queue)
       args[:work_dir] = maybe_work_dir(work_dir)
@@ -81,47 +82,58 @@ Returns:
                         :queue => :normal}
       async = lsf_args(args, async_defaults, :memory, :queue)
 
+      manifest = args.delete(:manifest) # TODO: find manifest automatically
+      args.delete(:memory)
+      args.delete(:queue)
+
+      work_dir = maybe_work_dir(work_dir)
+      log_dir = File.join(work_dir, 'log')
+      Dir.mkdir(log_dir) unless File.exist?(log_dir)
+      args = {:work_dir => work_dir,
+              :log_dir => log_dir}.merge(args)
+
       sjname = run_name + '.sample.json'
+      njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
-      smname = run_name + '.sim'
+      smname = run_name + '.illuminus.sim'
       gcname = run_name + '.gencall.bed'
       ilname = run_name + '.illuminus.bed'
 
       sjson = sample_intensities(dbfile, run_name, sjname, args)
 
-      smargs = {:metadata => cjname}.merge(args)
-      smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, async)
+      smargs = {:normalize => true,
+                :chromosome_meta => cjname,
+                :snp_meta => njname}.merge(args)
+
+      smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
       gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
 
-      ilfile =
-          if cjson
-            chunks = chromosome_bounds(cjson).collect do |cspec|
-              chr = cspec["chromosome"]
-              start_snp = cspec["start"]
-              end_snp = cspec["end"]
-              befile = run_name + '.' + chr
+      ilargs = {:size => 10000,
+                :group_size => 50,
+                :plink => true,
+                :snps => njson}.merge(args)
 
-              call_from_sim_p(smfile, sjson, manifest, befile,
-                              {:work_dir =>  work_dir,
-                               :log_dir => work_dir,
-                               :chromosome => chr,
-                               :start => start_snp,
-                               :end => end_snp,
-                               :size => 10000,
-                               :group_size => 50,
-                               :plink => true}, async)
-            end
+      chunks = chromosome_bounds(cjson).collect do |cspec|
+        chr = cspec["chromosome"]
+        pargs = {:chromosome => chr,
+                 :start => cspec["start"],
+                 :end => cspec["end"]}
 
-            merge_bed(chunks.flatten, ilname, {:work_dir => work_dir}, async)
-          end
+        call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
+                        ilargs.merge(pargs), async)
+      end
 
-      [gcfile, ilfile].all?
+      ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
+
+      [gcfile, ilfile] if [gcfile, ilfile].all?
     end
 
     :private
     def chromosome_bounds(cjson)
       if cjson
-        chrs = JSON.parse(File.read(cjson))
+        JSON.parse(File.read(cjson))
+      else
+        []
       end
     end
   end
