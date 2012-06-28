@@ -1,5 +1,3 @@
-#!/software/bin/perl
-
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # May 2012
 
@@ -47,6 +45,7 @@ sub numericBytesByFormat {
 sub readBlock {
     # read block of .sim data from a filehandle; can read only some SNPs for each sample
     # $numericToRead is total numeric entries to read in each record
+    # not currently in use! reading entire block for a sample exceeds memory limits, use findMeanXYDiff instead
     my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $numericToRead) = @_;
     my ($data, @block, @unPackCodes, $numericBytes);
     $numericBytes = numericBytesByFormat($numberType);
@@ -75,11 +74,58 @@ sub readBlock {
     return @block;
 }
 
+sub findMeanXYDiff {
+    # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
+    # data for all probes may not fit in memory!
+    # seek to required location and unpack data for 2 intensities at a time (or a "not too big" chunk?)
+    my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $probes) = @_;
+    my ($data, @pair, @unPackCodes, $numericBytes, $xyDiffTotal, $xyDiffCount);
+    $numericBytes = numericBytesByFormat($numberType);
+    if ($numberType==0) { @unPackCodes = qw(V L f); } 
+    elsif ($numberType==1) { @unPackCodes = qw(v); }
+    my $sampleStart = 16 + $blockOffset*$blockSize; # 16 = length of header
+    for (my $i=0;$i<$probes;$i++) {
+	my $start = $sampleStart + $nameLength + 2*$numericBytes*$i;
+	seek($fh, $start, 0);
+	my $size = 2*$numericBytes;
+	my $dataLength = read($fh, $data, $size);
+	if ($dataLength==0) { last; }
+	my $format = $unPackCodes[0].(2*$numericBytes);
+	@pair = unpack($format, $data);
+	for (my $j=0;$j<2;$j++) {
+	    if ($numberType==0) { 
+		# pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
+		# simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
+		$pair[$j] = pack($unPackCodes[1], $pair[$j]);
+		$pair[$j] = unpack($unPackCodes[2], $pair[$j]);
+	    } elsif ($numberType==1) {
+		$pair[$j] = $pair[$j] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
+	    }
+	}
+	$xyDiffTotal+= ($pair[1] - $pair[0]);
+	$xyDiffCount++;
+    }
+    my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
+    return $xyDiffMean;
+}
+
+sub readName {
+    # read name of sample with given $blockOffset
+     my ($fh, $nameLength, $blockOffset, $blockSize) = @_;
+     my $start = 16 + $blockOffset*$blockSize;
+     my $data;
+     seek($fh, $start, 0);
+     read($fh, $data, $nameLength);
+     my @words = unpack("a$nameLength", $data);
+     my $name = shift(@words);
+     return $name;
+}
+
 sub readWriteXYDiffs {
     # find xydiffs for each sample in input; write to output
     # can correctly handle large input files (.sim files can be >> 1G)
     # use the first $useProbes probes, or all probes, whichever is less
-    my ($in, $out, $useProbes, $verbose) = @_;
+    my ($in, $out, $verbose) = @_;
     $verbose ||= 0;
     my @header = readHeader($in);
     if ($header[5]!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
@@ -87,30 +133,26 @@ sub readWriteXYDiffs {
     my $probes = $header[4];
     my $channels = $header[5];
     my $numberType = $header[6];
-    if (not $useProbes || $useProbes > $probes) { $useProbes = $probes; } # number of probes to use for xydiff
-    my $numericToRead = $useProbes * $channels;
     my $blockSize = blockSizeFromHeader(@header);
     my $i = 0;
     my @samples;
     my @means;
     my $maxBlocks = 50;
     while (!eof($in)) {
-	my @block = readBlock($in, $nameLength, $numberType, $i, $blockSize, $numericToRead);
-	my $name = $block[0];
-	unless ($name) { last; } # empty line at end of file
+	my $name = readName($in, $nameLength, $i, $blockSize);
+	my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, $blockSize, $probes);
 	$name =~ s/\0//g; # strip off null padding
 	push(@samples, $name);
-	my $sampleMean = mean(xyDiffs(@block));
-	push(@means, $sampleMean);
+	push(@means, $xydiff);
 	$i++;	
+	if ($verbose) { print $i."\t".$name."\t".$xydiff."\n"; }
 	if (@samples==$maxBlocks || eof($in)) {
 	    # print buffers to output filehandle
 	    for (my $j=0;$j<@samples;$j++) {
 		$name = $samples[$j];
-		if ($verbose) { print $name."\n"; }
 		printf($out "%s\t%.8f\n", ($name, $means[$j]));
 	    }
-	    if ($verbose) { print $i." samples read.\n"; }
+	    if ($verbose) { print $i." samples written.\n"; }
 	    @samples = ();
 	    @means = ();
 	}
