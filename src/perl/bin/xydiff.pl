@@ -33,8 +33,7 @@ Options:
 if ($inPath) { open $fh, "< $inPath"; }
 else { $fh = \*STDIN; }
 open $out, "> $outPath";
-my $useProbes = 1000;
-WTSI::Genotyping::QC::SimFiles::readWriteXYDiffs($fh, $out, $useProbes);
+WTSI::Genotyping::QC::SimFiles::readWriteXYDiffs($fh, $out);
 close $fh;
 close $out;
 
