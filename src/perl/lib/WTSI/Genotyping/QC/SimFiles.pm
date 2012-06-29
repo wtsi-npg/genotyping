@@ -32,56 +32,6 @@ sub extractSampleRange {
     }
 }
 
-sub findMeanXYDiff0 {
-    # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
-    # data for all probes may not fit in memory!
-    # seek to required location and unpack data for 2 intensities at a time (or a "not too big" chunk?)
-    my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $probes) = @_;
-    my ($data, @pair, @unPackCodes, $numericBytes, $xyDiffTotal, $xyDiffCount);
-    $numericBytes = numericBytesByFormat($numberType);
-    if ($numberType==0) { @unPackCodes = qw(V L f); } 
-    elsif ($numberType==1) { @unPackCodes = qw(v); }
-    my $sampleStart = 16 + $blockOffset*$blockSize; # 16 = length of header
-    for (my $i=0;$i<$probes;$i++) {
-	my $start = $sampleStart + $nameLength + 2*$numericBytes*$i;
-	seek($fh, $start, 0);
-	my $size = 2*$numericBytes;
-	my $dataLength = read($fh, $data, $size);
-	if ($dataLength==0) { last; }
-	my $format = $unPackCodes[0].(2*$numericBytes);
-	@pair = unPackPair($data, $format, $numberType, \@unPackCodes);
-	$xyDiffTotal+= ($pair[1] - $pair[0]);
-	$xyDiffCount++;
-    }
-    my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
-    return $xyDiffMean;
-}
-
-sub findMeanXYDiff1 {
-    # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
-    # data for all probes may not fit in memory!
-    # seek to required location and unpack data for chunks of intensities (one pair at a time is too slow)
-    my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $probes, $groupSize) = @_;
-    my ($data, @pair, @unPackCodes, $numericBytes, $xyDiffTotal, $xyDiffCount);
-    $numericBytes = numericBytesByFormat($numberType);
-    if ($numberType==0) { @unPackCodes = qw(V L f); } 
-    elsif ($numberType==1) { @unPackCodes = qw(v); }
-    my $sampleStart = 16 + $blockOffset*$blockSize; # 16 = length of header
-    for (my $i=0;$i<$probes;$i++) {
-	my $start = $sampleStart + $nameLength + 2*$numericBytes*$i;
-	seek($fh, $start, 0);
-	my $size = 2*$numericBytes;
-	my $dataLength = read($fh, $data, $size);
-	if ($dataLength==0) { last; }
-	my $format = $unPackCodes[0].(2*$numericBytes);
-	@pair = unPackPair($data, $format, $numberType, \@unPackCodes);
-	$xyDiffTotal+= ($pair[1] - $pair[0]);
-	$xyDiffCount++;
-    }
-    my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
-    return $xyDiffMean;
-}
-
 sub findMeanXYDiff {
     # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
     # data for all probes may not fit in memory, and reading one probe at a time is too slow!
@@ -98,7 +48,7 @@ sub findMeanXYDiff {
 	if ($i+1==$groups) { $readProbes = $probes % $groupNum; } # update number of probes for final group
 	my $size = 2*$readProbes*$numericBytes;
 	my $groupStart = $start + ($i*$groupSize);
-	seek($fh, $groupStart, 0); # TODO check if seeking from current position is faster?
+	seek($fh, $groupStart, 0); 
 	my $dataLength = read($fh, $data, $size);
 	my @signals = unpackSignals($data, $numericBytes, $numberType);
 	while (@signals) {
@@ -109,14 +59,6 @@ sub findMeanXYDiff {
     }
     my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
     return $xyDiffMean;
-}
-
-sub mean {
-    # mean of given array -- use to find mean xydiff
-    my ($count, $total) = (0,0);
-    foreach my $term (@_) { $count += 1; $total += $term; }
-    if ($count==0) { return undef; } # avoid dividing by zero
-    else { return $total / $count; }
 }
 
 sub numericBytesByFormat {
@@ -202,24 +144,6 @@ sub unpackHeader {
     my $header = shift;
     my @fields = unpack("A3CSLLCC", $header);
     return @fields;
-}
-
-sub unPackPair {
-    # unpack data block containing an (x,y) intensity pair
-    my ($data, $format, $numberType, $unPackCodesRef) = @_;
-    my @pair = unpack($format, $data);
-    my @unPackCodes = @$unPackCodesRef;
-    for (my $j=0;$j<2;$j++) {
-	if ($numberType==0) { 
-	    # pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
-	    # simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
-	    $pair[$j] = pack($unPackCodes[1], $pair[$j]);
-	    $pair[$j] = unpack($unPackCodes[2], $pair[$j]);
-	} elsif ($numberType==1) {
-	    $pair[$j] = $pair[$j] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
-	}
-    }
-    return @pair;
 }
 
 sub unpackSignals {
