@@ -42,38 +42,6 @@ sub numericBytesByFormat {
     else { die "Unknown .sim numeric format code: $format : $!"; }
 }
 
-sub readBlock {
-    # read block of .sim data from a filehandle; can read only some SNPs for each sample
-    # $numericToRead is total numeric entries to read in each record
-    # not currently in use! reading entire block for a sample exceeds memory limits, use findMeanXYDiff instead
-    my ($fh, $nameLength, $numberType, $blockOffset, $blockSize, $numericToRead) = @_;
-    my ($data, @block, @unPackCodes, $numericBytes);
-    $numericBytes = numericBytesByFormat($numberType);
-    if ($numberType==0) { @unPackCodes = qw(V L f); } 
-    elsif ($numberType==1) { @unPackCodes = qw(v); }
-    my $start = 16 + $blockOffset*$blockSize;
-    seek($fh, $start, 0);
-    my $size = $nameLength + $numericToRead * $numericBytes;
-    my $dataLength = read($fh, $data, $size);
-    if ($dataLength > 0) { # unpack binary data chunk into usable format
-	my $format = "a$nameLength $unPackCodes[0]$numericToRead";
-	@block = unpack($format, $data);
-	my $name = shift(@block);
-	for (my $i=0;$i<@block;$i++) { # additional processing to convert from .sim formats to native Perl float
-	    if ($numberType==0) { 
-		# pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
-		# simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
-		$block[$i] = pack($unPackCodes[1], $block[$i]);
-		$block[$i] = unpack($unPackCodes[2], $block[$i]);
-	    } elsif ($numberType==1) {
-		$block[$i] = $block[$i] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
-	    }
-	}
-	unshift(@block, $name);
-    }
-    return @block;
-}
-
 sub findMeanXYDiff {
     # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
     # data for all probes may not fit in memory!
@@ -150,25 +118,6 @@ sub readWriteXYDiffs {
     return $i;
 }
 
-sub sampleMeanXYDiffs {
-    # find mean xydiff for each sample in file
-    my $fh = shift;
-    my @header = readHeader($fh);
-    my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @header;
-    if ($channels!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
-    my $i = 0;
-    my @samples;
-    my @means;
-    while (!eof($fh)) {
-	my @block = readBlock($fh, $i, \@header);
-	push(@samples, $block[0]);
-	my $sampleMean = mean(xyDiffs(@block));
-	push(@means, $sampleMean);
-	$i++;	
-    }
-    return (\@samples, \@means);
-}
-
 sub unPackPair {
     # unpack data block containing an (x,y) intensity pair
     my ($data, $format, $numberType, $unPackCodesRef) = @_;
@@ -186,19 +135,5 @@ sub unPackPair {
     }
     return @pair;
 }
-
-sub xyDiffs {
-    # find xydiffs for given sample block
-    my @block = @_;
-    my $name = shift(@block);
-    unless (@block % 2 == 0) { die "Cannot compute xydiff on odd number of intensities: $!"; }
-    my @diffs;
-    while (@block) {
-	my ($xint, $yint) = splice(@block, 0, 2);
-	push(@diffs, ($yint-$xint));
-    }
-    return @diffs;
-}
-
 
 return 1;
