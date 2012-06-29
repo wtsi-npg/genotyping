@@ -9,37 +9,11 @@ package WTSI::Genotyping::QC::SimFiles;
 use strict;
 use warnings;
 
-sub mean {
-    # mean of given array -- use to find mean xydiff
-    my ($count, $total) = (0,0);
-    foreach my $term (@_) { $count += 1; $total += $term; }
-    if ($count==0) { return undef; } # avoid dividing by zero
-    else { return $total / $count; }
-}
-
-sub readHeader {
-    # read and unpack .sim format header
-    # header fields are: ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
-    my $fh = shift;
-    my $header;
-    read($fh, $header, 16); # header = first 16 bytes
-    my @fields = unpack("A3CSLLCC", $header);
-    return @fields;
-}
-
 sub blockSizeFromHeader {
     # input an unpacked .sim header; size = name_length + (probes * channels * numeric_bytes)
     my $numberBytes = numericBytesByFormat($_[6]);
     my $blockSize = $_[2] + ($_[4] * $_[5] * $numberBytes);
     return $blockSize;
-}
-
-sub numericBytesByFormat {
-    # return number of bytes used for each numeric entry, for .sim format code
-    my $format = shift;
-    if ($format==0) { return 4; }
-    elsif ($format==1) { return 2; }
-    else { die "Unknown .sim numeric format code: $format : $!"; }
 }
 
 sub findMeanXYDiff {
@@ -66,6 +40,33 @@ sub findMeanXYDiff {
     my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
     return $xyDiffMean;
 }
+
+sub mean {
+    # mean of given array -- use to find mean xydiff
+    my ($count, $total) = (0,0);
+    foreach my $term (@_) { $count += 1; $total += $term; }
+    if ($count==0) { return undef; } # avoid dividing by zero
+    else { return $total / $count; }
+}
+
+sub numericBytesByFormat {
+    # return number of bytes used for each numeric entry, for .sim format code
+    my $format = shift;
+    if ($format==0) { return 4; }
+    elsif ($format==1) { return 2; }
+    else { die "Unknown .sim numeric format code: $format : $!"; }
+}
+
+sub readHeader {
+    # read and unpack .sim format header
+    # header fields are: ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
+    my $fh = shift;
+    my $header;
+    read($fh, $header, 16); # header = first 16 bytes
+    my @fields = unpack("A3CSLLCC", $header);
+    return @fields;
+}
+
 
 sub readName {
     # read name of sample with given $blockOffset
