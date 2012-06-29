@@ -13,7 +13,7 @@ use warnings;
 use Getopt::Long;
 use WTSI::Genotyping::QC::SimFiles;
 
-my ($help, $inPath, $outPath, $fh, $out, $verbose);
+my ($help, $inPath, $outPath, $fh, $out, $verbose, $probeNum);
 
 GetOptions("help"         => \$help,
 	   "input:s"      => \$inPath, # optional
@@ -32,11 +32,12 @@ Options:
     exit(0);
 }
 $verbose ||= 0; # defaults to quiet mode
+$probeNum ||= 10000; # number of probes to read in at one time
 
 if ($inPath) { open $fh, "< $inPath"; }
 else { $fh = \*STDIN; }
 open $out, "> $outPath";
-WTSI::Genotyping::QC::SimFiles::readWriteXYDiffs($fh, $out);
+WTSI::Genotyping::QC::SimFiles::readWriteXYDiffs($fh, $out, $verbose, $probeNum);
 close $fh;
 close $out;
 
