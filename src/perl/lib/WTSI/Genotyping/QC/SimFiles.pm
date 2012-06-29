@@ -91,17 +91,7 @@ sub findMeanXYDiff {
 	my $dataLength = read($fh, $data, $size);
 	if ($dataLength==0) { last; }
 	my $format = $unPackCodes[0].(2*$numericBytes);
-	@pair = unpack($format, $data);
-	for (my $j=0;$j<2;$j++) {
-	    if ($numberType==0) { 
-		# pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
-		# simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
-		$pair[$j] = pack($unPackCodes[1], $pair[$j]);
-		$pair[$j] = unpack($unPackCodes[2], $pair[$j]);
-	    } elsif ($numberType==1) {
-		$pair[$j] = $pair[$j] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
-	    }
-	}
+	@pair = unPackPair($data, $format, $numberType, \@unPackCodes);
 	$xyDiffTotal+= ($pair[1] - $pair[0]);
 	$xyDiffCount++;
     }
@@ -177,6 +167,24 @@ sub sampleMeanXYDiffs {
 	$i++;	
     }
     return (\@samples, \@means);
+}
+
+sub unPackPair {
+    # unpack data block containing an (x,y) intensity pair
+    my ($data, $format, $numberType, $unPackCodesRef) = @_;
+    my @pair = unpack($format, $data);
+    my @unPackCodes = @$unPackCodesRef;
+    for (my $j=0;$j<2;$j++) {
+	if ($numberType==0) { 
+	    # pack to Perl long int, unpack to Perl float; Perl numeric formats depend on local installation
+	    # simply unpacking with 'f' *might* work, but this is safer and makes .sim endianness explicit
+	    $pair[$j] = pack($unPackCodes[1], $pair[$j]);
+	    $pair[$j] = unpack($unPackCodes[2], $pair[$j]);
+	} elsif ($numberType==1) {
+	    $pair[$j] = $pair[$j] / 1000; # convert 16-bit integer to float in range 0.0-65.535 inclusive
+	}
+    }
+    return @pair;
 }
 
 sub xyDiffs {
