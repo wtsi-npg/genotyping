@@ -40,8 +40,9 @@ sub writePlotLinks {
     my ($out, $descsRef) = @_;
     my %descs = %$descsRef; # output descriptions
     my @png = sort(glob('*.png'));
-    my $plateDir = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir;
-    my $plateIndex = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
+    my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+    my $plateDir = $fileNames{'plate_dir'};
+    my $plateIndex = $fileNames{'plate_index'};
     my $plateIndexPath = $plateDir."/".$plateIndex;
     my @heatMapPng = sort(glob($plateDir."/*.png"));
     my $heatMapExample = shift(@heatMapPng);
@@ -123,7 +124,8 @@ my $qcStatus = shift(@ARGV); # .json file with qc status
 my $title = shift(@ARGV); # experiment name
 $title ||= 'Untitled Analysis';
 chdir($plotDir); # find and link to relative paths wrt plotdir
-my $outPath = $WTSI::Genotyping::QC::QCPlotShared::mainIndex;
+my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+my $outPath = $fileNames{'main_index'};
 my @png = glob('*.png');
 @png = sort(@png);
 open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
