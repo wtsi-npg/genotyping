@@ -60,7 +60,8 @@ my @outNames = ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetF
 if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
 
-my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
+my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+my $scriptDir = $Bin."/".$RScriptsRelative; 
 
 sub findFailedCrHet {
     # find cr/het metrics for failed samples
@@ -118,13 +119,14 @@ sub writeFailCounts {
     my ($qcResultsRef, $failText, $comboText) = @_;
     my %results = %$qcResultsRef;
     my (%singleFails, %combinedFails, @failedSamples);
+    my %shortNames = WTSI::Genotyping::QC::QCPlotShared::readQCShortNameHash();
     foreach my $sample (keys(%results)) {
 	my %metricResults = %{$results{$sample}};
 	my @fails = ();
 	foreach my $metric (keys(%metricResults)) {
 	    my ($pass, $value) = @{$metricResults{$metric}};
 	    if ($pass) { next; }
-	    push(@fails, $WTSI::Genotyping::QC::QCPlotShared::qcMetricNamesShort{$metric} );
+	    push(@fails, $shortNames{$metric} );
 	    $singleFails{$metric}++;
 	}
 	my $combo = join('', sort(@fails));
@@ -189,8 +191,9 @@ sub run {
     writeFailedCrHet(\@failedSamples, \%qcResults, $crHetPath, $crHetFail);
     # run R scripts to produce plots
     # barplot individual failures
-    my @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
-		$Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."plotIndividualFails.R",
+    my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+    my @args = ($RScriptExec,
+		$Bin."/".$RScriptsRelative."plotIndividualFails.R",
 		$failText, $failTotal, $title
 	);
     my @outputs = ($causePng,);
@@ -198,8 +201,8 @@ sub run {
     my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { $allOK = 0; }
     # barplot combined failures
-    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
-	     $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."plotCombinedFails.R",
+    @args = ($RScriptExec,
+	     $Bin."/".$RScriptsRelative."plotCombinedFails.R",
 	     $comboText, $title
 	);
     @outputs = ($comboPng,);
@@ -210,8 +213,8 @@ sub run {
     my %thresholds =  WTSI::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
     my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
     my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
-    @args = ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec,
-	     $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative."scatterPlotFails.R",
+    @args = ($RScriptExec,
+	     $Bin."/".$RScriptsRelative."scatterPlotFails.R",
 	     $crHetFail, $hetMean, $hetMaxDist,  $thresholds{'call_rate'}, $title,
 	);
     @outputs = ($scatterPng, $detailPng);

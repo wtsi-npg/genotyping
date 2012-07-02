@@ -53,8 +53,8 @@ $outputFail ||= 'identity_check_fail.txt';
 $outputFailedPairs ||= 'identity_check_failed_pairs.txt';
 $outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
 $log ||= 'identity_check.log';
-$minCheckedSNPs ||=  $WTSI::Genotyping::QC::QCPlotShared::minSnpsForIdent;
-$minIdent ||= $WTSI::Genotyping::QC::QCPlotShared::minIdentity;
+$minCheckedSNPs ||= 10;
+$minIdent ||= 0.9;
 
 run($outputGT, $outputResults,  $outputFail, $outputFailedPairs, $outputFailedPairsMatch, 
     $minCheckedSNPs, $minIdent, $log);

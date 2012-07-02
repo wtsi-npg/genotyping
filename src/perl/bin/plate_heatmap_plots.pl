@@ -38,14 +38,16 @@ Unspecified options will receive default values, with output written to: ./plate
     exit(0);
 }
 
+
 # mode is a string; one of cr, het, xydiff.
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-$RScriptPath ||= $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
+my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+$RScriptPath ||= $RScriptExec;
 $outDir ||= 'platePlots';
 
-my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
+my $scriptDir = $Bin."/".$RScriptsRelative; 
 
 sub getXYdiffMinMax {
     # get min/max for plot range

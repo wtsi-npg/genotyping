@@ -7,43 +7,13 @@
 
 package WTSI::Genotyping::QC::QCPlotShared;
 
+use warnings;
+use strict;
+use FindBin qw($Bin);
 use JSON;
 
-$RScriptExec = "/software/R-2.11.1/bin/Rscript";
-$RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scripts
+# read default qc names and thresholds from .json files
 
-# file and directory names
-$sampleCrHet = 'sample_cr_het.txt'; # main source of input
-$xyDiffExpr = "/*XYdiff.txt"; # use to glob for xydiff input (old pipeline output only; now read from .sim file)
-$xydiff = "xydiff.txt"; # xydiff output file in new qc
-$mainIndex = 'index.html';
-$plateHeatmapDir = 'plate_heatmaps';
-$plateHeatmapIndex = 'index.html'; # written to $plateHeatmapDir, not main output directory
-$duplicates = 'duplicate_summary.txt';
-$idents = 'identity_check_results.txt'; 
-$genders = 'sample_xhet_gender.txt';
-$qcResults = 'qc_results.json';
-
-# set of allowed QC metric names (long and short versions)
-@qcMetricNames = qw(call_rate heterozygosity duplicate identity gender xydiff);
-%qcMetricNames;
-foreach my $name (@qcMetricNames) { $qcMetricNames{$name}=1; } # convenient for checking name legality
-%qcMetricNamesShort = ($qcMetricNames[0] => 'C',
-		       $qcMetricNames[1] => 'H',
-		       $qcMetricNames[2] => 'D',
-		       $qcMetricNames[3] => 'I',
-		       $qcMetricNames[4] => 'G',
-		       $qcMetricNames[5] => 'X',
-    );
-%qcMetricInputs = ($qcMetricNames[0] => $sampleCrHet,
-		   $qcMetricNames[1] => $sampleCrHet,
-		   $qcMetricNames[2] => [$sampleCrHet, $duplicates],
-		   $qcMetricNames[3] => $idents,
-		   $qcMetricNames[4] => $genders,
-		   $qcMetricNames[5] => $xydiff,
-    );
-
-# standard qc thresholds are in .json file
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
 
 sub meanSd {
@@ -59,14 +29,72 @@ sub meanSd {
     return ($mean, $sd);
 }
 
+sub getRPaths {
+    # contains default paths for R scripts
+    my $RScriptExec = "/software/R-2.11.1/bin/Rscript";
+    my $RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scripts
+    return ($RScriptExec, $RScriptsRelative);
+}
+
+sub readFileToString {
+    # generic method to read a file (eg. json) into a single string variable
+    my $inPath = shift();
+    open IN, "< $inPath";
+    my @lines = <IN>;
+    close IN;
+    return join('', @lines);
+}
+
+sub readQCFileNames {
+    # read default qc file names
+    my $inPath = shift();
+    my %allNames = readQCNameConfig($inPath);
+    my %fileNames = %{$allNames{'file_names'}};
+}
+
+sub readQCNameConfig {
+    # read qc metric names from JSON config
+    my $inPath = shift();
+    $inPath ||= $Bin."/../json/qc_name_config.json";
+    my %names = %{decode_json(readFileToString($inPath))};
+    return %names;
+}
+
+sub readQCMetricInputs {
+    my $inPath = shift();
+    my %names = readQCNameConfig($inPath);
+    my %inputs = %{$names{'input_names'}};
+    return %inputs;
+}
+
+sub readQCNameArray {
+    my $inPath = shift();
+    my %names = readQCNameConfig($inPath);
+    my @nameArray = @{$names{'name_array'}};
+    return @nameArray;
+}
+
+sub readQCNameHash {
+    # convenience method, find hash for checking name legality
+    my $inPath = shift();
+    my @nameArray = readQCNameArray($inPath);
+    my %nameHash;
+    foreach my $name (@nameArray) { $nameHash{$name} = 1; }
+    return %nameHash;
+}
+
+sub readQCShortNameHash {
+    my $inPath = shift();
+    my %names = readQCNameConfig($inPath);
+    my %shortNames = %{$names{'short_names'}};
+    return %shortNames;
+}
+
 sub readQCResultHash {
     # read QC results data structure from JSON file
     # assumes top-level structure is a hash
     my $inPath = shift;
-    open IN, "< $inPath";
-    my @lines = <IN>;
-    close IN;
-    my %results = %{decode_json(join('', @lines))};
+    my %results = %{decode_json(readFileToString($inPath))};
     return %results;
 }
 
@@ -93,16 +121,15 @@ sub readSampleData {
 sub readThresholds {
     # read QC metric thresholds from config path
     my $configPath = shift;
-    open IN, "< $configPath";
-    my @lines = <IN>;
-    close IN;
-    my %config = %{decode_json(join('', @lines))};
+    my %config = %{decode_json(readFileToString($configPath))};
     my %thresholds = %{$config{"Metrics_thresholds"}};
+    my %qcMetricNames = readQCNameHash();
     foreach my $name (keys(%thresholds)) { # validate metric names
-	unless ($WTSI::Genotyping::QC::QCPlotShared::qcMetricNames{$name}) {
+	unless ($qcMetricNames{$name}) {
 	    die "Unknown QC metric name: $!";
 	}
     }
     return %thresholds;
 }
 
+return 1;
