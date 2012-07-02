@@ -1,5 +1,3 @@
-#!/software/bin/perl
-
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012
 
