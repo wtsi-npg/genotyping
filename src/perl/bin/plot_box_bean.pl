@@ -48,12 +48,13 @@ Unspecified options will receive default values, with output written to: ./plate
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-$RScriptPath ||=  $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
+my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+$RScriptPath ||=  $RScriptExec;
 $outDir ||= 'testBoxPlots';
 $title ||= "UNTITLED";
 $test ||= 1; # test mode is on by default
 
-my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
+my $scriptDir = $Bin."/".$RScriptsRelative; 
 
 sub parsePlate {
     # parse plate from sample name, assuming usual PLATE_WELL_ID format

@@ -43,7 +43,8 @@ Options:
 $inputDir ||= '.';
 $outputDir ||= $inputDir;
 $configPath ||= $Bin."/../json/qc_threshold_defaults.json";
-my $outPath = $outputDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::qcResults;
+my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+my $outPath = $outputDir.'/'.$fileNames{'qc_results'};
 
 run($inputDir, $configPath, $outPath);
 
@@ -258,12 +259,13 @@ sub run {
     my ($inputDir, $configPath, $outPath, $sep) = @_;
     $sep ||= "\t";
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
+    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray();
     my @metrics = ();
-    foreach my $metric (@WTSI::Genotyping::QC::QCPlotShared::qcMetricNames) { 
+    foreach my $metric (@metricNames) { 
 	# use metrics with defined thresholds
 	if (defined($thresholds{$metric})) { push(@metrics, $metric); }
     } 
-    my %inputNames = %WTSI::Genotyping::QC::QCPlotShared::qcMetricInputs;
+    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs();
     my $out;
     open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
     writeResults($out, $sep, $inputDir, \@metrics, \%thresholds, \%inputNames);
