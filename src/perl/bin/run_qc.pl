@@ -98,13 +98,14 @@ sub getPlotCommands {
     my ($outDir, $title, $noPlate) = @_;
     my @cmds = ();
     my $cmd;
+    my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
     ### plate heatmaps ###
-    my $crHetPath = $WTSI::Genotyping::QC::QCPlotShared::sampleCrHet;
-    my $xydiffPath = $WTSI::Genotyping::QC::QCPlotShared::xydiff;
+    my $crHetPath = $fileNames{'sample_cr_het'};
+    my $xydiffPath = $fileNames{'xydiff'};
     unless ($noPlate) {
 	# creating heatmap plots can take several minutes; may wish to omit for testing
 	my $heatMapScript = "$Bin/plate_heatmap_plots.pl";
-	my $hmOut = $outDir.'/'.$WTSI::Genotyping::QC::QCPlotShared::plateHeatmapDir; # heatmaps in subdirectory
+	my $hmOut = $outDir.'/'.$fileNames{'plate_dir'}; # heatmaps in subdirectory
 	unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
 	my @modes = ('cr', 'het');
 	foreach my $mode (@modes) { # assumes $crHetPath exists and is readable
@@ -116,7 +117,7 @@ sub getPlotCommands {
 	    push(@cmds, $cmd);
 	}
 	my $indexScript = "$Bin/plate_heatmap_index.pl";
-	my $indexName = $WTSI::Genotyping::QC::QCPlotShared::plateHeatmapIndex;
+	my $indexName = $fileNames{'plate_index'};
 	push (@cmds, "perl $indexScript $title $hmOut $indexName");
     }
     ### boxplots ###
@@ -139,11 +140,11 @@ sub getPlotCommands {
     push(@cmds, $cmd);
     ### failure cause breakdowns ###
     my $failPlotScript = "$Bin/plot_fail_causes.pl";
-    $cmd = join(' ', ('perl', $failPlotScript, "--input_dir=.", "--output_dir=.", "--title=".$title));
+    $cmd = join(' ', ('perl', $failPlotScript, "--title=".$title));
     push(@cmds, $cmd);
     ### html index for all plots ###
     my $plotIndexScript = "$Bin/main_plot_index.pl";
-    $cmd = join(' ', ('perl', $plotIndexScript, $outDir, $WTSI::Genotyping::QC::QCPlotShared::qcResults, $title));
+    $cmd = join(' ', ('perl', $plotIndexScript, $outDir, $fileNames{'qc_results'}, $title));
     push(@cmds, $cmd);
     return @cmds;
 }
@@ -166,7 +167,7 @@ sub writeInputFiles {
     }
     push(@cmds, "perl $Bin/write_qc_status.pl --config=$configPath");
     my @omits = (0) x ($#cmds+1); 
-    #@omits = (1,0,0,0,0,0); ### hack for testing
+    #@omits = (1,0,0,0,1,0); ### hack for testing
     if ($verbose) { print WTSI::Genotyping::QC::QCPlotTests::timeNow()." Starting QC checks.\n"; }
     ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommandList(\@cmds, $tests, $failures, 
 									     $verbose, \@omits);

@@ -119,8 +119,9 @@ my $plotPath = $outDir.$prefix.'.png';
 if ($sanityCancel) { $sanityOpt='FALSE'; }
 else { $sanityOpt='TRUE'; }
 my $summaryPath = $outDir.$prefix.'_summary.txt';
-my $cmd = join(' ', ($WTSI::Genotyping::QC::QCPlotShared::RScriptExec, 
-		     $Bin.'/'.$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative.'/check_xhet_gender.R',
+my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+my $cmd = join(' ', ($RScriptExec, 
+		     $Bin.'/'.$RScriptsRelative.'/check_xhet_gender.R',
 		     $tempName, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
 # $cmd uses csh redirect
 my ($tests, $failures) = (0,0);

@@ -33,11 +33,12 @@ Unspecified options will receive default values, with output written to current 
     exit(0);
 }
 
-$RScriptPath ||= $WTSI::Genotyping::QC::QCPlotShared::RScriptExec;
+my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
+$RScriptPath ||= $RScriptExec;
 $outDir ||= '.';
 $title ||= 'Unknown';
 
-my $scriptDir = $Bin."/".$WTSI::Genotyping::QC::QCPlotShared::RScriptsRelative; 
+my $scriptDir = $Bin."/".$RScriptsRelative; 
 my $test = 1;
 
 sub getBinCounts {
