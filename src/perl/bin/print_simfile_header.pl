@@ -3,7 +3,7 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # May 2012
 
-# simple test script for SimFiles module
+# convenience script to look at the header and first few entries of a .sim file
 
 use warnings;
 use strict;
