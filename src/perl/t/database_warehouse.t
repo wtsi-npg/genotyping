@@ -13,6 +13,8 @@ require_ok('WTSI::Genotyping::Database::Warehouse');
 
 use WTSI::Genotyping::Database::Warehouse;
 
+Log::Log4perl::init('etc/log4perl_tests.conf');
+
 my $db_credentials = $ENV{HOME} . "/.npg/genotyping.ini";
 
 SKIP: {

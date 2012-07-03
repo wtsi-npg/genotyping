@@ -28,6 +28,8 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                get_collection_meta
                                add_collection_meta);
 
+Log::Log4perl::init('etc/log4perl_tests.conf');
+
 my $data_path = "t/irods";
 my $test_file = "$data_path/test.txt";
 my $test_dir = "$data_path/test";

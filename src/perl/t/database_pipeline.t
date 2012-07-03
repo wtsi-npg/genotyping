@@ -16,6 +16,8 @@ require_ok('WTSI::Genotyping::Schema');
 
 use WTSI::Genotyping::Database::Pipeline;
 
+Log::Log4perl::init('etc/log4perl_tests.conf');
+
 my $ini_path = './etc';
 my $dbfile = 't/pipeline.db';
 unlink($dbfile);

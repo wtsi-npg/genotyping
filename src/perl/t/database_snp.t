@@ -13,6 +13,8 @@ require_ok('WTSI::Genotyping::Database::SNP');
 
 use WTSI::Genotyping::Database::SNP;
 
+Log::Log4perl::init('etc/log4perl_tests.conf');
+
 my $db_credentials = $ENV{HOME} . "/.npg/genotyping.ini";
 
 SKIP: {

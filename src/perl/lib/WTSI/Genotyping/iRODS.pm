@@ -5,7 +5,10 @@ package WTSI::Genotyping::iRODS;
 use strict;
 use warnings;
 use Carp;
+use Log::Log4perl;
 use File::Basename qw(fileparse);
+
+use WTSI::Genotyping qw(run_command);
 
 use vars qw(@ISA @EXPORT_OK);
 
@@ -34,16 +37,38 @@ our $IQUEST = 'iquest';
 our $IRM = 'irm';
 our $IPWD = 'ipwd';
 
+our $log = Log::Log4perl->get_logger('genotyping');
+
+=head2 ipwd
+
+  Arg [1]    : None
+  Example    : $dir = ipwd()
+  Description: Returns the current iRODS working directory.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub ipwd {
-  my @wd = _run_command($IPWD);
+  my @wd = run_command($IPWD);
 
   return shift @wd;
 }
 
+=head2 list_object
+
+  Arg [1]    : iRODS data object name
+  Example    : $obj = list_object($object)
+  Description: Returns the full path of the object.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub list_object {
   my ($object) = @_;
 
-  $object or croak "A non-empty object argument is required\n";
+  $object or $log->logconfess('A non-empty object argument is required');
 
   my ($data_name, $collection) = fileparse($object);
   $collection =~ s!/$!!;
@@ -53,41 +78,90 @@ sub list_object {
   }
 
   my @objects =
-    _run_command($IQUEST, '"%s"',
+    run_command($IQUEST, '"%s"',
                  "\"SELECT DATA_NAME WHERE DATA_NAME = '$data_name' AND " .
                  "COLL_NAME = '$collection'\"");
 
   return $objects[0] if @objects;
 }
 
+=head2 add_object
+
+  Arg [1]    : Name of file to add to iRODs
+  Arg [2]    : iRODS data object name
+  Example    : add_object('lorem.txt', '/my/path/lorem.txt')
+  Description: Adds a file to iRODS.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub add_object {
   my ($file, $target) = @_;
 
-  $file or croak "A non-empty file argument is required\n";
-  $target or croak "A non-empty target (object) argument is required\n";
+  $file or $log->logconfess('A non-empty file argument is required');
+  $target or
+    $log->logconfess('A non-empty target (object) argument is required');
 
   $target = _ensure_absolute($target);
-  _run_command($IPUT, $file, $target);
+  run_command($IPUT, $file, $target);
 
   return $target;
 }
 
+=head2 remove_object
+
+  Arg [1]    : iRODS data object name
+  Example    : remove_object('/my/path/lorem.txt')
+  Description: Removes a data object.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub remove_object {
   my ($target) = @_;
 
-  $target or croak "A non-empty target (object) argument is required\n";
+  $target or
+    $log->logconfess('A non-empty target (object) argument is required');
 
   _irm($target);
 }
 
+=head2 get_object_meta
+
+  Arg [1]    : iRODS data object name
+  Example    : get_object_meta('/my/path/lorem.txt')
+  Description: Gets metadata on a data object. Where there are multiple
+               values for one key, the values are contained in an array under
+               that key.
+  Returntype : hash
+  Caller     : general
+
+=cut
+
 sub get_object_meta {
   my ($object) = @_;
 
-  $object or croak "A non-empty object argument is required\n";
-  list_object($object) or croak "Object '$object' does not exist\n";
+  $object or $log->logconfess('A non-empty object argument is required');
+  list_object($object) or $log->logconfess("Object '$object' does not exist");
 
-  return _parse_raw_meta(_run_command($IMETA, 'ls', '-d', $object))
+  return _parse_raw_meta(run_command($IMETA, 'ls', '-d', $object))
 }
+
+=head2 add_object_meta
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+  Example    : add_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
+  Description: Adds metadata to a data object. Returns an array of
+               the new key, value and units.
+  Returntype : array
+  Caller     : general
+
+=cut
 
 sub add_object_meta {
   my ($object, $key, $value, $units) = @_;
@@ -95,35 +169,63 @@ sub add_object_meta {
   $units ||= '';
 
   if (meta_exists($key, $value, get_object_meta($object))) {
-    croak "Metadata pair '$key' -> '$value' already exists for $object\n";
+    $log->logcluck("Metadata pair '$key' -> '$value' already exists for $object");
   }
 
-  _run_command($IMETA, 'add', '-d', $object, $key, $value, $units);
+  run_command($IMETA, 'add', '-d', $object, $key, $value, $units);
 
   return ($key, $value, $units);
 }
+
+=head2 remove_object_meta
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+  Example    : remove_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
+  Description: Removes metadata to a data object. Returns an array of
+               the removed key, value and units.
+  Returntype : array
+  Caller     : general
+
+=cut
 
 sub remove_object_meta {
   my ($object, $key, $value, $units) = @_;
 
-  $object or croak "A non-empty object argument is required\n";
-  $key or croak "A non-empty key argument is required\n";
-  $value or croak "A non-empty value argument is required\n";
+  $object or $log->logconfess('A non-empty object argument is required');
+  $key or $log->logconfess('A non-empty key argument is required');
+  $value or $log->logconfess('A non-empty value argument is required');
   $units ||= '';
 
   if (!meta_exists($key, $value, get_object_meta($object))) {
-    croak "Metadata pair '$key' -> '$value' does not exist for $object\n";
+    $log->logcluck("Metadata pair '$key' -> '$value' does not exist for $object");
   }
 
-  _run_command($IMETA, 'rm', '-d', $object, $key, $value, $units);
+  run_command($IMETA, 'rm', '-d', $object, $key, $value, $units);
 
   return ($key, $value, $units);
 }
 
+=head2 list_collection
+
+  Arg [1]    : iRODS collection name
+  Example    : $dir = list_collection($coll)
+  Description: Returns the contents of the collectionas two arrayrefs,
+               the first listing data objects, the second listing nested
+               collections.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+
 sub list_collection {
   my ($collection) = @_;
 
-  $collection or croak "A non-empty collection argument is required\n";
+  $collection or
+    $log->logconfess('A non-empty collection argument is required');
   $collection =~ s!/$!!;
 
   my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME)
@@ -138,65 +240,134 @@ sub list_collection {
   return (\@objects, \@collections);
 }
 
+=head2 add_collection
+
+  Arg [1]    : Name of directory to add to iRODs
+  Arg [2]    : iRODS collection name
+  Example    : add_collection('./foo', '/my/path/foo')
+  Description: Adds a directory as a collection to iRODS. Returns the new
+               collection.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub add_collection {
   my ($dir, $target) = @_;
 
-  $dir or croak "A non-empty dir argument is required\n";
-  $target or croak "A non-empty target (collection) argument is required\n";
+  $dir or $log->logconfess('A non-empty dir argument is required');
+  $target or
+    $log->logconfess('A non-empty target (collection) argument is required');
 
   $target = _ensure_absolute($target);
-  _run_command($IPUT, '-r', $dir, $target);
+  run_command($IPUT, '-r', $dir, $target);
 
   return $target;
 }
 
+=head2 remove_collection
+
+  Arg [1]    : iRODS collection name
+  Example    : remove_collectioon('/my/path/foo')
+  Description: Removes a collection and contents, recursively.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub remove_collection {
   my ($target) = @_;
 
-  $target or croak "A non-empty target (object) argument is required\n";
+  $target or
+    $log->logconfess('A non-empty target (object) argument is required');
 
   _irm($target);
 }
 
+=head2 get_collection_meta
+
+  Arg [1]    : iRODS data collection name
+  Example    : get_collection_meta('/my/path/lorem.txt')
+  Description: Gets metadata on a collection. Where there are multiple
+               values for one key, the values are contained in an array under
+               that key.
+  Returntype : hash
+  Caller     : general
+
+=cut
+
+
 sub get_collection_meta {
   my ($collection) = @_;
 
-  $collection or croak "A non-empty collection argument is required\n";
+  $collection or
+    $log->logconfess('A non-empty collection argument is required');
   $collection =~ s!/$!!;
 
-  return _parse_raw_meta(_run_command($IMETA, 'ls', '-C', $collection))
+  return _parse_raw_meta(run_command($IMETA, 'ls', '-C', $collection))
 }
+
+=head2 add_collection_meta
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+  Example    : add_collection_meta('/my/path/foo', 'id', 'ABCD1234')
+  Description: Adds metadata to a collection. Returns an array of
+               the new key, value and units.
+  Returntype : array
+  Caller     : general
+
+=cut
 
 sub add_collection_meta {
   my ($collection, $key, $value, $units) = @_;
 
-  $collection or croak "A non-empty collection argument is required\n";
-  $key or croak "A non-empty key argument is required\n";
-  $value or croak "A non-empty value argument is required\n";
+  $collection or
+    $log->logconfess('A non-empty collection argument is required');
+
+  $key or $log->logconfess('A non-empty key argument is required');
+  $value or $log->logconfess('A non-empty value argument is required');
 
   $units ||= '';
   $collection =~ s!/$!!;
 
-  _run_command($IMETA, 'add', '-C', $collection, $key, $value, $units);
+  run_command($IMETA, 'add', '-C', $collection, $key, $value, $units);
 
   return ($key, $value, $units);
 }
 
+=head2 remove_collection_meta
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+  Example    : remove_collection_meta('/my/path/foo', 'id', 'ABCD1234')
+  Description: Removes metadata to a data object. Returns an array of
+               the removed key, value and units.
+  Returntype : array
+  Caller     : general
+
+=cut
+
 sub remove_collection_meta {
   my ($collection, $key, $value, $units) = @_;
 
-  $collection or croak "A non-empty collection argument is required\n";
-  $key or croak "A non-empty key argument is required\n";
-  $value or croak "A non-empty value argument is required\n";
+  $collection or
+    $log->logconfess('A non-empty collection argument is required');
+  $key or $log->logconfess('A non-empty key argument is required');
+  $value or $log->logconfess('A non-empty value argument is required');
 
   $units ||= '';
   $collection =~ s!/$!!;
 
   if (!meta_exists($key, $value, get_collection_meta($collection))) {
-    croak "Metadata pair '$key' -> '$value' does not exist for $collection\n";
+    $log->logcluck("Metadata pair '$key' -> '$value' does not exist for $collection");
   }
 
-  _run_command($IMETA, 'rm', '-C', $collection, $key, $value, $units);
+  run_command($IMETA, 'rm', '-C', $collection, $key, $value, $units);
 
   return ($key, $value, $units);
 }
@@ -224,7 +395,7 @@ sub _parse_raw_meta {
   @raw_meta = grep { m/^[attribute|value|units]/ } @raw_meta;
   my $n = scalar @raw_meta;
   unless ($n % 3 == 0) {
-    croak "Expected imeta triples, but found $n elements\n";
+    $log->logcroak("Expected imeta triples, but found $n elements");
   }
 
   my %meta;
@@ -232,13 +403,13 @@ sub _parse_raw_meta {
     my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
 
     my ($attribute) = $str0 =~ /^attribute: (.*)/ or
-      croak "Invalid triple $i: expected an attribute but found '$str0'\n";
+       $log->logcroak("Invalid triple $i: expected an attribute but found '$str0'");
 
     my ($value) = $str1 =~ /^value: (.*)/ or
-      croak "Invalid triple $i: expected a value but found '$str1'\n";
+      $log->lofcroak("Invalid triple $i: expected a value but found '$str1'");
 
     my ($units) = $str2 =~ /^units: (.*)/ or
-      croak "Invalid triple $i: expected units but found '$str2'";
+      $log->logcroak("Invalid triple $i: expected units but found '$str2'");
 
     if (exists $meta{$attribute}) {
       push(@{$meta{$attribute}}, $value);
@@ -256,9 +427,9 @@ sub _safe_select {
 
   my @result;
 
-  my @count = _run_command($IQUEST, '"%s"', $icount);
+  my @count = run_command($IQUEST, '"%s"', $icount);
   if (@count && $count[0] > 0) {
-    push(@result, _run_command($IQUEST, '"%s"', $iquery));
+    push(@result, run_command($IQUEST, '"%s"', $iquery));
   }
 
   return @result;
@@ -267,32 +438,31 @@ sub _safe_select {
 sub _irm {
   my (@args) = @_;
 
-  _run_command($IRM, '-r', join(" ", @args));
+  run_command($IRM, '-r', join(" ", @args));
 
   return @args;
 }
 
-sub _run_command {
-  my @command = @_;
-
-  my $command = join(' ', @command);
-
-  open(EXEC, "$command |")
-    or die "Failed open pipe to command '$command': $!\n";
-
-  my @result;
-  while (<EXEC>) {
-    chomp;
-    push(@result, $_);
-  }
-
-  close(EXEC);
-
-  if ($?) {
-    croak "Execution of '$command' failed with exit code: $?\n";
-  }
-
-  return @result;
-}
-
 1;
+
+__END__
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

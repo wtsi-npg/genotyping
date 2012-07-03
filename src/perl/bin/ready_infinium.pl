@@ -6,10 +6,11 @@ package main;
 
 use warnings;
 use strict;
-
 use Getopt::Long;
+use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
+use WTSI::Genotyping;
 use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::Database::Infinium;
 use WTSI::Genotyping::Database::Warehouse;
@@ -19,6 +20,8 @@ our $AUTOCALL_PASS = 'Pass';
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+
+Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
@@ -215,7 +218,7 @@ sub validate_snpset {
       'me.name' => {"!=" => 'Sequenom'}},
      {join => {datasets => 'piperun'}, distinct => 1});
 
-  if ($run_snpset && $run_snpset != $snpset) {
+  if ($run_snpset and $run_snpset->id_snpset != $snpset->id_snpset) {
     die "Cannot add this project to '", $run->name, "'; design mismatch: '",
       $run_snpset->name, "' != '", $snpset->name, "'\n";
   }
