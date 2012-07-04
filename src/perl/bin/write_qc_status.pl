@@ -82,7 +82,7 @@ sub findMetricResults {
     } elsif ($metric eq 'xydiff') { 
 	%results = resultsXydiff($threshold, $inputDir.'/'.$input);
     } else { die "Unknown QC metric $metric: $!"; }
-    return %results;
+     return %results;
 }
 
 sub readSampleNames {
@@ -198,9 +198,15 @@ sub resultsIdentity {
 	my @fields = @$ref;
 	my ($sample, $concord) = ($fields[0], $fields[3]);
 	my $pass;
-	if ($concord >= $threshold) { $pass = 1; }
-	else { $pass = 0; }
-	if ($concord == 1) { $concord = "1.0"; } # removes unwanted trailing zeroes
+	if ($concord eq '.') {  # identity concordance not available -- assume pass
+	    $pass = 1;
+	    $concord = 'NA';
+	} elsif ($concord >= $threshold) { 
+	    $pass = 1; 
+	} else { 
+	    $pass = 0; 
+	}
+	if ($concord ne 'NA' && $concord == 1) { $concord = "1.0"; } # removes unwanted trailing zeroes
 	$results{$sample} = [$pass, $concord];
     }
     return %results;
@@ -211,6 +217,7 @@ sub resultsMetricSd {
     # threshold expressed in standard deviations; first need to find absolute thresholds
     my ($threshold, $index, $inPath, $startLine) = @_;
     my (@samples, @values, $pass, %results);
+    unless (-e $inPath) { return (); } # silently return empty hash if input does not exist
     my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, $startLine);
     foreach my $ref (@data) {
 	my @fields = @$ref;
