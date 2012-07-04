@@ -92,12 +92,16 @@ sub makePlots {
 sub parseSampleName {
     # parse sample name in PLATE_WELL_ID format
     # WELL is in the form H10 for x=8, y=10
+    # silently return undefined values if name not in correct format
     my $name = shift;
-    my ($plate, $well, $id) = split /_/, $name;
-    my @chars = split //, $well;
-    my $x = ord(uc(shift(@chars))) - 64; # convert letter to position in alphabet 
-    my $y = join('', @chars);
-    $y =~ s/^0+//; # remove leading zeroes from $y
+    my ($plate, $well, $id, $x, $y);
+    if ($name =~ m/^[^_]+_[A-Z][0-9]+_\w+/) { # check name format, eg some-plate_H10_sample-id
+	($plate, $well, $id) = split /_/, $name;
+	my @chars = split //, $well;
+	$x = ord(uc(shift(@chars))) - 64; # convert letter to position in alphabet 
+	$y = join('', @chars);
+	$y =~ s/^0+//; # remove leading zeroes from $y
+    }
     return ($plate, $x, $y);
 }
 
@@ -107,12 +111,13 @@ sub readData {
     my ($inputRef, $index, $mode) = @_;
     my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
     my ($xMax, $yMax, $duplicates) = (0,0,0);
+    my $dataOK = 1;
     while (<$inputRef>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
 	my ($plate, $x, $y) = parseSampleName($words[0]);
-	unless ($plate) {die "Cannot get plate from $words[0]: $!";} 
+	unless ($plate) { $dataOK = 0; last; }
 	# clean up plate name by removing illegal characters; plate name used as filename component
 	if (not $plateNames{$plate}) {
 	    # first time plate is encountered
@@ -140,7 +145,7 @@ sub readData {
 	$plotMin = $allResults[0];
 	$plotMax = $allResults[-1];
     }
-    return (\%results, $xMax, $yMax, $plotMin, $plotMax);
+    return ($dataOK, \%results, $xMax, $yMax, $plotMin, $plotMax);
 }
 
 sub readComments {
@@ -221,10 +226,15 @@ sub run {
 	xydiff => 1, );
     my $inputFH = \*STDIN;  
     # read data from STDIN; output data values by plate & useful stats
-    my ($dataRef, $xMax, $yMax, $plotMin, $plotMax) = readData($inputFH, $index{$mode}, $mode);
-    writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, $plotMin, $plotMax); 
-    my $ok = makePlots($RScriptPath, $outDir, $plotScripts{$mode}, 
-		       $mode."_*", "plot_${mode}_", $minMaxArgs{$mode}, $test); 
+    my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = readData($inputFH, $index{$mode}, $mode);
+    my $ok = 1;
+    if ($dataOK) {
+	writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, $plotMin, $plotMax); 
+	$ok = makePlots($RScriptPath, $outDir, $plotScripts{$mode}, 
+			$mode."_*", "plot_${mode}_", $minMaxArgs{$mode}, $test); 
+    } else {
+	print STDERR "Cannot parse plate/well locations; omitting plate heatmap plots.\n";
+    }
     return $ok;
 }
 
