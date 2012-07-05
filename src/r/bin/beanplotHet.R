@@ -14,5 +14,5 @@ plate <- data$V1
 het <-  data$V2
 png(outpath, height=800, width=800, pointsize=18)
 library(beanplot)
-beanplot(het~plate, horizontal=TRUE, las=1,  col=c(3,1), xlab="Autosome heterozygosity rate", main=paste("Sample het rate by plate: ", title ))
+beanplot(het~plate, horizontal=TRUE, las=1,  col=c(3,1), xlab="Autosome heterozygosity rate", main=paste("Sample het rate by plate: ", title ), log="")
 dev.off()
