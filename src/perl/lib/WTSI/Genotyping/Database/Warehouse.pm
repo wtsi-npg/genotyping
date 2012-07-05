@@ -116,7 +116,7 @@ sub find_infinium_studies {
   my $dbh = $self->dbh;
 
  my $query =
-    qq(SELECT
+    qq(SELECT DISTINCT
          st.internal_id,
          st.uuid,
          st.name,
