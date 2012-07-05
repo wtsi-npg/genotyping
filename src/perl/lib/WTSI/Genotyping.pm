@@ -43,10 +43,11 @@ use WTSI::Genotyping::DelimitedFiles;
 use WTSI::Genotyping::GenoSNP;
 use WTSI::Genotyping::IO;
 use WTSI::Genotyping::Illuminus;
-use WTSI::Genotyping::iRODS;
 use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Utilities;
+
+use WTSI::Genotyping::iRODS;
 
 $VERSION = '0.2.0';
 
