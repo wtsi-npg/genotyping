@@ -54,7 +54,8 @@ sub make_warehouse_metadata {
 sub make_infinium_metadata {
   my ($if_sample) = @_;
 
-  return (['dcterms:identifier' => $if_sample->{'sample'}]);
+  return (['dcterms:identifier' => $if_sample->{sample}],
+          [beadchip => $if_sample->{beadchip}]);
 }
 
 sub make_file_metadata {
