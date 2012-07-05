@@ -17,13 +17,19 @@ use JSON;
 sub meanSd {
     # find mean and standard deviation of input list
     # first pass -- mean
-    my $total = 0;
-    foreach my $x (@_) { $total+= $x; }
-    my $mean = $total / @_;
-    # second pass -- sd
-    $total = 0;
-    foreach my $x (@_) { $total += abs($x - $mean); }
-    my $sd = $total / @_;
+    my ($mean, $sd);
+    unless (@_) {
+	$mean = undef;
+	$sd = 0;
+    } else {
+	my $total = 0;
+	foreach my $x (@_) { $total+= $x; }
+	$mean = $total / @_;
+	# second pass -- sd
+	$total = 0;
+	foreach my $x (@_) { $total += abs($x - $mean); }
+	$sd = $total / @_;
+    }
     return ($mean, $sd);
 }
 
@@ -100,6 +106,7 @@ sub readSampleData {
     # read data for given sample names from space-delimited file; return array of arrays of data read
     # optional start, stop points counting from zero
     my ($inPath, $startLine, $stopLine) = @_;
+    unless (-e $inPath) { return (); } # silently return empty list if input does not exist
     $startLine ||= 0;
     $stopLine ||= 0;
     my @data;
