@@ -216,7 +216,7 @@ sub run_command {
   close(EXEC);
 
   if ($?) {
-    $log->logconfess("Execution of '$command' failed with exit code: $?");
+    $log->logconfess("Execution of '$command' failed with exit code: $? reason");
   }
 
   return @result;

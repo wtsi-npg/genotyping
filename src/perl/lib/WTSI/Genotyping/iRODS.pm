@@ -20,6 +20,7 @@ use Exporter;
                 add_object
                 remove_object
                 add_object_meta
+                batch_object_meta
                 get_object_meta
                 remove_object_meta
 
@@ -27,9 +28,11 @@ use Exporter;
                 add_collection
                 remove_collection
                 add_collection_meta
+
                 get_collection_meta
                 remove_collection_meta);
 
+our $ICHKSUM = 'ichksum';
 our $IMETA = 'imeta';
 our $IMKDIR = 'imkdir';
 our $IPUT = 'iput';
@@ -79,8 +82,8 @@ sub list_object {
 
   my @objects =
     run_command($IQUEST, '"%s"',
-                 "\"SELECT DATA_NAME WHERE DATA_NAME = '$data_name' AND " .
-                 "COLL_NAME = '$collection'\"");
+                qq("SELECT DATA_NAME WHERE DATA_NAME = '$data_name' AND \
+                    COLL_NAME = '$collection'"));
 
   return $objects[0] if @objects;
 }
@@ -104,6 +107,7 @@ sub add_object {
     $log->logconfess('A non-empty target (object) argument is required');
 
   $target = _ensure_absolute($target);
+  $log->debug("Adding object '$target'");
   run_command($IPUT, $file, $target);
 
   return $target;
@@ -125,6 +129,7 @@ sub remove_object {
   $target or
     $log->logconfess('A non-empty target (object) argument is required');
 
+  $log->debug("Removing object '$target'");
   _irm($target);
 }
 
@@ -168,13 +173,40 @@ sub add_object_meta {
 
   $units ||= '';
 
+  $log->debug("Adding metadata pair '$key' -> '$value' to $object");
   if (meta_exists($key, $value, get_object_meta($object))) {
-    $log->logcluck("Metadata pair '$key' -> '$value' already exists for $object");
+    $log->logconfess("Metadata pair '$key' -> '$value' ",
+                     "already exists for $object");
   }
 
-  run_command($IMETA, 'add', '-d', $object, $key, $value, $units);
+  run_command($IMETA, 'add', '-d', qq($object "$key" "$value" "$units"));
 
   return ($key, $value, $units);
+}
+
+sub batch_object_meta {
+  my ($object, $meta_tuples) = @_;
+
+  open(IMETA, "| $IMETA > /dev/null")
+    or $log->logconfess("Failed open pipe to command '$IMETA': $!");
+  foreach my $tuple (@$meta_tuples) {
+    my ($key, $value, $units) = @$tuple;
+    $units ||= '';
+
+    $log->debug("Adding metadata pair '$key' -> '$value' to $object");
+    print IMETA qq(add -d $object "$key" "$value" "$units"), "\n";
+  }
+  close(IMETA);
+
+  # WARNING: imeta exits with the error code for the last operation in
+  # the batch. An error followed by a success will be reported as a
+  # success.
+
+  if ($?) {
+    $log->logconfess("Execution of '$IMETA' failed with exit code: $?");
+  }
+
+  return $object;
 }
 
 =head2 remove_object_meta
@@ -199,11 +231,13 @@ sub remove_object_meta {
   $value or $log->logconfess('A non-empty value argument is required');
   $units ||= '';
 
+  $log->debug("Removing metadata pair '$key' -> '$value' from $object");
   if (!meta_exists($key, $value, get_object_meta($object))) {
-    $log->logcluck("Metadata pair '$key' -> '$value' does not exist for $object");
+    $log->logcluck("Metadata pair '$key' -> '$value' ",
+                   "does not exist for $object");
   }
 
-  run_command($IMETA, 'rm', '-d', $object, $key, $value, $units);
+  run_command($IMETA, 'rm', '-d', qq($object "$key" "$value" "$units"));
 
   return ($key, $value, $units);
 }
@@ -220,7 +254,6 @@ sub remove_object_meta {
 
 =cut
 
-
 sub list_collection {
   my ($collection) = @_;
 
@@ -228,13 +261,13 @@ sub list_collection {
     $log->logconfess('A non-empty collection argument is required');
   $collection =~ s!/$!!;
 
-  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME)
+  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME) \
                                  WHERE COLL_NAME = '$collection'"),
-                             qq("SELECT DATA_NAME
+                             qq("SELECT DATA_NAME \
                                  WHERE COLL_NAME = '$collection'"));
-  my @collections = _safe_select(qq("SELECT COUNT(COLL_NAME)
+  my @collections = _safe_select(qq("SELECT COUNT(COLL_NAME) \
                                      WHERE COLL_PARENT_NAME = '$collection'"),
-                                 qq("SELECT COLL_NAME
+                                 qq("SELECT COLL_NAME \
                                      WHERE COLL_PARENT_NAME = '$collection'"));
 
   return (\@objects, \@collections);
@@ -260,6 +293,7 @@ sub add_collection {
     $log->logconfess('A non-empty target (collection) argument is required');
 
   $target = _ensure_absolute($target);
+  $log->debug("Adding collection '$target'");
   run_command($IPUT, '-r', $dir, $target);
 
   return $target;
@@ -281,6 +315,7 @@ sub remove_collection {
   $target or
     $log->logconfess('A non-empty target (object) argument is required');
 
+  $log->debug("Removing collection '$target'");
   _irm($target);
 }
 
@@ -333,7 +368,13 @@ sub add_collection_meta {
   $units ||= '';
   $collection =~ s!/$!!;
 
-  run_command($IMETA, 'add', '-C', $collection, $key, $value, $units);
+  $log->debug("Adding metadata pair '$key' -> '$value' to $collection");
+  if (meta_exists($key, $value, get_collection_meta($collection))) {
+    $log->logconfess("Metadata pair '$key' -> '$value' ",
+                     "already exists for $collection");
+  }
+
+  run_command($IMETA, 'add', '-C', qq($collection "$key" "$value" "$units"));
 
   return ($key, $value, $units);
 }
@@ -363,11 +404,13 @@ sub remove_collection_meta {
   $units ||= '';
   $collection =~ s!/$!!;
 
+  $log->debug("Removing metadata pair '$key' -> '$value' from $collection");
   if (!meta_exists($key, $value, get_collection_meta($collection))) {
-    $log->logcluck("Metadata pair '$key' -> '$value' does not exist for $collection");
+    $log->logcluck("Metadata pair '$key' -> '$value' ",
+                   "does not exist for $collection");
   }
 
-  run_command($IMETA, 'rm', '-C', $collection, $key, $value, $units);
+  run_command($IMETA, 'rm', '-C', qq($collection "$key" "$value" "$units"));
 
   return ($key, $value, $units);
 }
@@ -375,7 +418,7 @@ sub remove_collection_meta {
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
-  exists $meta{$key} and grep { $value } @{$meta{$key}};
+  exists $meta{$key} and grep { $_ eq $value } @{$meta{$key}};
 }
 
 sub _ensure_absolute {
@@ -403,10 +446,11 @@ sub _parse_raw_meta {
     my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
 
     my ($attribute) = $str0 =~ /^attribute: (.*)/ or
-       $log->logcroak("Invalid triple $i: expected an attribute but found '$str0'");
+       $log->logcroak("Invalid triple $i: expected an attribute but found ",
+                      "'$str0'");
 
     my ($value) = $str1 =~ /^value: (.*)/ or
-      $log->lofcroak("Invalid triple $i: expected a value but found '$str1'");
+      $log->logcroak("Invalid triple $i: expected a value but found '$str1'");
 
     my ($units) = $str2 =~ /^units: (.*)/ or
       $log->logcroak("Invalid triple $i: expected units but found '$str2'");
