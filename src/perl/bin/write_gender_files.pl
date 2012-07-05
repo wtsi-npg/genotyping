@@ -169,6 +169,9 @@ sub run {
 	if ($plotsDir) { 
 	    my @plots = glob($tempDir."/*.png"); # cleaner than doing cp with the shell expansion
 	    if (@plots>0) { system("cp ".join(' ', @plots)." $plotsDir"); }
+	    my @files = glob($tempDir."/*_summary.txt"); # also copy model training summary, if available
+	    my $summary = shift(@files);
+	    if ($summary) { system("cp $summary $plotsDir"); }
 	}
     }
 }
