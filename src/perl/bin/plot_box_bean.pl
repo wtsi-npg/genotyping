@@ -58,21 +58,36 @@ my $scriptDir = $Bin."/".$RScriptsRelative;
 
 sub parsePlate {
     # parse plate from sample name, assuming usual PLATE_WELL_ID format
-    my @terms = split(/_/, $_[0]);
-    return $terms[0];
+    # return undefined value for incorrectly formatted name
+    my $name = shift;
+    my $plate;
+    if ($name =~ /\w+_\w+/) {
+	my @terms = split(/_/, $name);
+	$plate = shift @terms;
+    }
+    return $plate;
 }
 
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
     # data is taken from a particular index in space-separated input (eg. sample_cr_het.txt)
     my ($input, $output, $index) = @_;
+    my $inputOK = 1;
     while (<$input>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
 	my $plate = parsePlate($words[0]);
+	unless ($plate) {
+	    my $message = "Cannot parse plate from sample name; omitting box/beanplots.\n";
+	    print $output "# ERROR: $message";
+	    print STDERR $message;
+	    $inputOK = 0;
+	    last;
+	}
 	print $output $plate."\t".$words[$index]."\n";
     }
+    return $inputOK;
 }
 
 sub runBeanPlot {
@@ -105,14 +120,17 @@ sub run {
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
     my $pngOutPath = $outDir."/".$mode."_boxplot.png";
     open my $output, "> $textOutPath" || die "Cannot open output file: $!";
-    writeBoxplotInput($input, $output, $index{$mode});
+    my $inputOK = writeBoxplotInput($input, $output, $index{$mode});
     close $output;
-    my @args = ($RScriptPath, $plotScripts{$mode}, $textOutPath, $title);
-    my @outputs = ($pngOutPath,);
-    if ($mode eq 'cr') { push(@outputs, $outDir."/platePopulationSizes.png"); }
-    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
-    my $result = runBeanPlot($mode, $RScriptPath, $outDir, $title, $scriptDir, $textOutPath, $test);
-    if ($test && $result==0) { $plotsOK = 0; }
+    my $plotsOK = 1;
+    if ($inputOK) {
+	my @args = ($RScriptPath, $plotScripts{$mode}, $textOutPath, $title);
+	my @outputs = ($pngOutPath,);
+	if ($mode eq 'cr') { push(@outputs, $outDir."/platePopulationSizes.png"); }
+	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+	my $result = runBeanPlot($mode, $RScriptPath, $outDir, $title, $scriptDir, $textOutPath, $test);
+	if ($test && $result==0) { $plotsOK = 0; }
+    }
     return $plotsOK;
 }
 

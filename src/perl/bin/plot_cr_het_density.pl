@@ -73,6 +73,9 @@ sub readCrHet {
     # read (cr, het) coordinates from given input filehandle
     # also get min/max heterozygosity
     my $input = shift;
+    my $qMax = shift;
+    $qMax ||= 40;
+    my $crMax = 1 - 10**(-$qMax/10); # truncate very high CR (may have CR=100% for few SNPs)
     my ($crIndex, $hetIndex) = (1,2); 
     my @coords = ();
     my ($hetMin, $hetMax) = (1, 0);
@@ -80,7 +83,10 @@ sub readCrHet {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	my $crScore = -10 * (log(1 - $words[$crIndex]) / log(10)); # convert cr to phred scale
+	my $cr = $words[$crIndex];
+	my $crScore; # convert cr to phred scale
+	if ($cr > $crMax) { $crScore = $qMax; } 
+	else { $crScore = -10 * (log(1 - $words[$crIndex]) / log(10)); } 
 	my $het = $words[$hetIndex];
 	if ($het < $hetMin) { $hetMin = $het; }
 	if ($het > $hetMax) { $hetMax = $het; }
@@ -114,7 +120,7 @@ sub run {
     ### read input and do heatmap plot ###
     my $input = \*STDIN;
     my ($coordsRef, $hetMin, $hetMax) = readCrHet($input);
-    my ($xmin, $xmax, $xsteps, $ysteps) = (0, 40, 40, 40);
+    my ($xmin, $xmax, $xsteps, $ysteps) = (0, 41, 40, 40);
     my @counts = getBinCounts($coordsRef, $xmin, $xmax, $xsteps, $hetMin, $hetMax, $ysteps);
     open $output, "> $heatText" || die "Cannot open output path $heatText: $!";
     writeTable(\@counts, $output);

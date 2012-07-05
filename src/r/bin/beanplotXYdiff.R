@@ -14,5 +14,5 @@ plate <- data$V1
 xy.diff <-  data$V2
 png(outpath, height=800, width=800, pointsize=18)
 library(beanplot)
-beanplot(xy.diff~plate, horizontal=TRUE, las=1, col=c(3,1), xlab="Mean (y-x) intensity", main=paste("Sample XYdiff by plate: ", title ))
+beanplot(xy.diff~plate, horizontal=TRUE, las=1, col=c(3,1), xlab="Mean (y-x) intensity", main=paste("Sample XYdiff by plate: ", title ), log="")
 dev.off()
