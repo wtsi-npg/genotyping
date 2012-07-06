@@ -18,6 +18,8 @@ use Exporter;
 @EXPORT_OK = qw(ipwd
                 list_object
                 add_object
+                get_object_checksum
+                checksum_object
                 remove_object
                 add_object_meta
                 batch_object_meta
@@ -30,7 +32,8 @@ use Exporter;
                 add_collection_meta
 
                 get_collection_meta
-                remove_collection_meta);
+                remove_collection_meta
+                meta_exists);
 
 our $ICHKSUM = 'ichksum';
 our $IMETA = 'imeta';
@@ -58,6 +61,57 @@ sub ipwd {
   return shift @wd;
 }
 
+sub get_object_checksum {
+  my ($object) = @_;
+
+  $object or
+    $log->logconfess('A non-empty object argument is required');
+
+  my ($data_name, $collection) = fileparse($object);
+
+  $collection =~ s!/$!!;
+
+  if ($collection eq '.') {
+    $collection = ipwd();
+  }
+
+  my @raw_checksum = run_command($ICHKSUM, qq('$object'));
+  unless (@raw_checksum) {
+    $log->logconfess("Failed to get iRODS checksum for '$object'");
+  }
+
+  my $checksum = shift @raw_checksum;
+  $checksum =~ s/.*([0-9a-f]{32})$/$1/;
+
+  return $checksum;
+}
+
+sub checksum_object {
+  my ($object) = @_;
+
+  my $identical = 0;
+  my %meta = get_object_meta($object);
+
+  if (exists $meta{md5}) {
+    my $irods_md5 = get_object_checksum($object);
+    my $md5 = shift @{$meta{md5}};
+
+    if ($md5 eq $irods_md5) {
+      $log->debug("Confirmed '$object' MD5 as ", $md5);
+      $identical = 1;
+    }
+    else {
+      $log->warn("Expected MD5 of $irods_md5 but found $md5 for '$object'");
+    }
+  }
+  else {
+    $log->warn("MD5 metadata is missing from '$object'");
+  }
+
+  return $identical;
+}
+
+
 =head2 list_object
 
   Arg [1]    : iRODS data object name
@@ -80,12 +134,15 @@ sub list_object {
       $collection = ipwd();
   }
 
-  my @objects =
-    run_command($IQUEST, '"%s"',
-                qq("SELECT DATA_NAME WHERE DATA_NAME = '$data_name' AND \
-                    COLL_NAME = '$collection'"));
+  my $command = join(' ', $IQUEST, '"%s"',
+                     qq("SELECT DATA_NAME \
+                         WHERE DATA_NAME = '$data_name' \
+                         AND COLL_NAME = '$collection'"));
 
-  return $objects[0] if @objects;
+  my $name = `$command 2> /dev/null`;
+  chomp($name);
+
+  return $name;
 }
 
 =head2 add_object
@@ -261,7 +318,7 @@ sub list_collection {
     $log->logconfess('A non-empty collection argument is required');
   $collection =~ s!/$!!;
 
-  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME) \
+  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME)
                                  WHERE COLL_NAME = '$collection'"),
                              qq("SELECT DATA_NAME \
                                  WHERE COLL_NAME = '$collection'"));
