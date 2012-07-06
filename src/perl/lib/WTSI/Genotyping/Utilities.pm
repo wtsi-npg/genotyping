@@ -207,6 +207,8 @@ sub run_command {
   open(EXEC, "$command |")
     or $log->logconfess("Failed open pipe to command '$command': $!");
 
+  $log->debug("Running child '$command'");
+
   my @result;
   while (<EXEC>) {
     chomp;
@@ -216,7 +218,7 @@ sub run_command {
   close(EXEC);
 
   if ($?) {
-    $log->logconfess("Execution of '$command' failed with exit code: $? reason");
+    $log->logconfess("Execution of '$command' failed with exit code: $?");
   }
 
   return @result;
