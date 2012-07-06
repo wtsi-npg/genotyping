@@ -59,6 +59,17 @@ __PACKAGE__->has_many('related_samples',
 
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
 
+sub include_from_state {
+  my $self = shift;
+
+  if (grep { $_->name eq 'autocall_pass' or
+               $_->name eq 'pi_approved' } $self->states) {
+    $self->include(1);
+  } else {
+    $self->include (0);
+  }
+}
+
 sub uri {
   my $self = shift;
 
