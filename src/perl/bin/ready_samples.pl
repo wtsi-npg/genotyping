@@ -26,6 +26,7 @@ sub run {
   my $config;
   my $dbfile;
   my $input;
+  my $select;
   my $remove;
   my $output;
   my $verbose;
@@ -35,11 +36,25 @@ sub run {
              'dbfile=s'=> \$dbfile,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'input=s' => \$input,
+             'select=s' => \$select,
              'remove=s' => \$remove,
              'output=s' => \$output,
              'verbose' => \$verbose);
 
   $config ||= $DEFAULT_INI;
+
+  if ($select && $add) {
+    pod2usage(-msg => "The --select argument is incompatible with --add\n",
+              -exitval => 2);
+  }
+  if ($select && $remove) {
+    pod2usage(-msg => "The --select argument is incompatible with --remove\n",
+              -exitval => 2);
+  }
+  if ($select && $input) {
+    pod2usage(-msg => "The --select argument is incompatible with --input\n",
+              -exitval => 2);
+  }
 
   my $pipedb = WTSI::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
@@ -51,51 +66,76 @@ sub run {
   my $in = maybe_stdin($input);
   my $out = maybe_stdout($output);
 
-  $pipedb->in_transaction
-    (sub {
-       while (my $name = <$in>) {
-         chomp($name);
-         my $sample = $pipedb->sample->find({name => $name});
+  if ($select) {
+    foreach my $sample ($pipedb->sample->all) {
+      my $state = $pipedb->state->find({name => $select});
+      unless ($state) {
+        die "Failed to select sample state '$remove': invalid state\n";
+      }
 
-         unless ($sample) {
-           warn "Failed to find $name\n";
-           next;
-         }
+      if (grep { $state->name eq $_->name } $sample->states) {
+        print $out $sample->name, "\n";
+        describe_sample($sample, \*STDERR) if $verbose;
+      }
+    }
+  }
+  elsif ($add or $remove) {
+    $pipedb->in_transaction
+      (sub {
+         while (my $name = <$in>) {
+           chomp($name);
+           my $sample = $pipedb->sample->find({name => $name});
 
-         if ($remove) {
-           my $state = $pipedb->state->find({name => $remove});
-           unless ($state) {
-             die "Failed to remove sample state '$remove': invalid state\n";
+           unless ($sample) {
+             warn "Failed to find $name\n";
+             next;
            }
 
-           if (grep { $state->name eq $_->name } $sample->states) {
-             $sample->remove_from_states($state);
+           if ($remove) {
+             my $state = $pipedb->state->find({name => $remove});
+             unless ($state) {
+               die "Failed to remove sample state '$remove': invalid state\n";
+             }
+
+             if (grep { $state->name eq $_->name } $sample->states) {
+               $sample->remove_from_states($state);
+             }
            }
-         }
 
-         if ($add) {
-           my $state = $pipedb->state->find({name => $add});
-           unless ($state) {
-             die "Failed to add sample state '$add': invalid state\n";
+           if ($add) {
+             my $state = $pipedb->state->find({name => $add});
+             unless ($state) {
+               die "Failed to add sample state '$add': invalid state\n";
+             }
+
+             unless (grep { $state->name eq $_->name } $sample->states) {
+               $sample->add_to_states($state);
+             }
            }
 
-           unless (grep { $state->name eq $_->name } $sample->states) {
-             $sample->add_to_states($state);
-           }
+           $sample->include_from_state;
+
+           print $out $sample->name, "\n";
+
+           describe_sample($sample, \*STDERR) if $verbose;
          }
+       });
+  }
+  else {
+    foreach my $sample ($pipedb->sample->all) {
+      print $out $sample->name, "\n";
+      describe_sample($sample, \*STDERR) if $verbose;
+    }
+  }
+}
 
-         $sample->include_from_state;
+sub describe_sample {
+  my ($sample, $where) = @_;
+  print $where $sample->include ? '+' : '-';
+  print $where ' ';
+  print $where join(' ', $sample->name,
+                    map { $_->name } $sample->states), "\n";
 
-         print $out $sample->name, "\n";
-
-         if ($verbose) {
-           print STDERR $sample->include ? '+' : '-';
-           print STDERR ' ';
-           print STDERR join(' ', $sample->name,
-                             map { $_->name } $sample->states), "\n";
-         }
-       }
-     });
 }
 
 
@@ -107,9 +147,10 @@ ready_samples
 
 =head1 SYNOPSIS
 
-ready_samples [--config <database .ini file>] [--dbfile <SQLite file>] \
+ready_samples [--config <database .ini file>]
+    [--dbfile <SQLite file>] \
     [--input <filename>] [--output <filename>] \
-    [--add <name>] [--remove <name>] [--verbose]
+    [--select <name>] [--add <name>] [--remove <name>] [--verbose]
 
 Options:
 
@@ -117,12 +158,17 @@ Options:
               Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile    The SQLite database file. If not supplied, defaults to the
               value given in the configuration .ini file.
-  --input     The sample name input file, one sample name per line. Optional,
-              defaults to STDIN.
-  --input     The sample name output file, one sample name per line. Optional,
-              defaults to STDOUT.
-  --add       The sample state term to add to the named samples. Optional.
-  --remove    The sample state term to remove from the named samples. Optional.
+  --input     The sample name input file, one sample name per line.
+              Optional, defaults to STDIN.
+  --output    The sample name output file, one sample name per line.
+              Optional, defaults to STDOUT.
+  --add       The sample state term to add to the named samples.
+              Optional.
+  --remove    The sample state term to remove from the named samples.
+              Optional.
+  --select    The sample state term to select samples when no input names
+              are provided. Optional, incompatible with --input, --add and
+              --remove.
   --verbose   Print messages while processing. Optional.
 
 =head1 DESCRIPTION
@@ -140,6 +186,12 @@ Once the samples' state has been changed, it will automatically be
 flagged for inclusion or exclusion fromn the analysis as
 appropriate. In verbose mode, the inclusion or exclusion status, and
 all current states are reported on STDERR for each sample.
+
+The --select argument used with a state causes the names of matching
+samples to be printed to the output.
+
+If no arguments are given, the names of all samples are printed to the
+output.
 
 =head1 METHODS
 
