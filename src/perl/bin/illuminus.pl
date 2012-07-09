@@ -13,6 +13,7 @@ use File::Temp qw(tempdir);
 use File::Spec::Functions qw(catfile);
 use Getopt::Long;
 use IO::ScalarArray;
+use Log::Log4perl qw(:easy);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
@@ -20,6 +21,8 @@ use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
                         read_snp_json read_sample_json update_snp_locations
                         find_column_indices filter_columns
                         read_it_column_names update_it_columns write_gt_calls);
+
+Log::Log4perl->easy_init($ERROR);
 
 $|=1;
 

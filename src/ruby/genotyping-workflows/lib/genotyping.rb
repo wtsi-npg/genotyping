@@ -40,6 +40,7 @@ require 'genotyping/tasks/genotype_call'
 require 'genotyping/tasks/illuminus'
 require 'genotyping/tasks/plink'
 require 'genotyping/tasks/genosnp'
+require 'genotyping/tasks/quality_control'
 
 require 'genotyping/workflows/fetch_sample_data'
 require 'genotyping/workflows/genotype_illuminus'
