@@ -169,9 +169,13 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.2.0
 
 =head1 CHANGELOG
+
+  0.2.0
+
+    Added logging.
 
   0.1.0
 
