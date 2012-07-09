@@ -23,9 +23,6 @@ __PACKAGE__->add_columns
    'id_dataset',       { data_type => 'integer',
                          is_foreign_key => 1,
                          is_nullable => 0 },
-   'id_state',         { data_type => 'integer',
-                         is_foreign_key => 1,
-                         is_nullable => 0 },
    'include',          { data_type => 'integer',
                          is_nullable => 0 });
 
@@ -36,10 +33,6 @@ __PACKAGE__->add_unique_constraint(['name']);
 __PACKAGE__->belongs_to('dataset',
                         'WTSI::Genotyping::Schema::Result::Dataset',
                         { 'foreign.id_dataset' => 'self.id_dataset' });
-
-__PACKAGE__->belongs_to('state',
-                        'WTSI::Genotyping::Schema::Result::State',
-                        { 'foreign.id_state' => 'self.id_state' });
 
 __PACKAGE__->has_many('wells',
                       'WTSI::Genotyping::Schema::Result::Well',
@@ -52,13 +45,30 @@ __PACKAGE__->has_many('sample_genders',
                       'WTSI::Genotyping::Schema::Result::SampleGender',
                       { 'foreign.id_sample' => 'self.id_sample' });
 
+__PACKAGE__->has_many('sample_states',
+                      'WTSI::Genotyping::Schema::Result::SampleState',
+                      { 'foreign.id_sample' => 'self.id_sample' });
+
 __PACKAGE__->many_to_many('genders' => 'sample_genders', 'gender');
+
+__PACKAGE__->many_to_many('states' => 'sample_states', 'state');
 
 __PACKAGE__->has_many('related_samples',
                       'WTSI::Genotyping::Schema::Result::RelatedSample',
                       { 'foreign.id_sample_a' => 'self.id_sample' });
 
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
+
+sub include_from_state {
+  my $self = shift;
+
+  if (grep { $_->name eq 'autocall_pass' or
+               $_->name eq 'pi_approved' } $self->states) {
+    $self->include(1);
+  } else {
+    $self->include (0);
+  }
+}
 
 sub uri {
   my $self = shift;

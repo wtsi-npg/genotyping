@@ -2,13 +2,26 @@ use utf8;
 
 package WTSI::Genotyping;
 
+use warnings;
 use strict;
+
 use vars qw($VERSION @ISA @EXPORT_OK);
 
 use Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(
                 common_stem
+                collect_files
+                collect_dirs
+                make_collector
+                modified_between
+                run_command
+
+                make_warehouse_metadata
+                make_infinium_metadata
+                make_file_metadata
+                make_creation_metadata
+
                 filter_columns
                 filter_gt_columns
                 find_column_indices
@@ -30,8 +43,11 @@ use WTSI::Genotyping::DelimitedFiles;
 use WTSI::Genotyping::GenoSNP;
 use WTSI::Genotyping::IO;
 use WTSI::Genotyping::Illuminus;
+use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Utilities;
+
+use WTSI::Genotyping::iRODS;
 
 $VERSION = '0.2.0';
 

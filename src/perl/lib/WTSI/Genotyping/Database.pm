@@ -4,11 +4,10 @@ package WTSI::Genotyping::Database;
 
 use strict;
 use warnings;
-
 use Carp;
 use Config::IniFiles;
 use DBI;
-
+use Log::Log4perl;
 
 =head2 new
 
@@ -32,7 +31,6 @@ sub new {
    return $self;
 }
 
-
 =head2 configure
 
   Arg [1]    : name => string
@@ -55,12 +53,13 @@ sub configure {
   my $ini = Config::IniFiles->new(-file => $self->inifile);
 
   unless ($self->name) {
-    croak("No data source name was defined.")
+    $self->log->logconfess('No data source name was defined.')
   }
 
   $self->data_source($ini->val($self->name, 'data_source'));
   $self->username($ini->val($self->name, 'username'));
   $self->password($ini->val($self->name, 'password'));
+  $self->log(Log::Log4perl->get_logger('genotyping'));
 
   return $self;
 }
@@ -75,6 +74,7 @@ sub configure {
   Caller     : general
 
 =cut
+
 
 sub inifile {
   my $self = shift;
@@ -103,6 +103,7 @@ sub connect {
   my %args = @_;
 
   unless ($self->{_dbh}) {
+    $self->log->info('Connecting to ', $self->data_source);
     $self->{_dbh} = DBI->connect($self->data_source,
                                  $self->username,
                                  $self->password,
@@ -125,6 +126,7 @@ sub connect {
 
 sub disconnect {
   my $self = shift;
+  $self->log->info('Disconnecting from ', $self->data_source);
   $self->dbh->disconnect;
 }
 
@@ -238,6 +240,26 @@ sub password {
 
   return $self->{_password};
 }
+
+=head2 log
+
+  Arg [1]    : None
+  Example    : $db->log
+  Description: Returns the current logger.
+  Returntype : Logger object
+  Caller     : general
+
+=cut
+
+sub log {
+  my $self = shift;
+  if (@_) {
+    $self->{_log} = shift;
+  }
+
+  return $self->{_log};
+}
+
 
 1;
 

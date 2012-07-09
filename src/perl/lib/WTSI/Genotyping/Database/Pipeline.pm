@@ -18,6 +18,7 @@ our $relations_ini = 'relations.ini';
 our $snpsets_ini = 'snpsets.ini';
 our $states_ini = 'states.ini';
 
+
 =head2 new
 
   Arg [1]    : name => string
@@ -54,7 +55,8 @@ sub initialize {
   my $ds = $self->data_source;
   my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
   unless ($base && $file) {
-    croak "Failed to parse datasource string '$ds' in " . $self->inifile, "\n";
+    $self->log->logconfess("Failed to parse datasource string '$ds' in ",
+                           $self->inifile);
   }
 
   # Override the default data source if a database file was given in
@@ -96,25 +98,26 @@ sub create {
 
   my $sql_path = $ini->val($self->name, 'sqlpath');
   my $sqlite = $ini->val($self->name, 'sqlite');
+  my $log = $self->log;
 
   unless ($sql_path) {
-    croak "Failed to create database: sql_path declaration is missing from " .
-      $self->inifile, "\n";
+    $log->logconfess("Failed to create database: sql_path declaration is missing from ",
+                     $self->inifile);
   }
   unless (-e $sql_path) {
-    croak "Failed to create database: DDL file '$sql_path' is missing\n";
+    $log->logconfess("Failed to create database: DDL file '$sql_path' is missing");
   }
   unless ($sqlite) {
-    croak "Failed to create database: sqlite declaration is missing from " .
-      $self->inifile, "\n";
+    $log->logconfess("Failed to create database: sqlite declaration is missing from ",
+                     $self->inifile);
   }
 
   if (-e $file) {
-    croak "Failed to create database: database '$file' already exists\n";
+    $log->logconfess("Failed to create database: database '$file' already exists");
   }
   else {
     system("$sqlite $file < $sql_path") == 0
-      or croak "Failed to create SQLite database '$file': $?";
+      or $log->logconfess("Failed to create SQLite database '$file': $?");
   }
 
   return $self;
@@ -141,7 +144,7 @@ sub populate {
   my $ini_path = $ini->val($self->name, 'inipath');
 
   unless ($self->is_connected) {
-    croak "Failed to populate database: not connected\n";
+    $self->log->logconfess('Failed to populate database: not connected');
   }
 
   $self->_populate_addresses;
@@ -166,6 +169,7 @@ sub connect {
   my %args = @_;
 
   unless ($self->is_connected) {
+    $self->log->info('Connecting to ', $self->data_source);
     $self->{_schema} = WTSI::Genotyping::Schema->connect($self->data_source,
                                                          $self->username,
                                                          $self->password,
@@ -197,6 +201,7 @@ sub is_connected {
 sub disconnect {
   my $self = shift;
   if ($self->is_connected) {
+    $self->log->info('Disconnecting from ', $self->data_source);
     $self->schema->storage->disconnect;
   }
 
@@ -261,16 +266,17 @@ sub in_transaction {
 
   if ($@) {
     my $error = $@;
+    my $log = $self->log;
+
     if ($error =~ /Rollback failed/) {
-      croak "$error.\nRollback failed!\nWARNING: data may be inconsistent.\n";
+      $log->logconfess("$error.\nRollback failed!\nWARNING: data may be inconsistent.");
     } else {
-      croak "$error.\nRollback successful\n";
+      $log->logconfess("$error.\nRollback successful");
     }
   };
 
   return wantarray ? @result : $result[0];
 }
-
 
 =head2 schema
 

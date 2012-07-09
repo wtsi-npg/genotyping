@@ -24,6 +24,7 @@ module Genotyping::Workflows
     include Genotyping::Tasks::GenotypeCall
     include Genotyping::Tasks::Illuminus
     include Genotyping::Tasks::Plink
+    include Genotyping::Tasks::QualityControl
 
     description <<-DESC
 Collates the normalized intensity values and GenCall genotype calls for the
@@ -121,7 +122,9 @@ Returns:
 
       ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
 
-      [gcfile, ilfile] if [gcfile, ilfile].all?
+      qc = quality_control(ilfile, :work_dir => work_dir)
+
+      [gcfile, ilfile] if [gcfile, ilfile, qc].all?
     end
 
     :private

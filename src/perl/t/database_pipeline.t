@@ -6,13 +6,17 @@ use utf8;
 use strict;
 use warnings;
 
-use Test::More tests => 24;
+use Test::More tests => 26;
 use Test::Exception;
+
+use Data::Dumper;
 
 BEGIN { use_ok('WTSI::Genotyping::Schema'); }
 require_ok('WTSI::Genotyping::Schema');
 
 use WTSI::Genotyping::Database::Pipeline;
+
+Log::Log4perl::init('etc/log4perl_tests.conf');
 
 my $ini_path = './etc';
 my $dbfile = 't/pipeline.db';
@@ -51,9 +55,9 @@ dies_ok { $db->should_not_autoload_this_method->all }
 
 $db->populate;
 is(18, $db->snpset->count, 'The snpset dictionary');
-is(3, $db->method->count, 'The method dictionary');
+is(4, $db->method->count, 'The method dictionary');
 is(2, $db->relation->count, 'The relation dictionary');
-is(1, $db->state->count, 'The state dictionary');
+is(10, $db->state->count, 'The state dictionary');
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
@@ -78,29 +82,35 @@ foreach my $i (1..3) {
 }
 
 my $sample_base = 'test_sample';
-my $good = $db->state->find({name => 'Good'});
-ok($good, 'A state found');
+my $pass = $db->state->find({name => 'autocall_pass'});
+ok($pass, 'A state found');
+
+my $fail = $db->state->find({name => 'autocall_fail'});
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
                         my $sample = $datasets[0]->add_to_samples
                           ({name => sprintf("%s_%d", $sample_base, $i),
-                            state => $good,
                             beadchip => 'ABC123456',
                             include => 1});
+                        $sample->add_to_states($pass);
                       }
                     });
 
-is(1000, scalar $datasets[0]->samples, 'Expected samples found');
+my @samples = $datasets[0]->samples;
+is(1000, scalar @samples, 'Expected samples found');
+my @states = $samples[0]->states;
+is(1, scalar @states);
+is('autocall_pass', $states[0]->name);
 
 dies_ok {
   $db->in_transaction(sub {
                         foreach my $i (1001..2000) {
                           my $sample = $datasets[0]->add_to_samples
                             ({name => sprintf("%s_%d", $sample_base, $i),
-                              state => $good,
                               beadchip => 'ABC123456',
                               include => 1});
+                          $sample->add_to_states($pass);
 
                           if ($i == 1900) {
                             die "Test error at $i\n";
