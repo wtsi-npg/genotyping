@@ -119,11 +119,9 @@ my $plotPath = $outDir.$prefix.'.png';
 if ($sanityCancel) { $sanityOpt='FALSE'; }
 else { $sanityOpt='TRUE'; }
 my $summaryPath = $outDir.$prefix.'_summary.txt';
-my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-my $cmd = join(' ', ($RScriptExec, 
-		     $Bin.'/'.$RScriptsRelative.'/check_xhet_gender.R',
+my $cmd = join(' ', ("check_xhet_gender.R",
 		     $tempName, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
-# $cmd uses csh redirect
+# $cmd uses csh redirect; assumes R script is in same directory as perl script
 my ($tests, $failures) = (0,0);
 ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
 if ($failures == 0) { system("rm $tempName"); exit(0); }
