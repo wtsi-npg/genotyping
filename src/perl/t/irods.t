@@ -6,10 +6,9 @@ use utf8;
 use strict;
 use warnings;
 
-use Data::Dumper;
 use JSON;
 
-use Test::More tests => 33;
+use Test::More tests => 34;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
 require_ok('WTSI::Genotyping::iRODS');
