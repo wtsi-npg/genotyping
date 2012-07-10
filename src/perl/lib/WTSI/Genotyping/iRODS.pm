@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Carp;
 use Log::Log4perl;
-use File::Basename qw(fileparse);
+use File::Basename qw(basename fileparse);
 
 use WTSI::Genotyping qw(run_command);
 
@@ -28,6 +28,7 @@ use Exporter;
 
                 list_collection
                 add_collection
+                put_collection
                 remove_collection
                 add_collection_meta
 
@@ -110,7 +111,6 @@ sub checksum_object {
 
   return $identical;
 }
-
 
 =head2 list_object
 
@@ -317,49 +317,90 @@ sub list_collection {
   $collection or
     $log->logconfess('A non-empty collection argument is required');
   $collection =~ s!/$!!;
+  $collection = _ensure_absolute($collection);
 
-  my @objects = _safe_select(qq("SELECT COUNT(DATA_NAME)
-                                 WHERE COLL_NAME = '$collection'"),
-                             qq("SELECT DATA_NAME \
-                                 WHERE COLL_NAME = '$collection'"));
-  my @collections = _safe_select(qq("SELECT COUNT(COLL_NAME) \
-                                     WHERE COLL_PARENT_NAME = '$collection'"),
-                                 qq("SELECT COLL_NAME \
-                                     WHERE COLL_PARENT_NAME = '$collection'"));
+  my @root = _safe_select(qq("SELECT COUNT(COLL_NAME) \
+                              WHERE COLL_NAME = '$collection'"),
+                          qq("SELECT COLL_NAME \
+                              WHERE COLL_NAME = '$collection'"));
 
-  return (\@objects, \@collections);
+  $log->debug("Listing collection '$collection'");
+
+  if (@root) {
+    $log->debug("Collection '$collection' exists");
+    my @objs = _safe_select(qq("SELECT COUNT(DATA_NAME)
+                                WHERE COLL_NAME = '$collection'"),
+                            qq("SELECT DATA_NAME \
+                                WHERE COLL_NAME = '$collection'"));
+    my @colls = _safe_select(qq("SELECT COUNT(COLL_NAME) \
+                                 WHERE COLL_PARENT_NAME = '$collection'"),
+                             qq("SELECT COLL_NAME \
+                                 WHERE COLL_PARENT_NAME = '$collection'"));
+
+    $log->debug("Collection '$collection' contains ", scalar @objs,
+                " data objects and ", scalar @colls, " collections");
+
+
+    return (\@objs, \@colls);
+  }
+  else {
+    $log->debug("Collection '$collection' does not exist");
+    return undef;
+  }
 }
 
 =head2 add_collection
 
-  Arg [1]    : Name of directory to add to iRODs
-  Arg [2]    : iRODS collection name
-  Example    : add_collection('./foo', '/my/path/foo')
-  Description: Adds a directory as a collection to iRODS. Returns the new
-               collection.
+  Arg [1]    : iRODS collection name
+  Example    : add_collection('/my/path/foo')
+  Description: Makes a new collection in iRODS. Returns the new collection.
   Returntype : string
   Caller     : general
 
 =cut
 
 sub add_collection {
+  my ($collection) = @_;
+
+  $collection or
+    $log->logconfess('A non-empty collection argument is required');
+  $collection =~ s!/$!!;
+  $collection = _ensure_absolute($collection);
+
+  $log->debug("Adding collection '$collection'");
+  run_command($IMKDIR, '-p', $collection);
+
+  return $collection;
+}
+
+=head2 put_collection
+
+  Arg [2]    : iRODS collection name
+  Example    : put_collection('/my/path/foo', )
+  Description: Makes a new collection in iRODS. Returns the new collection.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub put_collection {
   my ($dir, $target) = @_;
 
-  $dir or $log->logconfess('A non-empty dir argument is required');
-  $target or
-    $log->logconfess('A non-empty target (collection) argument is required');
-
+  $dir or
+    $log->logconfess('A non-empty directory argument is required');
+  $target =~ s!/$!!;
   $target = _ensure_absolute($target);
-  $log->debug("Adding collection '$target'");
+
+  $log->debug("Putting collection '$dir'");
   run_command($IPUT, '-r', $dir, $target);
 
-  return $target;
+  return $target . '/' . basename($dir);
 }
 
 =head2 remove_collection
 
   Arg [1]    : iRODS collection name
-  Example    : remove_collectioon('/my/path/foo')
+  Example    : remove_collection('/my/path/foo')
   Description: Removes a collection and contents, recursively.
   Returntype : string
   Caller     : general
@@ -387,7 +428,6 @@ sub remove_collection {
   Caller     : general
 
 =cut
-
 
 sub get_collection_meta {
   my ($collection) = @_;
