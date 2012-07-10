@@ -122,9 +122,9 @@ Returns:
 
       ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
 
-      qc = quality_control(ilfile, :work_dir => work_dir)
+      # qc = quality_control(ilfile, :work_dir => work_dir)
 
-      [gcfile, ilfile] if [gcfile, ilfile, qc].all?
+      [gcfile, ilfile] if [gcfile, ilfile].all?
     end
 
     :private
