@@ -1,4 +1,4 @@
-#! /usr/bin/env Rscript
+#! /software/R-2.14.1/bin/Rscript
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # April 2012
@@ -189,11 +189,15 @@ mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanity
 }
 
 zero.thresholds <- function(xhet, boundary.sd) {
-  # find thresholds for high population with xhet exactly zero
+  # find thresholds where high population has negligible xhet
   m.max <- 0.05 # corresponds to a 5% calling error in male samples which "should" have zero xhet
   non.male <- xhet[xhet>=m.max]
-  f.min <- mean(non.male) - boundary.sd*sd(non.male)
-  if (f.min < m.max) { f.min <- m.max }
+  if (length(non.male) > 100) { # require at least 100 "non-male" samples to try finding ambiguity zone
+    f.min <- mean(non.male) - boundary.sd*sd(non.male)
+    if (f.min < m.max) { f.min <- m.max }
+  } else {
+    f.min <- 0.05
+  }
   return(c(m.max, f.min))
 }
 
@@ -205,7 +209,7 @@ find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityChec
   total <- length(xhet.train)
   if (zeroCount/total >= 0.1 & (smallCount-zeroCount)/total <= 0.1) {
     # large population with xhet (almost) zero and few close outliers; mixture model won't work
-    cat(paste(signif(zeroCount/total, 4), "of samples have negligible xhet; omitting mixture model.\n"))
+    cat(paste(signif(zeroCount*100/total, 4), "% of samples have negligible xhet; omitting mixture model.\n", sep=""))
     thresholds <- zero.thresholds(xhet.train, zero.boundary.sd)
   } else { # train and apply mixture model
     thresholds <- mixmodel.thresholds(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials)
