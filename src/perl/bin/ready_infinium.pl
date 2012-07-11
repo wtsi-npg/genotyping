@@ -247,7 +247,7 @@ ready_infinium
 
 ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
    [--namespace <sample namespace>] [--maximum <n>] --project <project name> \
-   --run_name <pipeline run name> --supplier <supplier name> [--verbose]
+   --run <pipeline run name> --supplier <supplier name> [--verbose]
 
 Options:
 

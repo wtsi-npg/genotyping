@@ -19,6 +19,7 @@
 module Genotyping::Tasks
 
   GENOSNP = 'GenoSNP'
+  GENOSNP_WRAPPER = 'genosnp.pl'
   DEFAULT_CUTOFF = 0.7
 
   # Returns true if the GenoSNP executable is available.
@@ -52,10 +53,10 @@ module Genotyping::Tasks
     #
     # Returns:
     # - An array of GenoSNP or Plink output file paths.
-    def call_from_sim_p(sim_file, snp_meta, manifest, output, args = {}, async = {})
+    def call_from_sim_p(sim_file, snp_json, manifest, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
-      if args_available?(sim_file, snp_meta, manifest , output, work_dir)
+      if args_available?(sim_file, snp_json, manifest , output, work_dir)
         output = absolute_path(output, work_dir) unless absolute_path?(output)
         start_sample = args[:start] || 0
         end_sample = args[:end]
@@ -92,32 +93,33 @@ module Genotyping::Tasks
            :end => range.end}
         end
 
-        genosnp_args = partitions(output, sample_ranges.size).collect do |part|
+        genosnp_wrap_args = partitions(output, sample_ranges.size).collect do |part|
           grouped_part = partition_group_path(part, group_size)
           grouped_dir = File.dirname(grouped_part)
           Dir.mkdir(grouped_dir) unless File.exist?(grouped_dir)
 
-          {:samples => "/dev/stdin",
-           :snps => snp_meta,
-           :calls => grouped_part,
-           :plink => plink,
-           :cutoff => cutoff}
+          {:input => "/dev/stdin",
+           :snps => snp_json,
+           :cutoff => cutoff,
+           :output => grouped_part,
+           :plink => true}
         end
 
-        commands = genotype_call_args.zip(genosnp_args).collect do |gca, gsa|
+        commands = genotype_call_args.zip(genosnp_wrap_args).collect do |gca, gwa|
          cmd = [GENOTYPE_CALL, 'sim-to-genosnp', cli_arg_map(gca, :prefix => '--')]
-         cmd += ['|', 'tee', gsa[:calls] + '.raw.txt'] if debug
-         cmd += ['|', GENOSNP, cli_arg_map(gsa, :prefix => '-')]
+         cmd += ['|', 'tee', gwa[:output] + '.raw.txt'] if debug
+         cmd += ['|', GENOSNP_WRAPPER, cli_arg_map(gwa, :prefix => '--')]
          cmd.flatten.join(' ')
         end
 
         # Job memoization keys, i corresponds to the partition index
-        margs_arrays = genotype_call_args.zip(genosnp_args).collect { |gca, gsa|
-          [work_dir, gca, gsa]
+        margs_arrays = genotype_call_args.zip(genosnp_wrap_args).collect { |gca, gwa|
+          [work_dir, gca, gwa]
         }.each_with_index.collect { |elt, i| [i] + elt }
 
         # Expected call files
-        call_partitions = genosnp_args.collect { |gsa| gsa[:calls] }
+        suffix = plink ? '.bed' : ''
+        call_partitions = genosnp_wrap_args.collect { |gwa| gwa[:output] + suffix }
 
         task_id = task_identity(:genosnp_from_sim_p, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
