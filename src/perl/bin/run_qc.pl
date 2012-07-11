@@ -54,14 +54,17 @@ $configPath ||= $Bin."/../json/qc_threshold_defaults.json";
 $verbose ||= 0;
 
 $plinkPrefix = $ARGV[0];
-unless ($plinkPrefix) { die "ERROR: Must supply a PLINK filename prefix!"; }
-# disassemble prefix to find absolute path to directory
-my @terms = split("/", $plinkPrefix);
-my $filePrefix = pop(@terms);
-if (@terms) { 
-    my $plinkDir = abs_path(join("/", @terms));
-    $plinkPrefix = $plinkDir."/".$filePrefix;
+# want PLINK prefix to include absolute path, so plink I/O will still work after change of working directory
+unless ($plinkPrefix) { 
+    die "ERROR: Must supply a PLINK filename prefix!"; 
+} elsif ($plinkPrefix =~ "/") { # prefix is "directory-like"; disassemble to find absolute path
+    my @terms = split("/", $plinkPrefix);
+    my $filePrefix = pop(@terms);
+    $plinkPrefix = abs_path(join("/", @terms))."/".$filePrefix;
+} else {
+    $plinkPrefix = getcwd()."/".$plinkPrefix;
 }
+
 run($plinkPrefix, $simPath, $configPath, $outDir, $title, $noWrite, $noPlate, $noPlots, $verbose);
 
 sub checkPlinkInputs {
