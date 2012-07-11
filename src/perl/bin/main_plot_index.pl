@@ -17,7 +17,8 @@ sub getSummaryStats {
     # interesting stats: mean/sd of call rate, and overall pass/fail
     my $inPath = shift;
     my %allResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inPath);
-    my (@cr, $fails);
+    my @cr;
+    my $fails = 0;
     my @samples = keys(%allResults);
     my $total = @samples;
     foreach my $sample (@samples) {
