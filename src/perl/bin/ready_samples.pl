@@ -70,7 +70,7 @@ sub run {
     foreach my $sample ($pipedb->sample->all) {
       my $state = $pipedb->state->find({name => $select});
       unless ($state) {
-        die "Failed to select sample state '$remove': invalid state\n";
+        die "Failed to select sample state '$select': invalid state\n";
       }
 
       if (grep { $state->name eq $_->name } $sample->states) {
@@ -217,7 +217,7 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.1
+  0.1.0
 
 =head1 CHANGELOG
 

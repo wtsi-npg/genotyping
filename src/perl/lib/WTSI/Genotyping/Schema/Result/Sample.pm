@@ -85,7 +85,7 @@ sub gtc {
   my $method = shift;
 
   my $file;
-  my $result = $self->results->find({'method.name' =>'Infinium'},
+  my $result = $self->results->find({'method.name' =>'Autocall'},
                                     {join => 'method'});
 
   if ($result && $result->value) {
