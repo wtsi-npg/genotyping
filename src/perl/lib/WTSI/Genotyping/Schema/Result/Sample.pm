@@ -66,7 +66,7 @@ sub include_from_state {
                $_->name eq 'pi_approved' } $self->states) {
     $self->include(1);
   } else {
-    $self->include (0);
+    $self->include(0);
   }
 }
 
