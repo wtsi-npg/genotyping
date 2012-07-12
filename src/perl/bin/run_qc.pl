@@ -64,6 +64,7 @@ unless ($plinkPrefix) {
 } else {
     $plinkPrefix = getcwd()."/".$plinkPrefix;
 }
+if ($simPath) { $simPath = abs_path($simPath); } # similarly, want sim path as absolute path
 
 run($plinkPrefix, $simPath, $configPath, $outDir, $title, $noWrite, $noPlate, $noPlots, $verbose);
 
