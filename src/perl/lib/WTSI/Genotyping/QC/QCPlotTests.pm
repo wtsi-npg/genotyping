@@ -13,6 +13,7 @@ use POSIX qw/strftime/;
 use XML::Parser;
 use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
 
+our @EXPORT = qw/pngOK/;
 
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
@@ -213,15 +214,20 @@ sub wrapCommand {
     # generic wrapper for a system call; assume non-zero return value indicates an error
     # if given a filehandle, execute command in test mode and print result; otherwise just run command
     # increment and return the given test/failure counts
-    my ($cmd, $fh, $tests, $failures) = @_;
+    my ($cmd, $fh, $tests, $failures, $verbose) = @_;
     my $result;
     $tests ||= 0;
     $failures ||= 0;
+    $verbose ||= 0;
     $tests++;
     if ($fh) {
 	$result = eval { system($cmd); }; # return value of $cmd, or undef for unexpected Perl error
-	if (not(defined($result)) || $result != 0) { $failures++; print $fh "FAIL\t$cmd\n"; } 
-	else { print $fh "OK\t$cmd\n"; }
+	if (not(defined($result)) || $result != 0) { 
+	    $failures++; 
+	    if ($verbose) {print $fh "FAIL\t$cmd\n"; } 
+	} elsif ($verbose) { 
+	    print $fh "OK\t$cmd\n"; 
+	}
     } else {
 	system($cmd);
     }
