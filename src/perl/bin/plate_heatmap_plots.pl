@@ -12,13 +12,11 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use Getopt::Long;
-use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($mode, $RScriptPath, $outDir, $help);
 
 GetOptions("mode=s"    => \$mode,
-           "R=s"       => \$RScriptPath,
 	   "out_dir=s" => \$outDir,
 	   "h|help"    => \$help);
 
@@ -31,7 +29,6 @@ Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or th
 Options:
 --mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff
 --out_dir=PATH      Output directory for plots
---R=PATH            Path to Rscript installation to execute plots
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to: ./platePlots
 ";
@@ -43,11 +40,7 @@ Unspecified options will receive default values, with output written to: ./plate
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-$RScriptPath ||= $RScriptExec;
 $outDir ||= 'platePlots';
-
-my $scriptDir = $Bin."/".$RScriptsRelative; 
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -67,7 +60,7 @@ sub makePlots {
     # assume file names are of the form PREFIX_PLATE.txt
     # execute given script with input table, output path, and plate name as arguments
     # supply global min/max as arguments (not used except by XYdiff)
-    my ($RScriptPath, $inputDir, $plotScript, $expr, $prefix, $minMaxArgs, $test) = @_;
+    my ($inputDir, $plotScript, $expr, $prefix, $minMaxArgs, $test) = @_;
     my @paths = glob($inputDir.'/'.$expr);
     my $allPlotsOK = 1;
     foreach my $path (@paths) {
@@ -80,7 +73,7 @@ sub makePlots {
 	}
 	$plate =~ s/\s+/_/; # get rid of spaces in plate name (if any)
 	my $outPath = $inputDir.'/'.$prefix.$plate.'.png';
-	my @args = ($RScriptPath, $plotScript, $path, $plate);
+	my @args = ($plotScript, $path, $plate);
 	if ($minMaxArgs) { push(@args, ($comments{'PLOT_MIN'}, $comments{'PLOT_MAX'})); }
 	my @outputs = ($outPath, );
 	my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
@@ -209,13 +202,12 @@ sub writePlateData {
 
 sub run {
     # mode = cr, het or xydiff
-    my ($mode, $RScriptPath, $scriptDir, $outDir) = @_;
-    if ($scriptDir =~ /\/$/) { $scriptDir .= '/'; }
+    my ($mode, $outDir) = @_;
     my $test = 1; # keep tests on by default, since they are very quick to run
     my %plotScripts = ( # R plotting scripts for each mode
-	cr     => $scriptDir.'plotCrPlate.R',
-	het    => $scriptDir.'plotHetPlate.R', 
-	xydiff => $scriptDir.'plotXYdiffPlate.R', );
+	cr     => 'plotCrPlate.R',
+	het    => 'plotHetPlate.R', 
+	xydiff => 'plotXYdiffPlate.R', );
     my %index = ( # index in whitespace-separated input data for each mode
 	cr     => 1,
 	het    => 2, 
@@ -230,7 +222,7 @@ sub run {
     my $ok = 1;
     if ($dataOK) {
 	writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, $plotMin, $plotMax); 
-	$ok = makePlots($RScriptPath, $outDir, $plotScripts{$mode}, 
+	$ok = makePlots($outDir, $plotScripts{$mode}, 
 			$mode."_*", "plot_${mode}_", $minMaxArgs{$mode}, $test); 
     } else {
 	print STDERR "Cannot parse plate/well locations; omitting plate heatmap plots.\n";
@@ -238,6 +230,6 @@ sub run {
     return $ok;
 }
 
-my $ok = run($mode, $RScriptPath, $scriptDir, $outDir);
+my $ok = run($mode, $outDir);
 if ($ok) { exit(0); }
 else { exit(1); }

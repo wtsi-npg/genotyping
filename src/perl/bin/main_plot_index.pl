@@ -17,7 +17,8 @@ sub getSummaryStats {
     # interesting stats: mean/sd of call rate, and overall pass/fail
     my $inPath = shift;
     my %allResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inPath);
-    my (@cr, $fails);
+    my @cr;
+    my $fails = 0;
     my @samples = keys(%allResults);
     my $total = @samples;
     foreach my $sample (@samples) {
@@ -112,7 +113,7 @@ my %descriptions = (
     'het_beanplot.png' => "Heterozygosity beanplot",
     'het_boxplot.png' => "Heterozygosity boxplot",
     'hetHistogram.png' => "Heterozygosity distribution histogram",
-    'platePopulationSizes.png' => "Number of samples found per plate",
+    'total_samples_per_plate.png' => "Number of samples found per plate",
     'sample_xhet_gender_model.png' => "Summary of gender model",
     'xydiff.png' => "XYdiff histogram",
     'xydiff_beanplot.png' => 'XYdiff beanplot',

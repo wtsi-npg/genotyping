@@ -15,6 +15,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
+use Carp qw(confess);
 use WTSI::Genotyping::QC::QCPlotShared;
 use WTSI::Genotyping::QC::QCPlotTests;
 
@@ -60,8 +61,20 @@ my @outNames = ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetF
 if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
 
-my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-my $scriptDir = $Bin."/".$RScriptsRelative; 
+sub containsFailedSample {
+    # check results hash for a failed sample
+    my %qcResults = %{ shift() };
+    my $fail = 0;
+    foreach my $sample (keys(%qcResults)) {
+	my %results = %{$qcResults{$sample}};
+	foreach my $metric (keys(%results)) {
+	    my ($pass, $value) = @{$results{$metric}};
+	    if (int($pass) == 0) { $fail = 1; last; }
+	}
+	if ($fail) { last; }
+    }
+    return $fail;
+}
 
 sub findFailedCrHet {
     # find cr/het metrics for failed samples
@@ -182,8 +195,12 @@ sub writeFailedCrHet {
 
 sub run {
     # find failure causes and write input for R scripts
-    my ($inputPath, $qcConfigPath, $outputsRef, $title, $scriptDir, $crHetPath) = @_;
+    my ($inputPath, $qcConfigPath, $outputsRef, $title, $crHetPath) = @_;
     my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inputPath);
+    unless (containsFailedSample(\%qcResults)) {
+	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
+	return 1;
+    }
     my ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng) 
 	= @$outputsRef;
     my @failedSamples = writeFailCounts(\%qcResults, $failText, $comboText);
@@ -191,38 +208,25 @@ sub run {
     writeFailedCrHet(\@failedSamples, \%qcResults, $crHetPath, $crHetFail);
     # run R scripts to produce plots
     # barplot individual failures
-    my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-    my @args = ($RScriptExec,
-		$Bin."/".$RScriptsRelative."plotIndividualFails.R",
-		$failText, $failTotal, $title
-	);
+    my @args = ("plotIndividualFails.R", $failText, $failTotal, $title);
     my @outputs = ($causePng,);
-    my $allOK = 1;
     my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allOK = 0; }
+    unless ($ok) { confess "Error for individual failure barplot: $!"; }
     # barplot combined failures
-    @args = ($RScriptExec,
-	     $Bin."/".$RScriptsRelative."plotCombinedFails.R",
-	     $comboText, $title
-	);
+    @args = ("plotCombinedFails.R", $comboText, $title);
     @outputs = ($comboPng,);
-    $allOK = 1;
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allOK = 0; }
-    # scatterplots
+    unless ($ok) { confess "Error for combined failure barplot: $!"; }    
     my %thresholds =  WTSI::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
     my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
     my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
-    @args = ($RScriptExec,
-	     $Bin."/".$RScriptsRelative."scatterPlotFails.R",
-	     $crHetFail, $hetMean, $hetMaxDist,  $thresholds{'call_rate'}, $title,
-	);
+    @args = ("scatterPlotFails.R", $crHetFail, $hetMean, $hetMaxDist, $thresholds{'call_rate'}, $title);
     @outputs = ($scatterPng, $detailPng);
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { $allOK = 0; }
-    return $allOK;
+    unless ($ok) { confess "Error for failure scatterplot: $!"; }
+    return $ok;
 }
 
-my $allPlotsOK = run($inPath, $configPath, \@outputPaths, $title, $scriptDir, $crHetPath);
+my $allPlotsOK = run($inPath, $configPath, \@outputPaths, $title, $crHetPath);
 if ($allPlotsOK) { exit(0); }
 else { exit(1); }
