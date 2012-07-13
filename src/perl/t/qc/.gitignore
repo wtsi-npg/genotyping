@@ -1,1 +1,2 @@
 sample_xhet_gender_model_summary.txt # expected to differ between test runs
+identity_check.log
