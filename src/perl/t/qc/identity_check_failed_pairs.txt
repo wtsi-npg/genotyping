@@ -1,0 +1,4 @@
+# Pairwise check using all samples which failed concordance, for possible ID swaps.
+# Check A:B finds Sequenom calls for B, then compares to Illumina calls for A
+# MIN_IDENTITY_FOR_MATCH:0.9
+Illumina	Sequenom	common SNPs	matching calls	concordance	result
