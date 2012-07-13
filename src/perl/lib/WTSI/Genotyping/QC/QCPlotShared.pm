@@ -33,13 +33,6 @@ sub meanSd {
     return ($mean, $sd);
 }
 
-sub getRPaths {
-    # contains default paths for R scripts
-    my $RScriptExec = "/software/R-2.11.1/bin/Rscript";
-    my $RScriptsRelative = "../../r/bin/";  # relative path from perl bin dir to R scripts
-    return ($RScriptExec, $RScriptsRelative);
-}
-
 sub readFileToString {
     # generic method to read a file (eg. json) into a single string variable
     my $inPath = shift();
@@ -54,6 +47,7 @@ sub readQCFileNames {
     my $inPath = shift();
     my %allNames = readQCNameConfig($inPath);
     my %fileNames = %{$allNames{'file_names'}};
+    return %fileNames;
 }
 
 sub readQCNameConfig {

@@ -45,7 +45,7 @@ sub findMeanXYDiff {
     my $readProbes = $groupNum; # number of probes to read in at one time
     my $groupSize = 2*$groupNum*$numericBytes; # generic size of groups (applies to all but last one)
     for (my $i=0;$i<$groups;$i++) {
-	if ($i+1==$groups) { $readProbes = $probes % $groupNum; } # update number of probes for final group
+	if ($i>0 && $i+1==$groups) { $readProbes = $probes % $groupNum; } # update number of probes for final group
 	my $size = 2*$readProbes*$numericBytes;
 	my $groupStart = $start + ($i*$groupSize);
 	seek($fh, $groupStart, 0); 
@@ -67,6 +67,20 @@ sub numericBytesByFormat {
     if ($format==0) { return 4; }
     elsif ($format==1) { return 2; }
     else { die "Unknown .sim numeric format code: $format : $!"; }
+}
+
+sub readBlock {
+    # read given data block from .sim filehandle
+    my ($fh, $nameLength, $numberType, $blockSize, $blockOffset, $numericToRead) = @_;
+    my $name = readName($fh, $nameLength, $blockOffset, $blockSize);
+    my $start = 16 + $blockSize* $blockOffset + $nameLength; # start of numeric data
+    seek($fh, $start, 0);
+    my $binary;
+    my $numericBytes = numericBytesByFormat($numberType);
+    read($fh, $binary, $numericBytes * $numericToRead);
+    my @block = unpackSignals($binary, $numericBytes, $numberType);
+    unshift(@block, $name);
+    return @block;
 }
 
 sub readHeader {

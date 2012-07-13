@@ -11,3 +11,5 @@ muN = abs(muF-muM)/2
 sigM = 0.002 
 sigF = 0.03
 sigN = abs(sigF-sigM)/2
+
+Update 2012-07-13:  The data and BASH script are still useful for a standalone test of the gender check, but preferable to use src/perl/t/qc.t which does a test of the entire QC setup using the standard Perl testing framework.
