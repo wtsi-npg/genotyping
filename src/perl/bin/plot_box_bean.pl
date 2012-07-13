@@ -111,6 +111,7 @@ sub runPlotScript {
     }
     my @args = ($plotScript, $textPath, $title);
     my @outputs = ($pngOutPath,);
+    if (!$bean && $mode eq 'cr') { push(@outputs, $outDir.'/total_samples_per_plate.png'); }
     my $result = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
     return $result;
 }
