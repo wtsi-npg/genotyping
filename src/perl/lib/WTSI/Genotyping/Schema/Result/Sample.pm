@@ -62,12 +62,16 @@ __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
 sub include_from_state {
   my $self = shift;
 
-  if (grep { $_->name eq 'autocall_pass' or
-               $_->name eq 'pi_approved' } $self->states) {
-    $self->include(1);
-  } else {
-    $self->include(0);
-  }
+  my @states = $self->states;
+
+  if    (grep { $_->name eq 'autocall_pass'} @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'pi_approved'}  @states)  { $self->include(1) }
+  else                                                { $self->include(0) }
+
+  # If the data are unavailable, we cannot analyse
+  if (grep { $_->name eq 'gtc_unavailable'} @states)  { $self->include(0) }
+
+  return $self->include;
 }
 
 sub uri {
@@ -82,7 +86,6 @@ sub uri {
 
 sub gtc {
   my $self = shift;
-  my $method = shift;
 
   my $file;
   my $result = $self->results->find({'method.name' =>'Autocall'},
@@ -95,6 +98,44 @@ sub gtc {
     $file =~ s|//|/|;
     $file =~ s|netapp6[ab]/illumina|nfs/new_illumina|;
     $file =~ s|geno(\d)|geno0$1|;
+  }
+
+  return $file;
+}
+
+sub idat {
+  my $self = shift;
+  my $channel = shift;
+
+  $channel or $self->log->logconfess('A channel argument is required');
+  unless ($channel =~ /^red|green$/) {
+    $self->log->logconfess("Invalid channel argument '$channel' ",
+                           "must be one of [red, green]");
+  }
+
+  my @result = $self->results->search({'method.name' =>'Infinium'},
+                                      {join => 'method'});
+  my @values = map { $_->value } @result;
+
+  my @files;
+  if ($channel eq 'red') {
+    @files = grep { defined $_ and /red/ } @values;
+  } else {
+    @files = grep { defined $_ and /grn/ } @values;
+  }
+
+  my $file = shift @files;
+
+  # Horrible, fragile munging because the Infinium LIMS doesn't store
+  # the correct path case and the result is then exposed as an NFS mount.
+  if ($file) {
+    $file =~ s|\\|/|g;
+    $file =~   s|//|/|;
+    $file =~   s|netapp6[ab]/illumina|nfs/new_illumina|;
+    $file =~   s|geno(\d)|geno0$1|;
+    $file =~   s|_r(\d+)c(\d+)_|_R$1C$2_|;
+    $file =~   s|grn|Grn|;
+    $file =~   s|red|Red|;
   }
 
   return $file;
