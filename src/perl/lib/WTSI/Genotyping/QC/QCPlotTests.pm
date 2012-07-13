@@ -10,10 +10,13 @@ use warnings;
 use Carp;
 use Cwd qw /getcwd abs_path/;
 use POSIX qw/strftime/;
+use JSON;
 use XML::Parser;
 use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
+use Exporter;
 
-our @EXPORT = qw/pngOK/;
+our @ISA = qw/Exporter/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK/;
 
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
@@ -112,6 +115,22 @@ sub filesDiffer {
     else { return 1; }
 }
 
+sub jsonOK {
+    # check if given filehandle contains valid JSON
+    my $fh = shift;
+    my $ok = 0;
+    my $maxLength = 100*(10**6);
+    my $contents;
+    read($fh, $contents, $maxLength); 
+    my $result = eval { my $stuff = decode_json($contents);  }; # trap any errors from parser
+    if (defined($result)) { $ok = 1; }
+    return $ok;
+}
+
+sub jsonPathOK {
+    return pathOK($_[0], 2);
+}
+
 sub pngOK {
     # check given filehandle for correct png header
     # return 1 if png header is valid, 0 otherwise
@@ -127,6 +146,42 @@ sub pngOK {
 	for (my $i=0;$i<@correctHeader;$i++) {
 	    if (ord($header[$i]) != $correctHeader[$i]) { $ok = 0; last; }
 	}
+    }
+    return $ok;
+}
+
+sub pngMultiplePathsOK {
+    return multiplePathsOK(\@_, 0);
+}
+
+sub pngPathOK {
+    # check on png path
+    return pathOK($_[0], 0);
+}
+
+sub multiplePathsOK {
+    # check on multiple paths
+    my @paths = @{ shift() };
+    my $mode = shift;
+    my $ok = 1;
+    foreach my $path (@paths) {
+	unless (pathOK($path, $mode)) { $ok = 0; last; }
+    }
+    return $ok;
+}
+
+sub pathOK {
+    # check if given path exists and contents are in correct format
+    my $inPath = shift;
+    my $mode = shift;
+    my $ok = 0;
+    if (-r $inPath) {
+	my $fh;
+	open $fh, "< $inPath";
+	if ($mode==0) { $ok = pngOK($fh); }
+	elsif ($mode==1) { $ok = xmlOK($fh); }
+	elsif ($mode==2) { $ok = jsonOK($fh); }
+	close $fh;
     }
     return $ok;
 }
@@ -297,6 +352,11 @@ sub xmlOK {
     my $result = eval {$p -> parse($fh);}; # trap any errors from parser
     if (defined($result)) { $ok = 1; }
     return $ok;
+}
+
+sub xmlPathOK {
+    # check on xml path
+    return pathOK($_[0], 1);
 }
 
 return 1; # must have a true return value for module import
