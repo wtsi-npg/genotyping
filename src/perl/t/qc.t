@@ -10,7 +10,7 @@ use strict;
 use warnings;
 use Cwd;
 use FindBin qw($Bin);
-use Test::More tests => 68;
+use Test::More tests => 69;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -20,6 +20,7 @@ my $sim = "$Bin/qc_test_data/alpha.sim";
 my $outDir = "$Bin/qc/";
 my $heatMapDir = $outDir."/plate_heatmaps/";
 my $title = "Alpha";
+my $config = "$bin/../json/qc_threshold_defaults.json";
 my ($cmd, $status);
 
 chdir($outDir);
@@ -50,7 +51,7 @@ $status = system("perl $bin/xydiff.pl --input=$sim --output=xydiff.txt");
 is($status, 0, "xydiff.pl exit status");
 
 ## test collation into summary
-$status = system("perl $bin/write_qc_status.pl --config=$bin/../json/qc_threshold_defaults.json");
+$status = system("perl $bin/write_qc_status.pl --config=$config");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
@@ -98,7 +99,6 @@ foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
 
-
 ## html index for all plots
 $cmd = "perl $bin/main_plot_index.pl . qc_results.json $title";
 is(system($cmd), 0, "main_plot_index.pl exit status");
@@ -106,7 +106,9 @@ is(system($cmd), 0, "main_plot_index.pl exit status");
 ## main index output
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
-# TODO add test of run_qc.pl bootstrap script
+## check run_qc.pl bootstrap script
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$title --sim=$sim $plink > /dev/null";
+is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 my $duration = time() - $start;
-print "Finished.  Duration: $duration s\n";
+print "QC test finished.  Duration: $duration s\n";
