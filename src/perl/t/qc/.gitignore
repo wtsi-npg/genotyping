@@ -1,2 +1,2 @@
-*.txt # expected to differ between test runs
+*.txt
 identity_check.log
