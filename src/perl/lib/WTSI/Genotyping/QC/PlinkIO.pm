@@ -27,6 +27,22 @@ use warnings;
 use strict;
 use Carp;
 use plink_binary; # from gftools package
+use Exporter;
+
+our @ISA = qw/Exporter/;
+our @EXPORT_OK = qw/checkPlinkBinaryInputs/;
+
+sub checkPlinkBinaryInputs {
+    # check that PLINK binary files exist and are readable
+    my $plinkPrefix = shift;
+    my @suffixes = qw(.bed .bim .fam);
+    my $inputsOK = 1;
+    foreach my $suffix (@suffixes) {
+	my $path = $plinkPrefix.$suffix;
+	unless (-r $path) { $inputsOK = 0; last; } 
+    }
+    return $inputsOK;
+}
 
 sub countCallsHets {
     # filter SNPs on call rate and PAR location; count successful calls, and het calls, for SNPs passing filters
