@@ -100,6 +100,8 @@ sub run {
   my $supplied = $pipedb->method->find({name => 'Supplied'});
   my $autocall_pass = $pipedb->state->find({name => 'autocall_pass'});
   my $autocall_fail = $pipedb->state->find({name => 'autocall_fail'});
+  my $idat_unavailable = $pipedb->state->find({name => 'idat_unavailable'});
+  my $gtc_unavailable = $pipedb->state->find({name => 'gtc_unavailable'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_name})) {
@@ -142,13 +144,6 @@ sub run {
          my $if_name = $if_sample->{'sample'};
          my $if_status = $if_sample->{'status'};
 
-         my $include = 1;
-         my $autocall_state = $autocall_pass;
-         unless ($if_status && $if_status eq $AUTOCALL_PASS) {
-            $include = 0;
-            $autocall_state = $autocall_fail;
-         }
-
          my $ss_plate;
          if (exists $cache{$if_sample->{'plate'}}) {
            $ss_plate = $cache{$if_sample->{'plate'}};
@@ -176,8 +171,13 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                include => $include});
+                                                include => 1});
          $sample->add_to_genders($gender, {method => $supplied});
+
+         my $autocall_state = $autocall_pass;
+         unless ($if_status && $if_status eq $AUTOCALL_PASS) {
+           $autocall_state = $autocall_fail;
+         }
          $sample->add_to_states($autocall_state);
 
          my $plate = $pipedb->plate->find_or_create
@@ -186,13 +186,28 @@ sub run {
 
          $plate->add_to_wells({address => $address,
                                sample  => $sample});
-
          $sample->add_to_results({method => $autocall,
                                   value => $gtc_path});
          $sample->add_to_results({method => $infinium,
                                   value => $grn_path});
          $sample->add_to_results({method => $infinium,
                                   value => $red_path});
+
+         my $unix_gtc_path = $sample->gtc;
+         unless (defined $unix_gtc_path and -e $unix_gtc_path) {
+           $sample->add_to_states($gtc_unavailable);
+         }
+
+         my $unix_red_path = $sample->idat('red');
+         my $unix_grn_path = $sample->idat('green');
+         my $red_found = defined $unix_red_path and -e $unix_red_path;
+         my $grn_found = defined $unix_grn_path and -e $unix_grn_path;
+         unless ($red_found and $grn_found) {
+           $sample->add_to_states($idat_unavailable);
+         }
+
+         $sample->include_from_state;
+         $sample->update;
 
          push @samples, $sample;
 
