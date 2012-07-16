@@ -5,8 +5,9 @@ use utf8;
 
 use strict;
 use warnings;
+use Log::Log4perl;
 
-use Test::More tests => 26;
+use Test::More tests => 34;
 use Test::Exception;
 
 use Data::Dumper;
@@ -86,6 +87,7 @@ my $pass = $db->state->find({name => 'autocall_pass'});
 ok($pass, 'A state found');
 
 my $fail = $db->state->find({name => 'autocall_fail'});
+my $pi_approved = $db->state->find({name => 'pi_approved'});
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
@@ -120,3 +122,33 @@ dies_ok {
 } 'Expected transaction to fail';
 
 is(1000, scalar $datasets[0]->samples, 'Successful rollback');
+
+# Test removing and adding states
+my $passed_sample = ($datasets[0]->samples)[0];
+my $sample_id = $passed_sample->id_sample;
+
+$passed_sample->remove_from_states($pass);
+is(0, scalar $passed_sample->states, "autocall_pass state removed");
+$passed_sample->add_to_states($fail);
+is(1, scalar $passed_sample->states, "autocall_fail state added 1");
+ok((grep { $_->name eq 'autocall_fail' } $passed_sample->states),
+   "autocall_fail state added 2");
+
+# Test that changing states allows inclusion policy to be updated
+ok($passed_sample->include);
+$passed_sample->include_from_state;
+$passed_sample->update;
+
+my $failed_sample = $db->sample->find({id_sample => $sample_id});
+ok($failed_sample);
+ok(!$failed_sample->include, "Sample excluded after autocall_fail");
+
+# Test that pi_approved state overrides exclusion
+$failed_sample->add_to_states($pi_approved);
+ok((grep { $_->name eq 'pi_approved' } $failed_sample->states),
+    "pi_approved state added");
+$failed_sample->include_from_state;
+$failed_sample->update;
+
+$failed_sample = $db->sample->find({id_sample => $sample_id});
+ok($failed_sample->include, "Sample included after pi_approved");
