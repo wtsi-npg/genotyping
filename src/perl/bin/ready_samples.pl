@@ -114,6 +114,7 @@ sub run {
            }
 
            $sample->include_from_state;
+           $sample->update;
 
            print $out $sample->name, "\n";
 
