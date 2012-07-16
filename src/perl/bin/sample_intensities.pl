@@ -61,7 +61,7 @@ sub run {
   }
 
   my $where = {'piperun.name' => $run->name,
-               'method.name' => 'Infinium'};
+               'method.name' => 'Autocall'};
   unless ($all) {
     $where->{'me.include'} = 1;
   }
