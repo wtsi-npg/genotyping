@@ -25,6 +25,7 @@
 
 use warnings;
 use strict;
+use Carp;
 use plink_binary; # from gftools package
 
 sub countCallsHets {
@@ -54,7 +55,7 @@ sub countCallsHets {
 	foreach my $sample (keys(%calls)) { $allCalls{$sample}++; }
 	foreach my $sample (keys(%hets)) { $allHets{$sample}++; }
     }
-    if ($snpTotal==0) { die "ERROR: No valid SNPs found: $!"; } 
+    if ($snpTotal==0) { croak "ERROR: No valid SNPs found: $!"; } 
     elsif ($verbose) { print "$snpTotal SNPs passed, $snpPar from PARs rejected, $snpFail failed CR check\n"; }
     return (\%allCalls, \%allHets, $snpTotal);   
 }
@@ -119,7 +120,7 @@ sub isXPAR {
     my $snp = shift;
     my $chrom = $snp->{"chromosome"};
     if ($chrom ne 'X' && $chrom!=23) { 
-	die "Non-X SNP supplied to X chromosome PAR check: Chromosome $snp->{\"chromosome\"}: $!"; 
+	croak "Non-X SNP supplied to X chromosome PAR check: Chromosome $snp->{\"chromosome\"}: $!"; 
     }
     my @xPars = ( # X chrom pseudoautosomal regions; from NCBI GRCh37 Patch Release 8 (GRCh37.p8), 2012-04-12
 	[60001,	2699520],
