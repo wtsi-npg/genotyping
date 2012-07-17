@@ -154,7 +154,7 @@ sub writeInputFiles {
     my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
 		"$crStatsExecutable $plinkPrefix",
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
-		"perl $Bin/write_gender_files.pl --qc-output=sample_xhet_gender.txt --plots-dir=. $plinkPrefix"
+		"perl $Bin/check_xhet_gender.pl --input=$plinkPrefix"
 	);
     if ($simPath) {
 	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");

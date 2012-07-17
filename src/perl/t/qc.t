@@ -43,8 +43,8 @@ $status = system("perl $bin/check_duplicates_bed.pl $plink");
 is($status, 0, "check_duplicates_bed.pl exit status");
 
 ## test gender check
-$status = system("perl $bin/write_gender_files.pl --qc-output=sample_xhet_gender.txt --plots-dir=. $plink");
-is($status, 0, "write_gender_files.pl exit status");
+$status = system("perl $bin/check_xhet_gender.pl --input=$plink");
+is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test xydiff computation
 $status = system("perl $bin/xydiff.pl --input=$sim --output=xydiff.txt");
@@ -92,7 +92,7 @@ is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
 my @png = qw /cr_beanplot.png          crHetDensityScatter.png  failScatterPlot.png  het_beanplot.png  
-sample_xhet_gender_model.png  xydiff_boxplot.png      cr_boxplot.png           crHistogram.png          
+sample_xhet_gender.png  xydiff_boxplot.png      cr_boxplot.png           crHistogram.png          
 failsCombined.png    het_boxplot.png   total_samples_per_plate.png
 crHetDensityHeatmap.png  failScatterDetail.png    failsIndividual.png  hetHistogram.png  xydiff_beanplot.png/;
 foreach my $png (@png) {
