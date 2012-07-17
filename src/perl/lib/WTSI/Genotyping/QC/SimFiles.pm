@@ -58,7 +58,9 @@ sub findMeanXYDiff {
 	    $xyDiffCount++;
 	}
     }
-    my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
+    my $xyDiffMean = 0;
+    if ($xyDiffCount > 0) { $xyDiffMean = $xyDiffTotal / $xyDiffCount; }
+    else { carp("WARNING: No intensities found for xydiff at sample $sampleOffset"); }
     return $xyDiffMean;
 }
 
