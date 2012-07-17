@@ -95,13 +95,15 @@ sub extractChromData {
 sub findHetRates {
     # find het rates by sample for given plink binary and sample names
     # het rate defined as: successful calls / het calls for each sample, on snps satisfying min call rate
-    my ($pb, $sampleNamesRef, $log, $verbose, $includePar, $minCR) = @_;
+    my ($pb, $sampleNamesRef, $log, $includePar, $minCR, $verbose) = @_;
+    $includePar = 0;
     $minCR ||= 0.95;
     $log ||= 0;
+    $verbose ||= 0;
     my @sampleNames = @$sampleNamesRef;
-    if ($verbose) { print "Finding SNP evaluation set.\n"; }
+    if ($verbose) { print STDERR "Finding SNP evaluation set.\n"; }
     my ($allCallsRef, $allHetsRef, $snps) = countCallsHets($pb, $sampleNamesRef,$minCR,$log,$verbose,$includePar);
-    if ($verbose) { print $snps." SNPs found for het rate computation.\n"; }
+    if ($verbose) { print STDERR $snps." SNPs found for het rate computation.\n"; }
     my %allCalls = %$allCallsRef;
     my %allHets = %$allHetsRef;
     my %hetRates = ();
@@ -120,7 +122,6 @@ sub getSampleNamesGenders {
     # get sample names and genders from given plink binary object
     # (may want to compare inferred and supplied genders)
     my $pb = shift;
-    my $verbose = shift;
     my (@sampleNames, @sampleGenders);
     for my $i (0..$pb->{"individuals"}->size() - 1) {
 	my $name = $pb->{"individuals"}->get($i)->{"name"};
