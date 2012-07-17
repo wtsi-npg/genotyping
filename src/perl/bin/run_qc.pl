@@ -14,6 +14,7 @@ use warnings;
 use Getopt::Long;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
+use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
@@ -68,17 +69,6 @@ if ($simPath) { $simPath = abs_path($simPath); } # similarly, want sim path as a
 
 run($plinkPrefix, $simPath, $configPath, $outDir, $title, $noWrite, $noPlate, $noPlots, $verbose);
 
-sub checkPlinkInputs {
-    # check that PLINK binary files exist and are readable
-    my $plinkPrefix = shift;
-    my @suffixes = qw(.bed .bim .fam);
-    my $inputsOK = 1;
-    foreach my $suffix (@suffixes) {
-	my $path = $plinkPrefix.$suffix;
-	unless (-r $path) { $inputsOK = 0; last; } 
-    }
-    return $inputsOK;
-}
 
 sub createPlots {
     # create plots from QC files
@@ -164,7 +154,7 @@ sub writeInputFiles {
     my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
 		"$crStatsExecutable $plinkPrefix",
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
-		"perl $Bin/write_gender_files.pl --qc-output=sample_xhet_gender.txt --plots-dir=. $plinkPrefix"
+		"perl $Bin/check_xhet_gender.pl --input=$plinkPrefix"
 	);
     if ($simPath) {
 	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
@@ -187,7 +177,7 @@ sub run {
     if (not -d $outDir || not -w $outDir) { die "Output directory $outDir not writable: $!"; }
     my ($tests, $failures) = (0,0);
     unless ($noWrite) {
-	my $inputsOK = checkPlinkInputs($plinkPrefix);
+	my $inputsOK = checkPlinkBinaryInputs($plinkPrefix);
 	if (not $inputsOK) { die "Cannot read PLINK inputs for $plinkPrefix; exiting"; }
 	elsif ($verbose) { print "PLINK input files found.\n"; }
 	if (not $simPath) { print "Path to .sim intensity file not supplied; omitting xydiff calculation.\n"; }

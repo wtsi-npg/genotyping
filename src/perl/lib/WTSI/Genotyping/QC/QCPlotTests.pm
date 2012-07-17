@@ -28,8 +28,8 @@ sub columnsMatch {
     my $match = 1;
     my @indices = @$indicesRef; # column indices to check
     my ($line1, $line2);
-    open(IN1, $path1) || die "Cannot open $path1: $!";
-    open(IN2, $path2) || die "Cannot open $path2: $!";
+    open(IN1, $path1) || croak "Cannot open $path1: $!";
+    open(IN2, $path2) || croak "Cannot open $path2: $!";
     my $j = 0; # line count
     while (1) {
 	$line1 = readline(IN1);
@@ -190,7 +190,7 @@ sub readPrefix {
     # read PLINK file prefix from a suitable .txt file; prefix is first non-comment line
     # use to anonymise test data (name of chip/project not visible)
     my $inPath = shift;
-    open IN, "< $inPath" || die "Cannot open input file $inPath: $!";
+    open IN, "< $inPath" || croak "Cannot open input file $inPath: $!";
     my $prefix = 0;
     while (<IN>) {
 	unless (/^#/) { # comments start with #
@@ -299,7 +299,7 @@ sub wrapCommandList {
     else { for (my $i=0;$i<$total;$i++) { push(@omits, 0); } }
     my $fh;
     my $start = time();
-    if ($logPath) { open $fh, "> $logPath" || die "Cannot open log $logPath: $!"; }
+    if ($logPath) { open $fh, "> $logPath" || croak "Cannot open log $logPath: $!"; }
     else { $fh = *STDOUT; }
     if ($verbose) { print timeNow()." Command list started.\n"; }
     for (my $i=0;$i<$total;$i++) {

@@ -1,128 +1,109 @@
 #! /usr/bin/env perl
 
-# Author:  Iain Bancarz, ib5@sanger.ac.uk
-# April 2012
+#
+# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-# invoke R script to do improved gender check
-# script writes revised sample_xhet_gender.txt, and png plot of mixture model, to given output directory
+# Author:  Iain Bancarz, ib5@sanger.ac.uk
+# July 2012
+
+# Invoke R script to do improved gender check.  Input may be in text or plink binary format.
+# For plink input, extract x chromosome data to temporary files and write text input for R script.
+# Output: Gender information in text or JSON format; log file; png plot of mixture model (if any)
 
 use strict;
 use warnings;
-use File::Temp qw(tempfile);
+use Carp;
+use File::Temp qw/tempdir/;
 use Getopt::Long;
-use FindBin qw($Bin);
-use WTSI::Genotyping qw(read_sample_json);
-use WTSI::Genotyping::QC::QCPlotShared; # must have path to WTSI directory in PERL5LIB
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
-sub readNamesXhetText {
-    # read sample_xhet_gender.txt file; tab-delimited, first two columns are name and xhet, first line is header
-    my $inPath = shift;
-    open IN, "< $inPath" || die "Cannot open input file $inPath: $!";
-    my $line = 0;
-    my @names = ();
-    my @xhets = ();
-    while (<IN>) {
-	if ($line==0) { $line++; next; } # first line is header
-	chomp;
-	my @words = split;
-	push(@names, $words[0]);
-	push(@xhets, $words[1]);
-    }
-    close IN;
-    return (\@names, \@xhets);
-}
+my ($help, $input, $inputFormat, $outputDir, $json, $title, $includePar, $sanityCancel, 
+    $clip, $trials);
 
-sub readNamesXhetJson {
-    # read sample names and xhet from .json file
-    # TODO may need to change $nameKey, $xhetKey defaults
-    my ($inPath, $nameKey, $xhetKey) = @_;
-    $nameKey ||= "sample";
-    $xhetKey ||= "xhet";
-    my @records = read_sample_json($inPath);
-    my @names = ();
-    my @xhets = ();
-    foreach my $recordRef (@records) {
-	my %record = %$recordRef;
-	push(@names, $record{$nameKey});
-	push(@xhets, $record{$xhetKey});
-    }
-    return (\@names, \@xhets);
-}
+GetOptions("h|help"              => \$help,
+	   "input=s"             => \$input,
+	   "input-format=s"      => \$inputFormat,
+	   "output-dir=s"        => \$outputDir,
+	   "json"                => \$json,
+	   "title=s"             => \$title,
+	   "include-par"         => \$includePar,
+	   "cancel-sanity-check" => \$sanityCancel,
+	   "clip=f"              => \$clip,
+	   "trials=i"            => \$trials,
+    );
 
-sub writeSampleXhet {
-    # write given sample names and xhets to temporary file
-    my ($namesRef, $xhetRef) = @_;
-    my ($fh, $filename) = tempfile();
-    my @names = @$namesRef;
-    my @xhets = @$xhetRef;
-    my $total = @names;
-    if ($total != @xhets) { die "Name and xhet list arguments of different length: $!";  }
-    my $header = "sample\txhet\n";
-    print $fh $header;
-    for (my $i=0;$i<$total;$i++) {
-	print $fh "$names[$i]\t$xhets[$i]\n";
-    }
-    close $fh;
-    return $filename;
-}
 
-my ($inPath, $outDir, $title, $help, $prefix, $clip, $trials, $sanityCancel, $sanityOpt, $namesRef, $xhetRef);
-
-GetOptions("input=s"                =>  \$inPath,
-	   "output_dir=s"           =>  \$outDir,
-	   "title=s"                =>  \$title,
-	   "file_prefix=s"          =>  \$prefix,
-	   "cancel_sanity_check"    =>  \$sanityCancel,
-	   "clip=f"                 =>  \$clip,
-	   "trials=i"               =>  \$trials,
-	   "h|help"                 =>  \$help);
+my ($clipDefault, $trialsDefault) = (0.01, 20);
 
 if ($help) {
     print STDERR "Usage: $0 [ options ] 
-Script to do improved gender check by fitting a mixture model to xhet data.
+Input/output options:
+--input=PATH           Path to text/json input file, OR prefix for binary plink files (without .bed, .bim, .fam extension).  Required.
+--input-format=FORMAT  One of: $textFormat, $jsonFormat, $plinkFormat.  Optional; if not supplied, will be deduced from input filename.
+--output-dir=PATH      Path to output directory.  Defaults to current working directory.
+--include-par          Read SNPs from pseudoautosomal regions.  Plink input only; may increase apparent x heterozygosity of male samples.
+--json                 Output in .json format
 
-Options:
---input=PATH          Input file in .json or sample_xhet_gender.txt format
---output_dir=PATH     Output directory 
---title=TITLE         Title for model summary plot
---file_prefix=NAME    Prefix for output file names
---cancel_sanity_check Cancel sanity-checking on model
---trials=INTEGER      Number of trials used to obtain consensus model
---help                Print this help text and exit
-Unspecified options will receive default values.
+Gender model options:
+--title=STRING         Title for plots and other output
+--cancel-sanity-check  Omit sanity checks in mixture model
+--clip=FLOAT           Proportion of high x heterozygosity outliers to clip; defaults to $clipDefault
+--trials=INTEGER       Number of independent trials to form consensus mixture model; defaults to $trialsDefault
+
+Other:
+--help                 Print this help text and exit
 ";
     exit(0);
 }
 
-$inPath ||= './sample_xhet_gender.txt';
-$outDir ||= '.';
-$title  ||= "Untitled";
-$prefix ||= "sample_xhet_gender_model";
-$clip   ||= 0.01; # proportion of high xhet values to clip; default to 1%
-$trials ||= 20;
-$sanityCancel ||= 0;
-
-# read sample names and xhet values from given input
-if ($inPath =~ /\.txt$/) {
-    ($namesRef, $xhetRef) = readNamesXhetText($inPath);
-} elsif ($inPath =~ /\.json$/) {
-    ($namesRef, $xhetRef) = readNamesXhetJson($inPath);
+if ($inputFormat) {
+    if ($inputFormat ne $textFormat && $inputFormat ne $jsonFormat && $inputFormat ne $plinkFormat) {
+	croak "ERROR: Input format must be one of: $textFormat, $jsonFormat, $plinkFormat";
+    }
+} elsif ($input =~ /\.txt$/) { 
+    $inputFormat = $textFormat; 
+} elsif ($input =~ /\.json$/) {
+    $inputFormat = $jsonFormat;
 } else {
-    die "ERROR: Illegal filename extension on $inPath: $!";
+    $inputFormat = $plinkFormat; 
 }
-my $tempName = writeSampleXhet($namesRef, $xhetRef);  # write input for R script
+if ($inputFormat eq $plinkFormat) { 
+    if (not checkPlinkBinaryInputs($input)) { croak "ERROR: Plink binary input files not available"; }
+} elsif (not -r $input) {
+    croak "ERROR: Cannot read input path $input";
+}
 
-if ($outDir !~ /\/$/) { $outDir .= '/'; }
-my $textPath = $outDir.$prefix.'.txt';
-my $plotPath = $outDir.$prefix.'.png';
-if ($sanityCancel) { $sanityOpt='FALSE'; }
-else { $sanityOpt='TRUE'; }
-my $summaryPath = $outDir.$prefix.'_summary.txt';
-my $cmd = join(' ', ("check_xhet_gender.R",
-		     $tempName, $textPath, $plotPath, $title, $sanityOpt, $clip, $trials, ">& ".$summaryPath) ); 
-# $cmd uses csh redirect; assumes R script is in same directory as perl script
-my ($tests, $failures) = (0,0);
-($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT, $tests, $failures);
-if ($failures == 0) { system("rm $tempName"); exit(0); }
-else { exit(1); } # error; keep tempfile for debugging
+$outputDir ||= '.'; # TODO default output to tempdir, to push results to database only?
+$json ||= 0; 
+$title ||= "Untitled";
+$includePar ||= 0;
+$sanityCancel ||= 0;
+$clip ||= $clipDefault;
+$trials ||= $trialsDefault;
+
+my $outputFormat;
+if ($json) { $outputFormat = $jsonFormat; }
+else { $outputFormat = $textFormat; }
+my @modelParams = ($sanityCancel, $clip, $trials, $title, $outputDir);
+
+my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($input, $inputFormat, $includePar);
+my @inferred = runGenderModel($namesRef, $xhetsRef, \@modelParams);
+writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, $outputFormat, $outputDir); 
+
+
+
