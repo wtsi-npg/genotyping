@@ -8,6 +8,7 @@ package WTSI::Genotyping::QC::SimFiles;
 
 use strict;
 use warnings;
+use Carp;
 use bytes;
 use POSIX;
 
@@ -57,7 +58,9 @@ sub findMeanXYDiff {
 	    $xyDiffCount++;
 	}
     }
-    my $xyDiffMean = $xyDiffTotal / $xyDiffCount;
+    my $xyDiffMean = 0;
+    if ($xyDiffCount > 0) { $xyDiffMean = $xyDiffTotal / $xyDiffCount; }
+    else { carp("WARNING: No intensities found for xydiff at sample $sampleOffset"); }
     return $xyDiffMean;
 }
 
@@ -66,7 +69,7 @@ sub numericBytesByFormat {
     my $format = shift;
     if ($format==0) { return 4; }
     elsif ($format==1) { return 2; }
-    else { die "Unknown .sim numeric format code: $format : $!"; }
+    else { croak "Unknown .sim numeric format code: $format : $!"; }
 }
 
 sub readBlock {
@@ -122,7 +125,7 @@ sub readWriteXYDiffs {
     my ($in, $out, $verbose, $groupNum) = @_;
     $verbose ||= 0;
     my @header = unpackHeader(readHeader($in));
-    if ($header[5]!=2) { die "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
+    if ($header[5]!=2) { croak "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
     my $nameLength = $header[2];
     my $probes = $header[4];
     my $channels = $header[5];
@@ -164,7 +167,7 @@ sub unpackSignals {
     # unpack a chunk of binary data into signal values
     my ($data, $numericBytes, $numberType) = @_;
     my $dataBytes = bytes::length($data);
-    if ($dataBytes % $numericBytes !=0) { die "Incorrect number of bytes in signal data chunk: $!"; }
+    if ($dataBytes % $numericBytes !=0) { croak "Incorrect number of bytes in signal data chunk: $!"; }
     my $signals = $dataBytes/$numericBytes; # how many signal vlaues?
     my @signals;
     if ($numberType==0) { 

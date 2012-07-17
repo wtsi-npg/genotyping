@@ -7,6 +7,7 @@ package WTSI::Genotyping::QC::QCPlotShared;
 
 use warnings;
 use strict;
+use Carp;
 use FindBin qw($Bin);
 use JSON;
 
@@ -104,7 +105,7 @@ sub readSampleData {
     $startLine ||= 0;
     $stopLine ||= 0;
     my @data;
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
+    open IN, "< $inPath" || croak "Cannot open input path $inPath: $!";
     my $line = 0;
     while (<IN>) {
 	$line++;
@@ -125,7 +126,7 @@ sub readThresholds {
     my %qcMetricNames = readQCNameHash();
     foreach my $name (keys(%thresholds)) { # validate metric names
 	unless ($qcMetricNames{$name}) {
-	    die "Unknown QC metric name: $!";
+	    croak "Unknown QC metric name: $!";
 	}
     }
     return %thresholds;
