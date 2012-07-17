@@ -35,7 +35,7 @@ use WTSI::Genotyping::QC::PlinkIO;
 use WTSI::Genotyping::QC::QCPlotTests;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat readSampleXhet/;
+our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat readSampleXhet runGenderModel writeOutput/;
 
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
@@ -182,8 +182,7 @@ sub writeOutput {
 	    $record{$supplyKey} = getSuppliedGenderOutput($suppliedRef, $i);
 	    push(@records, \%record);
 	}
-	my $recString = encode_json(\@records);
-	print $out $recString;
+	print $out encode_json(\@records);
     }
     close $out;
 }
