@@ -45,8 +45,10 @@ sub findMeanXYDiff {
     my $groups = ceil($probes/$groupNum); # total number of groups
     my $readProbes = $groupNum; # number of probes to read in at one time
     my $groupSize = 2*$groupNum*$numericBytes; # generic size of groups (applies to all but last one)
+    my $remainderGroup = 0;
+    if ($probes % $groupNum != 0) { $remainderGroup = 1; }
     for (my $i=0;$i<$groups;$i++) {
-	if ($i>0 && $i+1==$groups) { $readProbes = $probes % $groupNum; } # update number of probes for final group
+	if ($i>0 && $i+1==$groups && $remainderGroup) { $readProbes = $probes % $groupNum; } # final group
 	my $size = 2*$readProbes*$numericBytes;
 	my $groupStart = $start + ($i*$groupSize);
 	seek($fh, $groupStart, 0); 
@@ -121,7 +123,6 @@ sub readSampleBinary {
 sub readWriteXYDiffs {
     # find xydiffs for each sample in input; write to output
     # can correctly handle large input files (.sim files can be >> 1G)
-    # use the first $useProbes probes, or all probes, whichever is less
     my ($in, $out, $verbose, $groupNum) = @_;
     $verbose ||= 0;
     my @header = unpackHeader(readHeader($in));
@@ -137,17 +138,21 @@ sub readWriteXYDiffs {
     my $maxBlocks = 50;
     while (!eof($in)) {
 	my $name = readName($in, $nameLength, $i, $blockSize);
-	my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, $blockSize, $probes, $groupNum);
 	$name =~ s/\0//g; # strip off null padding
-	push(@samples, $name);
-	push(@means, $xydiff);
+	if ($name) {
+	    my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, $blockSize, $probes, $groupNum);
+	    push(@samples, $name);
+	    push(@means, $xydiff);
+	    if ($verbose && $i % 20 == 0) { print $i."\t".$name."\t".$xydiff."\n"; }
+	} else {
+	    carp "Warning: No name found for sample $i\n";
+	}
 	$i++;	
-	if ($verbose) { print $i."\t".$name."\t".$xydiff."\n"; }
 	if (@samples==$maxBlocks || eof($in)) {
 	    # print buffers to output filehandle
 	    for (my $j=0;$j<@samples;$j++) {
 		$name = $samples[$j];
-		printf($out "%s\t%.8f\n", ($name, $means[$j]));
+		printf($out "%s\t%.8f\n", ($name, $means[$j])); 
 	    }
 	    if ($verbose) { print $i." samples written.\n"; }
 	    @samples = ();
