@@ -1,7 +1,5 @@
 
-# Tests creation of input files for genotyping QC
-# Start with running individual scripts and testing exit status
-# Later try and validate inputs
+# Tests operation of genotyping QC, both individual scripts and bootstrap
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # July 2012
@@ -10,44 +8,50 @@ use strict;
 use warnings;
 use Cwd;
 use FindBin qw($Bin);
-use Test::More tests => 69;
+use Test::More tests => 74;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plink = "$Bin/qc_test_data/alpha";
-my $sim = "$Bin/qc_test_data/alpha.sim";
-my $outDir = "$Bin/qc/";
-my $heatMapDir = $outDir."/plate_heatmaps/";
-my $title = "Alpha";
+my $plinkA = "$Bin/qc_test_data/alpha";
+my $plinkB = "$Bin/qc_test_data/beta";
+my $simA = "$Bin/qc_test_data/alpha.sim";
+my $simB = "$Bin/qc_test_data/beta.sim";
+my $outDirA = "$Bin/qc/alpha/";
+my $outDirB = "$Bin/qc/beta/";
+my $heatMapDir = "plate_heatmaps/";
+my $titleA = "Alpha";
+my $titleB = "Beta";
 my $config = "$bin/../json/qc_threshold_defaults.json";
 my ($cmd, $status);
 
-chdir($outDir);
+chdir($outDirA);
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, if any
 
 ### test creation of QC input files ### 
 
+print "Testing dataset Alpha.\n";
+
 ## test identity check
-$status = system("perl $bin/check_identity_bed.pl $plink");
+$status = system("perl $bin/check_identity_bed.pl $plinkA");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "/nfs/users/nfs_i/ib5/mygit/github/Gftools/snp_af_sample_cr_bed"; # TODO make more portable
-$status = system("$crHetFinder $plink");
+$status = system("$crHetFinder $plinkA");
 is($status, 0, "snp_af_sample_cr_bed exit status");
 
 ## test duplicate check
-$status = system("perl $bin/check_duplicates_bed.pl $plink");
+$status = system("perl $bin/check_duplicates_bed.pl $plinkA");
 is($status, 0, "check_duplicates_bed.pl exit status");
 
 ## test gender check
-$status = system("perl $bin/check_xhet_gender.pl --input=$plink");
+$status = system("perl $bin/check_xhet_gender.pl --input=$plinkA");
 is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test xydiff computation
-$status = system("perl $bin/xydiff.pl --input=$sim --output=xydiff.txt");
+$status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
 is($status, 0, "xydiff.pl exit status");
 
 ## test collation into summary
@@ -61,7 +65,7 @@ ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 ## plate heatmap plots
 my @modes = qw/cr het xydiff/;
 foreach my $mode (@modes) {
-    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$heatMapDir";
+    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
     for (my $i=1;$i<=11;$i++) {
 	my $png = "plate_heatmaps/plot_".$mode."_plate".sprintf("%02d", $i).".png";
@@ -70,7 +74,7 @@ foreach my $mode (@modes) {
 }
 
 ## plate heatmap index
-$cmd = "perl $bin/plate_heatmap_index.pl $title $heatMapDir index.html";
+$cmd = "perl $bin/plate_heatmap_index.pl $titleA $heatMapDir index.html";
 is(system($cmd), 0, "plate_heatmap_index.pl exit status");
 ## plate heatmap index output
 ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
@@ -78,16 +82,16 @@ ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid X
 ## box/bean plots
 my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
 for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$title";
+    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA";
     is(system($cmd), 0, "plot_box_bean.pl exit status: mode $modes[$i]");
 }
 
 ## cr/het density
-$cmd = "cat sample_cr_het.txt | perl $bin/plot_cr_het_density.pl --out_dir=. --title=$title";
+$cmd = "cat sample_cr_het.txt | perl $bin/plot_cr_het_density.pl --out_dir=. --title=$titleA";
 is(system($cmd), 0, "plot_cr_het_density.pl exit status");
 
 ## failure cause breakdown
-$cmd = "perl $bin/plot_fail_causes.pl --title=$title";
+$cmd = "perl $bin/plot_fail_causes.pl --title=$titleA";
 is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
@@ -100,14 +104,31 @@ foreach my $png (@png) {
 }
 
 ## html index for all plots
-$cmd = "perl $bin/main_plot_index.pl . qc_results.json $title";
+$cmd = "perl $bin/main_plot_index.pl . qc_results.json $titleA";
 is(system($cmd), 0, "main_plot_index.pl exit status");
 
 ## main index output
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$title --sim=$sim $plink > /dev/null";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --sim=$simA $plinkA > /dev/null";
+is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
+
+print "\tTest dataset Alpha finished.\n";
+chdir($outDirB);
+print "\tTesting dataset Beta; sample names *not* in PLATE_WELL_ID format.\n";
+$crHetFinder = "/nfs/users/nfs_i/ib5/mygit/github/Gftools/snp_af_sample_cr_bed"; # TODO make more portable
+$status = system("$crHetFinder $plinkB");
+is($status, 0, "snp_af_sample_cr_bed exit status");
+
+## box/bean plots -- expected to fail without plate names
+for (my $i=0;$i<@modes;$i++) {
+    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleB 2> /dev/null";
+    isnt(system($cmd), 0, "plot_box_bean.pl exit status, expected to fail: mode $modes[$i]");
+}
+
+## check run_qc.pl bootstrap script
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleB --sim=$simB $plinkB > /dev/null 2> /dev/null"; # suppress stdout; expect some chatter from failed box/beanplot scripts
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 my $duration = time() - $start;
