@@ -37,7 +37,8 @@ use WTSI::Genotyping::QC::PlinkIO;
 use WTSI::Genotyping::QC::QCPlotTests;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput/;
+our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
+readDatabaseGenders updateDatabase/;
 
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey $ini_path/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
@@ -85,7 +86,6 @@ sub readDatabaseGenders {
     my $dbfile = shift;
     my $method = shift;
     $method ||= 'Inferred';
-    #$method ||= 'Supplied';
     my $db = getDatabaseObject($dbfile);
     my @samples = $db->sample->all;
     my %genders;
@@ -203,7 +203,6 @@ sub updateDatabase {
     for (my $i=0;$i<@names;$i++) {
 	$genders{$names[$i]} = $genders[$i];
     }
-    #my $ini_path = "$Bin/../etc";
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
     # transaction to update sample genders
