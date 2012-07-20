@@ -27,19 +27,35 @@ use warnings;
 use strict;
 use Carp;
 use File::Temp qw/tempfile tempdir/;
+use FindBin qw /$Bin/;
 use JSON;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
+use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::PlinkIO;
 use WTSI::Genotyping::QC::QCPlotTests;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat readSampleXhet runGenderModel writeOutput/;
+our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput/;
 
-use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey/;
+use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey $ini_path/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
 ($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
+$ini_path = "$Bin/../etc/";
+
+sub getDatabaseObject {
+    # set up database object
+    my $dbfile = shift;
+    my $db = WTSI::Genotyping::Database::Pipeline->new
+	(name => 'pipeline',
+	 inifile => "$ini_path/pipeline.ini",
+	 dbfile => $dbfile);
+    my $schema = $db->connect(RaiseError => 1,
+		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
+    $db->populate;
+    return $db;
+}
 
 sub getSuppliedGenderOutput {
     my $suppliedRef = shift;
@@ -62,6 +78,30 @@ sub readModelGenders {
     }
     close $in;
     return @inferred;
+}
+
+sub readDatabaseGenders {
+    # read inferred genders from database -- use for testing database update
+    my $dbfile = shift;
+    my $method = shift;
+    $method ||= 'Inferred';
+    #$method ||= 'Supplied';
+    my $db = getDatabaseObject($dbfile);
+    my @samples = $db->sample->all;
+    my %genders;
+    $db->in_transaction(sub {
+	foreach my $sample (@samples) {
+	    my $sample_name = $sample->name;
+	    my $gender = $db->gender->find
+		({'sample.id_sample' => $sample->id_sample,
+		  'method.name' => $method},
+		 {join => {'sample_genders' => ['method', 'sample']}},
+		 {prefetch =>  {'sample_genders' => ['method', 'sample']} });
+	    $genders{$sample_name} = $gender->code;
+	}
+			});
+    $db->disconnect();
+    return %genders;
 }
 
 sub readNamesXhetJson {
@@ -89,7 +129,6 @@ sub readPlink {
     my $pb = extractChromData($plinkPrefix, $tempDir); # extract X data and get plink_binary reading object
     my ($nameRef, $suppliedRef) = getSampleNamesGenders($pb);
     my $snpLogPath ||=  $tempDir."/snps_gender_check.txt";
-    #my $log;
     open(my $log, "> $snpLogPath") || croak "Cannot open log path $snpLogPath: $!";
     my %hetRates = findHetRates($pb, $nameRef, $log, $includePar);
     close $log;
@@ -153,6 +192,35 @@ sub runGenderModel {
     system($cmd);
     my @inferred = readModelGenders($textPath);
     return @inferred;
+}
+
+sub updateDatabase {
+    # update pipeline database with inferred genders
+    my ($namesRef, $gendersRef, $dbfile) = @_;
+    my @names = @$namesRef;
+    my @genders = @$gendersRef;
+    my %genders;
+    for (my $i=0;$i<@names;$i++) {
+	$genders{$names[$i]} = $genders[$i];
+    }
+    #my $ini_path = "$Bin/../etc";
+    my $db = getDatabaseObject($dbfile);
+    my $inferred = $db->method->find({name => 'Inferred'});
+    # transaction to update sample genders
+    my @samples = $db->sample->all;
+    $db->in_transaction(sub {
+	foreach my $sample (@samples) {
+	    my $sample_name = $sample->name;
+	    my $genderCode = $genders{$sample_name};
+	    my $gender;
+	    if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
+	    elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }
+	    elsif ($genderCode==0) { $gender = $db->gender->find({name => 'Unknown'}); }
+	    else { $gender = $db->gender->find({name => 'Not available'}); }
+	    $sample->add_to_genders($gender, {method => $inferred});
+	}
+			});
+    $db->disconnect();
 }
 
 sub writeOutput {
