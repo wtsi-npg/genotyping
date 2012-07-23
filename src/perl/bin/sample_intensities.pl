@@ -16,7 +16,7 @@ use WTSI::Genotyping qw(maybe_stdout);
 
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/msx;
 
 Log::Log4perl->easy_init($ERROR);
 

@@ -187,7 +187,7 @@ sub remove_object {
     $log->logconfess('A non-empty target (object) argument is required');
 
   $log->debug("Removing object '$target'");
-  _irm($target);
+  return _irm($target);
 }
 
 =head2 get_object_meta
@@ -414,7 +414,7 @@ sub remove_collection {
     $log->logconfess('A non-empty target (object) argument is required');
 
   $log->debug("Removing collection '$target'");
-  _irm($target);
+  return _irm($target);
 }
 
 =head2 get_collection_meta
@@ -515,14 +515,14 @@ sub remove_collection_meta {
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
-  exists $meta{$key} and grep { $_ eq $value } @{$meta{$key}};
+  return exists $meta{$key} and grep { $_ eq $value } @{$meta{$key}};
 }
 
 sub _ensure_absolute {
   my ($target) = @_;
 
   my $absolute = $target;
-  unless ($target =~ /^\//) {
+  unless ($target =~ m/^\//) {
     $absolute = ipwd() . '/' . $absolute;
   }
 
@@ -542,14 +542,14 @@ sub _parse_raw_meta {
   for (my $i = 0; $i < $n; $i += 3) {
     my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
 
-    my ($attribute) = $str0 =~ /^attribute: (.*)/ or
-       $log->logcroak("Invalid triple $i: expected an attribute but found ",
-                      "'$str0'");
+    my ($attribute) = $str0 =~ m/^attribute: (.*)/ or
+      $log->logcroak("Invalid triple $i: expected an attribute but found ",
+                     "'$str0'");
 
-    my ($value) = $str1 =~ /^value: (.*)/ or
+    my ($value) = $str1 =~ m/^value: (.*)/ or
       $log->logcroak("Invalid triple $i: expected a value but found '$str1'");
 
-    my ($units) = $str2 =~ /^units: (.*)/ or
+    my ($units) = $str2 =~ m/^units: (.*)/ or
       $log->logcroak("Invalid triple $i: expected units but found '$str2'");
 
     if (exists $meta{$attribute}) {
@@ -579,7 +579,7 @@ sub _safe_select {
 sub _irm {
   my (@args) = @_;
 
-  run_command($IRM, '-r', join(" ", @args));
+  run_command($IRM, '-r', join(' ', @args));
 
   return @args;
 }
