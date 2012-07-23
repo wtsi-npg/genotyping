@@ -4,7 +4,6 @@ package WTSI::Genotyping::Schema::Result::Sample;
 
 use strict;
 use warnings;
-
 use URI;
 
 use base 'DBIx::Class::Core';
@@ -63,13 +62,12 @@ sub include_from_state {
   my $self = shift;
 
   my @states = $self->states;
-
-  if    (grep { $_->name eq 'autocall_pass'} @states) { $self->include(1) }
-  elsif (grep { $_->name eq 'pi_approved'}  @states)  { $self->include(1) }
-  else                                                { $self->include(0) }
+  if    (grep { $_->name eq 'autocall_pass' } @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'pi_approved' }   @states) { $self->include(1) }
+  else                                                 { $self->include(0) }
 
   # If the data are unavailable, we cannot analyse
-  if (grep { $_->name eq 'gtc_unavailable'} @states)  { $self->include(0) }
+  if (grep { $_->name eq 'gtc_unavailable' } @states)  { $self->include(0) }
 
   return $self->include;
 }
@@ -94,10 +92,10 @@ sub gtc {
   if ($result && $result->value) {
     # Munge the windows path into the correspoding NFS mount
     $file = $result->value;
-    $file =~ s|\\|/|g;
-    $file =~ s|//|/|;
-    $file =~ s|netapp6[ab]/illumina|nfs/new_illumina|;
-    $file =~ s|geno(\d)|geno0$1|;
+    $file =~ s{\\}{/}gmsx;
+    $file =~ s{//}{/}msx;
+    $file =~ s{netapp6[ab]/illumina}{nfs/new_illumina}msx;
+    $file =~ s{geno(\d)}{geno0$1}msx;
   }
 
   return $file;
@@ -108,7 +106,7 @@ sub idat {
   my $channel = shift;
 
   $channel or $self->log->logconfess('A channel argument is required');
-  unless ($channel =~ /^red|green$/) {
+  unless ($channel =~ m{^red|green$}msx) {
     $self->log->logconfess("Invalid channel argument '$channel' ",
                            "must be one of [red, green]");
   }
@@ -119,9 +117,9 @@ sub idat {
 
   my @files;
   if ($channel eq 'red') {
-    @files = grep { defined $_ and /red/ } @values;
+    @files = grep { defined $_ and m{red}msx } @values;
   } else {
-    @files = grep { defined $_ and /grn/ } @values;
+    @files = grep { defined $_ and m{grn}msx } @values;
   }
 
   my $file = shift @files;
@@ -129,13 +127,13 @@ sub idat {
   # Horrible, fragile munging because the Infinium LIMS doesn't store
   # the correct path case and the result is then exposed as an NFS mount.
   if ($file) {
-    $file =~ s|\\|/|g;
-    $file =~   s|//|/|;
-    $file =~   s|netapp6[ab]/illumina|nfs/new_illumina|;
-    $file =~   s|geno(\d)|geno0$1|;
-    $file =~   s|_r(\d+)c(\d+)_|_R$1C$2_|;
-    $file =~   s|grn|Grn|;
-    $file =~   s|red|Red|;
+    $file =~ s{\\}{/}gmsx;
+    $file =~ s{//}{/}msx;
+    $file =~ s{netapp6[ab]/illumina}{nfs/new_illumina}msx;
+    $file =~ s{geno(\d)}{geno0$1}msx;
+    $file =~ s{_r(\d+)c(\d+)_}{_R$1C$2_}msx;
+    $file =~ s{grn}{Grn}msx;
+    $file =~ s{red}{Red}msx;
   }
 
   return $file;

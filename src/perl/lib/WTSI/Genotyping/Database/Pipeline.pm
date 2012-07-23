@@ -495,13 +495,18 @@ sub AUTOLOAD {
         join(", ", sort keys %lookup) . "]\n";
   }
 
+
  SYMBOL_TABLE: {
+    ## no critic
+
     no strict qw(refs);
 
     *$AUTOLOAD = sub {
       my $self = shift;
       return $self->schema->resultset($lookup{$method_name});
     };
+
+    ## use critic
   }
 
   unshift @_, $self;

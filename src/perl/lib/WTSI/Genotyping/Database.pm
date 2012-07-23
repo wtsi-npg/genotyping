@@ -23,7 +23,7 @@ use Log::Log4perl;
 =cut
 
 sub new {
-   my $class = shift;
+   my ($class) = @_;
 
    my $self = {};
    bless($self, $class);
@@ -45,8 +45,7 @@ sub new {
 =cut
 
 sub configure {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   $self->name($args{name});
   $self->inifile($args{inifile});
@@ -99,8 +98,7 @@ sub inifile {
 =cut
 
 sub connect {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   unless ($self->{_dbh}) {
     $self->log->info('Connecting to ', $self->data_source);
@@ -125,7 +123,7 @@ sub connect {
 =cut
 
 sub disconnect {
-  my $self = shift;
+  my ($self) = @_;
   $self->log->info('Disconnecting from ', $self->data_source);
   $self->dbh->disconnect;
 }
@@ -142,7 +140,7 @@ sub disconnect {
 =cut
 
 sub is_connected {
-  my $self = shift;
+  my ($self) = @_;
   return defined $self->dbh && $self->dbh->ping;
 }
 
@@ -158,7 +156,7 @@ sub is_connected {
 =cut
 
 sub dbh {
-  my $self = shift;
+  my ($self) = @_;
   return $self->{_dbh};
 }
 

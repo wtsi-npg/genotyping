@@ -55,10 +55,10 @@ dies_ok { $db->should_not_autoload_this_method->all }
   'Expected AUTOLOAD to fail on invalid method';
 
 $db->populate;
-is(18, $db->snpset->count, 'The snpset dictionary');
-is(4, $db->method->count, 'The method dictionary');
-is(2, $db->relation->count, 'The relation dictionary');
-is(10, $db->state->count, 'The state dictionary');
+is($db->snpset->count, 18, 'The snpset dictionary');
+is($db->method->count, 5, 'The method dictionary');
+is($db->relation->count, 2, 'The relation dictionary');
+is($db->state->count, 10, 'The state dictionary',);
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
@@ -100,10 +100,10 @@ $db->in_transaction(sub {
                     });
 
 my @samples = $datasets[0]->samples;
-is(1000, scalar @samples, 'Expected samples found');
+is(scalar @samples, 1000, 'Expected samples found');
 my @states = $samples[0]->states;
-is(1, scalar @states);
-is('autocall_pass', $states[0]->name);
+is(scalar @states, 1);
+is($states[0]->name, 'autocall_pass');
 
 dies_ok {
   $db->in_transaction(sub {
@@ -121,16 +121,16 @@ dies_ok {
                       });
 } 'Expected transaction to fail';
 
-is(1000, scalar $datasets[0]->samples, 'Successful rollback');
+is(scalar $datasets[0]->samples, 1000, 'Successful rollback');
 
 # Test removing and adding states
 my $passed_sample = ($datasets[0]->samples)[0];
 my $sample_id = $passed_sample->id_sample;
 
 $passed_sample->remove_from_states($pass);
-is(0, scalar $passed_sample->states, "autocall_pass state removed");
+is(scalar $passed_sample->states, 0, "autocall_pass state removed");
 $passed_sample->add_to_states($fail);
-is(1, scalar $passed_sample->states, "autocall_fail state added 1");
+is(scalar $passed_sample->states, 1, "autocall_fail state added 1");
 ok((grep { $_->name eq 'autocall_fail' } $passed_sample->states),
    "autocall_fail state added 2");
 

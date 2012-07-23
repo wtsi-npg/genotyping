@@ -1,0 +1,24 @@
+
+use utf8;
+
+use strict;
+use warnings;
+
+use Test::More;
+
+eval {
+  require Test::Perl::Critic;
+};
+
+if($@) {
+  plan skip_all => 'Test::Perl::Critic not installed';
+
+}
+else {
+  Test::Perl::Critic->import(-severity => 5,
+                             -profile  => 't/perlcriticrc');
+
+  all_critic_ok();
+}
+
+1;

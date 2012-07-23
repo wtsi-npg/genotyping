@@ -45,6 +45,8 @@ sub run {
     $db ||= 'configured database';
     print STDERR "Created $db using config from $config\n";
   }
+
+  return;
 }
 
 

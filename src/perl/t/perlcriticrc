@@ -1,0 +1,11 @@
+
+exclude = Modules::RequireVersionVar Modules::RequireFilenameMatchesPackage Modules::RequireExplicitPackage ValuesAndExpressions::RequireInterpolationOfMetachars Miscellanea::RequireRcsKeywords CodeLayout::RequireTidyCode
+
+
+[ControlStructures::ProhibitPostfixControls]
+allow = if unless
+
+
+[Documentation::RequirePodSections]
+lib_sections    = AUTHOR | COPYRIGHT AND DISCLAIMER
+script_sections = NAME | SYNOPSIS | DESCRIPTION | COPYRIGHT AND DISCLAIMER | AUTHOR

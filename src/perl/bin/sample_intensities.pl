@@ -90,6 +90,8 @@ sub run {
   my $fh = maybe_stdout($output);
   print $fh to_json(\@samples, {utf8 => 1, pretty => 1});
   close($fh);
+
+  return;
 }
 
 

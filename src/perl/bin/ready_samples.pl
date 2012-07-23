@@ -128,6 +128,8 @@ sub run {
       describe_sample($sample, \*STDERR) if $verbose;
     }
   }
+
+  return;
 }
 
 sub describe_sample {
@@ -137,6 +139,7 @@ sub describe_sample {
   print $where join(' ', $sample->name,
                     map { $_->name } $sample->states), "\n";
 
+  return;
 }
 
 

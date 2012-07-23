@@ -244,16 +244,16 @@ sub add_object_meta {
 sub batch_object_meta {
   my ($object, $meta_tuples) = @_;
 
-  open(IMETA, "| $IMETA > /dev/null")
+  open(my $imeta, '|', "$IMETA > /dev/null")
     or $log->logconfess("Failed open pipe to command '$IMETA': $!");
   foreach my $tuple (@$meta_tuples) {
     my ($key, $value, $units) = @$tuple;
     $units ||= '';
 
     $log->debug("Adding metadata pair '$key' -> '$value' to $object");
-    print IMETA qq(add -d $object "$key" "$value" "$units"), "\n";
+    print $imeta qq(add -d $object "$key" "$value" "$units"), "\n";
   }
-  close(IMETA);
+  close($imeta) or warn "Failed to close pipe to command '$IMETA'\n";
 
   # WARNING: imeta exits with the error code for the last operation in
   # the batch. An error followed by a success will be reported as a
@@ -345,7 +345,7 @@ sub list_collection {
   }
   else {
     $log->debug("Collection '$collection' does not exist");
-    return undef;
+    return;
   }
 }
 

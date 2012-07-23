@@ -150,17 +150,19 @@ else {
     # Illuminus writes all its calls, then all its probs, so we can't
     # interleave reads and make this a nice stream. We have to slurp all
     # of one, then the other.
-    open(CALLS, "<$calls_fifo") or die "Failed to open '$calls_fifo': $!\n";
-    while (my $line = <CALLS>) {
+    open(my $calls, '<', "$calls_fifo")
+      or die "Failed to open '$calls_fifo': $!\n";
+    while (my $line = <$calls>) {
       push(@calls, $line);
     }
-    close(CALLS) or warn "Failed to close FIFO $calls_fifo: $!\n";
+    close($calls) or warn "Failed to close FIFO $calls_fifo: $!\n";
 
-    open(PROBS, "<$probs_fifo") or die "Failed to open '$probs_fifo': $!\n";
-    while (my $line = <PROBS>) {
+    open(my $probs, '<', "$probs_fifo")
+      or die "Failed to open '$probs_fifo': $!\n";
+    while (my $line = <$probs>) {
       push(@probs, $line);
     }
-    close(PROBS) or warn "Failed to close FIFO $probs_fifo: $!\n";
+    close($probs) or warn "Failed to close FIFO $probs_fifo: $!\n";
 
     # write_gt_calls requires streams, so this is a shim to pretend that
     # we have such
@@ -216,7 +218,8 @@ sub write_gt_header {
 sub write_gender_codes {
   my ($file, $chromosome, $samples) = @_;
 
-  open(GENDERS, ">$file") or die "Failed to open '$file' for writing: $!\n";
+  open(my $genders, '>', "$file")
+    or die "Failed to open '$file' for writing: $!\n";
   foreach my $sample (@$samples) {
     my $code = 0;
     if ($chromosome =~ /^M/) {
@@ -225,9 +228,9 @@ sub write_gender_codes {
       $code = $sample->{'gender_code'};
     }
 
-    print GENDERS "$code\n";
+    print $genders "$code\n";
   }
-  close(GENDERS);
+  close($genders) or warn "Failed to close gender code file '$file'\n";
 
   return $file;
 }
@@ -286,7 +289,7 @@ sub nullify_females {
   my ($input, $command, $samples, $verbose) = @_;
 
   my $in = maybe_stdin($input);
-  open(ILN, "| $command") or die "Failed to open pipe to '$command'\n";
+  open(my $iln, '|', "$command") or die "Failed to open pipe to '$command'\n";
   my $col_names = read_it_column_names($in);
   my $females = find_female_columns($col_names, $samples);
 
@@ -295,9 +298,11 @@ sub nullify_females {
       join(", "), "]";
   }
 
-  print ILN join("\t", qw(SNP Coor Alleles), @$col_names), "\n";
-  update_it_columns($in, \*ILN, $females, 1.0);
-  close(ILN);
+  print $iln join("\t", qw(SNP Coor Alleles), @$col_names), "\n";
+  update_it_columns($in, $iln, $females, 1.0);
+  close($iln) or warn "Failed to close pipe to '$command'\n";
+
+  return;
 }
 
 # Illuminus is incapable of writing complete Plink output, so we have
@@ -323,6 +328,8 @@ sub update_plink_annotation {
   close($out);
   move($tmp_bim, $bim_file) or die "Failed to move $tmp_bim: $!\n";
   unlink($tmp_bim);
+
+  return;
 }
 
 

@@ -37,7 +37,7 @@ sub maybe_stdin {
       croak "'$file' is a directory\n";
     }
 
-    open($fh, "<$file") or croak "Failed to open file '$file': $!\n";
+    open($fh, '<', "$file") or croak "Failed to open file '$file': $!\n";
   } else {
     $fh = \*STDIN;
   }
@@ -62,7 +62,7 @@ sub maybe_stdout {
 
   my $fh;
   if (defined $file) {
-    open($fh, ">$file") or croak "Failed to open '$file': $!\n";
+    open($fh, '>', "$file") or croak "Failed to open '$file': $!\n";
   } else {
     $fh = \*STDOUT;
   }
@@ -83,10 +83,10 @@ sub maybe_stdout {
 sub read_sample_json {
   my $file = shift;
 
-  open(FH, "<$file")
+  open(my $fh, '<', "$file")
     or die "Failed to open JSON file '$file' for reading: $!\n";
-  my $str = do { local $/ = undef; <FH> };
-  close(FH);
+  my $str = do { local $/ = undef; $fh };
+  close($fh) or warn "Failed to close JSON file '$file'\n";
 
   return @{from_json($str, {utf8 => 1})};
 }
@@ -106,10 +106,10 @@ sub read_sample_json {
 sub read_snp_json {
   my $file = shift;
 
-  open(FH, "<$file")
+  open(my $fh, '<', "$file")
     or die "Failed to open JSON file '$file' for reading: $!\n";
-  my $str = do { local $/ = undef; <FH> };
-  close(FH);
+  my $str = do { local $/ = undef; $fh };
+  close($fh) or warn "Failed to close JSON file '$file'\n";
 
   return @{from_json($str, {utf8 => 1})};
 }

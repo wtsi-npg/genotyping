@@ -59,9 +59,9 @@ $output ||= '/dev/stdout';
 my $tmp_dir = tempdir(CLEANUP => 1);
 my @snps = read_snp_json($snps);
 my $snps_file = $tmp_dir . '/' . 'genosnp_snps';
-open (SNPS, ">$snps_file") or die "Failed to open '$snps_file': $!\n";
-write_gs_snps(\*SNPS, \@snps);
-close(SNPS);
+open (my $snps, '>', "$snps_file") or die "Failed to open '$snps_file': $!\n";
+write_gs_snps($snps, \@snps);
+close($snps) or warn "Failed to close '$snps_file'\n";
 
 my @command = ($executable, '-cutoff', $cutoff,
                '-samples', $input, '-snps', $snps_file);
@@ -114,6 +114,8 @@ sub update_plink_annotation {
   close($out);
   move($tmp_bim, $bim_file) or die "Failed to move $tmp_bim: $!\n";
   unlink($tmp_bim);
+
+  return;
 }
 
 

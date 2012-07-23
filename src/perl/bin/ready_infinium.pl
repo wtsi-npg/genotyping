@@ -222,6 +222,8 @@ sub run {
      });
 
   print_post_report($pipedb, $project_name, $num_untracked_plates) if $verbose;
+
+  return;
 }
 
 sub validate_snpset {
@@ -247,6 +249,8 @@ sub print_pre_report {
   print STDERR "  From '", $supplier->name, "'\n";
   print STDERR "  Into namespace '$namespace'\n";
   print STDERR "  Using '", $snpset->name, "'\n";
+
+  return;
 }
 
 sub print_post_report {
@@ -268,6 +272,8 @@ sub print_post_report {
   print STDERR "  $num_plates plates ($untracked missing from Warehouse)\n";
   print STDERR "  $num_samples samples\n";
   print STDERR "  $num_calls Sequenom SNP calls\n";
+
+  return;
 }
 
 __END__
