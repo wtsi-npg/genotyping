@@ -6,3 +6,4 @@ analysis pipeline which provides the pipeline definitions. It defines
 which external analytical programs are run, with what arguments and in
 what order. The Percolate pipeline management application is required
 to run the pipelines.
+

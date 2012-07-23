@@ -13,6 +13,8 @@ require_ok('WTSI::Genotyping::Database::Infinium');
 
 use WTSI::Genotyping::Database::Infinium;
 
+Log::Log4perl::init('etc/log4perl_tests.conf');
+
 my $db_credentials = $ENV{HOME} . "/.npg/genotyping.ini";
 
 SKIP: {

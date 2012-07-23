@@ -1,0 +1,39 @@
+* Header
+** Title
+   How to run a standalone sex check with wtsi-npg/genotyping
+** Author
+   Iain Bancarz, ib5@sanger.ac.uk
+** Created
+   2012-06-20
+** Updated
+   2012-06-20
+
+* Introduction
+  The wtsi-npg/genotyping project (https://github.com/wtsi-npg/genotyping) is a comprehensive software package to automatically analyse large quantities of genotyping data.  As a QC step, it includes robust inference of sample gender from heterozygosity on the X chromosome using a mixture model.  The inference method is described in detail in the document "Adaptive gender thresholds for genotyping data".
+
+  There has been interest in running this sex check as a standalone measure, separately from the wtsi-npg/genotyping pipeline.  This document describes how to run a standalone sex check.
+
+** Key scripts
+   The minimal set of scripts required is check_xhet_gender.R and write_gender_files.pl.  For more convenient execution, check_xhet_gender.pl is also needed.
+
+* Prerequisites
+  The full set of prerequisites for the genotyping pipeline is not required in order to run the sex check.  Minimal requirements are set out below.
+
+** Perl modules
+   All modules must be visible in the PERL5LIB environment variable.
+*** plink_binary
+    The plink_binary module is required.  This is part of the Sanger GFtools package available from Github:  https://github.com/wtsi-npg/Gftools .  PERL5LIB must include the path to the directory containing plink_binary.pm.
+*** PlinkIO.pm
+    This module is part of wtsi-npg/genotyping, located in genotyping/src/perl/lib/WTSI/Genotyping/QC/.  PlinkIO in turn requires the plink_binary module (see above).  PERL5LIB must include the genotyping/src/perl/lib/ directory.
+
+*** Additional modules for check_xhet_gender.pl
+** R packages
+   The mixtools package is required.  This is available from CRAN:  http://cran.r-project.org/web/packages/mixtools/index.html
+   The R_LIBS_USER environment variable (or equivalent) must include the mixtools installation.
+
+** Scripts
+   Two scripts from wtsi-npg/genotyping are needed.
+*** write_gender_files.pl
+    Found in genotyping/src/perl/bin.  This extracts X chromosome data from binary PLINK files, writes a number of temporary files, and finally writes sample_xhet_input.txt, which lists samples and X heterozygosity values and serves as input to check_xhet_gender.R.
+*** check_xhet_gender.R
+    Found in genotyping/src/perl/bin. This trains and applies the mixture model, and writes 

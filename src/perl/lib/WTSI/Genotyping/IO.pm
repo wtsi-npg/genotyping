@@ -7,6 +7,7 @@ use warnings;
 use Carp;
 use JSON;
 
+
 =head2 maybe_stdin
 
   Arg [1]    : filename or undef
@@ -114,8 +115,6 @@ sub read_snp_json {
 }
 
 1;
-
-
 
 
 __END__

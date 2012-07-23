@@ -9,10 +9,11 @@ use warnings;
 use Cwd;
 use File::Basename;
 use File::Copy;
-use File::Temp qw(tempdir);
 use File::Spec::Functions qw(catfile);
+use File::Temp qw(tempdir);
 use Getopt::Long;
 use IO::ScalarArray;
+use Log::Log4perl qw(:easy);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
@@ -21,12 +22,14 @@ use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
                         find_column_indices filter_columns
                         read_it_column_names update_it_columns write_gt_calls);
 
+Log::Log4perl->easy_init($ERROR);
+
 $|=1;
 
 my $chromosome;
 my $end;
-my $input;
 my $executable;
+my $input;
 my $output;
 my $plink;
 my $samples;
@@ -388,9 +391,13 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.5.0
+  0.6.0
 
 =head1 CHANGELOG
+
+  0.6.0
+
+    Added logging.
 
   0.5.0
 

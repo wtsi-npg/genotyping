@@ -7,10 +7,13 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
+use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
 use WTSI::Genotyping qw(read_fon find_column_indices filter_columns
                         read_gt_column_names filter_gt_columns);
+
+Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
@@ -184,10 +187,16 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.2.0
 
 =head1 CHANGELOG
 
-Mon Oct 17 13:14:29 BST 2011 -- Initial version 0.1.0
+  0.2.0
+
+     Added logging.
+
+  0.1.0
+
+     Initial version 0.1.0
 
 =cut

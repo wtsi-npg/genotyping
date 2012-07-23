@@ -6,13 +6,15 @@ package main;
 
 use warnings;
 use strict;
-
 use Getopt::Long;
+use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
 use WTSI::Genotyping::Database::Pipeline;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
+
+Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 

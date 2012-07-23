@@ -1,6 +1,12 @@
+MANIFEST*
+MYMETA.yml
+.pversion
+genotyping.db
+pipeline.db
 Build
 _build
 blib
 .idea
 *.iml
 *~
+*.pyc # compiled Python files
