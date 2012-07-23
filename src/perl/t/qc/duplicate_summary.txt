@@ -1,6 +1,0 @@
-#(D)uplicate/(R)elated	Sample_1	Sample_2	Concordance (#SNPs)
-D	plate01_A01_s000000	plate01_B01_s000001	1.0000	 (44)
-D	plate01_C01_s000002	plate01_D01_s000003	1.0000	 (43)
-D	plate01_E01_s000004	plate01_F01_s000005	1.0000	 (46)
-D	plate01_G01_s000006	plate01_H01_s000007	1.0000	 (43)
-D	plate01_A02_s000008	plate01_B02_s000009	1.0000	 (45)

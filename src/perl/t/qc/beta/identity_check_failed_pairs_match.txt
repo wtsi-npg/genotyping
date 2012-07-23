@@ -1,0 +1,3 @@
+# Details of sample pairs (S1, S2) which failed at least one pairwise check
+# Check A:B finds Sequenom calls for B, then compares to Illumina calls for A
+# S1	S2	S1:S2 shared SNPs	S1:S2 matches	S1:S2 concordance	S2:S1 shared SNPs	S2:S1 matches	S2:S1 concordance

@@ -14,6 +14,7 @@
 
 use strict;
 use warnings;
+use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::QCPlotTests;
@@ -71,20 +72,16 @@ sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
     # data is taken from a particular index in space-separated input (eg. sample_cr_het.txt)
     my ($input, $output, $index) = @_;
-    my $inputOK = 1;
+    my $inputOK = 0;
     while (<$input>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
 	my $plate = parsePlate($words[0]);
-	unless ($plate) {
-	    my $message = "Cannot parse plate from sample name; omitting box/beanplots.\n";
-	    print $output "# ERROR: $message";
-	    print STDERR $message;
-	    $inputOK = 0;
-	    last;
+	if ($plate) {
+	    $inputOK = 1; # require at least one sample with a valid plate!
+	    print $output $plate."\t".$words[$index]."\n";
 	}
-	print $output $plate."\t".$words[$index]."\n";
     }
     return $inputOK;
 }
@@ -126,10 +123,10 @@ sub run {
 	xydiff => 1, );
     my $input = \*STDIN;
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
-    open my $output, "> $textOutPath" || die "Cannot open output file: $!";
+    open my $output, "> $textOutPath" || croak "Cannot open output file: $!";
     my $inputOK = writeBoxplotInput($input, $output, $index{$mode});
     close $output;
-    my $plotsOK = 1;
+    my $plotsOK = 0; 
     if ($inputOK) {
 	if ($type eq 'both' || $type eq 'box') {
 	    $plotsOK = runPlotScript($mode, 0,  $outDir, $title, $textOutPath, $test); # boxplot
@@ -137,6 +134,8 @@ sub run {
 	if ($plotsOK && ($type eq 'both' || $type eq 'bean')) {
 	    $plotsOK = runPlotScript($mode, 1,  $outDir, $title, $textOutPath, $test); # beanplot
 	}
+    } else {
+	croak "\tERROR: Cannot parse any plate names from standard input";
     }
     return $plotsOK;
 }
