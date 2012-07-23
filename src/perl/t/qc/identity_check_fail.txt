@@ -1,2 +1,0 @@
-# Sequenom identity comparison	MIN_SNPS:10	PASS_THRESHOLD:0.9
-# sample	common SNPs	matching calls	concordance	result

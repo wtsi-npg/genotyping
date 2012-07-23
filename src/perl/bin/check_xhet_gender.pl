@@ -32,13 +32,14 @@ use Getopt::Long;
 use WTSI::Genotyping::QC::GenderCheck;
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
-my ($help, $input, $inputFormat, $outputDir, $json, $title, $includePar, $sanityCancel, 
+my ($help, $input, $inputFormat, $outputDir, $dbFile, $json, $title, $includePar, $sanityCancel, 
     $clip, $trials);
 
 GetOptions("h|help"              => \$help,
 	   "input=s"             => \$input,
 	   "input-format=s"      => \$inputFormat,
 	   "output-dir=s"        => \$outputDir,
+	   "dbfile=s"            => \$dbFile,
 	   "json"                => \$json,
 	   "title=s"             => \$title,
 	   "include-par"         => \$includePar,
@@ -58,6 +59,7 @@ Input/output options:
 --output-dir=PATH      Path to output directory.  Defaults to current working directory.
 --include-par          Read SNPs from pseudoautosomal regions.  Plink input only; may increase apparent x heterozygosity of male samples.
 --json                 Output in .json format
+--dbfile=PATH          Push results to given pipeline database file (in addition to writing text/json output)
 
 Gender model options:
 --title=STRING         Title for plots and other output
@@ -90,6 +92,7 @@ if ($inputFormat eq $plinkFormat) {
 
 $outputDir ||= '.'; # TODO default output to tempdir, to push results to database only?
 $json ||= 0; 
+$dbFile ||= 0;
 $title ||= "Untitled";
 $includePar ||= 0;
 $sanityCancel ||= 0;
@@ -104,6 +107,5 @@ my @modelParams = ($sanityCancel, $clip, $trials, $title, $outputDir);
 my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($input, $inputFormat, $includePar);
 my @inferred = runGenderModel($namesRef, $xhetsRef, \@modelParams);
 writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, $outputFormat, $outputDir); 
-
-
+if ($dbFile) { updateDatabase($namesRef, \@inferred, $dbFile); }
 
