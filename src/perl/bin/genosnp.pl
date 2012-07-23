@@ -44,7 +44,7 @@ unless ($snps) {
 }
 
 if (defined $plink && !defined $output) {
-  pod2usage(-msg => "An --output argument must be given if --plink is specified",
+  pod2usage(-msg => "An --output argument must be given if --plink is specified\n",
             -exitval => 2);
 }
 
