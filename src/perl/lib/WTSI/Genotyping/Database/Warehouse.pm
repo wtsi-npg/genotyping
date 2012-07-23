@@ -35,20 +35,21 @@ sub find_infinium_plate {
   my $dbh = $self->dbh;
 
   my $query =
-    "SELECT
-       sm.sanger_sample_id,
-       sm.uuid,
-       sm.gender,
-       pl.barcode_prefix,
-       pl.barcode,
-       wl.map
-     FROM
-       current_plates pl, current_samples sm, current_wells wl
-     WHERE
-       pl.infinium_barcode = ?
-       AND wl.plate_barcode = pl.barcode
-       AND wl.sample_internal_id = sm.internal_id";
+    qq(SELECT
+         sm.sanger_sample_id,
+         sm.uuid,
+         sm.gender,
+         pl.barcode_prefix,
+         pl.barcode,
+         wl.map
+       FROM
+         current_plates pl, current_samples sm, current_wells wl
+       WHERE
+         pl.infinium_barcode = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.sample_internal_id = sm.internal_id);
 
+  $self->log->trace("Executing: '$query' with args [$plate_name]");
   my $sth = $dbh->prepare($query);
   $sth->execute($plate_name);
 
@@ -58,6 +59,91 @@ sub find_infinium_plate {
   }
 
   return \%plate;
+}
+
+sub find_infinium_sample {
+  my ($self, $plate_name, $map) = @_;
+
+  my $unpadded_map = $map;
+  $unpadded_map =~ s/0//;
+
+  my $dbh = $self->dbh;
+
+  my $query =
+    qq(SELECT
+         sm.sanger_sample_id,
+         sm.internal_id,
+         sm.uuid,
+         sm.name,
+         sm.common_name,
+         sm.accession_number,
+         sm.gender,
+         pl.barcode_prefix,
+         pl.barcode,
+         wl.map
+       FROM
+         current_plates pl, current_samples sm, current_wells wl
+       WHERE
+         pl.infinium_barcode = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.sample_internal_id = sm.internal_id
+         AND wl.map = ?);
+
+  $self->log->trace("Executing: '$query' with args [$plate_name, $unpadded_map]");
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_name, $unpadded_map);
+
+  my @samples;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@samples, $row);
+  }
+
+  my $n = scalar @samples;
+  if ($n > 1) {
+    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+  }
+
+  return shift @samples;
+}
+
+
+sub find_infinium_studies {
+  my ($self, $plate_name, $map) = @_;
+
+  my $unpadded_map = $map;
+  $unpadded_map =~ s/0//;
+
+  my $dbh = $self->dbh;
+
+ my $query =
+    qq(SELECT DISTINCT
+         st.internal_id,
+         st.uuid,
+         st.name,
+         st.accession_number,
+         st.study_title,
+         st.study_type
+      FROM
+         current_plates pl, current_samples sm, current_wells wl,
+         current_study_samples ss, current_studies st
+       WHERE
+         pl.infinium_barcode = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.sample_internal_id = sm.internal_id
+         AND wl.map = ?
+         AND ss.sample_internal_id = sm.internal_id
+         AND st.internal_id = ss.study_internal_id);
+
+  $self->log->trace("Executing: '$query' with args [$plate_name, $unpadded_map]");
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_name, $unpadded_map);
+
+  my @studies;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@studies, $row);
+  }
+
+  return \@studies;
 }
 
 1;

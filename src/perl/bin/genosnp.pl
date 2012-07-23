@@ -12,10 +12,13 @@ use File::Copy;
 use File::Temp qw(tempdir);
 use Getopt::Long;
 use JSON;
+use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
 use WTSI::Genotyping qw(maybe_stdin maybe_stdout
                         read_snp_json write_gs_snps update_snp_locations);
+
+Log::Log4perl->easy_init($ERROR);
 
 $|=1;
 
@@ -166,9 +169,13 @@ GNU General Public License for more details.
 
 =head1 VERSION
 
-  0.1.0
+  0.2.0
 
 =head1 CHANGELOG
+
+  0.2.0
+
+    Added logging.
 
   0.1.0
 

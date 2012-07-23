@@ -6,10 +6,10 @@ package main;
 
 use warnings;
 use strict;
-
 use Getopt::Long;
-use Pod::Usage;
 use JSON;
+use Log::Log4perl qw(:easy);
+use Pod::Usage;
 
 use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping qw(maybe_stdout);
@@ -17,6 +17,8 @@ use WTSI::Genotyping qw(maybe_stdout);
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+
+Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
@@ -59,7 +61,7 @@ sub run {
   }
 
   my $where = {'piperun.name' => $run->name,
-               'method.name' => 'Infinium'};
+               'method.name' => 'Autocall'};
   unless ($all) {
     $where->{'me.include'} = 1;
   }
