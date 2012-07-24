@@ -19,10 +19,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase/;
-
-use vars qw/$ini_path/;
-$ini_path = "$Bin/../etc/";
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase readPlinkSampleNames $ini_path/;
 
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
@@ -258,6 +255,26 @@ sub pathOK {
 	close $fh;
     }
     return $ok;
+}
+
+sub readPlinkSampleNames {
+    # read sample names from a PLINK .fam file
+    my $famPath = shift;
+    open my $in, "< $famPath" || croak "Cannot open input $famPath";
+    my %samples;
+    while (<$in>) {
+	my @words = split;
+	my $name = $words[1];
+	if ($samples{$name}) {
+	    carp "Sample name $name repeated in $famPath";
+	} else {
+	    $samples{$name} = 1;
+	}
+    }
+    close $in || croak "Cannot close input $famPath";
+    my @samples = keys(%samples);
+    @samples = sort(@samples);
+    return @samples;
 }
 
 sub readPrefix {
