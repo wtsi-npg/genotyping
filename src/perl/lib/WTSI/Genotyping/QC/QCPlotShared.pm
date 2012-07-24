@@ -10,6 +10,7 @@ use strict;
 use Carp;
 use FindBin qw($Bin);
 use JSON;
+use WTSI::Genotyping::Database::Pipeline;
 
 # read default qc names and thresholds from .json files
 
@@ -32,6 +33,19 @@ sub meanSd {
 	$sd = $total / @_;
     }
     return ($mean, $sd);
+}
+
+sub openDatabase {
+    # open connection to pipeline DB
+    my $dbfile = shift;
+    my $db = WTSI::Genotyping::Database::Pipeline->new
+	(name => 'pipeline',
+	 inifile => "$ini_path/pipeline.ini",
+	 dbfile => $dbfile);
+    my $schema = $db->connect(RaiseError => 1,
+			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
+    $db->populate;
+    return $db;
 }
 
 sub readFileToString {
