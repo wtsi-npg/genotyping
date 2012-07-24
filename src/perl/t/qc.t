@@ -11,6 +11,7 @@ use FindBin qw($Bin);
 use Test::More tests => 74;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
+
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $plinkA = "$Bin/qc_test_data/alpha";
@@ -23,6 +24,7 @@ my $heatMapDir = "plate_heatmaps/";
 my $titleA = "Alpha";
 my $titleB = "Beta";
 my $config = "$bin/../json/qc_threshold_defaults.json";
+my $dbfileA = "$Bin/qc_test_data/alpha_pipeline.db";
 my ($cmd, $status);
 
 chdir($outDirA);
@@ -55,7 +57,7 @@ $status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
 is($status, 0, "xydiff.pl exit status");
 
 ## test collation into summary
-$status = system("perl $bin/write_qc_status.pl --config=$config");
+$status = system("perl $bin/write_qc_status.pl --config=$config --dbpath=$dbfileA");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
@@ -65,10 +67,10 @@ ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 ## plate heatmap plots
 my @modes = qw/cr het xydiff/;
 foreach my $mode (@modes) {
-    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir";
+    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
     for (my $i=1;$i<=11;$i++) {
-	my $png = "plate_heatmaps/plot_".$mode."_plate".sprintf("%02d", $i).".png";
+	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
 	ok(pngPathOK($png), "PNG output $png in valid format");
     }
 }
