@@ -16,6 +16,7 @@ use JSON;
 use Test::More tests => 24;
 use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -73,46 +74,6 @@ foreach my $format qw(plink json text) {
 
 my $duration = time() - $start;
 print "Gender check test finished.  Duration: $duration s\n";
-
-sub createTestDatabase {
-    # create temporary test database with given sample names
-    # takes $ini_path from GenderCheck.pm
-    my @names = @{ shift() };
-    my $dbfile = tempdir(CLEANUP => 1).'/pipeline.db'; # remove database file on successful script exit
-    my $db = WTSI::Genotyping::Database::Pipeline->new
-	(name => 'pipeline',
-	 inifile => "$ini_path/pipeline.ini",
-	 dbfile => $dbfile);
-    my $schema = $db->connect(RaiseError => 1,
-			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    $db->populate;
-    ## (supplier, snpset) table objects are required 
-    my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
-						      namespace => 'wtsi'});
-    my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
-    ## additional database setup
-    my $run = $db->piperun->find_or_create({name => 'paperstreet',
-					    start_time => time()});
-    my $dataset = $run->add_to_datasets({if_project => "mayhem",
-				     datasupplier => $supplier,
-				     snpset => $snpset});
-    my $pass = $db->state->find({name => 'autocall_pass'});
-    my $supplied = $db->method->find({name => 'Supplied'});
-    # fill in with sample names and dummy gender values
-    $db->in_transaction(sub {
-	foreach my $i (0..@names-1) {
-	    my $sample = $dataset->add_to_samples
-		({name => $names[$i],
-		  beadchip => 'ABC123456',
-		  include => 1});
-	    $sample->add_to_states($pass);
-	    my $gender = $db->gender->find({name => 'Not Available'});
-	    $sample->add_to_genders($gender, {method => $supplied});
-	}
-			});
-    $db->disconnect();
-    return $dbfile;
-}
 
 sub diffGenders {
     # compare gender results to benchmark
