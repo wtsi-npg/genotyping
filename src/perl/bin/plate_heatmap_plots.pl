@@ -13,7 +13,7 @@ use warnings;
 use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
-use WTSI::Genotyping::QC::QCPlotShared qw(openDatabase);
+use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($dbPath, $mode, $RScriptPath, $outDir, $help);
@@ -47,7 +47,8 @@ $mode ||= "cr";
 $outDir ||= 'platePlots';
 # TODO add default for dbPath??
 
-unless (-r $dbPath) { croak "Cannot read database path $dbPath"; }
+if (not $dbPath) { croak "Must supply a pipeline database path!"; }
+elsif (not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -63,26 +64,6 @@ sub getXYdiffMinMax {
     return ($sortedResults[0], $sortedResults[-1]);
 }
 
-sub getPlateLocations {
-    # get plate and (x,y) location form database
-    my $db = shift;
-    my @samples = $db->sample->all;
-    my %plateLocs;
-    $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    my ($plate, $x, $y) = (0,0,0);
-	    my $name = $sample->name;
-	    my $well = ($sample->wells->all)[0]; # assume only one well per sample
-	    my $address = $well->address;
-	    ($x, $y) = parseLabel($address->label1);
-	    $plate = $well->plate;
-	    my $plateName = $plate->ss_barcode;
-	    $plateLocs{$name} = [$plateName, $x, $y];  
-	}
-			});
-    return %plateLocs;
-}
-	
 sub makePlots {
     # assume file names are of the form PREFIX_PLATE.txt
     # execute given script with input table, output path, and plate name as arguments
@@ -109,19 +90,6 @@ sub makePlots {
     return $allPlotsOK;
 }
 
-sub parseLabel {
-    # parse sample label of the form H10 for x=8, y=10; may be obtained from pipeline DB
-    # silently return undefined values if name not in correct format
-    my $label = shift;
-    my ($x, $y);
-    if ($label =~ m/^[A-Z][0-9]+$/) { # check name format, eg H10
-	my @chars = split //, $label;
-	$x = ord(uc(shift(@chars))) - 64; # convert letter to position in alphabet 
-	$y = join('', @chars);
-	$y =~ s/^0+//; # remove leading zeroes from $y
-    }
-    return ($x, $y);
-}
 
 sub parseSampleName {
     # parse sample name in PLATE_WELL_ID format
@@ -144,14 +112,13 @@ sub readData {
     my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
     my ($xMax, $yMax, $duplicates) = (0,0,0);
     my $dataOK = 1;
-    my $db = openDatabase($dbPath);
-    my %plateLocs = getPlateLocations($db);
-    $db->disconnect();
+    my %plateLocs = getPlateLocationsFromPath($dbPath);
     while (<$inputRef>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	my ($plate, $x, $y) = @{$plateLocs{$words[0]}};   #getPlateAddress($words[0]);
+	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};   #getPlateAddress($words[0]);
+	my ($x, $y) = parseLabel($addressLabel);
 	unless ($plate) { $dataOK = 0; last; }
 	# clean up plate name by removing illegal characters; plate name used as filename component
 	if (not $plateNames{$plate}) {
