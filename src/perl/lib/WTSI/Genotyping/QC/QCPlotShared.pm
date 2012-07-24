@@ -8,9 +8,20 @@ package WTSI::Genotyping::QC::QCPlotShared;
 use warnings;
 use strict;
 use Carp;
+use Cwd;
 use FindBin qw($Bin);
+use Log::Log4perl qw(:easy);
 use JSON;
 use WTSI::Genotyping::Database::Pipeline;
+use Exporter;
+
+Log::Log4perl->easy_init($ERROR);
+
+our @ISA = qw/Exporter/;
+our @EXPORT = qw/openDatabase $ini_path/;
+
+use vars qw/$ini_path/;
+$ini_path = "$Bin/../etc/";
 
 # read default qc names and thresholds from .json files
 
@@ -38,6 +49,10 @@ sub meanSd {
 sub openDatabase {
     # open connection to pipeline DB
     my $dbfile = shift;
+    my $start = getcwd;
+    # very hacky, but ensures correct loading of database using pipeline.ini
+    # assumes script is run from a subdirectory of src/perl (eg. perl/t or perl/bin)
+    chdir("$Bin/.."); 
     my $db = WTSI::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
 	 inifile => "$ini_path/pipeline.ini",
@@ -45,6 +60,7 @@ sub openDatabase {
     my $schema = $db->connect(RaiseError => 1,
 			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
     $db->populate;
+    chdir $start;
     return $db;
 }
 
