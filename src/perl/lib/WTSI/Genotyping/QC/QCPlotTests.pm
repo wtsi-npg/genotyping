@@ -9,14 +9,20 @@ use strict;
 use warnings;
 use Carp;
 use Cwd qw /getcwd abs_path/;
-use POSIX qw/strftime/;
+use File::Temp qw/tempfile tempdir/;
+use FindBin qw /$Bin/;
+use POSIX qw/floor strftime/;
 use JSON;
 use XML::Parser;
 use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
+use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase/;
+
+use vars qw/$ini_path/;
+$ini_path = "$Bin/../etc/";
 
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
@@ -67,6 +73,74 @@ sub columnsMatch {
     close IN2;
     return $match;
 }
+
+
+sub createTestDatabase {
+    # create temporary test database with given sample names
+    my ($namesRef, $dbfile) = @_;
+    my @names;
+    if ($namesRef) { 
+	@names = @$namesRef; 
+    } else {
+	foreach my $i (1..20) { push @names, sprintf("sample_%03i", ($i)); }
+    }
+    $dbfile ||= tempdir(CLEANUP => 1).'/pipeline.db'; # remove database file on successful script exit
+    my $db = WTSI::Genotyping::Database::Pipeline->new
+	(name => 'pipeline',
+	 inifile => "$ini_path/pipeline.ini",
+	 dbfile => $dbfile);
+    my $schema = $db->connect(RaiseError => 1,
+			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
+    $db->populate;
+    ## (supplier, snpset) table objects are required 
+    my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
+						      namespace => 'wtsi'});
+    my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+    ## additional database setup
+    my $run = $db->piperun->find_or_create({name => 'paperstreet',
+					    start_time => time()});
+    my $dataset = $run->add_to_datasets({if_project => "mayhem",
+				     datasupplier => $supplier,
+				     snpset => $snpset});
+    my $pass = $db->state->find({name => 'autocall_pass'});
+    my $supplied = $db->method->find({name => 'Supplied'});
+    $db->in_transaction(sub {
+	foreach my $i (0..@names-1) {
+	    my $sample = $dataset->add_to_samples
+		({name => $names[$i],
+		  beadchip => 'ABC123456',
+		  include => 1});
+	    $sample->add_to_states($pass);
+	    my $gender = $db->gender->find({name => 'Not Available'});
+	    $sample->add_to_genders($gender, {method => $supplied});
+	    my ($plate, $addr) = createPlateAddress($db, $i);
+	    $sample->add_to_wells({address => $addr,
+				   plate => $plate});
+	}
+			});
+    $db->disconnect();
+    return $dbfile;
+}
+
+sub createPlateAddress {
+    # create plate and address objects in pipeline DB
+    my ($db, $sampleNum, $rows, $cols) = @_;
+    $rows ||= 12;
+    $cols ||= 8;
+    my $plateSize = $rows*$cols;
+    my $plateSuffix = sprintf("plate%04i", (floor($sampleNum/$plateSize)+1));
+    my $plate = $db->plate->find_or_create({ss_barcode => 'SS-'.$plateSuffix,
+					    if_barcode => 'IF-'.$plateSuffix});
+    my $i = $sampleNum % $plateSize; # index within plate
+    my $row = pack("c", floor($i / $rows)+65);
+    my $col = $i % $rows+1;
+    my $lab1 = $row.sprintf("%02d", $col);
+    my $lab2 = $row.$col;
+    my $addr = $db->address->find_or_create({label1 => $lab1,
+					     label2 => $lab2});
+    return ($plate, $addr); 
+}
+
 
 sub diffGlobs {
     # glob for files in output and reference directories
