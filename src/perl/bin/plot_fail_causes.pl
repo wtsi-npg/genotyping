@@ -196,7 +196,7 @@ sub writeFailedCrHet {
 sub run {
     # find failure causes and write input for R scripts
     my ($inputPath, $qcConfigPath, $outputsRef, $title, $crHetPath) = @_;
-    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inputPath);
+    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath);
     unless (containsFailedSample(\%qcResults)) {
 	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
 	return 1;
