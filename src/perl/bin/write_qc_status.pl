@@ -245,7 +245,7 @@ sub resultsMetricSd {
 sub resultsXydiff {
     my ($threshold, $inPath) = @_;
     my $index = 1;
-    my $startLine = 1;
+    my $startLine = 0;
     return resultsMetricSd($threshold, $index, $inPath, $startLine);
 }
 
