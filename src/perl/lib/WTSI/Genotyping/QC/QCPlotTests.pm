@@ -19,7 +19,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase readPlinkSampleNames $ini_path/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames $ini_path/;
 
 sub columnsMatch {
     # check for difference in specific columns (of space-delimited files, can also do for other separators)
@@ -117,6 +117,14 @@ sub createTestDatabase {
 			});
     $db->disconnect();
     return $dbfile;
+}
+
+sub createTestDatabasePlink {
+    # convenience method to create a test pipline database with sample names from a plink .fam file
+    my ($famPath, $dbPath) = @_;
+    my @names = readPlinkSampleNames($famPath);
+    createTestDatabase(\@names, $dbPath);
+    return 1;
 }
 
 sub createPlateAddress {
