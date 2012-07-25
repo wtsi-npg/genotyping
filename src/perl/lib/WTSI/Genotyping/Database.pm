@@ -23,11 +23,11 @@ use Log::Log4perl;
 =cut
 
 sub new {
-   my ($class) = @_;
+   my ($class, @args) = @_;
 
    my $self = {};
    bless($self, $class);
-   $self->configure(@_);
+   $self->configure(@args);
    return $self;
 }
 

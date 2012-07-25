@@ -204,21 +204,30 @@ sub run_command {
 
   my $command = join(' ', @command);
 
-  open(my $exec, "$command", '|')
+  open(my $exec, '-|', "$command")
     or $log->logconfess("Failed open pipe to command '$command': $!");
 
   $log->debug("Running child '$command'");
 
   my @result;
-  while ($exec) {
+  while (<$exec>) {
     chomp;
     push(@result, $_);
   }
 
   close($exec) or warn "Failed to close pipe to command '$command'\n";
 
-  if ($?) {
-    $log->logconfess("Execution of '$command' failed with exit code: $?");
+  my $returned = $?;
+  if ($returned) {
+    my $signal = $returned & 127;
+    my $exit = $returned >> 8;
+
+    if ($signal) {
+      $log->logconfess("Execution of '$command' died from signal: $signal");
+    }
+    else {
+      $log->logconfess("Execution of '$command' failed with exit code: $exit");
+    }
   }
 
   return @result;

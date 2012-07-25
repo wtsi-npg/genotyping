@@ -85,7 +85,7 @@ sub read_sample_json {
 
   open(my $fh, '<', "$file")
     or die "Failed to open JSON file '$file' for reading: $!\n";
-  my $str = do { local $/ = undef; $fh };
+  my $str = do { local $/ = undef; <$fh> };
   close($fh) or warn "Failed to close JSON file '$file'\n";
 
   return @{from_json($str, {utf8 => 1})};
@@ -108,7 +108,7 @@ sub read_snp_json {
 
   open(my $fh, '<', "$file")
     or die "Failed to open JSON file '$file' for reading: $!\n";
-  my $str = do { local $/ = undef; $fh };
+  my $str = do { local $/ = undef; <$fh> };
   close($fh) or warn "Failed to close JSON file '$file'\n";
 
   return @{from_json($str, {utf8 => 1})};

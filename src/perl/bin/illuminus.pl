@@ -289,7 +289,7 @@ sub nullify_females {
   my ($input, $command, $samples, $verbose) = @_;
 
   my $in = maybe_stdin($input);
-  open(my $iln, '|', "$command") or die "Failed to open pipe to '$command'\n";
+  open(my $iln, '|-', "$command") or die "Failed to open pipe to '$command'\n";
   my $col_names = read_it_column_names($in);
   my $females = find_female_columns($col_names, $samples);
 
