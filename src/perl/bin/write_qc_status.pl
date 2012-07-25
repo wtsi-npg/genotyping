@@ -16,14 +16,16 @@
 
 use strict;
 use warnings;
+use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared;
+use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
 
-my ($inputDir, $outputDir, $configPath, $help);
+my ($inputDir, $outputDir, $configPath, $dbPath, $help);
 
 GetOptions("input-dir=s"   => \$inputDir,
+	   "dbpath=s"      => \$dbPath,
 	   "output-dir=s"  => \$outputDir,
 	   "config=s"      => \$configPath,
 	   "help"          => \$help,
@@ -35,6 +37,7 @@ Options:
 --input-dir         Directory containing input files (defaults to current working directory)
 --output-dir        Output directory (defaults to input directory)
 --config            Config path in JSON format, specifying metrics and thresholds (defaults to standard file)
+--dbpath            Path to pipeline.db file, to obtain plate names for each sample
 --help              Print this help text and exit
 ";
     exit(0);
@@ -43,10 +46,13 @@ Options:
 $inputDir ||= '.';
 $outputDir ||= $inputDir;
 $configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+if (not $dbPath) { croak "Must supply a pipeline database path!"; }
+elsif (not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
+
 my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
 my $outPath = $outputDir.'/'.$fileNames{'qc_results'};
 
-run($inputDir, $configPath, $outPath);
+run($inputDir, $configPath, $dbPath, $outPath);
 
 sub convertResults {
     # convert results from metric-major to sample-major ordering
@@ -239,14 +245,14 @@ sub resultsMetricSd {
 sub resultsXydiff {
     my ($threshold, $inPath) = @_;
     my $index = 1;
-    my $startLine = 1;
+    my $startLine = 0;
     return resultsMetricSd($threshold, $index, $inPath, $startLine);
 }
 
 sub writeResults {
     # find QC results and write to given filehandle in JSON format
     # assumes all results will fit in memory!  If not, will need to rethink I/O and file format.
-    my ($out, $sep, $inputDir, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
+    my ($out, $inputDir, $dbPath, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
     my @metrics = @$metricsRef;
     my %thresholds = %$thresholdsRef;
     my %inputNames = %$inputNamesRef;
@@ -257,14 +263,23 @@ sub writeResults {
     }
     # change from metric-major to sample-major ordering; simplifies later data processing
     my %sampleResults = convertResults(\%metricResults);
+    my %plateLocs = getPlateLocationsFromPath($dbPath);
+    foreach my $sample (keys(%sampleResults)) {
+	my %results = %{$sampleResults{$sample}};
+	my ($plate, $addressLabel) = ("Unknown_plate", "Unknown_address");
+	my $locsRef = $plateLocs{$sample};
+	if ($locsRef) { ($plate, $addressLabel) = @$locsRef; }
+	$results{'plate'} = $plate;
+	$results{'address'} = $addressLabel;
+	$sampleResults{$sample} = \%results;
+    }
     my $resultString = encode_json(\%sampleResults);
     print $out $resultString;
 }
 
 sub run {
     # main method to run script
-    my ($inputDir, $configPath, $outPath, $sep) = @_;
-    $sep ||= "\t";
+    my ($inputDir, $configPath, $dbPath, $outPath) = @_;
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
     my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray();
     my @metrics = ();
@@ -275,7 +290,7 @@ sub run {
     my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs();
     my $out;
     open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
-    writeResults($out, $sep, $inputDir, \@metrics, \%thresholds, \%inputNames);
+    writeResults($out, $inputDir, $dbPath, \@metrics, \%thresholds, \%inputNames);
     close($out);
 }
 

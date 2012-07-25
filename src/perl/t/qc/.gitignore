@@ -1,3 +1,6 @@
-sample_xhet_gender.log
-sample_xhet_gender.png
-identity_check.log
+*.log
+*.png
+*.txt
+*.html
+*.json
+

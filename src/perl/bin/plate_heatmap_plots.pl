@@ -10,13 +10,16 @@
 
 use strict;
 use warnings;
+use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
+use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($mode, $RScriptPath, $outDir, $help);
+my ($dbPath, $mode, $RScriptPath, $outDir, $help);
 
-GetOptions("mode=s"    => \$mode,
+GetOptions("dbpath=s"    => \$dbPath,
+	   "mode=s"    => \$mode,    
 	   "out_dir=s" => \$outDir,
 	   "h|help"    => \$help);
 
@@ -28,6 +31,7 @@ Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or th
 
 Options:
 --mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff
+--dbpath=PATH       Path to SQLite pipeline database, to find plate addresses
 --out_dir=PATH      Output directory for plots
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to: ./platePlots
@@ -41,6 +45,10 @@ Unspecified options will receive default values, with output written to: ./plate
 # default options
 $mode ||= "cr";
 $outDir ||= 'platePlots';
+# TODO add default for dbPath??
+
+if (not $dbPath) { croak "Must supply a pipeline database path!"; }
+elsif (not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -82,18 +90,17 @@ sub makePlots {
     return $allPlotsOK;
 }
 
+
 sub parseSampleName {
     # parse sample name in PLATE_WELL_ID format
     # WELL is in the form H10 for x=8, y=10
     # silently return undefined values if name not in correct format
+    # OBSOLETE as of 2012-07-24; get plate/well info from pipeline DB instead
     my $name = shift;
     my ($plate, $well, $id, $x, $y);
     if ($name =~ m/^[^_]+_[A-Z][0-9]+_\w+/) { # check name format, eg some-plate_H10_sample-id
 	($plate, $well, $id) = split /_/, $name;
-	my @chars = split //, $well;
-	$x = ord(uc(shift(@chars))) - 64; # convert letter to position in alphabet 
-	$y = join('', @chars);
-	$y =~ s/^0+//; # remove leading zeroes from $y
+	($x, $y) = parseLabel($well);
     }
     return ($plate, $x, $y);
 }
@@ -101,15 +108,17 @@ sub parseSampleName {
 sub readData {
     # read from a filehandle
     # get data values by plate
-    my ($inputRef, $index, $mode) = @_;
+    my ($inputRef, $index, $mode, $dbPath) = @_;
     my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
     my ($xMax, $yMax, $duplicates) = (0,0,0);
     my $dataOK = 1;
+    my %plateLocs = getPlateLocationsFromPath($dbPath);
     while (<$inputRef>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	my ($plate, $x, $y) = parseSampleName($words[0]);
+	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};   #getPlateAddress($words[0]);
+	my ($x, $y) = parseLabel($addressLabel);
 	unless ($plate) { $dataOK = 0; last; }
 	# clean up plate name by removing illegal characters; plate name used as filename component
 	if (not $plateNames{$plate}) {
@@ -202,7 +211,7 @@ sub writePlateData {
 
 sub run {
     # mode = cr, het or xydiff
-    my ($mode, $outDir) = @_;
+    my ($mode, $outDir, $dbPath) = @_;
     my $test = 1; # keep tests on by default, since they are very quick to run
     my %plotScripts = ( # R plotting scripts for each mode
 	cr     => 'plotCrPlate.R',
@@ -218,7 +227,7 @@ sub run {
 	xydiff => 1, );
     my $inputFH = \*STDIN;  
     # read data from STDIN; output data values by plate & useful stats
-    my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = readData($inputFH, $index{$mode}, $mode);
+    my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = readData($inputFH, $index{$mode}, $mode, $dbPath);
     my $ok = 1;
     if ($dataOK) {
 	writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, $plotMin, $plotMax); 
@@ -230,6 +239,6 @@ sub run {
     return $ok;
 }
 
-my $ok = run($mode, $outDir);
+my $ok = run($mode, $outDir, $dbPath);
 if ($ok) { exit(0); }
 else { exit(1); }

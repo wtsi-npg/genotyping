@@ -1,5 +1,0 @@
-call_rate	307
-duplicate	5
-gender	35
-heterozygosity	15
-xydiff	12

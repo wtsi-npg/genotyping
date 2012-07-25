@@ -29,6 +29,7 @@ use Carp;
 use File::Temp qw/tempfile tempdir/;
 use FindBin qw /$Bin/;
 use JSON;
+use Log::Log4perl;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
@@ -44,6 +45,8 @@ use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $su
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
 ($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
 $ini_path = "$Bin/../etc/";
+
+Log::Log4perl::init($ini_path.'/log4perl_tests.conf');
 
 sub getDatabaseObject {
     # set up database object
