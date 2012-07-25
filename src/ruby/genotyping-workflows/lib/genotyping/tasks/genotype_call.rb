@@ -122,7 +122,8 @@ module Genotyping::Tasks
         task_id = task_identity(:gtc_to_sim, *margs)
         log = File.join(log_dir, task_id + '.log')
 
-        command = [GENOTYPE_CALL, dspace_arg(async), 'gtc-to-sim',
+        command = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.9),
+                   'gtc-to-sim',
                    cli_arg_map(cli_args, :prefix => '--') { |key|
                      key.gsub(/_/, '-') }].flatten.join(' ')
 
@@ -174,7 +175,8 @@ module Genotyping::Tasks
         task_id = task_identity(:gtc_to_bed, *margs)
         log = File.join(log_dir, task_id + '.log')
 
-        command = [GENOTYPE_CALL, dspace_arg(async), 'gtc-to-bed',
+        command = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.9),
+                   'gtc-to-bed',
                    cli_arg_map(cli_args, :prefix => '--') { |key|
                      key.gsub(/_/, '-') }].flatten.join(' ')
 
@@ -207,7 +209,8 @@ module Genotyping::Tasks
         cli_args = {:manifest => manifest,
                     :output => output}
 
-        command = [GENOTYPE_CALL, dspace_arg(async), 'bpm-to-genosnp',
+        command = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.9),
+                   'bpm-to-genosnp',
                    cli_arg_map(cli_args, :prefix => '--') { |key|
                      key.gsub(/_/, '-') }].flatten.join(' ')
 
@@ -222,11 +225,10 @@ module Genotyping::Tasks
       end
     end
 
-    def dspace_arg(async)
+    def GenotypeCall.memory_request_arg(async, frac = 0.9)
       if async.has_key?(:memory)
-        frac_of_requested = 0.9
         chunk_factor = 100
-        mem = (frac_of_requested  * async[:memory] / chunk_factor).ceil * chunk_factor
+        mem = (frac  * async[:memory] / chunk_factor).ceil * chunk_factor
         "--dynamic-space-size #{mem}"
       else
         ""
