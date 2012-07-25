@@ -46,7 +46,7 @@ module Genotyping::Tasks
 
         command = [RUN_QC,
                    cli_arg_map(cli_args, :prefix => '--') { |key|
-                     key.gsub(/_/, '-') }].flatten.join(' ')
+                     key.gsub(/_/, '-') }, base].flatten.join(' ')
 
         task_id = task_identity(:quality_control, *margs)
         log = File.join(log_dir, task_id + '.%I.log')
