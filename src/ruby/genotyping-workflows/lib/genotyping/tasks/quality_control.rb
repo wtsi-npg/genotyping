@@ -41,7 +41,10 @@ module Genotyping::Tasks
         bedfile = input.first
         base = File.basename(bedfile, File.extname(bedfile))
 
-        cli_args = args.merge({:output_dir => work_dir})
+        qc_dir = File.join(work_dir, 'qc')
+        Dir.mkdir(qc_dir) unless File.exist?(qc_dir)
+
+        cli_args = args.merge({:output_dir => qc_dir})
         margs = [cli_args, base]
 
         command = [RUN_QC,

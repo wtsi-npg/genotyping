@@ -111,7 +111,9 @@ module Genotyping::Tasks
         end
 
         commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
-          cmd = [GENOTYPE_CALL, 'sim-to-illuminus', cli_arg_map(gca, :prefix => '--')]
+          cmd = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.5),
+                 'sim-to-illuminus',
+                 cli_arg_map(gca, :prefix => '--')]
           cmd += ['|', 'tee', iwa[:output] + '.iln'] if debug
           cmd += ['|', ILLUMINUS_WRAPPER, cli_arg_map(iwa, :prefix => '--')]
           cmd.flatten.join(' ')

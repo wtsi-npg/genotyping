@@ -47,6 +47,8 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
+    chunk_size: <integer> number of SNPs to analyse in a single Illuminus jobs.
+    Optional, defaults to 2000.
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
@@ -73,13 +75,15 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
+      args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
+                               :chunk_size)
 
       async_defaults = {:memory => 1024,
                         :queue => :normal}
       async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
+      chunk_size = args.delete(:chunk_size) || 2000
       args.delete(:memory)
       args.delete(:queue)
 
@@ -105,7 +109,7 @@ Returns:
       smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
       gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
 
-      ilargs = {:size => 10000,
+      ilargs = {:size => chunk_size,
                 :group_size => 50,
                 :plink => true,
                 :snps => njson}.merge(args)
@@ -122,9 +126,9 @@ Returns:
 
       ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
 
-      # qc = quality_control(ilfile, :work_dir => work_dir)
+      qc = quality_control(ilfile, :work_dir => work_dir, :sim => smfile)
 
-      [gcfile, ilfile] if [gcfile, ilfile].all?
+      [gcfile, ilfile, qc] if [gcfile, ilfile, qc].all?
     end
 
     :private
