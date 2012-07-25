@@ -59,9 +59,10 @@ $output ||= '/dev/stdout';
 my $tmp_dir = tempdir(CLEANUP => 1);
 my @snps = read_snp_json($snps);
 my $snps_file = $tmp_dir . '/' . 'genosnp_snps';
-open (my $snps, '>', "$snps_file") or die "Failed to open '$snps_file': $!\n";
-write_gs_snps($snps, \@snps);
-close($snps) or warn "Failed to close '$snps_file'\n";
+open (my $genosnp_snps, '>', "$snps_file")
+  or die "Failed to open '$snps_file': $!\n";
+write_gs_snps($genosnp_snps, \@snps);
+close($genosnp_snps) or warn "Failed to close '$snps_file'\n";
 
 my @command = ($executable, '-cutoff', $cutoff,
                '-samples', $input, '-snps', $snps_file);
