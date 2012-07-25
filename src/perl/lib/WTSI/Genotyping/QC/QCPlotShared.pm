@@ -10,6 +10,7 @@ use strict;
 use Carp;
 use Cwd;
 use FindBin qw($Bin);
+use POSIX qw(floor);
 use Log::Log4perl qw(:easy);
 use JSON;
 use WTSI::Genotyping::Database::Pipeline;
@@ -18,7 +19,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/parseLabel getPlateLocationsFromPath $ini_path/;
+our @EXPORT = qw/getPlateLocationsFromPath meanSd median parseLabel readQCNameArray $ini_path/;
 
 use vars qw/$ini_path/;
 $ini_path = "$Bin/../etc/";
@@ -73,6 +74,18 @@ sub meanSd {
 	$sd = $total / @_;
     }
     return ($mean, $sd);
+}
+
+sub median {
+    # return median of given list
+    @_ = sort numeric @_;
+    my $length = @_;
+    my $mid = floor($length/2);
+    return $_[$mid];
+}
+
+sub numeric {
+    $a <=> $b
 }
 
 sub openDatabase {
