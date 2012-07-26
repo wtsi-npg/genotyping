@@ -26,6 +26,55 @@ __PACKAGE__->has_many('datasets',
                       'WTSI::Genotyping::Schema::Result::Dataset',
                       { 'foreign.id_piperun' => 'self.id_piperun' });
 
+sub validate_snpset {
+  my ($self, $snpset) = @_;
+
+  my @snpsets = map { $_->snpset } $self->datasets;
+  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+
+  my $valid = 1;
+  if (@infinium_snpsets) {
+    my $name = $snpset->name;
+    unless (grep { $_->name eq $name } @infinium_snpsets) {
+      $valid = 0;
+    }
+  }
+
+  return $valid;
+}
+
+sub validate_datasets {
+  my ($self) = @_;
+
+  my @snpsets = map { $_->snpset } $self->datasets;
+
+  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+  my @snpset_names = map { $_->name } @infinium_snpsets;
+
+  my $valid = 1;
+  if (scalar @snpset_names > 1) {
+    my ($first, @rest) = @snpset_names;
+
+    my @mismatched;
+    foreach my $elt (@rest) {
+      if ($elt eq $first) {
+        next;
+      }
+      else {
+        push(@mismatched, $elt);
+      }
+    }
+
+    if (@mismatched) {
+      $valid = 0;
+      $self->log->logwarn("Invalid piperun; datasets have mixed SNP sets: [",
+                          join(", ", @mismatched), "]");
+    }
+  }
+
+  return $valid;
+}
+
 1;
 
 __END__

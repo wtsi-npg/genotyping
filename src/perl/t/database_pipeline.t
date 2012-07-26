@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Log::Log4perl;
 
-use Test::More tests => 34;
+use Test::More tests => 38;
 use Test::Exception;
 
 use Data::Dumper;
@@ -71,6 +71,7 @@ ok($run, 'A run inserted');
 my $project_base = 'test_project';
 my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
 ok($snpset, 'A snpset found');
+ok($run->validate_snpset($snpset), 'A snpset validated in an empty piperun');
 
 my @datasets;
 foreach my $i (1..3) {
@@ -81,6 +82,11 @@ foreach my $i (1..3) {
   ok($dataset, 'A dataset inserted');
   push @datasets, $dataset;
 }
+
+ok($run->validate_datasets, 'A piperun validated');
+ok($run->validate_snpset($snpset), 'A snpset validated in a full piperun');
+ok(! $run->validate_snpset($db->snpset->find({name => 'HumanOmni25-4v1'})),
+   'A snpset validated in a mismatched piperun');
 
 my $sample_base = 'test_sample';
 my $pass = $db->state->find({name => 'autocall_pass'});
