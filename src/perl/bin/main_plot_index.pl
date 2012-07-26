@@ -16,7 +16,7 @@ sub getSummaryStats {
     # read .json file of qc status and get summary values
     # interesting stats: mean/sd of call rate, and overall pass/fail
     my $inPath = shift;
-    my %allResults = WTSI::Genotyping::QC::QCPlotShared::readQCResultHash($inPath);
+    my %allResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inPath);
     my @cr;
     my $fails = 0;
     my @samples = keys(%allResults);
@@ -24,9 +24,9 @@ sub getSummaryStats {
     foreach my $sample (@samples) {
 	my %results = %{$allResults{$sample}};
 	my $samplePass = 1;
-	foreach my $metric (keys(%results)) {
-	    my ($pass, $value) = @{$results{$metric}};
-	    if ($metric eq 'call_rate') { push(@cr, $value); }
+	foreach my $key (keys(%results)) {
+	    my ($pass, $value) = @{$results{$key}};
+	    if ($key eq 'call_rate') { push(@cr, $value); }
 	    unless ($pass) { $samplePass = 0; }
 	}
 	unless ($samplePass) { $fails++; }
