@@ -48,8 +48,6 @@ use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $su
 ($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
 $ini_path = "$Bin/../etc/";
 
-#Log::Log4perl::init($ini_path.'/log4perl_tests.conf');
-
 sub getSuppliedGenderOutput {
     my $suppliedRef = shift;
     my $i = shift;
