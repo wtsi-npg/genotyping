@@ -84,7 +84,8 @@ sub run {
                     uri => $sample->uri->as_string,
                     result => $sample->gtc,
                     gender =>  $gender_name,
-                    gender_code => $gender_code};
+                    gender_code => $gender_code,
+                    gender_method => $gender_method};
   }
 
   my $fh = maybe_stdout($output);
@@ -104,22 +105,25 @@ sample_intensities
 =head1 SYNOPSIS
 
 sample_intensities [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--output <JSON file>] --run <analysis run name> [--verbose]
+   [--output <JSON file>] --run <analysis run name> --gender <method> \
+   [--verbose]
 
 Options:
 
-  --all       Include all samples in output, even those marked as not for
-              analysis.
-  --config    Load database configuration from a user-defined .ini file.
-              Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file. If not supplied, defaults to the
-              value given in the configuration .ini file.
-  --help      Display help.
-  --output    The file to which output will be written. Optional, defaults
-              to STDOUT.
-  --run       The name of a pipe run defined previously using the
-              ready_infinium script.
-  --verbose   Print messages while processing. Optional.
+  --all            Include all samples in output, even those marked as not
+                   for analysis.
+  --config         Load database configuration from a user-defined .ini file.
+                   Optional, defaults to $HOME/.npg/genotyping.ini
+  --dbfile         The SQLite database file. If not supplied, defaults to
+                   the value given in the configuration .ini file.
+  --gender-method  The gender determination method as described in
+                   methods.ini. Optional, defaults to 'Supplied'.
+  --help           Display help.
+  --output         The file to which output will be written. Optional,
+                   defaults to STDOUT.
+  --run            The name of a pipe run defined previously using the
+                   ready_infinium script.
+  --verbose        Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
@@ -133,6 +137,7 @@ order. Each element of the array describes one sample as a JSON object:
      "uri" : <sample URI>,
      "gender" : <gender name string>,
      "gender_code" : <gender code integer>
+     "gender_method" : <gender method name string>
   }
 
 Only records for samples marked in the pipeline database for inclusion
