@@ -117,9 +117,13 @@ sub readData {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
+	unless ($plateLocs{$words[0]}) { 
+	    carp "Plate location not found in database for sample $words[0]";
+	    $dataOK = 0;
+	    last;
+	}
 	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};   #getPlateAddress($words[0]);
 	my ($x, $y) = parseLabel($addressLabel);
-	unless ($plate) { $dataOK = 0; last; }
 	# clean up plate name by removing illegal characters; plate name used as filename component
 	if (not $plateNames{$plate}) {
 	    # first time plate is encountered
