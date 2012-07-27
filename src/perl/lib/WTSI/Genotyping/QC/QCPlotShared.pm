@@ -19,7 +19,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/getPlateLocationsFromPath meanSd median parseLabel readQCNameArray $ini_path/;
+our @EXPORT = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCNameArray readQCShortNameHash $ini_path/;
 
 use vars qw/$ini_path/;
 $ini_path = "$Bin/../etc/";
@@ -28,6 +28,19 @@ $ini_path = "$Bin/../etc/";
 
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
 
+
+sub getDatabaseObject {
+    # set up database object
+    my $dbfile = shift;
+    my $db = WTSI::Genotyping::Database::Pipeline->new
+	(name => 'pipeline',
+	 inifile => "$ini_path/pipeline.ini",
+	 dbfile => $dbfile);
+    my $schema = $db->connect(RaiseError => 1,
+		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
+    $db->populate;
+    return $db;
+}
 
 sub getPlateLocations {
     # get plate and (x,y) location form database
@@ -55,6 +68,30 @@ sub getPlateLocationsFromPath {
     my %plateLocs = getPlateLocations($db);
     $db->disconnect();
     return %plateLocs;
+}
+
+sub getSummaryStats {
+    # read .json file of qc status and get summary values
+    # interesting stats: mean/sd of call rate, and overall pass/fail
+    my $inPath = shift;
+    my %allResults = readMetricResultHash($inPath);
+    my @cr;
+    my $fails = 0;
+    my @samples = keys(%allResults);
+    my $total = @samples;
+    foreach my $sample (@samples) {
+	my %results = %{$allResults{$sample}};
+	my $samplePass = 1;
+	foreach my $key (keys(%results)) {
+	    my ($pass, $value) = @{$results{$key}};
+	    if ($key eq 'call_rate') { push(@cr, $value); }
+	    unless ($pass) { $samplePass = 0; }
+	}
+	unless ($samplePass) { $fails++; }
+    }
+    my ($mean, $sd) = meanSd(@cr);
+    my $passRate = 1 - ($fails/$total);
+    return ($total, $fails, $passRate, $mean, $sd);
 }
 
 sub meanSd {
