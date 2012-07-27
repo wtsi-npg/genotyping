@@ -8,33 +8,10 @@
 use strict;
 use warnings;
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
-use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotShared qw/getSummaryStats/; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
 
-sub getSummaryStats {
-    # read .json file of qc status and get summary values
-    # interesting stats: mean/sd of call rate, and overall pass/fail
-    my $inPath = shift;
-    my %allResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inPath);
-    my @cr;
-    my $fails = 0;
-    my @samples = keys(%allResults);
-    my $total = @samples;
-    foreach my $sample (@samples) {
-	my %results = %{$allResults{$sample}};
-	my $samplePass = 1;
-	foreach my $key (keys(%results)) {
-	    my ($pass, $value) = @{$results{$key}};
-	    if ($key eq 'call_rate') { push(@cr, $value); }
-	    unless ($pass) { $samplePass = 0; }
-	}
-	unless ($samplePass) { $fails++; }
-    }
-    my ($mean, $sd) = WTSI::Genotyping::QC::QCPlotShared::meanSd(@cr);
-    my $passRate = 1 - ($fails/$total);
-    return ($total, $fails, $passRate, $mean, $sd);
-}
 
 sub writePlotLinks {
     # write index of QC plots in current directory
