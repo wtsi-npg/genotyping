@@ -121,7 +121,7 @@ sub run {
          ({name => $supplier_name,
            namespace => $namespace});
        my $run = $pipedb->piperun->find_or_create({name => $run_name});
-       validate_snpset($pipedb, $run, $snpset);
+       validate_snpset($run, $snpset);
 
        my $dataset = $run->add_to_datasets({if_project => $project_name,
                                             datasupplier => $supplier,
@@ -227,17 +227,13 @@ sub run {
 }
 
 sub validate_snpset {
-  my ($pipedb, $run, $snpset) = @_;
+  my ($run, $snpset) = @_;
 
-  # Ignore Sequenom in design mismatch test
-  my $run_snpset = $pipedb->snpset->find
-    ({'piperun.name' => $run->name,
-      'me.name' => {"!=" => 'Sequenom'}},
-     {join => {datasets => 'piperun'}, distinct => 1});
-
-  if ($run_snpset and $run_snpset->id_snpset != $snpset->id_snpset) {
+  unless ($run->validate_snpset($snpset)) {
     die "Cannot add this project to '", $run->name, "'; design mismatch: '",
-      $run_snpset->name, "' != '", $snpset->name, "'\n";
+      $snpset->name, "' cannot be added to existing designs [",
+        join(", ", map { $_->snpset->name } $run->datasets), "]\n";
+
   }
 
   return $snpset;

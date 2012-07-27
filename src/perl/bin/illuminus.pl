@@ -24,8 +24,6 @@ use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
 
 Log::Log4perl->easy_init($ERROR);
 
-$|=1;
-
 my $chromosome;
 my $end;
 my $executable;
@@ -146,6 +144,7 @@ else {
   elsif ($pid) {
     my @calls;
     my @probs;
+    local $|=1;
 
     # Illuminus writes all its calls, then all its probs, so we can't
     # interleave reads and make this a nice stream. We have to slurp all

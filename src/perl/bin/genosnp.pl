@@ -20,8 +20,6 @@ use WTSI::Genotyping qw(maybe_stdin maybe_stdout
 
 Log::Log4perl->easy_init($ERROR);
 
-$|=1;
-
 my $input;
 my $cutoff;
 my $executable;
