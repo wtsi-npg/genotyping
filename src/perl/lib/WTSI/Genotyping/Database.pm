@@ -76,9 +76,9 @@ sub configure {
 
 
 sub inifile {
-  my $self = shift;
-  if (@_) {
-    $self->{_inifile} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_inifile} = $args[0];
   }
 
   return $self->{_inifile};
@@ -97,6 +97,7 @@ sub inifile {
 
 =cut
 
+## no critic
 sub connect {
   my ($self, %args) = @_;
 
@@ -111,6 +112,7 @@ sub connect {
   return $self;
 }
 
+## use critic
 
 =head2 disconnect
 
@@ -126,6 +128,8 @@ sub disconnect {
   my ($self) = @_;
   $self->log->info('Disconnecting from ', $self->data_source);
   $self->dbh->disconnect;
+
+  return $self;
 }
 
 
@@ -172,9 +176,9 @@ sub dbh {
 =cut
 
 sub name {
-  my $self = shift;
-  if (@_) {
-    $self->{_name} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_name} = $args[0];
   }
 
   return $self->{_name};
@@ -192,9 +196,9 @@ sub name {
 =cut
 
 sub data_source {
-  my $self = shift;
-  if (@_) {
-    $self->{_data_source} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_data_source} = $args[0];
   }
 
   return $self->{_data_source};
@@ -212,9 +216,9 @@ sub data_source {
 =cut
 
 sub username {
-  my $self = shift;
-  if (@_) {
-    $self->{_username} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_username} = $args[0];
   }
 
   return $self->{_username};
@@ -231,9 +235,9 @@ sub username {
 =cut
 
 sub password {
-  my $self = shift;
-  if (@_) {
-    $self->{_password} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_password} = $args[0];
   }
 
   return $self->{_password};
@@ -250,9 +254,9 @@ sub password {
 =cut
 
 sub log {
-  my $self = shift;
-  if (@_) {
-    $self->{_log} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_log} = $args[0];
   }
 
   return $self->{_log};

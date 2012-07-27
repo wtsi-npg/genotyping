@@ -535,7 +535,7 @@ sub _parse_raw_meta {
   @raw_meta = grep { m/^[attribute|value|units]/ } @raw_meta;
   my $n = scalar @raw_meta;
   unless ($n % 3 == 0) {
-    $log->logcroak("Expected imeta triples, but found $n elements");
+    $log->logconfess("Expected imeta triples, but found $n elements");
   }
 
   my %meta;
@@ -543,14 +543,14 @@ sub _parse_raw_meta {
     my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
 
     my ($attribute) = $str0 =~ m/^attribute: (.*)/ or
-      $log->logcroak("Invalid triple $i: expected an attribute but found ",
+      $log->logconfess("Invalid triple $i: expected an attribute but found ",
                      "'$str0'");
 
     my ($value) = $str1 =~ m/^value: (.*)/ or
-      $log->logcroak("Invalid triple $i: expected a value but found '$str1'");
+      $log->logconfess("Invalid triple $i: expected a value but found '$str1'");
 
     my ($units) = $str2 =~ m/^units: (.*)/ or
-      $log->logcroak("Invalid triple $i: expected units but found '$str2'");
+      $log->logconfess("Invalid triple $i: expected units but found '$str2'");
 
     if (exists $meta{$attribute}) {
       push(@{$meta{$attribute}}, $value);
@@ -577,7 +577,7 @@ sub _safe_select {
 }
 
 sub _irm {
-  my (@args) = @_;
+  my @args = @_;
 
   run_command($IRM, '-r', join(' ', @args));
 

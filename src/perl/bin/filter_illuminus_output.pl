@@ -74,17 +74,14 @@ sub run {
               -exitval => 2);
   }
 
-  my $col;
-  open($col, '<', "$columns")
+  open(my $col, '<', "$columns")
     or die "Failed to open column file '$columns' for reading: $!\n";
   my $column_names = read_fon($col);
   close($col) or warn "Failed to close column file '$columns'\n";
 
-  my $gti;
-  my $gto;
-  open($gti, '<', "$gt_input")
+  open(my $gti, '<', "$gt_input")
     or die "Failed to open genotype file '$gt_input' for reading: $!\n";
-  open($gto, '>', "$gt_output")
+  open(my $gto, '>', "$gt_output")
     or die "Failed to open genotype file '$gt_output' for writing: $!\n";
 
   my $headers = read_gt_column_names($gti);
@@ -100,11 +97,9 @@ sub run {
   close($gto) or warn "Failed to close genotype file '$gt_output'\n";
   close($gti) or warn "Failed to close genotype file '$gt_input'\n";
 
-  my $pri;
-  my $pro;
-  open($pri, '<', "$pr_input")
+  open(my $pri, '<', "$pr_input")
     or die "Failed to open probability file '$pr_input' for reading: $!\n";
-  open($pro, '>', ">pr_output")
+  open(my $pro, '>', ">pr_output")
     or die "Failed to open probability file '$pr_output' for writing: $!\n";
 
   my $num_probs =

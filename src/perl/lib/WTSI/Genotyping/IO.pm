@@ -21,7 +21,7 @@ use JSON;
 =cut
 
 sub maybe_stdin {
-  my $file = shift;
+  my ($file) = @_;
 
   my $fh;
   if (defined $file) {
@@ -58,7 +58,7 @@ sub maybe_stdin {
 =cut
 
 sub maybe_stdout {
-  my $file = shift;
+  my ($file) = @_;
 
   my $fh;
   if (defined $file) {
@@ -81,7 +81,7 @@ sub maybe_stdout {
 =cut
 
 sub read_sample_json {
-  my $file = shift;
+  my ($file) = @_;
 
   open(my $fh, '<', "$file")
     or confess "Failed to open JSON file '$file' for reading: $!\n";
@@ -104,7 +104,7 @@ sub read_sample_json {
 =cut
 
 sub read_snp_json {
-  my $file = shift;
+  my ($file) = @_;
 
   open(my $fh, '<', "$file")
     or confess "Failed to open JSON file '$file' for reading: $!\n";

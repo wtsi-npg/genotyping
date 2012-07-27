@@ -36,8 +36,7 @@ our $states_ini = 'states.ini';
 =cut
 
 sub new {
-   my $class = shift;
-   my %args = @_;
+   my ($class, %args) = @_;
 
    my $self = $class->SUPER::new(%args);
    $self->{_dbfile} = $args{dbfile};
@@ -48,7 +47,7 @@ sub new {
 }
 
 sub initialize {
-  my $self = shift;
+  my ($self) = @_;
 
   my $ini = Config::IniFiles->new(-file => $self->inifile);
 
@@ -164,9 +163,10 @@ sub populate {
 
 =cut
 
+## no critic
+
 sub connect {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   unless ($self->is_connected) {
     $self->log->info('Connecting to ', $self->data_source);
@@ -179,6 +179,7 @@ sub connect {
   return $self;
 }
 
+## use critic
 
 =head2 is_connected
 
@@ -187,7 +188,7 @@ sub connect {
 =cut
 
 sub is_connected {
-  my $self = shift;
+  my ($self) = @_;
   return defined $self->dbh && $self->dbh->ping;
 }
 
@@ -199,7 +200,7 @@ sub is_connected {
 =cut
 
 sub disconnect {
-  my $self = shift;
+  my ($self) = @_;
   if ($self->is_connected) {
     $self->log->info('Disconnecting from ', $self->data_source);
     $self->schema->storage->disconnect;
@@ -216,7 +217,7 @@ sub disconnect {
 =cut
 
 sub dbh {
-  my $self = shift;
+  my ($self) = @_;
   if ($self->schema) {
     return $self->schema->storage->dbh;
   }
@@ -234,7 +235,7 @@ sub dbh {
 =cut
 
 sub dbfile {
-  my $self = shift;
+  my ($self) = @_;
   return $self->{_dbfile};
 }
 
@@ -289,7 +290,7 @@ sub in_transaction {
 =cut
 
 sub schema {
- my $self = shift;
+ my ($self) = @_;
  return $self->{_schema};
 }
 
@@ -390,6 +391,8 @@ sub _populate_addresses {
                                       label2 => $label2});
     }
   }
+
+  return $self;
 }
 
 # Populates snpsets dictionary (Infinium and Sequenom SNP sets).
@@ -471,13 +474,13 @@ sub _insert_from_ini {
 # my @samples = $db->sample->all;
 #
 sub AUTOLOAD {
-  my $self = shift;
-  my $type = ref($self) or croak "$self is not an object\n";
+  my ($self) = @_;
+  my $type = ref($self) or confess "$self is not an object\n";
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
   unless ($self->is_connected) {
-    croak "$self is not connected\n";
+    $self->log->logconfess("$self is not connected");
   }
 
   my $schema = $self->schema;
@@ -490,9 +493,9 @@ sub AUTOLOAD {
   my $method_name = $AUTOLOAD;
   $method_name =~ s/.*://;
   unless (exists $lookup{$method_name} ) {
-    croak "An invalid method `$method_name' was called " .
-      "on an object of $type. Permitted methods are [" .
-        join(", ", sort keys %lookup) . "]\n";
+    $self->log->logconfess("An invalid method `$method_name' was called ",
+                           "on an object of $type. Permitted methods are [",
+                           join(", ", sort keys %lookup), "]");
   }
 
 

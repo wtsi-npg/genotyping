@@ -1,5 +1,5 @@
 
-exclude = Modules::RequireVersionVar Modules::RequireFilenameMatchesPackage Modules::RequireExplicitPackage ValuesAndExpressions::RequireInterpolationOfMetachars Miscellanea::RequireRcsKeywords CodeLayout::RequireTidyCode
+exclude = InputOutput::RequireBriefOpen Modules::RequireVersionVar Modules::RequireFilenameMatchesPackage Modules::RequireExplicitPackage ValuesAndExpressions::RequireInterpolationOfMetachars Miscellanea::RequireRcsKeywords CodeLayout::RequireTidyCode 
 
 
 [ControlStructures::ProhibitPostfixControls]

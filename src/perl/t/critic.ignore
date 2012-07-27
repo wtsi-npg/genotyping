@@ -15,7 +15,7 @@ if($@) {
 
 }
 else {
-  Test::Perl::Critic->import(-severity => 5,
+  Test::Perl::Critic->import(-severity => 4,
                              -profile  => 't/perlcriticrc');
 
   all_critic_ok();
