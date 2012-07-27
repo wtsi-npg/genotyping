@@ -175,15 +175,14 @@ sub resultsGender {
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
     my ($threshold, $inPath) = @_;
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
     my %results;
     foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $inferred, $supplied) = ($fields[0], $fields[2], $fields[3]);
+	my ($sample, $xhet, $inferred, $supplied) = @$ref;
 	my $pass;
 	if ($inferred==$supplied) { $pass = 1; }
 	else { $pass = 0; }
-	$results{$sample} = [$pass, $inferred.$supplied];
+	$results{$sample} = [$pass, $xhet, $inferred, $supplied];
     }
     return %results;
 }
