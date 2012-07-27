@@ -29,13 +29,15 @@ use Carp;
 use File::Temp qw/tempfile tempdir/;
 use FindBin qw /$Bin/;
 use JSON;
-use Log::Log4perl;
+#use Log::Log4perl;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
 use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::PlinkIO;
+use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject/;
 use WTSI::Genotyping::QC::QCPlotTests;
+
 
 our @ISA = qw/Exporter/;
 our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
@@ -46,20 +48,7 @@ use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $su
 ($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
 $ini_path = "$Bin/../etc/";
 
-Log::Log4perl::init($ini_path.'/log4perl_tests.conf');
-
-sub getDatabaseObject {
-    # set up database object
-    my $dbfile = shift;
-    my $db = WTSI::Genotyping::Database::Pipeline->new
-	(name => 'pipeline',
-	 inifile => "$ini_path/pipeline.ini",
-	 dbfile => $dbfile);
-    my $schema = $db->connect(RaiseError => 1,
-		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    $db->populate;
-    return $db;
-}
+#Log::Log4perl::init($ini_path.'/log4perl_tests.conf');
 
 sub getSuppliedGenderOutput {
     my $suppliedRef = shift;
