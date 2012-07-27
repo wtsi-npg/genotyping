@@ -74,7 +74,9 @@ sub columnsMatch {
 
 sub createTestDatabase {
     # create temporary test database with given sample names
-    my ($namesRef, $dbfile) = @_;
+    my ($namesRef, $dbfile, $runName, $projectName) = @_;
+    $runName ||= "pipeline_run";
+    $projectName ||= "dataset_socrates";
     my @names;
     if ($namesRef) { 
 	@names = @$namesRef; 
@@ -94,9 +96,9 @@ sub createTestDatabase {
 						      namespace => 'wtsi'});
     my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
     ## additional database setup
-    my $run = $db->piperun->find_or_create({name => 'paperstreet',
+    my $run = $db->piperun->find_or_create({name => $runName,
 					    start_time => time()});
-    my $dataset = $run->add_to_datasets({if_project => "mayhem",
+    my $dataset = $run->add_to_datasets({if_project => $projectName,
 				     datasupplier => $supplier,
 				     snpset => $snpset});
     my $pass = $db->state->find({name => 'autocall_pass'});

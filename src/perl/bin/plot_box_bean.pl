@@ -17,14 +17,16 @@ use warnings;
 use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
+use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($mode, $type, $outDir, $title, $help, $test);
+my ($mode, $type, $outDir, $title, $help, $test, $dbpath);
 
 GetOptions("mode=s"     => \$mode,
 	   "type=s"     => \$type,
 	   "out_dir=s"  => \$outDir,
 	   "title=s"    => \$title,
+	   "dbpath=s"   => \$dbpath,
 	   "h|help"     => \$help);
 
 
@@ -37,6 +39,7 @@ Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or th
 Options:
 --mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff
 --type=KEY          Keyword for plot type.  Must be one of: box, bean, both
+--dbpath=PATH       Path to pipeline database containing plate information
 --out_dir=PATH      Output directory for plots
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to: ./platePlots
@@ -55,6 +58,7 @@ $test ||= 1; # test mode is on by default
 
 unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") { die "Illegal mode argument: $mode: $!"; }
 unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal type argument: $type: $!"; }
+unless ($dbpath) { die "Must supply a pipeline database path: $!"; }
 
 sub parsePlate {
     # parse plate from sample name, assuming usual PLATE_WELL_ID format
@@ -71,13 +75,14 @@ sub parsePlate {
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
     # data is taken from a particular index in space-separated input (eg. sample_cr_het.txt)
-    my ($input, $output, $index) = @_;
+    my ($input, $output, $index, $dbpath) = @_;
     my $inputOK = 0;
+    my %plateLocs = getPlateLocationsFromPath($dbpath);
     while (<$input>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	my $plate = parsePlate($words[0]);
+	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};
 	if ($plate) {
 	    $inputOK = 1; # require at least one sample with a valid plate!
 	    print $output $plate."\t".$words[$index]."\n";
@@ -116,7 +121,7 @@ sub runPlotScript {
 sub run {
     # mode = cr, het or xydiff
     # type = box, bean, or both
-    my ($mode, $type, $outDir, $title, $test) = @_;
+    my ($mode, $type, $outDir, $title, $dbpath, $test) = @_;
     my %index = ( # index in whitespace-separated input data for each mode; use to write .txt input to R scripts
 	cr     => 1,
 	het    => 2, 
@@ -124,7 +129,7 @@ sub run {
     my $input = \*STDIN;
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
     open my $output, "> $textOutPath" || croak "Cannot open output file: $!";
-    my $inputOK = writeBoxplotInput($input, $output, $index{$mode});
+    my $inputOK = writeBoxplotInput($input, $output, $index{$mode}, $dbpath);
     close $output;
     my $plotsOK = 0; 
     if ($inputOK) {
@@ -140,6 +145,6 @@ sub run {
     return $plotsOK;
 }
 
-my $ok = run($mode, $type, $outDir, $title, $test);
+my $ok = run($mode, $type, $outDir, $title, $dbpath, $test);
 if ($ok) { exit(0); }
 else { exit(1); }

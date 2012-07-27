@@ -8,24 +8,22 @@ use strict;
 use warnings;
 use Cwd;
 use FindBin qw($Bin);
-use Test::More tests => 74;
+use Test::More tests => 69;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $plinkA = "$Bin/qc_test_data/alpha";
-my $plinkB = "$Bin/qc_test_data/beta";
 my $simA = "$Bin/qc_test_data/alpha.sim";
-my $simB = "$Bin/qc_test_data/beta.sim";
 my $outDirA = "$Bin/qc/alpha/";
-my $outDirB = "$Bin/qc/beta/";
 my $heatMapDir = "plate_heatmaps/";
 my $titleA = "Alpha";
-my $titleB = "Beta";
 my $config = "$bin/../json/qc_threshold_defaults.json";
 my $dbfileA = "$Bin/qc_test_data/alpha_pipeline.db";
 my ($cmd, $status);
+
+# may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
 
@@ -84,7 +82,7 @@ ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid X
 ## box/bean plots
 my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
 for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA";
+    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA";
     is(system($cmd), 0, "plot_box_bean.pl exit status: mode $modes[$i]");
 }
 
@@ -113,25 +111,10 @@ is(system($cmd), 0, "main_plot_index.pl exit status");
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --sim=$simA $plinkA > /dev/null";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA > /dev/null";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 print "\tTest dataset Alpha finished.\n";
-chdir($outDirB);
-print "\tTesting dataset Beta; sample names *not* in PLATE_WELL_ID format.\n";
-$crHetFinder = "/nfs/users/nfs_i/ib5/mygit/github/Gftools/snp_af_sample_cr_bed"; # TODO make more portable
-$status = system("$crHetFinder $plinkB");
-is($status, 0, "snp_af_sample_cr_bed exit status");
-
-## box/bean plots -- expected to fail without plate names
-for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleB 2> /dev/null";
-    isnt(system($cmd), 0, "plot_box_bean.pl exit status, expected to fail: mode $modes[$i]");
-}
-
-## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleB --sim=$simB $plinkB > /dev/null 2> /dev/null"; # suppress stdout; expect some chatter from failed box/beanplot scripts
-is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 my $duration = time() - $start;
 print "QC test finished.  Duration: $duration s\n";
