@@ -53,13 +53,13 @@ sub getPlateLocations {
     $db->in_transaction(sub {
 	foreach my $sample (@samples) {
 	    my ($plate, $x, $y) = (0,0,0);
-	    my $name = $sample->name;
+	    my $uri = $sample->uri;
 	    my $well = ($sample->wells->all)[0]; # assume only one well per sample
 	    my $address = $well->address;
 	    my $label = $address->label1;
 	    $plate = $well->plate;
 	    my $plateName = $plate->ss_barcode;
-	    $plateLocs{$name} = [$plateName, $label];  
+	    $plateLocs{$uri} = [$plateName, $label];  
 	}
 			});
     return %plateLocs;
