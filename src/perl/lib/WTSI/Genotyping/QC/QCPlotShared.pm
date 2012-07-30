@@ -21,8 +21,9 @@ Log::Log4perl->easy_init($ERROR);
 our @ISA = qw/Exporter/;
 our @EXPORT = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCNameArray readQCShortNameHash $ini_path/;
 
-use vars qw/$ini_path/;
+use vars qw/$ini_path $INI_FILE_DEFAULT/;
 $ini_path = "$Bin/../etc/";
+$INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
 
 # read default qc names and thresholds from .json files
 
@@ -32,9 +33,11 @@ $ini_path = "$Bin/../etc/";
 sub getDatabaseObject {
     # set up database object
     my $dbfile = shift;
+    my $inifile = shift;
+    $inifile ||= $INI_FILE_DEFAULT;
     my $db = WTSI::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
-	 inifile => "$ini_path/pipeline.ini",
+	 inifile => $inifile,
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
@@ -64,7 +67,8 @@ sub getPlateLocations {
 	
 sub getPlateLocationsFromPath {
     my $dbPath = shift;
-    my $db = openDatabase($dbPath);
+    my $iniPath = shift;
+    my $db = openDatabase($dbPath, $iniPath);
     my %plateLocs = getPlateLocations($db);
     $db->disconnect();
     return %plateLocs;
@@ -128,13 +132,15 @@ sub numeric {
 sub openDatabase {
     # open connection to pipeline DB
     my $dbfile = shift;
+    my $inifile = shift;
+    $inifile ||= $INI_FILE_DEFAULT;
     my $start = getcwd;
     # very hacky, but ensures correct loading of database using pipeline.ini
     # assumes script is run from a subdirectory of src/perl (eg. perl/t or perl/bin)
     chdir("$Bin/.."); 
     my $db = WTSI::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
-	 inifile => "$ini_path/pipeline.ini",
+	 inifile => $inifile,
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
