@@ -30,6 +30,7 @@ my $inputDir = $outDir;
 my $title = "Alpha";
 my $script = "$bin/check_xhet_gender.pl";
 my $refFile = "$inputDir/benchmark_gender.json";
+my $runName = "pipeline_run";
 
 # read benchmark genders for comparison
 system('rm -f $outDir/*.png $outDir/*.log $outDir/sample_*_.txt'); # remove output from previous tests, if any
@@ -52,7 +53,7 @@ foreach my $format qw(plink json text) {
 	if ($format eq 'json') { $input = "$inputDir/input_xhet.json"; } 
 	elsif ($format eq 'text') { $input = "$inputDir/input_xhet.txt"; } 
 	elsif ($format eq 'plink') { $input = $plink; } 
-	my $cmd = "perl $script --input=$input --input-format=$format --output-dir=$outDir --dbfile=$dbfile";
+	my $cmd = "perl $script --run=$runName --input=$input --input-format=$format --output-dir=$outDir --dbfile=$dbfile";
 	if ($jsonOut) { 
 	    $cmd .= " --json"; 
 	    $outPath = "$outDir/sample_xhet_gender.json";

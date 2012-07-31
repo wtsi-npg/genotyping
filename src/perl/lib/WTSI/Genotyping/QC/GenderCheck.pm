@@ -186,7 +186,8 @@ sub runGenderModel {
 
 sub updateDatabase {
     # update pipeline database with inferred genders
-    my ($namesRef, $gendersRef, $dbfile) = @_;
+    # sample 'names' in input text/json should actually be URIs
+    my ($namesRef, $gendersRef, $dbfile, $runName) = @_;
     my @names = @$namesRef;
     my @genders = @$gendersRef;
     my %genders;
@@ -195,20 +196,28 @@ sub updateDatabase {
     }
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
+    my $run = $db->piperun->find({name => $runName});
+    unless ($runName) {
+	die "Run '$runName' does not exist. Valid runs are: [" .
+	    join(", ", map { $_->name } $db->piperun->all) . "]\n";
+    }
     # transaction to update sample genders
-    my @samples = $db->sample->all;
-    $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    my $sample_name = $sample->name;
-	    my $genderCode = $genders{$sample_name};
-	    my $gender;
-	    if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
-	    elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }
-	    elsif ($genderCode==0) { $gender = $db->gender->find({name => 'Unknown'}); }
-	    else { $gender = $db->gender->find({name => 'Not available'}); }
-	    $sample->add_to_genders($gender, {method => $inferred});
-	}
-			});
+    my @datasets = $run->datasets->all;
+    foreach my $ds (@datasets) {
+	my @samples = $ds->samples->all;
+	$db->in_transaction(sub {
+	    foreach my $sample (@samples) {
+		my $sample_name = $sample->name;
+		my $genderCode = $genders{$sample_name};
+		my $gender;
+		if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
+		elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }
+		elsif ($genderCode==0) { $gender = $db->gender->find({name => 'Unknown'}); }
+		else { $gender = $db->gender->find({name => 'Not available'}); }
+		$sample->add_to_genders($gender, {method => $inferred});
+	    }
+			    });
+    }
     $db->disconnect();
 }
 
