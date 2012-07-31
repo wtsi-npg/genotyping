@@ -5,17 +5,19 @@ use strict;
 use warnings;
 use Carp;
 use FindBin qw($Bin);
-use Test::More tests => 6;
+use Test::More tests => 8;
 use JSON;
 use WTSI::Genotyping::QC::Reports;
 
 my $resultPath = "$Bin/qc/alpha/qc_results.json";
 my $dbPath = "$Bin/qc_test_data/alpha_pipeline.db";
-my $textPath = "$Bin/qc/alpha/pipeline_summary.txt";
+my $texPath = "$Bin/qc/alpha/pipeline_summary.tex";
+my $pdfPath = "$Bin/qc/alpha/pipeline_summary.pdf";
 my $csvPath = "$Bin/qc/alpha/pipeline_summary.csv";
+my $metricPath = "$Bin/../json/qc_threshold_defaults.json";
+my $qcDir = "$Bin/qc/alpha/";
 
 my @text = textForDatasets($dbPath);
-foreach my $ref (@text) { print join(",", @$ref)."\n"; }
 ok(@text, "Read database dataset info");
 
 my $result = dbSampleInfo($dbPath);
@@ -27,6 +29,12 @@ is(@plateText, 13, "Find plate table text"); # expect exactly 13 lines, includin
 my @csvText = textForCsv($resultPath, $dbPath);
 is(@csvText, 996, "Find CSV text"); # expect 996 lines, including header
 
-ok(writeSummaryText($resultPath, $dbPath, $textPath), "Write summary text");
-
 ok(writeCsv($resultPath, $dbPath, $csvPath), "Write CSV text"); 
+
+ok(writeSummaryLatex($texPath, $resultPath, $metricPath, $dbPath, 0, 0, $qcDir), "Write summary .tex");
+
+system("rm -f $pdfPath");
+
+ok(texToPdf($texPath), "Convert .tex to .pdf");
+
+ok((-e $pdfPath), "PDF file exists")
