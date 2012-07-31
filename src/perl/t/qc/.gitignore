@@ -4,3 +4,9 @@
 *.html
 *.json
 *.csv
+# LaTeX files below this line
+*.tex
+*.aux
+*.dvi
+*.pdf
+*.lof

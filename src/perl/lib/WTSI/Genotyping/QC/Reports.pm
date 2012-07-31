@@ -8,13 +8,15 @@ package WTSI::Genotyping::QC::Reports;
 use strict;
 use warnings;
 use Carp;
+use Cwd qw/getcwd abs_path/;
 use JSON;
+use POSIX qw/strftime/;
 use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
 use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/dbDatasetInfo dbSampleInfo textForDatasets textForPlates textForCsv writeCsv writeSummaryText/;
+our @EXPORT = qw/dbDatasetInfo dbSampleInfo textForDatasets textForPlates textForCsv texToPdf writeCsv writeSummaryLatex writeSummaryText/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
 
 
@@ -50,7 +52,7 @@ sub dbSampleInfo {
 	    my @samples = $dataset->samples->all;
 	    foreach my $sample (@samples) {
 		@info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
-		$sampleInfo{$sample->name} = \@info;
+		$sampleInfo{$sample->uri} = \@info;
 	    }
 	}
     }
@@ -137,6 +139,117 @@ sub getSampleInfo {
     return @sampleFields;
 }
 
+sub latexAllPlots {
+    my $graphicsDir = shift;
+    my @plots = qw/failsIndividual.png failsCombined.png failScatterPlot.png failScatterDetail.png sample_xhet_gender.png cr_boxplot.png het_boxplot.png xydiff_boxplot.png crHetDensityHeatmap.png crHetDensityScatter.png crHistogram.png hetHistogram.png/;
+    my %captions = (
+	"failsIndividual.png" => "Individual causes of sample failure",
+	"failsCombined.png" => "Combined causes of sample failure",
+	"failScatterPlot.png" => "Scatterplot of failed samples",
+	"failScatterDetail.png" => "Scatterplot of failed samples passing CR/Het thresholds",
+	"sample_xhet_gender.png" => "Gender model",
+	"cr_boxplot.png" => "Call rate (CR) boxplot",
+	"het_boxplot.png" => "Heterozygosity (het) boxplot",
+	"xydiff_boxplot.png" => "XY intensity difference boxplot",
+	"crHetDensityHeatmap.png" => "Heatmap of sample density by CR/Het",
+	"crHetDensityScatter.png" => "Scatterplot of samples by CR/Het",
+	"crHistogram.png" => "Histogram of CR",
+	"hetHistogram.png" => "Histogram of heterozygosity",
+	);
+    my (@text, @missing); # gender plot is missing if mixture model fails sanity checks
+    foreach my $plot (@plots) {
+	if (-r $graphicsDir."/".$plot) {
+	    push(@text, latexPlot($plot, $captions{$plot}));
+	} else {
+	    carp "Cannot read plot ".$graphicsDir."/".$plot;
+	    push(@missing, $plot);
+	    next;
+	}
+    }
+    if (@missing>0) {
+	push(@text, "\n\\paragraph*{Missing plots:}");
+	push(@text, "\\begin{itemize}");
+	foreach my $plot (@missing) { 
+	    my $item = $plot;
+	    $item =~ s/_/\\_/g;
+	    $item = "\\item ".$item;
+	    if ($captions{$plot}) { $item .= ": ".$captions{$plot}; }
+	    push @text, $item;
+	}
+	push(@text, "\\end{itemize}\n");
+    }
+    return join("\n", @text)."\n";
+}
+
+sub latexFooter {
+    my $footer = "\n\\end{document}\n";
+}
+
+sub latexHeader {
+    my ($title, $author, $graphicsDir) = @_;
+    my $date = strftime("%Y-%m-%d %H:%M", localtime(time()));
+    my $header = '\documentclass{article} 
+\title{'.$title.'}
+\author{'.$author.'}
+\date{'.$date.'}
+
+\usepackage{graphicx}
+\graphicspath{{'.$graphicsDir.'}}
+
+\renewcommand{\familydefault}{\sfdefault} % sans serif font
+
+\begin{document}
+
+\maketitle
+';
+    return $header;
+}
+
+sub latexPlot {
+    # .tex for a single plot entry
+    # TODO check existence of plot file?
+    my ($plot, $caption, $label, $height) = @_;
+    $height ||= 400;
+    my $defaultLabel = $plot;
+    $defaultLabel =~ s/_//g;
+    $caption ||= $defaultLabel;
+    $label ||= $defaultLabel; 
+    my $text = '
+\begin{figure}[p]
+\includegraphics[height='.$height.'px]{'.$plot.'}';
+    if ($caption) { $text.="\n\\caption{".$caption."}"; }
+    if ($label) { $text.="\n\\label{".$label."}"; }
+    $text .= "\n\\end{figure}\n";
+    return $text;
+}
+
+sub latexTable {
+    # convert array of arrays into a (centred) table
+    my ($rowsRef, $caption, $label) = @_;
+    my @rows = @$rowsRef;
+    my $cols = @{$rows[0]};
+    my $table = "\n\\begin{table}[ht]\n\\centering\n\\begin{tabular}{|";
+    foreach my $i (1..$cols) { $table.=" l |"; }
+    $table.="} \\hline\n";
+    my $first = 1;
+    foreach my $ref (@rows) {
+	my @row = @$ref;
+	foreach my $item (@row) {
+	    $item =~ s/[_]/\\_/g;
+	    $item =~ s/%/\\%/g;
+	    if ($first) { $item = "\\textbf{".$item."}"; }
+	}
+	$table.=join(" & ", @row)." \\\\ \\hline";
+	if ($first) { $table .= ' \hline'; $first = 0; }
+	$table.="\n";
+    }
+    $table.="\\end{tabular}\n";
+    if ($caption) { $table.="\\caption{".$caption."}\n"; }
+    if ($label) { $table.="\\label{".$label."}\n"; }
+    $table.="\\end{table}\n";
+    return $table;
+}
+
 sub findPlateFields {
     # find report fields for a single plate, or an entire experiment
     my ($total, $pass, $crRef, $hetRef) = @_;
@@ -196,6 +309,21 @@ sub textForDatasets {
     return @text;
 }
 
+sub textForMetrics {
+    my %doc = %{readJson($_[0])};
+    my %thresh = %{$doc{'Metrics_thresholds'}};
+    my @names = keys(%thresh);
+    @names = sort @names;
+    my @headers = qw/metric threshold type description/;
+    my %descs = %{$doc{'Metric_descriptions'}};
+    my %types = %{$doc{'Threshold_types'}};
+    my @text = (\@headers,);
+    foreach my $name (@names) {
+	push(@text, [$name, $thresh{$name}, $types{$name}, $descs{$name}]);
+    }
+    return @text;
+}
+
 sub textForPassRate {
     ### TODO this may be unnecessary, same results appear in final line of textForPlates
     my $resultPath = shift;
@@ -243,6 +371,20 @@ sub textForCsv {
     return @text;
 }
 
+sub texToPdf {
+    my $texPath = shift;
+    $texPath = abs_path($texPath);
+    my @terms = split('/', $texPath);
+    my $file = pop @terms;
+    my $texDir = join('/', @terms);
+    my $startDir = getcwd();
+    chdir($texDir);
+    my $result = system('pdflatex '.$file.' > /dev/null');
+    chdir($startDir);
+    if ($result==0) { return 1; }
+    else { return 0; }
+}
+
 sub writeCsv {
     my ($resultPath, $dbPath, $outPath) = @_;
     my @text = textForCsv($resultPath, $dbPath);
@@ -253,36 +395,27 @@ sub writeCsv {
     close $out || croak  "Cannot close output path $outPath";
 }
 
-
-sub writeSummaryText {
-    # convenience method to show text output in summary
-    my ($resultPath, $dbPath, $outPath) = @_;
-    open my $out, ">", $outPath || croak "Cannot open output path $outPath";
-    print $out "* Genotype Pipeline Run Summary *\n\n";
-    print $out "Datasets\n";
-    my @datasetText = textForDatasets($dbPath);
-    foreach my $ref (@datasetText) {
-	print $out join("\t", @$ref)."\n";
-    }
-    print $out "\nPass/fail statistics\n";
-    my @passRateText = textForPassRate($resultPath);
-    my @headers = @{$passRateText[0]};
-    my @values =  @{$passRateText[1]};
-    foreach my $i (0..@headers-1) {
-	print $out $headers[$i]."\t".$values[$i]."\n";
-    }
-    print $out "\nResults by plate\n";
-    my @plateText = textForPlates($resultPath);
-    foreach my $ref (@plateText) {
-	print $out join("\t", @$ref)."\n";
-    }
-    close $out || croak  "Cannot close output path $outPath";
+sub writeSummaryLatex {
+    # write .tex input file for LaTeX; use to generate PDF
+    my ($texPath, $resultPath, $metricPath, $dbPath, $title, $author, $graphicsDir) = @_;
+    $texPath ||= "pipeline_summary.tex";
+    $title ||= "Untitled";
+    $author ||= "WTSI Genotyping Pipeline";
+    $graphicsDir ||= ".";
+    open my $out, ">", $texPath || croak "Cannot open output path $texPath";
+    print $out latexHeader($title, $author, $graphicsDir);
+    my @text = textForDatasets($dbPath);
+    print $out latexTable(\@text);
+    @text = textForPlates($resultPath);
+    print $out latexTable(\@text);
+    @text = textForMetrics($metricPath);
+    print $out latexTable(\@text);
+    print $out "\\pagebreak\n";
+    print $out "\\listoffigures\n\n";
+    print $out latexAllPlots($graphicsDir);
+    print $out latexFooter();
+    close $out || croak "Cannot close output path $texPath";
     return 1;
 }
-
-    #my @headers = ("Sscape study name","LIMS project name","BeadChip","Sample ID","Sanger sample name","Supplier sample name","IDAT filename","Plate","Well","Infinium barcode","Region","Ethnicity","Genotype file","Sample status","Supplied gender","Sequenom Gender","Illumina gender","Gender status","Gender score","Call rate status","Call rate","Het status","Het score","Identity status","Sequenom concordance score","Duplicate status","Concordance score","Sample match","XYdiff status","XYdiff score");
-
-#    foreach my $sample ()
-
 
 
