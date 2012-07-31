@@ -19,7 +19,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCNameArray readQCShortNameHash $ini_path/;
+our @EXPORT = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
 $ini_path = "$Bin/../etc/";
