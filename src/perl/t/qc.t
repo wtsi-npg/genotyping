@@ -8,7 +8,7 @@ use strict;
 use warnings;
 use Cwd;
 use FindBin qw($Bin);
-use Test::More tests => 69;
+use Test::More tests => 87;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 
@@ -26,7 +26,6 @@ my ($cmd, $status);
 # may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
-
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, if any
 
 ### test creation of QC input files ### 
@@ -110,9 +109,28 @@ is(system($cmd), 0, "main_plot_index.pl exit status");
 ## main index output
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
+system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
+print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
+
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA > /dev/null";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
+
+## check (non-heatmap) outputs again
+foreach my $png (@png) {
+    ok(pngPathOK($png), "PNG output $png in valid format");
+}
+ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
+
+my $heatMapsOK = 1;
+foreach my $mode (@modes) {
+    for (my $i=1;$i<=11;$i++) {
+	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
+	unless (pngPathOK($png)) {$heatMapsOK = 0; last; }
+    }
+    unless (xmlPathOK('plate_heatmaps/index.html')) { $heatMapsOK = 0; }
+}
+ok($heatMapsOK, "Plate heatmap outputs OK");
 
 print "\tTest dataset Alpha finished.\n";
 
