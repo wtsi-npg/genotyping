@@ -33,7 +33,7 @@ use WTSI::Genotyping::QC::GenderCheck;
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
 my ($help, $input, $inputFormat, $outputDir, $dbFile, $json, $title, $includePar, $sanityCancel, 
-    $clip, $trials);
+    $clip, $trials, $runName);
 
 GetOptions("h|help"              => \$help,
 	   "input=s"             => \$input,
@@ -46,6 +46,7 @@ GetOptions("h|help"              => \$help,
 	   "cancel-sanity-check" => \$sanityCancel,
 	   "clip=f"              => \$clip,
 	   "trials=i"            => \$trials,
+	   "run=s"               => \$runName,
     );
 
 
@@ -60,6 +61,7 @@ Input/output options:
 --include-par          Read SNPs from pseudoautosomal regions.  Plink input only; may increase apparent x heterozygosity of male samples.
 --json                 Output in .json format
 --dbfile=PATH          Push results to given pipeline database file (in addition to writing text/json output)
+--run=NAME             Name of pipeline run to update in pipeline database
 
 Gender model options:
 --title=STRING         Title for plots and other output
@@ -107,5 +109,5 @@ my @modelParams = ($sanityCancel, $clip, $trials, $title, $outputDir);
 my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($input, $inputFormat, $includePar);
 my @inferred = runGenderModel($namesRef, $xhetsRef, \@modelParams);
 writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, $outputFormat, $outputDir); 
-if ($dbFile) { updateDatabase($namesRef, \@inferred, $dbFile); }
+if ($dbFile) { updateDatabase($namesRef, \@inferred, $dbFile, $runName); }
 
