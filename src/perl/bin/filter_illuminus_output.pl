@@ -171,7 +171,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2011 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2011-2012 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
@@ -182,19 +182,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.2.0
-
-=head1 CHANGELOG
-
-  0.2.0
-
-     Added logging.
-
-  0.1.0
-
-     Initial version 0.1.0
 
 =cut

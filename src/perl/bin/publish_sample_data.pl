@@ -368,14 +368,4 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-=head1 VERSION
-
-  0.1.1
-
-=head1 CHANGELOG
-
-0.1.0
-
-  Initial version 0.1.0
-
 =cut
