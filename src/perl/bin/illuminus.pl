@@ -18,7 +18,7 @@ use POSIX qw(mkfifo);
 use Pod::Usage;
 
 use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
-                        read_snp_json read_sample_json update_snp_locations
+                        read_sample_json
                         find_column_indices filter_columns
                         read_it_column_names update_it_columns write_gt_calls);
 
@@ -31,7 +31,6 @@ my $input;
 my $output;
 my $plink;
 my $samples;
-my $snps;
 my $start;
 my $verbose;
 my $whole_genome_amplified;
@@ -43,7 +42,6 @@ GetOptions('chr=s' => \$chromosome,
            'output=s' => \$output,
            'plink' => \$plink,
            'samples=s' => \$samples,
-           'snps=s' => \$snps,
            'start=i' => \$start,
            'verbose' => \$verbose,
            'wga' => \$whole_genome_amplified);
@@ -70,11 +68,6 @@ if (!defined $start && defined $end) {
 
 if (defined $plink && !defined $output) {
   pod2usage(-msg => "An --output argument must be given if --plink is specified",
-            -exitval => 2);
-}
-
-if (defined $plink && !defined $snps) {
-  pod2usage(-msg => "An --snps argument must be given if --plink is specified",
             -exitval => 2);
 }
 
@@ -120,7 +113,6 @@ if ($plink) {
   else {
     system($command) == 0 or die "Failed to execute '$command'\n";
   }
-  update_plink_annotation($output, $snps, $tmp_dir) if $snps;
 
   exit(0);
 }
@@ -165,8 +157,8 @@ else {
 
     # write_gt_calls requires streams, so this is a shim to pretend that
     # we have such
-    my $CALLS = new IO::ScalarArray(\@calls);
-    my $PROBS = new IO::ScalarArray(\@probs);
+    my $CALLS = IO::ScalarArray->new(\@calls);
+    my $PROBS = IO::ScalarArray->new(\@probs);
 
     my $num_written = -1;
     while ($num_written != 0) {
@@ -225,6 +217,10 @@ sub write_gender_codes {
       $code = 1;
     } else {
       $code = $sample->{'gender_code'};
+    }
+    unless (defined $code) {
+      my $uri = $sample->{uri};
+      die "Failed to find a gender code for sample $uri in '$file'\n";
     }
 
     print $genders "$code\n";
@@ -304,34 +300,6 @@ sub nullify_females {
   return;
 }
 
-# Illuminus is incapable of writing complete Plink output, so we have
-# to fix it here by adding SNP chromosomes and positions
-sub update_plink_annotation {
-  my ($output, $snps, $tmp_dir) = @_;
-
-  # SNP information
-  my @snps = read_snp_json($snps);
-
-  my ($base, $path, $suffix) = fileparse($output, '.bed');
-  my $bim_file = $path . '/' . $base . '.bim';
-  my $tmp_bim = $tmp_dir . $base . '.bim';
-  my $in = maybe_stdin($bim_file);
-  my $out = maybe_stdout($tmp_bim);
-
-  my %locations;
-  foreach my $snp (@snps) {
-    $locations{$snp->{name}} = [$snp->{chromosome}, $snp->{position}];
-  }
-  update_snp_locations($in, $out, \%locations);
-  close($in);
-  close($out);
-  move($tmp_bim, $bim_file) or die "Failed to move $tmp_bim: $!\n";
-  unlink($tmp_bim);
-
-  return;
-}
-
-
 __END__
 
 =head1 NAME
@@ -341,13 +309,11 @@ illuminus - run the Illuminus genotype caller
 =head1 SYNOPSIS
 
 illuminus --chr X --samples <filename> [--start <n>] [--end <m>] \
-  [--plink --snps <filename>] < intensities > genotypes
+  [--plink] < intensities > genotypes
 
 Options:
 
   --chr      The name of the chromsome being analysed. Required.
-  --snps     A JSON file of SNP annotation used to populate Plink output
-             annotation. Required in combination with the --plink option.
   --samples  A JSON file of sample annotation use to determine column
              names, corresponding to the order of the intensity pairs
              in the intensity file. The order is important because these
@@ -394,37 +360,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.6.0
-
-=head1 CHANGELOG
-
-  0.6.0
-
-    Added logging.
-
-  0.5.0
-
-    Require --snps argument for Plink output.
-
-  0.4.0
-
-    Added handling of female samples when calling the Y chromosome.
-
-  0.3.0
-
-    Removed --gender option; genders are now handled internally.
-    Added --chr option.
-    Added --plink option to write Plink BED format.
-
-  0.2.0
-
-    Changed to read sample names from JSON input.
-
-  0.1.0
-
-    Initial version 0.1.0
 
 =cut
