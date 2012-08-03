@@ -104,21 +104,26 @@ Returns:
                 :snp_meta => njname}.merge(args)
 
       smfile, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      gsargs = {:snps => njson,
+      gsargs = {:samples => sjson,
                 :start => 0,
                 :end => num_samples,
                 :size => chunk_size,
                 :group_size => 50,
-                :plink => true}.merge(args)
+                :plink => true,
+                :debug => true}.merge(args)
 
-      chunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
-                               gsargs, async) || []
+      gschunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
+                                 gsargs, async)
+      gschunks = gschunks.flatten if gschunks
+      gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
+                                 sjson, njson, args, async)
 
-      gsfile = chunks.empty? ? nil : merge_bed(chunks.flatten, gsname, args, async)
+      # FIXME: temporarily commented out all QC
+      # qcargs = {:run => run_name}.merge(args)
+      # gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs)
 
-      qc = quality_control(gsfile, :work_dir => work_dir, :sim => smfile)
-
-      [gsfile, qc] if [gsfile, qc].all?
+      # [gsfile, gsquality] if [gsfile, gsquality].all?
+      gsfile
     end
 
     :private

@@ -31,7 +31,10 @@ module Genotyping::Tasks
     # - run_name (String): The analysis run name as given in the pipeline
     #   database.
     # - output (String): The JSON file name.
-    # - args (Hash): Arguments for the operation. Currently none.
+    # - args (Hash): Arguments for the operation.
+    #
+    #   :gender_method (String): The gender determination method name given
+    #   in genders.ini
     #
     # Returns:
     # - The result file path.
@@ -39,7 +42,7 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(dbfile, run_name, output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         cli_args = args.merge({:dbfile => dbfile,
                                :run => run_name,
                                :output => output})

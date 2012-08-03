@@ -84,6 +84,8 @@ module Genotyping::Tasks
     #
     #   :chromosome (String): Limit the operation to SNPs on one chromosome, as
     #   named in the BeadPool manifest.
+    #   :normalize (Boolean): Normalize the intensities. Should be false for
+    #   the GenoSNP caller.
     #
     # - async (Hash): Arguments for asynchronous management.
     #
@@ -95,7 +97,7 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(input, manifest, output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         expected = [output]
 
         cli_args = {:chromosome => args[:chromosome],
@@ -156,7 +158,7 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(input, manifest, output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         expected = [output]
 
         cli_args = {:chromosome => args[:chromosome],
@@ -203,7 +205,7 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(manifest , output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         expected = [output]
 
         cli_args = {:manifest => manifest,

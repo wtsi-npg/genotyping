@@ -57,7 +57,7 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(sim_file, snp_json, manifest , output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         start_sample = args[:start] || 0
         end_sample = args[:end]
         plink = args[:plink]

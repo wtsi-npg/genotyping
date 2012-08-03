@@ -26,6 +26,7 @@ module Genotyping::Tasks
     # Runs quality control on genotype call results.
     #
     # Arguments:
+    # - dbfile (String): The SQLite database file name.
     # - input (Array): An Array of 3 filenames, being the Plink BED and
     #   corresponding BIM and FAM files.
     # - args (Hash): Arguments for the operation.
@@ -34,17 +35,17 @@ module Genotyping::Tasks
     #
     # Returns:
     # - boolean
-    def quality_control(input, args = {}, async = {})
+    def quality_control(dbfile, input, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
-      if args_available?(input, work_dir)
+      if args_available?(dbfile, input, output, work_dir)
         bedfile = input.first
         base = File.basename(bedfile, File.extname(bedfile))
 
-        qc_dir = File.join(work_dir, 'qc')
-        Dir.mkdir(qc_dir) unless File.exist?(qc_dir)
+        Dir.mkdir(output) unless File.exist?(output)
 
-        cli_args = args.merge({:output_dir => qc_dir})
+        cli_args = args.merge({:dbpath => dbfile,
+                               :output_dir => output})
         margs = [cli_args, base]
 
         command = [RUN_QC,
@@ -52,7 +53,7 @@ module Genotyping::Tasks
                      key.gsub(/_/, '-') }, base].flatten.join(' ')
 
         task_id = task_identity(:quality_control, *margs)
-        log = File.join(log_dir, task_id + '.%I.log')
+        log = File.join(log_dir, task_id + '.log')
 
         async_task(margs, command, work_dir, log,
                    :result => lambda { true },
