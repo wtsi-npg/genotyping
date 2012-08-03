@@ -74,12 +74,13 @@ sub include_from_state {
   my ($self) = @_;
 
   my @states = $self->states;
-  if    (grep { $_->name eq 'autocall_pass' } @states) { $self->include(1) }
-  elsif (grep { $_->name eq 'pi_approved' }   @states) { $self->include(1) }
-  else                                                 { $self->include(0) }
+  if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) }
+  elsif (grep { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
+  else                                                  { $self->include(0) }
 
   # If the data are unavailable, we cannot analyse
-  if (grep { $_->name eq 'gtc_unavailable' } @states)  { $self->include(0) }
+  if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) }
 
   return $self->include;
 }

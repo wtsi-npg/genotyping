@@ -377,15 +377,17 @@ sub wrapCommand {
     $verbose ||= 0;
     $tests++;
     if ($fh) {
-	$result = eval { system($cmd); }; # return value of $cmd, or undef for unexpected Perl error
+	$result = system($cmd);  # return value of $cmd, or undef for unexpected Perl error
+
+    $result == 0 or confess "$cmd failed: $?\n";
 	if (not(defined($result)) || $result != 0) { 
 	    $failures++; 
-	    if ($verbose) {print $fh "FAIL\t$cmd\n"; } 
+	    if ($verbose) {print $fh "FAIL\t$cmd\n"; }
 	} elsif ($verbose) { 
-	    print $fh "OK\t$cmd\n"; 
+	    print $fh "OK\t$cmd\n";
 	}
     } else {
-	system($cmd);
+      system($cmd) == 0 or confess "$cmd failed: $?\n";
     }
     return ($tests, $failures);
 }

@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Log::Log4perl;
 
-use Test::More tests => 38;
+use Test::More tests => 40;
 use Test::Exception;
 
 use Data::Dumper;
@@ -55,10 +55,11 @@ dies_ok { $db->should_not_autoload_this_method->all }
   'Expected AUTOLOAD to fail on invalid method';
 
 $db->populate;
+
 is($db->snpset->count, 18, 'The snpset dictionary');
 is($db->method->count, 5, 'The method dictionary');
 is($db->relation->count, 2, 'The relation dictionary');
-is($db->state->count, 10, 'The state dictionary',);
+is($db->state->count, 11, 'The state dictionary',);
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
@@ -94,6 +95,7 @@ ok($pass, 'A state found');
 
 my $fail = $db->state->find({name => 'autocall_fail'});
 my $pi_approved = $db->state->find({name => 'pi_approved'});
+my $consent_withdrawn = $db->state->find({name => 'consent_withdrawn'});
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
@@ -158,3 +160,13 @@ $failed_sample->update;
 
 $failed_sample = $db->sample->find({id_sample => $sample_id});
 ok($failed_sample->include, "Sample included after pi_approved");
+
+# Test that consent_withdrawn overrides everything
+$failed_sample->add_to_states($consent_withdrawn);
+ok((grep { $_->name eq 'consent_withdrawn' } $failed_sample->states),
+    "consent_withdrawn state added");
+$failed_sample->include_from_state;
+$failed_sample->update;
+
+$failed_sample = $db->sample->find({id_sample => $sample_id});
+ok(!$failed_sample->include, "Sample excluded after consent_withdrawn");

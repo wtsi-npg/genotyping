@@ -60,10 +60,7 @@ class TestPlinkTasks < Test::Unit::TestCase
                   :log_dir => work_dir)
       end
 
-      assert_equal(3, merged.size)
-      merged.each do |file|
-        assert(File.exist?(file))
-      end
+      assert(File.exist?(merged))
 
       Percolate.log.close
       remove_work_dir(work_dir)
