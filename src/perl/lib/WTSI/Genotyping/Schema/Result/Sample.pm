@@ -58,8 +58,20 @@ __PACKAGE__->has_many('related_samples',
 
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
 
+
+=head2 include_from_state
+
+  Arg [1]    : None
+  Example    : $sample->include_from_state
+  Description: Modifies $self based on its state to indicate whether or not
+               it is to be included in analysis.
+  Returntype : boolean, true if sample is included in analysis.
+  Caller     : general
+
+=cut
+
 sub include_from_state {
-  my $self = shift;
+  my ($self) = @_;
 
   my @states = $self->states;
   if    (grep { $_->name eq 'autocall_pass' } @states) { $self->include(1) }
@@ -72,8 +84,18 @@ sub include_from_state {
   return $self->include;
 }
 
+=head2 uri
+
+  Arg [1]    : None
+  Example    : $sample->uri
+  Description: Returns a URI for the sample.
+  Returntype : URI object.
+  Caller     : general
+
+=cut
+
 sub uri {
-  my $self = shift;
+  my ($self) = @_;
 
   my $nid = $self->dataset->datasupplier->namespace;
   my $nss = $self->name;
@@ -82,8 +104,18 @@ sub uri {
   return $uri->canonical;
 }
 
+=head2 gtc
+
+  Arg [1]    : None
+  Example    : $sample->gtc
+  Description: Returns the path of the sample GTC file.
+  Returntype : string file path
+  Caller     : general
+
+=cut
+
 sub gtc {
-  my $self = shift;
+  my ($self) = @_;
 
   my $file;
   my $result = $self->results->find({'method.name' =>'Autocall'},
@@ -101,9 +133,18 @@ sub gtc {
   return $file;
 }
 
+=head2 idat
+
+  Arg [1]    : string channel, 'red' or 'green'
+  Example    : $sample->gtc
+  Description: Returns the path of the IDAT file for one of the two channels
+  Returntype : string file path
+  Caller     : general
+
+=cut
+
 sub idat {
-  my $self = shift;
-  my $channel = shift;
+  my ($self, $channel) = @_;
 
   $channel or $self->log->logconfess('A channel argument is required');
   unless ($channel =~ m{^red|green$}msx) {

@@ -35,8 +35,10 @@ use Exporter;
                 read_it_column_names
                 update_it_columns
                 write_gt_calls
-                update_snp_locations
                 write_gs_snps
+
+                update_snp_locations
+                update_sample_genders
               );
 
 use WTSI::Genotyping::DelimitedFiles;

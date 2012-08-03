@@ -26,6 +26,19 @@ __PACKAGE__->has_many('datasets',
                       'WTSI::Genotyping::Schema::Result::Dataset',
                       { 'foreign.id_piperun' => 'self.id_piperun' });
 
+=head2 validate_snpset
+
+  Arg [1]    : string Snpset name
+  Example    : $piperun->validate_snpset('HumanOmni25-8v1')
+  Description: Returns true if data for the requested Snpset may be analysed
+               in this Piperun. It is not possible to mix Snpsets in a single
+               Piperun. Validity in this context means that this Snpset
+               is the same as any which may be present in the Piperun already.
+  Returntype : boolean
+  Caller     : general
+
+=cut
+
 sub validate_snpset {
   my ($self, $snpset) = @_;
 
@@ -42,6 +55,17 @@ sub validate_snpset {
 
   return $valid;
 }
+
+=head2 validate_datasets
+
+  Arg [1]    : None
+  Example    : $piperun->validate_datasets
+  Description: Returns true if the datasets in this Piperun all use the same
+               Snpset.
+  Returntype : boolean
+  Caller     : general
+
+=cut
 
 sub validate_datasets {
   my ($self) = @_;

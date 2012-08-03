@@ -74,7 +74,6 @@ sub configure {
 
 =cut
 
-
 sub inifile {
   my ($self, @args) = @_;
   if (@args) {
