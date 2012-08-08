@@ -67,7 +67,8 @@ foreach my $format qw(plink json text) {
 	is($status, 0, "check_xhet_gender.pl exit status, input $format, output type $outType");
 	is(diffGenders(\%refGenders, $outPath), 0, "Verify $outType output vs. benchmark");
 	my %dbGenders = readDatabaseGenders($dbfile);
-	ok(%dbGenders, "Read inferred genders from database");
+	my @names = keys(%dbGenders);
+	is(keys(%dbGenders), 995, "Read correct number of inferred genders from database");
 	is(diffGenders(\%dbGenders, $outPath), 0, "Verify $outType output vs. database");
 	system("rm -f $dbfile");
     }
@@ -84,8 +85,10 @@ sub diffGenders {
     my %genders = readGenderOutput($inPath);
     # check gender codes
     foreach my $sample (keys(%genders)) {
-	#print "### $sample,$benchmark{$sample},$genders{$sample}\n";
-	if ($benchmark{$sample} != $genders{$sample}) { $diff = 1; last; }
+	if ($benchmark{$sample} != $genders{$sample}) { 
+	    $diff = 1; 
+	    last; 
+	}
     }
     # if codes OK, check that sample sets match
     unless ($diff) {
