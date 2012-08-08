@@ -17,7 +17,7 @@ use WTSI::Genotyping::QC::QCPlotShared qw(readQCFileNames);
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
 
-my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $boxtype);
+my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $boxtype, $runName);
 
 GetOptions("help"           => \$help,
 	   "output-dir=s"   => \$outDir,
@@ -27,6 +27,7 @@ GetOptions("help"           => \$help,
 	   "inipath=s"      => \$iniPath,
 	   "title=s"        => \$title,
 	   "boxmode=s"      => \$boxtype,
+	   "run=s"          => \$runName,
     );
 
 if ($help) {
@@ -37,6 +38,7 @@ Options:
 --sim=PATH          Path to SIM intensity file for xydiff calculation
 --dbpath=PATH       Path to pipeline database .db file
 --inipath=PATH      Path to .ini file containing general pipeline and database configuration; defaults to \$HOME/.npg/genotyping.ini
+--run=NAME          Name of run in pipeline database (needed for database update from gender check)
 --config=PATH       Path to .json file with QC thresholds
 --title             Title for this analysis; will appear in plots
 --boxtype           Keyword for boxplot type; must be one of 'box', 'bean', or 'both'; defaults to 'both'
@@ -59,7 +61,7 @@ $title ||= "Untitled";
 $boxtype ||= "both";
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $outDir, $title, $boxtype);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $runName, $configPath, $outDir, $title, $boxtype);
 
 sub getBoxBeanCommands {
     my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
@@ -127,15 +129,20 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $outDir, $title, $boxPlotType) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $runName, $configPath, $outDir, $title, $boxPlotType) = @_;
     my $startDir = getcwd;
     my %fileNames = readQCFileNames();
     ### input file generation ###
     my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
 		"$CR_STATS_EXECUTABLE $plinkPrefix",
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
-		"perl $Bin/check_xhet_gender.pl --input=$plinkPrefix"
 	);
+    my $genderCmd = "perl $Bin/check_xhet_gender.pl --input=$plinkPrefix";
+    if ($dbPath) { 
+	unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
+	$genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
+    }
+    push(@cmds, $genderCmd);
     my $xydiff = 0;
     if ($simPath) {
 	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
@@ -155,7 +162,7 @@ sub run {
     chdir($outDir);
     foreach my $cmd (@cmds) { 
 	my $result = system($cmd); 
-	unless ($result==0) { croak "Command finished with non-zero exit status: $cmd"; } 
+	unless ($result==0) { croak "Command finished with non-zero exit status: \"$cmd\""; } 
     }
     chdir($startDir);
 }
