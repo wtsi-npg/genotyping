@@ -21,6 +21,7 @@ use WTSI::Genotyping::QC::QCPlotTests;
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $noWrite, $noPlate, $noPlots, $verbose);
+my $runName;
 
 GetOptions("help"           => \$help,
 	   "output-dir=s"   => \$outDir,
@@ -28,6 +29,7 @@ GetOptions("help"           => \$help,
 	   "sim=s"          => \$simPath,
 	   "dbpath=s"       => \$dbPath,
 	   "inipath=s"      => \$iniPath,
+       "run=s"          => \$runName,
 	   "title=s"        => \$title,
 	   "no-data-write"  => \$noWrite,
 	   "no-plate"       => \$noPlate,
@@ -43,6 +45,7 @@ Options:
 --sim=PATH          Path to SIM intensity file for xydiff calculation
 --dbpath=PATH       Path to pipeline database .db file
 --inipath=PATH      Path to .ini file containing general pipeline and database configuration; defaults to \$HOME/.npg/genotyping.ini
+--run=run name      Name of the pipeline run.
 --config=PATH       Path to .json file with QC thresholds
 --title             Title for this analysis; will appear in plots
 --no-data-write     Do not write text input files for plots (plotting will fail unless files already exist)
@@ -166,7 +169,7 @@ sub writeInputFiles {
     my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
 		"$crStatsExecutable $plinkPrefix",
 		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
-		"perl $Bin/check_xhet_gender.pl --input=$plinkPrefix"
+		"perl $Bin/check_xhet_gender.pl --dbfile=$dbPath --run=$runName --input=$plinkPrefix"
 	);
     if ($simPath) {
 	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");

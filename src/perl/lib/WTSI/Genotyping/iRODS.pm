@@ -187,7 +187,7 @@ sub remove_object {
     $log->logconfess('A non-empty target (object) argument is required');
 
   $log->debug("Removing object '$target'");
-  _irm($target);
+  return _irm($target);
 }
 
 =head2 get_object_meta
@@ -244,16 +244,16 @@ sub add_object_meta {
 sub batch_object_meta {
   my ($object, $meta_tuples) = @_;
 
-  open(IMETA, "| $IMETA > /dev/null")
+  open(my $imeta, '|', "$IMETA > /dev/null")
     or $log->logconfess("Failed open pipe to command '$IMETA': $!");
   foreach my $tuple (@$meta_tuples) {
     my ($key, $value, $units) = @$tuple;
     $units ||= '';
 
     $log->debug("Adding metadata pair '$key' -> '$value' to $object");
-    print IMETA qq(add -d $object "$key" "$value" "$units"), "\n";
+    print $imeta qq(add -d $object "$key" "$value" "$units"), "\n";
   }
-  close(IMETA);
+  close($imeta) or warn "Failed to close pipe to command '$IMETA'\n";
 
   # WARNING: imeta exits with the error code for the last operation in
   # the batch. An error followed by a success will be reported as a
@@ -345,7 +345,7 @@ sub list_collection {
   }
   else {
     $log->debug("Collection '$collection' does not exist");
-    return undef;
+    return;
   }
 }
 
@@ -414,7 +414,7 @@ sub remove_collection {
     $log->logconfess('A non-empty target (object) argument is required');
 
   $log->debug("Removing collection '$target'");
-  _irm($target);
+  return _irm($target);
 }
 
 =head2 get_collection_meta
@@ -515,14 +515,14 @@ sub remove_collection_meta {
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
-  exists $meta{$key} and grep { $_ eq $value } @{$meta{$key}};
+  return exists $meta{$key} and grep { $_ eq $value } @{$meta{$key}};
 }
 
 sub _ensure_absolute {
   my ($target) = @_;
 
   my $absolute = $target;
-  unless ($target =~ /^\//) {
+  unless ($target =~ m/^\//) {
     $absolute = ipwd() . '/' . $absolute;
   }
 
@@ -535,22 +535,22 @@ sub _parse_raw_meta {
   @raw_meta = grep { m/^[attribute|value|units]/ } @raw_meta;
   my $n = scalar @raw_meta;
   unless ($n % 3 == 0) {
-    $log->logcroak("Expected imeta triples, but found $n elements");
+    $log->logconfess("Expected imeta triples, but found $n elements");
   }
 
   my %meta;
   for (my $i = 0; $i < $n; $i += 3) {
     my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
 
-    my ($attribute) = $str0 =~ /^attribute: (.*)/ or
-       $log->logcroak("Invalid triple $i: expected an attribute but found ",
-                      "'$str0'");
+    my ($attribute) = $str0 =~ m/^attribute: (.*)/ or
+      $log->logconfess("Invalid triple $i: expected an attribute but found ",
+                     "'$str0'");
 
-    my ($value) = $str1 =~ /^value: (.*)/ or
-      $log->logcroak("Invalid triple $i: expected a value but found '$str1'");
+    my ($value) = $str1 =~ m/^value: (.*)/ or
+      $log->logconfess("Invalid triple $i: expected a value but found '$str1'");
 
-    my ($units) = $str2 =~ /^units: (.*)/ or
-      $log->logcroak("Invalid triple $i: expected units but found '$str2'");
+    my ($units) = $str2 =~ m/^units: (.*)/ or
+      $log->logconfess("Invalid triple $i: expected units but found '$str2'");
 
     if (exists $meta{$attribute}) {
       push(@{$meta{$attribute}}, $value);
@@ -577,9 +577,9 @@ sub _safe_select {
 }
 
 sub _irm {
-  my (@args) = @_;
+  my @args = @_;
 
-  run_command($IRM, '-r', join(" ", @args));
+  run_command($IRM, '-r', join(' ', @args));
 
   return @args;
 }

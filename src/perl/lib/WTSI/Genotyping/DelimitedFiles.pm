@@ -19,7 +19,7 @@ use Carp;
 =cut
 
 sub read_fon {
-  my $fh = shift;
+  my ($fh) = @_;
 
   my @names;
   while (my $line = <$fh>) {

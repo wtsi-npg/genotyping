@@ -111,7 +111,7 @@ is(system($cmd), 0, "main_plot_index.pl exit status");
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA > /dev/null";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=pipeline_run > /dev/null";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 print "\tTest dataset Alpha finished.\n";
