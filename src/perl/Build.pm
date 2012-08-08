@@ -11,6 +11,19 @@ use File::Spec;
 
 use base 'Module::Build';
 
+#
+# Add an 'install_config' target to the build file.
+#
+sub ACTION_install_config {
+  my ($self) = @_;
+
+  $self->process_conf_files;
+  $self->process_ini_files;
+  $self->process_sql_files;
+
+  return $self;
+}
+
 sub process_conf_files {
   my ($self) = @_;
   return $self->process_files_by_category('conf_files');
@@ -29,11 +42,7 @@ sub process_sql_files {
 sub process_files_by_category {
   my ($self, $category) = @_;
 
-  # Is 'code' the correct action? The 'config_files' action would seem
-  # more appropriate. However, that doesn't seem to call any of the
-  # process_*_files which the documentation says we should use to
-  # install custom file types.
-  if ($self->current_action eq 'code') {
+  if ($self->current_action eq 'install_config') {
     my $translations = $self->{properties}->{$category};
     my $dest_base = $self->install_base;
 
