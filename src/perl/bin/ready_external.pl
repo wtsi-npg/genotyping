@@ -254,15 +254,16 @@ __END__
 
 =head1 NAME
 
-ready_infinium
+ready_external
 
 =head1 SYNOPSIS
 
-ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
+ready_external [--config <database .ini file>] [--dbfile <SQLite file>] \
    --namespace <sample namespace> --chip-design <chip design name> \
    --run <pipeline run name> --supplier <supplier name> [--verbose]
 
 Options:
+
   --chip-design The microarray chip design (see the snpsets.ini file)
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
