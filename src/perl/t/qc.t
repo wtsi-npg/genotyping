@@ -7,10 +7,10 @@
 use strict;
 use warnings;
 use Cwd;
+use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 69;
+use Test::More tests => 87;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
-
 
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
@@ -20,13 +20,19 @@ my $outDirA = "$Bin/qc/alpha/";
 my $heatMapDir = "plate_heatmaps/";
 my $titleA = "Alpha";
 my $config = "$bin/../json/qc_threshold_defaults.json";
-my $dbfileA = "$Bin/qc_test_data/alpha_pipeline.db";
+my $dbnameA = "alpha_pipeline.db";
+my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
+my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
+
+# copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
+my $tempdir = tempdir(CLEANUP => 1);
+system("cp $dbfileMasterA $tempdir");
+my $dbfileA = $tempdir."/".$dbnameA;
 
 # may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
-
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, if any
 
 ### test creation of QC input files ### 
@@ -110,9 +116,29 @@ is(system($cmd), 0, "main_plot_index.pl exit status");
 ## main index output
 ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
+system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
+system("cp $dbfileMasterA $tempdir");
+print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
+
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA > /dev/null";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
+
+## check (non-heatmap) outputs again
+foreach my $png (@png) {
+    ok(pngPathOK($png), "PNG output $png in valid format");
+}
+ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
+
+my $heatMapsOK = 1;
+foreach my $mode (@modes) {
+    for (my $i=1;$i<=11;$i++) {
+	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
+	unless (pngPathOK($png)) {$heatMapsOK = 0; last; }
+    }
+    unless (xmlPathOK('plate_heatmaps/index.html')) { $heatMapsOK = 0; }
+}
+ok($heatMapsOK, "Plate heatmap outputs OK");
 
 print "\tTest dataset Alpha finished.\n";
 

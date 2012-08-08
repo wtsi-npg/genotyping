@@ -74,12 +74,21 @@ sub columnsMatch {
 
 sub createTestDatabase {
     # create temporary test database with given sample names
-    my ($namesRef, $dbfile, $runName, $projectName) = @_;
+    my ($namesRef, $dbfile, $runName, $projectName, $uriStrip) = @_;
     $runName ||= "pipeline_run";
     $projectName ||= "dataset_socrates";
-    my @names;
+    $uriStrip ||= 1; # strip off excess colon-delimited uri fields, eg. foo:bar:item001 -> item001
+    my (@names, %names);
     if ($namesRef) { 
 	@names = @$namesRef; 
+	if ($uriStrip) {
+	    for my $i (0..@names-1) {
+		my @fields = split(/:/, $names[$i]);
+		my $name = pop(@fields);
+		if ($names{$name}) { croak "Error; sample name $name not unique after removing URI prefixes"; }
+		else { $names[$i] = $name; $names{$name}=1; }  
+	    }
+	}
     } else {
 	foreach my $i (1..20) { push @names, sprintf("sample_%03i", ($i)); }
     }

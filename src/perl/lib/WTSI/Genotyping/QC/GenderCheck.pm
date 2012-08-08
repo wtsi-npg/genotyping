@@ -73,6 +73,7 @@ sub readModelGenders {
 
 sub readDatabaseGenders {
     # read inferred genders from database -- use for testing database update
+    # return hash of genders indexed by sample URI (not sample name)
     my $dbfile = shift;
     my $method = shift;
     $method ||= 'Inferred';
@@ -81,13 +82,13 @@ sub readDatabaseGenders {
     my %genders;
     $db->in_transaction(sub {
 	foreach my $sample (@samples) {
-	    my $sample_name = $sample->name;
+	    my $sample_uri = $sample->uri;
 	    my $gender = $db->gender->find
 		({'sample.id_sample' => $sample->id_sample,
 		  'method.name' => $method},
 		 {join => {'sample_genders' => ['method', 'sample']}},
 		 {prefetch =>  {'sample_genders' => ['method', 'sample']} });
-	    $genders{$sample_name} = $gender->code;
+	    $genders{$sample_uri} = $gender->code;
 	}
 			});
     $db->disconnect();
@@ -186,19 +187,19 @@ sub runGenderModel {
 
 sub updateDatabase {
     # update pipeline database with inferred genders
-    # sample 'names' in input text/json should actually be URIs
-    my ($namesRef, $gendersRef, $dbfile, $runName) = @_;
-    my @names = @$namesRef;
+    # assume that sample names are given in URI format
+    my ($uriRef, $gendersRef, $dbfile, $runName) = @_;
+    my @uris = @$uriRef;
     my @genders = @$gendersRef;
     my %genders;
-    for (my $i=0;$i<@names;$i++) {
-	$genders{$names[$i]} = $genders[$i];
+    for (my $i=0;$i<@uris;$i++) {
+	$genders{$uris[$i]} = $genders[$i];
     }
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
     my $run = $db->piperun->find({name => $runName});
     unless ($runName) {
-	die "Run '$runName' does not exist. Valid runs are: [" .
+	croak "Run '$runName' does not exist. Valid runs are: [" .
 	    join(", ", map { $_->name } $db->piperun->all) . "]\n";
     }
     # transaction to update sample genders
@@ -207,13 +208,17 @@ sub updateDatabase {
 	my @samples = $ds->samples->all;
 	$db->in_transaction(sub {
 	    foreach my $sample (@samples) {
-		my $sample_name = $sample->name;
-		my $genderCode = $genders{$sample_name};
+		my $sample_uri = $sample->uri;
+		my $genderCode = $genders{$sample_uri};
+		unless (defined($genderCode)) { 
+		    croak "Error: Cannot find gender for sample \"$sample_uri\""; 
+		    #$genderCode = -1;
+		}
 		my $gender;
 		if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
 		elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }
 		elsif ($genderCode==0) { $gender = $db->gender->find({name => 'Unknown'}); }
-		else { $gender = $db->gender->find({name => 'Not available'}); }
+		else { $gender = $db->gender->find({name => 'Not Available'}); }
 		$sample->add_to_genders($gender, {method => $inferred});
 	    }
 			    });
