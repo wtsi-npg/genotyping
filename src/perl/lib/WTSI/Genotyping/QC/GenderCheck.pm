@@ -23,8 +23,6 @@
 # Module to do gender inference from x chromosome heterozygosity
 # Does input/output processing and acts as front-end for R script implementing mixture model
 
-use Data::Dumper;
-
 use warnings;
 use strict;
 use Carp;
@@ -198,7 +196,6 @@ sub updateDatabase {
     }
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
-
     my $run = $db->piperun->find({name => $runName});
     unless ($runName) {
 	die "Run '$runName' does not exist. Valid runs are: [" .
@@ -210,8 +207,8 @@ sub updateDatabase {
 	my @samples = $ds->samples->all;
 	$db->in_transaction(sub {
 	    foreach my $sample (@samples) {
-		my $sample_uri = $sample->uri;
-		my $genderCode = $genders{$sample_uri};
+		my $sample_name = $sample->name;
+		my $genderCode = $genders{$sample_name};
 		my $gender;
 		if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
 		elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }

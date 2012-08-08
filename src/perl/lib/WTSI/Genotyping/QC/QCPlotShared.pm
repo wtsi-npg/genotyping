@@ -41,7 +41,7 @@ sub getDatabaseObject {
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    # $db->populate;
+    $db->populate;
     return $db;
 }
 
