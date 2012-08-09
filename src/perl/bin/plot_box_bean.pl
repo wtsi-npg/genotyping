@@ -17,7 +17,7 @@ use warnings;
 use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
-use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
+use WTSI::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($mode, $type, $outDir, $title, $help, $test, $dbpath, $inipath);
@@ -63,18 +63,6 @@ unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal typ
 if ((!$dbpath) && (!$inipath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
 if ($dbpath && not -r $dbpath) { croak "Cannot read pipeline database path $dbpath"; }
 if ($inipath && not -r $inipath) { croak "Cannot read .ini path $inipath"; }
-
-sub parsePlate {
-    # parse plate from sample name, assuming usual PLATE_WELL_ID format
-    # return undefined value for incorrectly formatted name
-    my $name = shift;
-    my $plate;
-    if ($name =~ /\w+_\w+/) {
-	my @terms = split(/_/, $name);
-	$plate = shift @terms;
-    }
-    return $plate;
-}
 
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
