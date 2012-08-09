@@ -23,11 +23,11 @@ use Log::Log4perl;
 =cut
 
 sub new {
-   my $class = shift;
+   my ($class, @args) = @_;
 
    my $self = {};
    bless($self, $class);
-   $self->configure(@_);
+   $self->configure(@args);
    return $self;
 }
 
@@ -45,8 +45,7 @@ sub new {
 =cut
 
 sub configure {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   $self->name($args{name});
   $self->inifile($args{inifile});
@@ -75,11 +74,10 @@ sub configure {
 
 =cut
 
-
 sub inifile {
-  my $self = shift;
-  if (@_) {
-    $self->{_inifile} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_inifile} = $args[0];
   }
 
   return $self->{_inifile};
@@ -98,9 +96,10 @@ sub inifile {
 
 =cut
 
+## no critic
+
 sub connect {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   unless ($self->{_dbh}) {
     $self->log->info('Connecting to ', $self->data_source);
@@ -113,6 +112,7 @@ sub connect {
   return $self;
 }
 
+## use critic
 
 =head2 disconnect
 
@@ -125,9 +125,11 @@ sub connect {
 =cut
 
 sub disconnect {
-  my $self = shift;
+  my ($self) = @_;
   $self->log->info('Disconnecting from ', $self->data_source);
   $self->dbh->disconnect;
+
+  return $self;
 }
 
 
@@ -142,7 +144,7 @@ sub disconnect {
 =cut
 
 sub is_connected {
-  my $self = shift;
+  my ($self) = @_;
   return defined $self->dbh && $self->dbh->ping;
 }
 
@@ -158,7 +160,7 @@ sub is_connected {
 =cut
 
 sub dbh {
-  my $self = shift;
+  my ($self) = @_;
   return $self->{_dbh};
 }
 
@@ -174,9 +176,9 @@ sub dbh {
 =cut
 
 sub name {
-  my $self = shift;
-  if (@_) {
-    $self->{_name} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_name} = $args[0];
   }
 
   return $self->{_name};
@@ -194,9 +196,9 @@ sub name {
 =cut
 
 sub data_source {
-  my $self = shift;
-  if (@_) {
-    $self->{_data_source} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_data_source} = $args[0];
   }
 
   return $self->{_data_source};
@@ -214,9 +216,9 @@ sub data_source {
 =cut
 
 sub username {
-  my $self = shift;
-  if (@_) {
-    $self->{_username} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_username} = $args[0];
   }
 
   return $self->{_username};
@@ -233,9 +235,9 @@ sub username {
 =cut
 
 sub password {
-  my $self = shift;
-  if (@_) {
-    $self->{_password} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_password} = $args[0];
   }
 
   return $self->{_password};
@@ -252,9 +254,9 @@ sub password {
 =cut
 
 sub log {
-  my $self = shift;
-  if (@_) {
-    $self->{_log} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_log} = $args[0];
   }
 
   return $self->{_log};

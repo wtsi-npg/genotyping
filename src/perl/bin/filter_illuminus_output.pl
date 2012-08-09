@@ -74,17 +74,14 @@ sub run {
               -exitval => 2);
   }
 
-  my $col;
-  open($col, "<$columns")
+  open(my $col, '<', "$columns")
     or die "Failed to open column file '$columns' for reading: $!\n";
   my $column_names = read_fon($col);
-  close($col);
+  close($col) or warn "Failed to close column file '$columns'\n";
 
-  my $gti;
-  my $gto;
-  open($gti, "<$gt_input")
+  open(my $gti, '<', "$gt_input")
     or die "Failed to open genotype file '$gt_input' for reading: $!\n";
-  open($gto, ">$gt_output")
+  open(my $gto, '>', "$gt_output")
     or die "Failed to open genotype file '$gt_output' for writing: $!\n";
 
   my $headers = read_gt_column_names($gti);
@@ -97,21 +94,19 @@ sub run {
   my $num_genotypes =
     filter_gt_columns($gti, $gto, $gt_separator, $gt_offset, $gt_col_group,
                       $cols_to_use, $operation);
-  close($gto);
-  close($gti);
+  close($gto) or warn "Failed to close genotype file '$gt_output'\n";
+  close($gti) or warn "Failed to close genotype file '$gt_input'\n";
 
-  my $pri;
-  my $pro;
-  open($pri, "<$pr_input")
+  open(my $pri, '<', "$pr_input")
     or die "Failed to open probability file '$pr_input' for reading: $!\n";
-  open($pro, ">$pr_output")
+  open(my $pro, '>', ">pr_output")
     or die "Failed to open probability file '$pr_output' for writing: $!\n";
 
   my $num_probs =
     filter_gt_columns($pri, $pro, $pr_separator, $pr_offset, $pr_col_group,
                       $cols_to_use, $operation);
-  close($pro);
-  close($pri);
+  close($pro) or warn "Failed to close probability file '$pr_output'\n";
+  close($pri) or warn "Failed to close probability file '$pr_input'\n";
 
   unless ($num_genotypes == $num_probs) {
     die "Number of SNP genotype records ($num_genotypes) in '$gt_input' " .
@@ -121,8 +116,11 @@ sub run {
 
   if ($verbose) {
     my $verb = $operation . "d";
+    my $num_cols = scalar @$cols_to_use;
     print STDERR "$verb $num_cols columns from $num_genotypes records\n";
   }
+
+  return;
 }
 
 
@@ -173,7 +171,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2011 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2011-2012 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
@@ -184,19 +182,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.2.0
-
-=head1 CHANGELOG
-
-  0.2.0
-
-     Added logging.
-
-  0.1.0
-
-     Initial version 0.1.0
 
 =cut

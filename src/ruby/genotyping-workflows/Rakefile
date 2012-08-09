@@ -11,7 +11,7 @@ require 'lib/genotyping/version'
 spec = Gem::Specification.new do |spec|
   spec.name = 'genotyping-workflows'
   spec.version = Genotyping::VERSION
-  spec.add_dependency('percolate', '>= 0.9.0')
+  spec.add_dependency('percolate', '>= 0.9.5')
   spec.extra_rdoc_files = ['README', 'LICENSE']
   spec.summary = 'WTSI genotyping workflows.'
   spec.description = 'WTSI genotyping workflows for the Illumina Infinium' +
