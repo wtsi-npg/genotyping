@@ -106,7 +106,7 @@ sub getPlateInfo {
     my @metricNames = readQCNameArray();
     my (%crByPlate, %hetByPlate, %passByPlate, %samplesByPlate, %plateStats, @cr, @het, $pass, $samples);
     foreach my $sample (keys(%records)) {
-	if not ($records{$sample}) { croak "No QC results found for sample $sample!"; }
+	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
 	my %record = %{$records{$sample}};
 	my $plate = $record{'plate'};
 	my $samplePass = 1;
@@ -154,7 +154,7 @@ sub getSampleInfo {
     my @samples = keys(%records);
     @samples = sort @samples;
     foreach my $sample (@samples) {
-	if not ($records{$sample}) { croak "No QC results found for sample $sample!"; }
+	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
 	my %record = %{$records{$sample}};
 	my $samplePass = 1;
 	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); # $samplePass is placeholder
