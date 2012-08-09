@@ -16,9 +16,20 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/dbDatasetInfo dbSampleInfo textForDatasets textForPlates textForCsv texToPdf writeCsv writeSummaryLatex writeSummaryText/;
+our @EXPORT = qw/createReports/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
 
+sub createReports {
+    # 'main' method to write text and CSV files
+    my ($results, $db, $csv, $tex, $metrics, $qcDir, $title) = @_; # I/O paths
+    my $csvOK = writeCsv($results, $db, $csv);
+    if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
+    writeSummaryLatex($tex, $results, $metrics, $db, $qcDir, $title);
+    my $pdfOK = texToPdf($tex);
+    if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
+    my $ok = $csvOK && $pdfOK;
+    return $ok;
+}
 
 sub dbDatasetInfo {
     # get general information on analysis run(s) from pipeline database
@@ -57,6 +68,18 @@ sub dbSampleInfo {
 	}
     }
     return %sampleInfo;
+}
+
+sub findPlateFields {
+    # find report fields for a single plate, or an entire experiment
+    my ($total, $pass, $crRef, $hetRef) = @_;
+    my $excl = $total - $pass;
+    my $exclPercent = ($excl/$total)*100;
+    my @cr = @{$crRef};
+    my ($crMean, $crSd) = meanSd(@cr);
+    my $crMedian = median(@cr);
+    my ($hetMean, $hetSd) = meanSd(@{$hetRef});
+    return ($total, $excl, $exclPercent, $crMean, $crMedian, $hetMean);
 }
 
 sub getCsvHeaders {
@@ -250,18 +273,6 @@ sub latexTable {
     return $table;
 }
 
-sub findPlateFields {
-    # find report fields for a single plate, or an entire experiment
-    my ($total, $pass, $crRef, $hetRef) = @_;
-    my $excl = $total - $pass;
-    my $exclPercent = ($excl/$total)*100;
-    my @cr = @{$crRef};
-    my ($crMean, $crSd) = meanSd(@cr);
-    my $crMedian = median(@cr);
-    my ($hetMean, $hetSd) = meanSd(@{$hetRef});
-    return ($total, $excl, $exclPercent, $crMean, $crMedian, $hetMean);
-}
-
 sub plateFieldsToText {
     # convert title and unformatted results to array of formatted text fields
     my $title = shift;
@@ -324,16 +335,6 @@ sub textForMetrics {
     return @text;
 }
 
-sub textForPassRate {
-    ### TODO this may be unnecessary, same results appear in final line of textForPlates
-    my $resultPath = shift;
-    my ($total, $fails, $passRate, $cr_mean, $cr_sd) = getSummaryStats($resultPath);
-    my @headers = qw/total_samples failed_samples pass_rate/;
-    my @text = (\@headers,);
-    push(@text, [$total, $fails, sprintf('%.2f', $passRate*100)."%"]);
-    return @text;
-}
-
 sub textForPlates {
     my $resultPath = shift;
     my $resultsRef = readJson($resultPath);
@@ -373,6 +374,8 @@ sub textForCsv {
 
 sub texToPdf {
     my $texPath = shift;
+    my $cleanup = shift;
+    $cleanup ||= 1;
     $texPath = abs_path($texPath);
     my @terms = split('/', $texPath);
     my $file = pop @terms;
@@ -380,6 +383,10 @@ sub texToPdf {
     my $startDir = getcwd();
     chdir($texDir);
     my $result = system('pdflatex '.$file.' > /dev/null');
+    if ($cleanup) {
+	my @rm = qw/*.aux *.dvi *.lof/; # remove intermediate LaTeX files; keeps .log, .tex, .pdf
+	system('rm -f '.join(' ', @rm));
+    }
     chdir($startDir);
     if ($result==0) { return 1; }
     else { return 0; }
@@ -393,11 +400,13 @@ sub writeCsv {
 	print $out join(',', @$lineRef)."\n";
     }
     close $out || croak  "Cannot close output path $outPath";
+    if (@text > 0) { return 1; } # at least one line written without croak
+    else { return 0; }
 }
 
 sub writeSummaryLatex {
     # write .tex input file for LaTeX; use to generate PDF
-    my ($texPath, $resultPath, $metricPath, $dbPath, $title, $author, $graphicsDir) = @_;
+    my ($texPath, $resultPath, $metricPath, $dbPath, $graphicsDir, $title, $author) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Untitled";
     $author ||= "WTSI Genotyping Pipeline";
