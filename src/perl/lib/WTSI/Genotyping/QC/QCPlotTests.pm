@@ -21,57 +21,6 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames $ini_path/;
 
-sub columnsMatch {
-    # check for difference in specific columns (of space-delimited files, can also do for other separators)
-    # use where reference file sample names column has been scrubbed
-    my ($path1, $path2, $indicesRef, $verbose, $sep, $commentPattern) = @_;
-    $sep = '\s+';
-    $verbose ||= 0;
-    $commentPattern ||= "^#";
-    my $match = 1;
-    my @indices = @$indicesRef; # column indices to check
-    my ($line1, $line2);
-    open(IN1, $path1) || croak "Cannot open $path1: $!";
-    open(IN2, $path2) || croak "Cannot open $path2: $!";
-    my $j = 0; # line count
-    while (1) {
-	$line1 = readline(IN1);
-	$line2 = readline(IN2);
-	if ($line1) {chomp $line1;}
-	if ($line2) {chomp $line2;}
-	if (!($line1) && !($line2)) {
-	    # both files ended
-	    if ($verbose) {print STDERR "No difference found!\n"; }
-	    last;
-	} elsif (!($line1) || !($line2)) {
-	    # only one file ended; file lengths differ
-	    if ($verbose) {print STDERR "Warning: File lengths of $path1 and $path2 differ.\n";}
-	    $match = 0;
-	    last;
-	} elsif ($line1=~$commentPattern && $line2=~$commentPattern) {
-	    next;
-	} else {
-	    chomp $line1;
-	    chomp $line2;
-	    my @words1 = split(/$sep/, $line1);
-	    my @words2 = split(/$sep/, $line2);
-	    foreach my $i (@indices) {
-		if ($words1[$i] ne $words2[$i]) {
-		    if ($verbose) {print STDERR "Warning: Difference in column index $i at line index $j.\n";}
-		    $match = 0;
-		    last;
-		}
-	    }
-	    $j++;
-	    if (not $match) { last; }
-	}
-    }
-    close IN1;
-    close IN2;
-    return $match;
-}
-
-
 sub createTestDatabase {
     # create temporary test database with given sample names
     my ($namesRef, $dbfile, $runName, $projectName, $uriStrip) = @_;
@@ -157,54 +106,6 @@ sub createPlateAddress {
     return ($plate, $addr); 
 }
 
-
-sub diffGlobs {
-    # glob for files in output and reference directories
-    # want files to be identical
-    # if output file differs or is missing, record as failure
-    my ($refDir, $outDir, $fh, $tests, $failures, $globExpr, $colsRef) = @_;
-    $tests ||= 0;
-    $failures ||= 0;
-    $globExpr ||= '*.txt';
-    my $colString;
-    if ($colsRef) { $colString = join(":", @$colsRef); }
-    else { $colString = "ALL_COLS"; }
-    print $fh "###\tStarting diff tests: $refDir $outDir $globExpr $colString\n";
-    my $startDir = getcwd();
-    $outDir = abs_path($outDir);
-    chdir($refDir);
-    my @ref = glob($globExpr);
-    @ref = sort(@ref);
-    foreach my $name (@ref) {
-	$tests++;
-	my $outPath = $outDir.'/'.$name;
-	if (not(-r $outPath)) { 
-	    print $fh "FAIL\tdiff $name (output file missing)\n"; $failures++; 
-	} elsif ($colsRef) { # diff on specific columns only
-	    if (!(columnsMatch($name, $outPath, $colsRef))) {
-		print $fh "FAIL\tdiff $name (columns differ)\n"; $failures++;
-	    } else {
-		print $fh "OK\tdiff $name\n"; 
-	    }
-	} elsif (filesDiffer($name, $outPath)) { # diff entire files
-	    print $fh "FAIL\tdiff $name (files differ)\n"; $failures++; 
-	} else { 
-	    print $fh "OK\tdiff $name\n"; 
-	}
-    }
-    chdir($startDir);
-    return ($tests, $failures);
-}
-
-sub filesDiffer {
-    # use system call to diff to see if two files differ
-    # will return true if one or both files are missing!
-    my ($path1, $path2) = @_;
-    my $result = system('diff -q '.$path1.' '.$path2.' 2> /dev/null');
-    if ($result==0) { return 0; } # no difference
-    else { return 1; }
-}
-
 sub jsonOK {
     # check if given filehandle contains valid JSON
     my $fh = shift;
@@ -277,7 +178,7 @@ sub pathOK {
 }
 
 sub readPlinkSampleNames {
-    # read sample names from a PLINK .fam file
+    # read sample names from a PLINK .fam file; convenience method to get names list for createTestDatabase
     my $famPath = shift;
     open my $in, "< $famPath" || croak "Cannot open input $famPath";
     my %samples;
@@ -294,23 +195,6 @@ sub readPlinkSampleNames {
     my @samples = keys(%samples);
     @samples = sort(@samples);
     return @samples;
-}
-
-sub readPrefix {
-    # read PLINK file prefix from a suitable .txt file; prefix is first non-comment line
-    # use to anonymise test data (name of chip/project not visible)
-    my $inPath = shift;
-    open IN, "< $inPath" || croak "Cannot open input file $inPath: $!";
-    my $prefix = 0;
-    while (<IN>) {
-	unless (/^#/) { # comments start with #
-	    chomp;
-	    $prefix = $_;
-	    last;
-	}
-    }
-    close IN;
-    return $prefix;
 }
 
 sub testPlotRScript {
@@ -373,59 +257,6 @@ sub validatePng {
 	if ($ok==0) { last; }
     }
     return $ok;
-}
-
-sub wrapCommand {
-    # generic wrapper for a system call; assume non-zero return value indicates an error
-    # if given a filehandle, execute command in test mode and print result; otherwise just run command
-    # increment and return the given test/failure counts
-    my ($cmd, $fh, $tests, $failures, $verbose) = @_;
-    my $result;
-    $tests ||= 0;
-    $failures ||= 0;
-    $verbose ||= 0;
-    $tests++;
-    if ($fh) {
-	$result = eval { system($cmd); }; # return value of $cmd, or undef for unexpected Perl error
-	if (not(defined($result)) || $result != 0) { 
-	    $failures++; 
-	    if ($verbose) {print $fh "FAIL\t$cmd\n"; } 
-	} elsif ($verbose) { 
-	    print $fh "OK\t$cmd\n"; 
-	}
-    } else {
-	system($cmd);
-    }
-    return ($tests, $failures);
-}
-
-sub wrapCommandList {
-    # wrap multiple commands in a list
-    my ($cmdsRef, $tests, $failures, $verbose, $omitRef, $logPath) = @_;
-    my @cmds = @$cmdsRef;
-    my $total = @cmds;
-    my @omits;
-    if ($omitRef) { @omits = @$omitRef; }
-    else { for (my $i=0;$i<$total;$i++) { push(@omits, 0); } }
-    my $fh;
-    my $start = time();
-    if ($logPath) { open $fh, "> $logPath" || croak "Cannot open log $logPath: $!"; }
-    else { $fh = *STDOUT; }
-    if ($verbose) { print timeNow()." Command list started.\n"; }
-    for (my $i=0;$i<$total;$i++) {
-	if ($omits[$i]) { 
-	    if ($verbose) { print timeNow()." Omitting $cmds[$i]\n"; } 
-	} else {
-	    ($tests, $failures) = wrapCommand($cmds[$i], $fh, $tests, $failures);
-	    if ($verbose) { print timeNow()." Finished command ".($i+1)." of $total.\n"; }
-	}
-    }
-    if ($verbose) {
-	my $duration = time() - $start;
-	print "Command list finished. Duration: $duration s\n";
-    }
-    if ($logPath) { close $fh; }
-    return ($tests, $failures);
 }
 
 sub wrapPlotCommand {
