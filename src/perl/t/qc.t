@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 87;
+use Test::More tests => 89;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -33,7 +33,7 @@ my $dbfileA = $tempdir."/".$dbnameA;
 # may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
-system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, if any
+system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/*'); # remove any previous output
 
 ### test creation of QC input files ### 
 
@@ -139,6 +139,10 @@ foreach my $mode (@modes) {
     unless (xmlPathOK('plate_heatmaps/index.html')) { $heatMapsOK = 0; }
 }
 ok($heatMapsOK, "Plate heatmap outputs OK");
+
+# check summary outputs
+ok(-r 'pipeline_summary.csv', "CSV summary found");
+ok(-r 'pipeline_summary.pdf', "PDF summary found");
 
 print "\tTest dataset Alpha finished.\n";
 
