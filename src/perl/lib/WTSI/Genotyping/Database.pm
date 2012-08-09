@@ -97,6 +97,7 @@ sub inifile {
 =cut
 
 ## no critic
+
 sub connect {
   my ($self, %args) = @_;
 
