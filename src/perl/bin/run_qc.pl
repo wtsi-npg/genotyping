@@ -13,6 +13,7 @@ use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::Genotyping::QC::QCPlotShared qw(readQCFileNames);
+use WTSI::Genotyping::QC::Reports;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
@@ -164,5 +165,10 @@ sub run {
 	my $result = system($cmd); 
 	unless ($result==0) { croak "Command finished with non-zero exit status: \"$cmd\""; } 
     }
+    ### create CSV & PDF reports
+    my $resultPath = "qc_results.json";
+    my $csvPath = "pipeline_summary.csv";
+    my $texPath = "pipeline_summary.tex";
+    createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, ".", $title);
     chdir($startDir);
 }
