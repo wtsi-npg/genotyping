@@ -59,8 +59,7 @@ module Genotyping::Tasks
       chromosome = args[:chromosome]
 
       if args_available?(sim_file, sample_json, manifest, chromosome , output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
-        snp_json = args[:snps]
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         start_snp = args[:start] || 0
         end_snp = args[:end]
         wga = args[:wga]
@@ -101,9 +100,8 @@ module Genotyping::Tasks
           grouped_dir = File.dirname(grouped_part)
           Dir.mkdir(grouped_dir) unless File.exist?(grouped_dir)
 
-          {:samples => sample_json,
-           :chr => chromosome,
-           :snps => snp_json,
+          {:chr => chromosome,
+           :samples => sample_json,
            :wga => wga,
            :output => grouped_part,
            :plink => plink,
@@ -111,7 +109,9 @@ module Genotyping::Tasks
         end
 
         commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
-          cmd = [GENOTYPE_CALL, 'sim-to-illuminus', cli_arg_map(gca, :prefix => '--')]
+          cmd = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.5),
+                 'sim-to-illuminus',
+                 cli_arg_map(gca, :prefix => '--')]
           cmd += ['|', 'tee', iwa[:output] + '.iln'] if debug
           cmd += ['|', ILLUMINUS_WRAPPER, cli_arg_map(iwa, :prefix => '--')]
           cmd.flatten.join(' ')

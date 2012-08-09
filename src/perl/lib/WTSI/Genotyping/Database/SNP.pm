@@ -70,7 +70,8 @@ sub insert_sequenom_calls {
 
   my $count = 0;
   foreach my $sample (@$samples) {
-    if (defined $sample->sanger_sample_id) {
+
+    if ($sample->include && defined $sample->sanger_sample_id) {
       my $id = $sample->sanger_sample_id;
 
       $self->log->trace("Executing: '$query' with args [$id]");
