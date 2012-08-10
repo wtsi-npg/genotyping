@@ -14,7 +14,7 @@ use FindBin qw /$Bin/;
 use POSIX qw/floor strftime/;
 use JSON;
 use XML::Parser;
-use WTSI::Genotyping::QC::QCPlotShared;  # must have path to WTSI in PERL5LIB
+use WTSI::Genotyping::QC::QCPlotShared qw/$ini_path/; 
 use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
@@ -119,7 +119,8 @@ sub jsonOK {
 }
 
 sub jsonPathOK {
-    return pathOK($_[0], 2);
+    my $path = shift;
+    return pathOK($path, 2);
 }
 
 sub pngOK {
@@ -142,12 +143,14 @@ sub pngOK {
 }
 
 sub pngMultiplePathsOK {
-    return multiplePathsOK(\@_, 0);
+    my @input = @_;
+    return multiplePathsOK(\@input, 0);
 }
 
 sub pngPathOK {
     # check on png path; optional second argument is start time (ie. oldest permitted age of file)
-    return pathOK($_[0], 0, $_[1]);
+    my ($path, $start) = @_;
+    return pathOK($path, 0, $start);
 }
 
 sub multiplePathsOK {
@@ -174,7 +177,7 @@ sub pathOK {
 	carp "Warning: Path $inPath last modified before given start time";
     } else {
 	my $fh;
-	open $fh, "< $inPath";
+	open $fh, "<", $inPath;
 	if ($mode==0) { $ok = pngOK($fh); }
 	elsif ($mode==1) { $ok = xmlOK($fh); }
 	elsif ($mode==2) { $ok = jsonOK($fh); }
@@ -187,7 +190,7 @@ sub pathOK {
 sub readPlinkSampleNames {
     # read sample names from a PLINK .fam file; convenience method to get names list for createTestDatabase
     my $famPath = shift;
-    open my $in, "< $famPath" || croak "Cannot open input $famPath";
+    open my $in, "<", $famPath || croak "Cannot open input $famPath";
     my %samples;
     while (<$in>) {
 	my @words = split;
@@ -255,7 +258,8 @@ sub xmlOK {
 
 sub xmlPathOK {
     # check on xml path
-    return pathOK($_[0], 1);
+    my $path = shift;
+    return pathOK($path, 1);
 }
 
 return 1; # must have a true return value for module import

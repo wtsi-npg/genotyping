@@ -181,12 +181,14 @@ sub updateLog {
     my $snp_chrom = $snp->{"chromosome"};
     my $snp_pos = $snp->{"physical_position"};
     printf $log "%s\t%s\t%s\t%.6f\t%s\n", ($snp_id, $snp_chrom, $snp_pos, $cr, $par);
+    return 1;
 }
 
 sub writeSnpLogHeader {
     my $log = shift;
     my @headers = qw(SNP chromosome position CR is_PAR);
     print $log join("\t", @headers)."\n";
+    return 1;
 }
 
 

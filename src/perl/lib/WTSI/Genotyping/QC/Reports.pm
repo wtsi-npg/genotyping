@@ -16,7 +16,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/createReports/;
+our @EXPORT_OK = qw/createReports/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
 
 sub createReports {
@@ -217,6 +217,7 @@ sub latexAllPlots {
 
 sub latexFooter {
     my $footer = "\n\\end{document}\n";
+    return $footer;
 }
 
 sub latexHeader {
@@ -332,7 +333,8 @@ sub textForDatasets {
 }
 
 sub textForMetrics {
-    my %doc = %{readJson($_[0])};
+    my $jsonPath = shift;
+    my %doc = %{readJson($jsonPath)};
     my %thresh = %{$doc{'Metrics_thresholds'}};
     my @names = keys(%thresh);
     @names = sort @names;
@@ -438,4 +440,4 @@ sub writeSummaryLatex {
     return 1;
 }
 
-
+1;

@@ -13,7 +13,7 @@ use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::Genotyping::QC::QCPlotShared qw(readQCFileNames);
-use WTSI::Genotyping::QC::Reports;
+use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
