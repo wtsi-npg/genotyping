@@ -30,7 +30,7 @@ sub read_it_column_names {
   for (my $i = 0; $i < scalar @annotation_columns; ++$i) {
     my $annot = $annotation_columns[$i];
     unless ($names[$i] eq $annot) {
-       croak "Malformed column header line (missing the '$annot' column)\n";
+       confess "Malformed column header line (missing the '$annot' column)\n";
     }
   }
 
@@ -98,12 +98,12 @@ sub update_it_columns {
 =cut
 
 sub read_gt_column_names {
-  my $fh = shift;
+  my ($fh) = @_;
 
   my @names = read_column_names($fh, "\t");
 
   unless ($names[0] eq '') {
-    croak "Malformed column header line (missing the empty left column)\n";
+    confess "Malformed column header line (missing the empty left column)\n";
   }
 
   @names = @names[1..$#names];
@@ -203,7 +203,7 @@ sub write_gt_calls {
     unless ($call_name eq $prob_name &&
             $call_pos == $prob_pos &&
             $call_alleles eq $prob_alleles) {
-      croak "Illuminus calls and probabilities are out of sync: " .
+      confess "Illuminus calls and probabilities are out of sync: " .
         "$call_name/$prob_name " .
           "$call_pos/$prob_pos " .
             "$call_alleles/$prob_alleles\n"
@@ -213,7 +213,7 @@ sub write_gt_calls {
     my $num_probs = scalar @probs;
 
     unless ($num_calls * 4 == $num_probs) {
-      croak "Illuminus calls and probabilities are out of sync: " .
+      confess "Illuminus calls and probabilities are out of sync: " .
         "$num_calls calls, $num_probs probabilities, " .
           "# probabilities was not equal to  4 * # calls\n";
     }
@@ -247,11 +247,11 @@ sub write_gt_calls {
   }
   elsif ($calls_str && ! defined $probs_str) {
     chomp($calls_str);
-    croak "Illuminus call data is missing probabilites: '$calls_str'\n";
+    confess "Illuminus call data is missing probabilites: '$calls_str'\n";
   }
   elsif ($probs_str && ! defined $calls_str) {
     chomp($probs_str);
-    croak "Illuminus probabilities found withhout call data: '$probs_str'\n";
+    confess "Illuminus probabilities found withhout call data: '$probs_str'\n";
   }
 
   return $num_records;

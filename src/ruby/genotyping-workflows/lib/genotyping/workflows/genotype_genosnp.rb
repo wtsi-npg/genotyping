@@ -24,6 +24,7 @@ module Genotyping::Workflows
     include Genotyping::Tasks::GenotypeCall
     include Genotyping::Tasks::GenoSNP
     include Genotyping::Tasks::Plink
+    include Genotyping::Tasks::QualityControl
 
     description <<-DESC
     Collates the raw intensity values for the samples in one named pipeline run
@@ -45,6 +46,8 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
+    chunk_size: <integer> number of samples to analyse in a single GenoSNP job.
+    Optional, defaults to 20.
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
@@ -71,14 +74,15 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
+      args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
+                               :chunk_size)
 
-      async_defaults = {:memory => 500,
+      async_defaults = {:memory => 1024,
                         :queue => :normal}
-      prep_async = lsf_args(args, async_defaults, :memory, :queue)
-      call_async = lsf_args(args, async_defaults, :memory, :queue)
+      async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
+      chunk_size = args.delete(:chunk_size) || 20
       args.delete(:memory)
       args.delete(:queue)
 
@@ -99,23 +103,27 @@ Returns:
       smargs = {:normalize => false,
                 :snp_meta => njname}.merge(args)
 
-      smfile, njson = gtc_to_sim(sjson, manifest, smname, smargs, prep_async)
-
-      chunk_size = 20
-      gsargs = {:snps => njson,
+      smfile, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
+      gsargs = {:samples => sjson,
                 :start => 0,
                 :end => num_samples,
                 :size => chunk_size,
                 :group_size => 50,
-                :plink => true}.merge(args)
+                :plink => true,
+                :debug => true}.merge(args)
 
-      chunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
-                               gsargs, call_async) || []
+      gschunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
+                                 gsargs, async)
+      gschunks = gschunks.flatten if gschunks
+      gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
+                                 sjson, njson, args, async)
 
-      merge_async = call_async
-      chunks.empty? ? nil : merge_bed(chunks.flatten, gsname,
-                                      {:work_dir => work_dir,
-                                       :log_dir => log_dir}, merge_async)
+      # FIXME: temporarily commented out all QC
+      # qcargs = {:run => run_name}.merge(args)
+      # gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs)
+
+      # [gsfile, gsquality] if [gsfile, gsquality].all?
+      gsfile
     end
 
     :private

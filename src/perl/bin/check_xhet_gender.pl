@@ -46,7 +46,7 @@ GetOptions("h|help"              => \$help,
 	   "cancel-sanity-check" => \$sanityCancel,
 	   "clip=f"              => \$clip,
 	   "trials=i"            => \$trials,
-	   "run=s"               => \$runName,
+	   "run=s"               => \$runName
     );
 
 

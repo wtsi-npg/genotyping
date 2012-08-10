@@ -47,6 +47,10 @@ Arguments:
 
     config: <path> of custom pipeline database .ini file. Optional.
     manifest: <path> of the chip manifest file. Required.
+    gender_method: <string> name of a gender determination method described in
+    methods.ini. Optional, defaults to 'Inferred'
+    chunk_size: <integer> number of SNPs to analyse in a single Illuminus jobs.
+    Optional, defaults to 2000.
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
@@ -73,13 +77,16 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :queue, :memory)
+      args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
+                               :chunk_size, :gender_method)
 
       async_defaults = {:memory => 1024,
                         :queue => :normal}
       async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
+      chunk_size = args.delete(:chunk_size) || 2000
+      gender_method = args.delete(:gender_method)
       args.delete(:memory)
       args.delete(:queue)
 
@@ -93,38 +100,60 @@ Returns:
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       smname = run_name + '.illuminus.sim'
-      gcname = run_name + '.gencall.bed'
+      gciname = run_name + '.gencall.imajor.bed'
+      gcsname = run_name + '.gencall.smajor.bed'
       ilname = run_name + '.illuminus.bed'
 
-      sjson = sample_intensities(dbfile, run_name, sjname, args)
+      ## Insert gender_method here
+      siargs = {:gender_method => gender_method}.merge(args)
+      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
 
       smargs = {:normalize => true,
                 :chromosome_meta => cjname,
                 :snp_meta => njname}.merge(args)
-
       smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      gcfile, * = gtc_to_bed(sjson, manifest, gcname, args, async)
 
-      ilargs = {:size => 10000,
+      gcifile, * = gtc_to_bed(sjson, manifest, gciname, args, async)
+      gcsfile = transpose_bed(gcifile, gcsname, args, async)
+
+      # FIXME: temporarily commented out all QC
+      # qcargs = {:run => run_name}.merge(args)
+      # gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', qcargs)
+
+      ilargs = {:size => chunk_size,
                 :group_size => 50,
                 :plink => true,
                 :snps => njson}.merge(args)
 
-      chunks = chromosome_bounds(cjson).collect do |cspec|
-        chr = cspec["chromosome"]
-        pargs = {:chromosome => chr,
-                 :start => cspec["start"],
-                 :end => cspec["end"]}
+      ilchunks = nil
 
-        call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
-                        ilargs.merge(pargs), async)
+      if smfile
+        ilchunks = chromosome_bounds(cjson).collect do |cspec|
+          chr = cspec["chromosome"]
+          pargs = {:chromosome => chr,
+                   :start => cspec["start"],
+                   :end => cspec["end"]}
+
+          call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
+                          ilargs.merge(pargs), async)
+        end
+
+        ilchunks = ilchunks.flatten
       end
 
-      ilfile = chunks.empty? ? nil : merge_bed(chunks.flatten, ilname, args, async)
+      ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
+                                 sjson, njson, args, async)
 
-      # qc = quality_control(ilfile, :work_dir => work_dir)
+      # ilquality = quality_control(ilfile, 'illuminus_qc',
+      #                            :work_dir => work_dir, :sim => smfile)
 
-      [gcfile, ilfile] if [gcfile, ilfile].all?
+      # if [gcsfile, ilfile, gcquality, ilquality].all?
+      #   [gcsfile, ilfile, gcquality, ilquality]
+      # end
+
+      if [gcsfile, ilfile].all?
+        [gcsfile, ilfile]
+      end
     end
 
     :private

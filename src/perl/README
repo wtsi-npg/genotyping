@@ -5,3 +5,13 @@ This is the perl Genotyping module, a component of the WTSI genotype
 analysis pipeline which provides command-line applications. These
 applications may be run manually or within a pipeline defined by the
 Ruby Genotyping module.
+
+This software uses Module::Build to build, test and install its Perl
+packages.
+
+To install:
+
+  perl Build.PL
+  ./Build test
+  ./Build install --install_base <target directory>
+  ./Build install_config --install_base <target directory>

@@ -69,7 +69,7 @@ sub run {
     pod2usage(-msg => "A --type argument is required\n",
               -exitval => 2);
   }
-  unless ($type =~ /^idat$/i or $type =~ /^gtc$/i) {
+  unless ($type =~ m{^idat$}msxi or $type =~ m{^gtc$}msxi) {
     pod2usage(-msg => "Invalid --type '$type'; expected one of [gtc, idat]\n",
               -exitval => 2);
   }
@@ -89,7 +89,7 @@ sub run {
              " and ", $now->iso8601);
 
   my $file_test = modified_between($then->epoch(), $now->epoch());
-  my $file_regex = qr/.($type)$/i;
+  my $file_regex = qr/.($type)$/msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 1;
 
@@ -135,6 +135,8 @@ sub run {
   else {
     $log->logcroak("Unable to publish unknown data type '$type'");
   }
+
+  return 0;
 }
 
 sub publish_idat_files {
@@ -149,8 +151,8 @@ sub publish_idat_files {
   $log->debug("Publishing $pairs pairs of idat files");
 
   foreach my $pair (@$paired) {
-    my ($red) = grep { /Red/i } @$pair;
-    my ($grn) = grep { /Grn/i } @$pair;
+    my ($red) = grep { m{Red}msxi } @$pair;
+    my ($grn) = grep { m{Grn}msxi } @$pair;
 
     my ($basename, $dir, $suffix) = fileparse($red);
 
@@ -285,7 +287,7 @@ sub paired_idat_files {
 
   # Determine unique 
   foreach my $file (@$files) {
-    my ($stem, $colour, $suffix) = $file =~ /^(\S+)_(Red|Grn)(.idat)$/i;
+    my ($stem, $colour, $suffix) = $file =~ m{^(\S+)_(Red|Grn)(.idat)$}msxi;
 
     unless ($stem && $colour && $suffix) {
       $log->warn("Found a non-idat file while sorting idat files: '$file'");
@@ -365,15 +367,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.1.1
-
-=head1 CHANGELOG
-
-0.1.0
-
-  Initial version 0.1.0
 
 =cut
