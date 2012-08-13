@@ -62,7 +62,7 @@ $maf_max ||= $defaults{'maf_max'};
 $max_snps ||= $defaults{'max_snps'};
 $min_dist ||= $defaults{'min_dist'};
 $min_snp_cr ||= $defaults{'min_snp_cr'};
-my $bfile = $ARGV[0]; # prefix for PLINK data files
+$bfile = $ARGV[0]; # prefix for PLINK data files
 
 $help_text = "Generate a test set of SNPs; use concordance on test set to identify duplicate samples.
 Input files (including PLINK .bed and .bim) must be in current working directory.
@@ -84,7 +84,7 @@ if ($help) {
 }
 
 # generate hashes of chromosome and position for each SNP in .bim file
-open my $bim, "<", $bfile.bim or die qq(Unable to open $bfile.bim);
+open my $bim, "<", $bfile.".bim" or die qq(Unable to open $bfile.bim);
 while (<$bim>) {
     my ($chr, $snp, $pos) = (split)[0, 1, 3];
     $chr{$snp} = $chr;
