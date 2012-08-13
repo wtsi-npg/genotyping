@@ -1,5 +1,6 @@
 #!/software/bin/perl
 
+use warnings;
 use strict;
 use WrapDBI;
 use Getopt::Long;
@@ -80,8 +81,8 @@ sub compareGenotypes {
     sort(@sampleNames); # sorting not strictly necessary, but ensures consistent output order
     sort(@snpNames);
     # open output file and print headers
-    open GT, "> $outputGT" or die $!; 
-    print GT join("\t", qw(#SNP sample genotype sequenom)), "\n";
+    open my $gt, ">", $outputGT or die $!; 
+    print $gt join("\t", qw(#SNP sample genotype sequenom)), "\n";
     # write genotypes to file and populate comparison hash
     foreach my $snp (@snpNames) {
 	foreach my $sample (@sampleNames) {
@@ -89,7 +90,7 @@ sub compareGenotypes {
 	    unless ($plinkCall) { $plinkCall = '-'; }
 	    my $sqnmCall = $sqnmCalls{$sample}{$snp};
 	    unless ($sqnmCall) { $sqnmCall = '-'; }
-	    print GT join("\t", $snp, $sample, $plinkCall, $sqnmCall), "\n";
+	    print $gt join("\t", $snp, $sample, $plinkCall, $sqnmCall), "\n";
 	    next if ($plinkCall eq '-' || $sqnmCall eq '-'); # no comparison if one GT is missing
 	    $count{$sample}++;
 	    my $equiv = eval { genotypesAreEquivalent($sqnmCalls{$sample}{$snp}, $plinkCall) };
@@ -100,7 +101,7 @@ sub compareGenotypes {
 	    $match{$sample}++ if $equiv;
 	}
     }
-    close GT;
+    close $gt or die $!;
     return (\%count, \%match);
 }
 
@@ -223,7 +224,8 @@ sub readPlinkCalls {
 
 sub revComp {
     # reverse complement a DNA sequence
-    my @bases = reverse(split('', $_[0]));
+    my $seq = shift;
+    my @bases = reverse(split('', $seq));
     my @rev = ();
     foreach my $base (@bases) {
 	if ($base eq 'A') {push(@rev, 'T');}
@@ -266,13 +268,13 @@ sub writeComparisonResults {
     my $outputResults = shift;
     my $outputFailures = shift;
     my %failedSamples;
-    open RESULTS, "> $outputResults" or die $!;
-    open FAIL, "> $outputFailures" or die $!;
+    open my $results, ">", $outputResults or die $!;
+    open my $fail, ">", $outputFailures or die $!;
     my $header = join("\t", "# Sequenom identity comparison", "MIN_SNPS:$min_checked_snps", 
 		      "PASS_THRESHOLD:$min_ident")."\n";
     $header .= join("\t", "# sample", "common SNPs", "matching calls", "concordance", "result")."\n";
-    print RESULTS $header;
-    print FAIL $header;
+    print $results $header;
+    print $fail $header;
     # write skipped/pass/fail samples to RESULTS; fail samples to FAIL
     foreach my $sample (keys %count) {
 	my $concord = $match{$sample} / $count{$sample};
@@ -288,16 +290,16 @@ sub writeComparisonResults {
 	} else {
 	    $failedSamples{$sample} = 1;
 	    $line .= "Fail\n";
-	    print FAIL $line;
+	    print $fail $line;
 	}
-	print RESULTS $line;
+	print $results $line;
     }
-    close FAIL;
+    close $Fail;
     # write missing samples
     foreach my $sample (keys %missing) {
-	print RESULTS join("\t", $sample, ".", ".", ".", "Unavailable"), "\n";
+	print $results join("\t", $sample, ".", ".", ".", "Unavailable"), "\n";
     }
-    close RESULTS;
+    close $results;
     return %failedSamples;
 }
 
@@ -315,12 +317,12 @@ sub writeFailedPairCheck {
     my $digits = 3; # precision for output
     # do all pairwise checks and write results to file
     # populate @matchedPairs list of failed pairs with SNP call match above $minIdent threshold
-    open RESULTS, "> $resultsPath" or die $!;
+    open my $results, ">", $resultsPath or die $!;
     my $header = "# Pairwise check using all samples which failed concordance, for possible ID swaps.\n";
     $header .= "# Check A:B finds Sequenom calls for B, then compares to Illumina calls for A\n";
     $header .= "# MIN_IDENTITY_FOR_MATCH:$minIdent\n";
     $header .= join("\t", "Illumina", "Sequenom", "common SNPs", "matching calls", "concordance", "result")."\n";
-    print RESULTS $header;
+    print $results $header;
     for (my $i = 0; $i < @samples; $i++) {
 	for (my $j = $0; $j < @samples; $j++) {
 	    next if $i == $j;
@@ -338,14 +340,14 @@ sub writeFailedPairCheck {
 			       sprintf("%.${digits}f", $match[$i][$j]/$count[$i][$j]), $status)."\n";
 	}
     }
-    close RESULTS;
+    close $results;
     # write details of matched pairs (possible swaps) to second output file
-    open DETAIL, "> $detailsPath" or die $!;
     $header = "# Details of sample pairs (S1, S2) which failed at least one pairwise check\n";
     $header .= "# Check A:B finds Sequenom calls for B, then compares to Illumina calls for A\n";
     $header .= join("\t", "# S1", "S2", "S1:S2 shared SNPs", "S1:S2 matches", "S1:S2 concordance",
 		    "S2:S1 shared SNPs", "S2:S1 matches", "S2:S1 concordance")."\n"; 
-    print DETAIL $header;
+    open my $detail, ">", $detailsPath or die $!;
+    print $detail $header;
     foreach my $pairRef (@matchedPairs) {
 	($i, $j) = @$pairRef; # $i = sequenom sample, $j = illumina sample
 	if ($wroteMatch{$samples[$j]}{$samples[$i]}) { next; } # no need to write results for both (i,j) and (j,i)
@@ -354,9 +356,10 @@ sub writeFailedPairCheck {
 		     $count[$i][$j], $match[$i][$j], sprintf("%.${digits}f", $match[$i][$j]/$count[$i][$j]), 
 		     $count[$j][$i], $match[$j][$i], sprintf("%.${digits}f", $match[$j][$i]/$count[$j][$i]),  
 	    );
-	print DETAIL join("\t", @words)."\n";
+	print $detail join("\t", @words)."\n";
     }
-    close DETAIL;
+    close $detail;
+    return 1;
 }
 
 sub run {
@@ -368,20 +371,20 @@ sub run {
     my ($samplesRef, $sampleNamesRef, $sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal, $plinkCallsRef,
 	$duration, $countRef, $matchRef);
     # get sample IDs by name from PLINK file 
-    if ($log) { open LOG, "> $log" || die $!; }
+    if ($log) { open my $logfile, ">", $log || die $!; }
     my $pb = new plink_binary::plink_binary($ARGV[0]); # $pb = object to parse given PLINK files
     $pb->{"missing_genotype"} = "N"; # TODO check if this is necessary
     ($samplesRef, $sampleNamesRef) = getSampleNamesIDs($pb);
     my %samples = %$samplesRef;
     my @sampleNames = @$sampleNamesRef;
     my $size = @sampleNames;
-    if ($log) { print LOG $size." samples read from PLINK binary.\n"; }
+    if ($log) { print $logfile $size." samples read from PLINK binary.\n"; }
     # get Sequenom genotypes for all samples 
     ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) = getSequenomCallData(%samples);
-    if ($log) { print LOG $sqnmTotal." calls read from Sequenom.\n"; }
+    if ($log) { print $logfile $sqnmTotal." calls read from Sequenom.\n"; }
     # get PLINK genotypes for all samples; can take a while!
     ($plinkCallsRef, $duration) = readPlinkCalls($pb, $sampleNamesRef, $sqnmSnpsRef);
-    if ($log) { print LOG "Calls read from PLINK binary: $duration seconds.\n"; }
+    if ($log) { print $logfile "Calls read from PLINK binary: $duration seconds.\n"; }
     # compare PLINK and Sequenom genotypes, and write to combined file 
     ($countRef, $matchRef) = compareGenotypes($plinkCallsRef, $sqnmCallsRef, $outputGT);
     my %failedSamples = writeComparisonResults($countRef, $matchRef, $missingSamplesRef, $minCheckedSNPs, 
@@ -392,7 +395,8 @@ sub run {
     writeFailedPairCheck(\@failedSamples, $countRef, $matchRef, $minIdent, 
 			 $outputFailedPairs, $outputFailedPairsMatch);
     if ($log) {
-	print LOG "Finished.\n";
-	close LOG;
+	print $logfile "Finished.\n";
+	close $logfile;
     }
+    return 1;
 }
