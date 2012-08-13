@@ -40,7 +40,7 @@ use WTSI::Genotyping::QC::QCPlotTests;
 
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
+our @EXPORT_OK = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
 readDatabaseGenders updateDatabase/;
 
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey $ini_path/;
@@ -60,7 +60,7 @@ sub readModelGenders {
     # read inferred gender from model output
     my $inPath = shift;
     my @inferred = ();
-    open my $in, "< $inPath" || croak "Cannot read input path $inPath";
+    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
     my $first = 1;
     while (<$in>) {
 	if ($first) { $first=0; next; } # skip header line
@@ -120,7 +120,7 @@ sub readPlink {
     my $pb = extractChromData($plinkPrefix, $tempDir); # extract X data and get plink_binary reading object
     my ($nameRef, $suppliedRef) = getSampleNamesGenders($pb);
     my $snpLogPath ||=  $tempDir."/snps_gender_check.txt";
-    open(my $log, "> $snpLogPath") || croak "Cannot open log path $snpLogPath: $!";
+    open(my $log, ">", $snpLogPath) || croak "Cannot open log path $snpLogPath: $!";
     my %hetRates = findHetRates($pb, $nameRef, $log, $includePar);
     close $log;
     my @xhets;
@@ -133,18 +133,18 @@ sub readPlink {
 sub readNamesXhetText {
     # read sample_xhet_gender.txt file; tab-delimited, first two columns are name and xhet, first line is header
     my $inPath = shift;
-    open IN, "< $inPath" || die "Cannot open input file $inPath: $!";
+    open my $in, "<", $inPath || croak "Cannot open input file $inPath: $!";
     my $line = 0;
     my @names = ();
     my @xhets = ();
-    while (<IN>) {
+    while (<$in>) {
 	if ($line==0) { $line++; next; } # first line is header
 	chomp;
 	my @words = split;
 	push(@names, $words[0]);
 	push(@xhets, $words[1]);
     }
-    close IN;
+    close $in || croak "Cannot close input file $inPath: $!";
     return (\@names, \@xhets);
 }
 
@@ -224,6 +224,7 @@ sub updateDatabase {
 			    });
     }
     $db->disconnect();
+    return 1;
 }
 
 sub writeOutput {
@@ -236,7 +237,7 @@ sub writeOutput {
     elsif ($format eq $jsonFormat) {  $outputName ||= "sample_xhet_gender.json"; }
     else { croak "Illegal format argument: $format"; }
     my $outPath = $outputDir."/".$outputName;
-    open (my $out, "> $outPath") || croak "Cannot open output file $outPath!";
+    open (my $out, ">", $outPath) || croak "Cannot open output file $outPath!";
     if ($format eq $textFormat) {
 	 print $out join("\t", qw(sample xhet inferred supplied))."\n";
 	 for (my $i=0;$i<@names;$i++) {
@@ -255,7 +256,8 @@ sub writeOutput {
 	}
 	print $out encode_json(\@records);
     }
-    close $out;
+    close $out || croak "Cannot close output file $outPath!";
+    return 1;
 }
 
 sub writeSampleXhetTemp {
