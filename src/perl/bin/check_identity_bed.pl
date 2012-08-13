@@ -78,11 +78,11 @@ sub compareGenotypes {
     }
     @sampleNames = keys(%sampleNames);
     @snpNames = keys(%snpNames);
-    sort(@sampleNames); # sorting not strictly necessary, but ensures consistent output order
-    sort(@snpNames);
+    @sampleNames = sort(@sampleNames); # sorting not strictly necessary, but ensures consistent output order
+    @snpNames = sort(@snpNames);
     # open output file and print headers
     open my $gt, ">", $outputGT or die $!; 
-    print $gt join("\t", qw(#SNP sample genotype sequenom)), "\n";
+    print $gt "#".join("\t", qw(SNP sample genotype sequenom))."\n";
     # write genotypes to file and populate comparison hash
     foreach my $snp (@snpNames) {
 	foreach my $sample (@sampleNames) {
@@ -294,7 +294,7 @@ sub writeComparisonResults {
 	}
 	print $results $line;
     }
-    close $Fail;
+    close $fail;
     # write missing samples
     foreach my $sample (keys %missing) {
 	print $results join("\t", $sample, ".", ".", ".", "Unavailable"), "\n";
@@ -336,7 +336,7 @@ sub writeFailedPairCheck {
 		push (@matchedPairs, [$i, $j]);
 	    }
 	    # print illumina sample name first, then sequenom
-	    print RESULTS join("\t",  $samples[$j], $samples[$i], $count[$i][$j], $match[$i][$j], 
+	    print $results join("\t",  $samples[$j], $samples[$i], $count[$i][$j], $match[$i][$j], 
 			       sprintf("%.${digits}f", $match[$i][$j]/$count[$i][$j]), $status)."\n";
 	}
     }
@@ -371,7 +371,8 @@ sub run {
     my ($samplesRef, $sampleNamesRef, $sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal, $plinkCallsRef,
 	$duration, $countRef, $matchRef);
     # get sample IDs by name from PLINK file 
-    if ($log) { open my $logfile, ">", $log || die $!; }
+    my $logfile;
+    if ($log) { open $logfile, ">", $log || die $!; }
     my $pb = new plink_binary::plink_binary($ARGV[0]); # $pb = object to parse given PLINK files
     $pb->{"missing_genotype"} = "N"; # TODO check if this is necessary
     ($samplesRef, $sampleNamesRef) = getSampleNamesIDs($pb);
