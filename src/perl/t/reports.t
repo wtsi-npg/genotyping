@@ -7,7 +7,7 @@ use Carp;
 use FindBin qw($Bin);
 use Test::More tests => 9;
 use JSON;
-use WTSI::Genotyping::QC::Reports;
+use WTSI::Genotyping::QC::Reports qw(createReports);
 
 my $resultPath = "$Bin/qc/alpha/qc_results.json";
 my $dbPath = "$Bin/qc_test_data/alpha_pipeline.db";
