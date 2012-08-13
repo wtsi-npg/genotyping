@@ -16,7 +16,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/createReports/;
+our @EXPORT_OK = qw/createReports/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
 
 sub createReports {
@@ -106,12 +106,18 @@ sub getPlateInfo {
     my @metricNames = readQCNameArray();
     my (%crByPlate, %hetByPlate, %passByPlate, %samplesByPlate, %plateStats, @cr, @het, $pass, $samples);
     foreach my $sample (keys(%records)) {
+	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
 	my %record = %{$records{$sample}};
 	my $plate = $record{'plate'};
 	my $samplePass = 1;
 	foreach my $metric (@metricNames) {
 	    my @values;
-	    my ($pass, $val) = @{$record{$metric}};
+	    my ($pass, $val);
+	    if ($record{$metric}) {
+		($pass, $val) = @{$record{$metric}};
+	    } else {
+		($pass, $val) = (1, "NA"); # placeholders if metric not in use
+	    }
 	    if ($pass==0) { $samplePass = 0; }
 	    if ($metric eq 'call_rate') { 
 		if ($crByPlate{$plate}) { push @{$crByPlate{$plate}}, $val; }
@@ -148,13 +154,18 @@ sub getSampleInfo {
     my @samples = keys(%records);
     @samples = sort @samples;
     foreach my $sample (@samples) {
+	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
 	my %record = %{$records{$sample}};
 	my $samplePass = 1;
 	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); # $samplePass is placeholder
 	foreach my $metric (@metricNames) {
-	    my @status =  @{$record{$metric}}; # pass/fail and one or more metric values
-	    if ($status[0]==0) { $samplePass = 0; }
-	    push(@fields, @status); 
+	    if (not $record{$metric}) { 
+		push(@fields, (1, "NA")); # no results found; use placeholders for pass/fail and metric value
+	    } else {
+		my @status =  @{$record{$metric}}; # pass/fail and one or more metric values
+		if ($status[0]==0) { $samplePass = 0; }
+		push(@fields, @status); 
+	    }
 	}
 	$fields[3] = $samplePass;
 	push @sampleFields, \@fields;
@@ -206,6 +217,7 @@ sub latexAllPlots {
 
 sub latexFooter {
     my $footer = "\n\\end{document}\n";
+    return $footer;
 }
 
 sub latexHeader {
@@ -321,7 +333,8 @@ sub textForDatasets {
 }
 
 sub textForMetrics {
-    my %doc = %{readJson($_[0])};
+    my $jsonPath = shift;
+    my %doc = %{readJson($jsonPath)};
     my %thresh = %{$doc{'Metrics_thresholds'}};
     my @names = keys(%thresh);
     @names = sort @names;
@@ -427,4 +440,4 @@ sub writeSummaryLatex {
     return 1;
 }
 
-
+1;

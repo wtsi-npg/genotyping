@@ -14,8 +14,9 @@ use POSIX;
 
 sub blockSizeFromHeader {
     # input an unpacked .sim header; size = name_length + (probes * channels * numeric_bytes)
-    my $numberBytes = numericBytesByFormat($_[6]);
-    my $blockSize = $_[2] + ($_[4] * $_[5] * $numberBytes);
+    my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @_;
+    my $numberBytes = numericBytesByFormat($numberType);
+    my $blockSize = $nameLength + ($probes * $channels * $numberBytes);
     return $blockSize;
 }
 
@@ -31,6 +32,7 @@ sub extractSampleRange {
 	my $data = readSampleBinary($in, $i, $blockSize);
 	print $out $data;
     }
+    return 1;
 }
 
 sub findMeanXYDiff {
@@ -187,4 +189,4 @@ sub unpackSignals {
 }
 
 
-return 1;
+1;

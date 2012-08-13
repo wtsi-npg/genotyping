@@ -19,7 +19,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path/;
+our @EXPORT_OK = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
 $ini_path = "$Bin/../etc/";
@@ -101,32 +101,34 @@ sub getSummaryStats {
 sub meanSd {
     # find mean and standard deviation of input list
     # first pass -- mean
+    my @inputs = @_;
     my ($mean, $sd);
-    unless (@_) {
+    if (@inputs==0) {
 	$mean = undef;
 	$sd = 0;
     } else {
 	my $total = 0;
-	foreach my $x (@_) { $total+= $x; }
-	$mean = $total / @_;
+	foreach my $x (@inputs) { $total+= $x; }
+	$mean = $total / @inputs;
 	# second pass -- sd
 	$total = 0;
-	foreach my $x (@_) { $total += abs($x - $mean); }
-	$sd = $total / @_;
+	foreach my $x (@inputs) { $total += abs($x - $mean); }
+	$sd = $total / @inputs;
     }
     return ($mean, $sd);
 }
 
 sub median {
     # return median of given list
-    @_ = sort numeric @_;
-    my $length = @_;
+    my @inputs = @_;
+    @inputs = sort numeric @inputs;
+    my $length = @inputs;
     my $mid = floor($length/2);
-    return $_[$mid];
+    return $inputs[$mid];
 }
 
 sub numeric {
-    $a <=> $b
+    return $a <=> $b;
 }
 
 sub openDatabase {
@@ -167,9 +169,9 @@ sub parseLabel {
 sub readFileToString {
     # generic method to read a file (eg. json) into a single string variable
     my $inPath = shift();
-    open IN, "< $inPath";
-    my @lines = <IN>;
-    close IN;
+    open my $in, "<", $inPath;
+    my @lines = <$in>;
+    close $in;
     return join('', @lines);
 }
 
@@ -258,16 +260,16 @@ sub readSampleData {
     $startLine ||= 0;
     $stopLine ||= 0;
     my @data;
-    open IN, "< $inPath" || croak "Cannot open input path $inPath: $!";
+    open my $in, "<", $inPath || croak "Cannot open input path $inPath: $!";
     my $line = 0;
-    while (<IN>) {
+    while (<$in>) {
 	$line++;
 	if (/^#/ || $line <= $startLine) { next; } # comments start with a #
 	elsif ($stopLine && $line+1 == $stopLine) { last; }
 	my @fields = split;
 	push(@data, \@fields);
     }
-    close IN;
+    close $in;
     return @data;    
 }
 
@@ -285,4 +287,4 @@ sub readThresholds {
     return %thresholds;
 }
 
-return 1;
+1;
