@@ -19,7 +19,7 @@ my $simA = "$Bin/qc_test_data/alpha.sim";
 my $outDirA = "$Bin/qc/alpha/";
 my $heatMapDir = "plate_heatmaps/";
 my $titleA = "Alpha";
-#my $config = "$bin/../json/qc_threshold_defaults.json";
+my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbnameA = "alpha_pipeline.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
 my $piperun = "pipeline_run"; # run name in pipeline DB
@@ -61,7 +61,7 @@ $status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
 is($status, 0, "xydiff.pl exit status");
 
 ## test collation into summary
-$status = system("perl $bin/write_qc_status.pl --dbpath=$dbfileA");
+$status = system("perl $bin/write_qc_status.pl --dbpath=$dbfileA --inipath=$iniPath");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
@@ -71,7 +71,7 @@ ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 ## plate heatmap plots
 my @modes = qw/cr het xydiff/;
 foreach my $mode (@modes) {
-    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA";
+    $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA --inipath=$iniPath";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
     for (my $i=1;$i<=11;$i++) {
 	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
@@ -88,7 +88,7 @@ ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid X
 ## box/bean plots
 my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
 for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA";
+    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA --inipath=$iniPath";
     is(system($cmd), 0, "plot_box_bean.pl exit status: mode $modes[$i]");
 }
 
@@ -97,7 +97,7 @@ $cmd = "cat sample_cr_het.txt | perl $bin/plot_cr_het_density.pl --out_dir=. --t
 is(system($cmd), 0, "plot_cr_het_density.pl exit status");
 
 ## failure cause breakdown
-$cmd = "perl $bin/plot_fail_causes.pl --title=$titleA";
+$cmd = "perl $bin/plot_fail_causes.pl --title=$titleA --inipath=$iniPath";
 is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
@@ -121,7 +121,7 @@ system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun --inipath=$iniPath";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
