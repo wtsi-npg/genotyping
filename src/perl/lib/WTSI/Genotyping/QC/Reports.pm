@@ -398,8 +398,10 @@ sub texToPdf {
     my $file = pop @terms;
     my $texDir = join('/', @terms);
     my $startDir = getcwd();
+    # run pdflatex twice; needed to get cross-references correct, eg. in list of figures
     chdir($texDir);
-    my $result = system('pdflatex '.$file.' > /dev/null');
+    system('pdflatex -draftmode '.$file.' > /dev/null'); # first pass; draft mode is faster
+    my $result = system('pdflatex '.$file.' > /dev/null'); # second pass
     if ($cleanup) {
 	my @rm = qw/*.aux *.dvi *.lof/; # remove intermediate LaTeX files; keeps .log, .tex, .pdf
 	system('rm -f '.join(' ', @rm));
