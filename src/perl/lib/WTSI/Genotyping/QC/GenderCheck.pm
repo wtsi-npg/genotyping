@@ -29,7 +29,6 @@ use Carp;
 use File::Temp qw/tempfile tempdir/;
 use FindBin qw /$Bin/;
 use JSON;
-#use Log::Log4perl;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
@@ -179,7 +178,6 @@ sub runGenderModel {
     if ($sanityCancel) { $sanityOpt='FALSE'; }
     else { $sanityOpt='TRUE'; }
     my $cmd = join(' ', ("check_xhet_gender.R", $tempFile, $textPath, $pngPath, $title, $sanityOpt, $clip, $trials, ">& ".$logPath) ); # $cmd uses csh redirect
-    #my ($tests, $failures) = WTSI::Genotyping::QC::QCPlotTests::wrapCommand($cmd, \*STDOUT);
     system($cmd);
     my @inferred = readModelGenders($textPath);
     return @inferred;
