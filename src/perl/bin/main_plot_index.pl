@@ -8,17 +8,17 @@
 use strict;
 use warnings;
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
-use WTSI::Genotyping::QC::QCPlotShared qw/getSummaryStats/; # qcPlots module to define constants
+use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getSummaryStats/; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
 
 
 sub writePlotLinks {
     # write index of QC plots in current directory
-    my ($out, $descsRef) = @_;
+    my ($out, $descsRef, $config) = @_;
     my %descs = %$descsRef; # output descriptions
     my @png = sort(glob('*.png'));
-    my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+    my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames($config);
     my $plateDir = $fileNames{'plate_dir'};
     my $plateIndex = $fileNames{'plate_index'};
     my $plateIndexPath = $plateDir."/".$plateIndex;
@@ -63,7 +63,8 @@ sub writeSummaryTable {
     # write table of basic QC stats to given filehandle
     my $qcResultsPath = shift;
     my $output = shift;
-    my ($total, $fails, $passRate, $crMean, $crSD) = getSummaryStats($qcResultsPath);
+    my $configPath = shift;
+    my ($total, $fails, $passRate, $crMean, $crSD) = getSummaryStats($qcResultsPath, $configPath);
     my $percentPass = sprintf("%.1f", 100*$passRate)."%";
     my $crScore = sprintf("%.0f", -10*(log(1 - $crMean)/log(10))); # Phred score
     my $cr = sprintf("%.4f", $crMean)." +/- ".sprintf("%.4f", $crSD);
@@ -101,8 +102,10 @@ my $plotDir = shift(@ARGV); # input/output directory path
 my $qcStatus = shift(@ARGV); # .json file with qc status
 my $title = shift(@ARGV); # experiment name
 $title ||= 'Untitled Analysis';
+my $config = shift(@ARGV); # .json config file
+$config ||= defaultJsonConfig();
 chdir($plotDir); # find and link to relative paths wrt plotdir
-my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames($config);
 my $outPath = $fileNames{'main_index'};
 my @png = glob('*.png');
 @png = sort(@png);
@@ -114,9 +117,9 @@ print OUT header(-type=>''), # create the HTTP header; content-type declaration 
     h1($title.": QC Results"), # level 1 header
     ;
 # table of basic summary stats (if available)
-if (-r $qcStatus) { writeSummaryTable($qcStatus, \*OUT); }
+if (-r $qcStatus) { writeSummaryTable($qcStatus, \*OUT, $config); }
 print OUT p('&nbsp;'); # spacer before next table
-writePlotLinks(\*OUT, \%descriptions);
+writePlotLinks(\*OUT, \%descriptions, $config);
 print OUT end_html();
 close OUT;
 

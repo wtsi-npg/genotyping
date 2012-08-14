@@ -12,7 +12,7 @@ use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::Genotyping::QC::QCPlotShared qw(readQCFileNames);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig readQCFileNames);
 use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -38,9 +38,9 @@ Options:
 --output-dir=PATH   Directory for QC output
 --sim=PATH          Path to SIM intensity file for xydiff calculation
 --dbpath=PATH       Path to pipeline database .db file
---inipath=PATH      Path to .ini file containing general pipeline and database configuration; defaults to \$HOME/.npg/genotyping.ini
+--inipath=PATH      Path to .ini file containing general pipeline and database configuration; local default is $DEFAULT_INI
 --run=NAME          Name of run in pipeline database (needed for database update from gender check)
---config=PATH       Path to .json file with QC thresholds
+--config=PATH       Path to .json file with QC thresholds; default is taken from inipath
 --title             Title for this analysis; will appear in plots
 --boxtype           Keyword for boxplot type; must be one of 'box', 'bean', or 'both'; defaults to 'both'
 ";
@@ -50,7 +50,8 @@ Options:
 ### process options and validate inputs
 $plinkPrefix = processPlinkPrefix($ARGV[0]);
 $iniPath ||= $DEFAULT_INI;
-$configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+
+$configPath ||= defaultJsonConfig($iniPath);
 $configPath = verifyAbsPath($configPath);
 if ($simPath) { $simPath = verifyAbsPath($simPath); }
 if ($dbPath) { $dbPath = verifyAbsPath($dbPath); }
@@ -62,7 +63,7 @@ $title ||= "Untitled";
 $boxtype ||= "both";
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $runName, $configPath, $outDir, $title, $boxtype);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype);
 
 sub getBoxBeanCommands {
     my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
@@ -130,9 +131,9 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $runName, $configPath, $outDir, $title, $boxPlotType) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxPlotType) = @_;
     my $startDir = getcwd;
-    my %fileNames = readQCFileNames();
+    my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
     my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
 		"$CR_STATS_EXECUTABLE $plinkPrefix",

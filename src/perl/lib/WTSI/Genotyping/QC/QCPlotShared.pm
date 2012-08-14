@@ -8,6 +8,7 @@ package WTSI::Genotyping::QC::QCPlotShared;
 use warnings;
 use strict;
 use Carp;
+use Config::Tiny;
 use Cwd;
 use FindBin qw($Bin);
 use POSIX qw(floor);
@@ -19,16 +20,28 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path/;
+our @EXPORT_OK = qw/defaultJsonConfig getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path $INI_FILE_DEFAULT/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
-$ini_path = "$Bin/../etc/";
+#$ini_path = "$Bin/../etc/";
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
-
-# read default qc names and thresholds from .json files
+$ini_path = defaultConfigDir($INI_FILE_DEFAULT);
 
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
 
+sub defaultConfigDir {
+    my $iniPath = shift;
+    $iniPath ||= $INI_FILE_DEFAULT;
+    my $ini = Config::Tiny->read($iniPath);
+    my $configDir = $ini->{pipeline}->{'inipath'}; # typically src/perl/etc
+    return $configDir;
+}
+
+sub defaultJsonConfig {
+    my $iniPath = shift;
+    my $json = defaultConfigDir($iniPath)."/qc_config.json";
+    return $json;
+}
 
 sub getDatabaseObject {
     # set up database object
@@ -41,7 +54,6 @@ sub getDatabaseObject {
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 		       on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    $db->populate;
     return $db;
 }
 
@@ -78,7 +90,8 @@ sub getSummaryStats {
     # read .json file of qc status and get summary values
     # interesting stats: mean/sd of call rate, and overall pass/fail
     my $inPath = shift;
-    my %allResults = readMetricResultHash($inPath);
+    my $configPath = shift;
+    my %allResults = readMetricResultHash($inPath, $configPath);
     my @cr;
     my $fails = 0;
     my @samples = keys(%allResults);
@@ -146,7 +159,6 @@ sub openDatabase {
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    $db->populate;
     chdir $start;
     return $db;
 }
@@ -169,6 +181,7 @@ sub parseLabel {
 sub readFileToString {
     # generic method to read a file (eg. json) into a single string variable
     my $inPath = shift();
+    if (not(defined($inPath)) || not -r $inPath) { carp "Cannot read input path \"$inPath\"\n"; }
     open my $in, "<", $inPath;
     my @lines = <$in>;
     close $in;
@@ -180,9 +193,10 @@ sub readMetricResultHash {
     # assumes top-level structure is a hash
     # remove any 'non-metric' data such as plate names
     my $inPath = shift;
+    my $configPath = shift;
     my %allResults = readQCResultHash($inPath); # hash of QC data indexed by sample name
     my %metricResults;
-    my %metricNames = readQCNameHash();
+    my %metricNames = readQCNameHash($configPath);
     foreach my $sample (keys(%allResults)) {
 	my %results = %{$allResults{$sample}};
 	foreach my $key (keys(%results)) {
@@ -206,7 +220,7 @@ sub readQCFileNames {
 sub readQCNameConfig {
     # read qc metric names from JSON config
     my $inPath = shift();
-    $inPath ||= $Bin."/../json/qc_name_config.json";
+    #$inPath ||= $Bin."/../json/qc_name_config.json";
     my %names = %{decode_json(readFileToString($inPath))};
     return %names;
 }
@@ -278,7 +292,7 @@ sub readThresholds {
     my $configPath = shift;
     my %config = %{decode_json(readFileToString($configPath))};
     my %thresholds = %{$config{"Metrics_thresholds"}};
-    my %qcMetricNames = readQCNameHash();
+    my %qcMetricNames = readQCNameHash($configPath);
     foreach my $name (keys(%thresholds)) { # validate metric names
 	unless ($qcMetricNames{$name}) {
 	    croak "Unknown QC metric name: $!";

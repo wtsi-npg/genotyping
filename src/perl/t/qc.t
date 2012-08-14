@@ -19,7 +19,7 @@ my $simA = "$Bin/qc_test_data/alpha.sim";
 my $outDirA = "$Bin/qc/alpha/";
 my $heatMapDir = "plate_heatmaps/";
 my $titleA = "Alpha";
-my $config = "$bin/../json/qc_threshold_defaults.json";
+#my $config = "$bin/../json/qc_threshold_defaults.json";
 my $dbnameA = "alpha_pipeline.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
 my $piperun = "pipeline_run"; # run name in pipeline DB
@@ -61,7 +61,7 @@ $status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
 is($status, 0, "xydiff.pl exit status");
 
 ## test collation into summary
-$status = system("perl $bin/write_qc_status.pl --config=$config --dbpath=$dbfileA");
+$status = system("perl $bin/write_qc_status.pl --dbpath=$dbfileA");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
@@ -121,7 +121,7 @@ system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --config=$config --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun";
+$cmd = "perl $bin/run_qc.pl --output-dir=. --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun";
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again

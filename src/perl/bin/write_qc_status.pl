@@ -20,7 +20,9 @@ use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames);
+
+our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my ($inputDir, $outputDir, $configPath, $dbPath, $iniPath, $help);
 
@@ -37,9 +39,9 @@ if ($help) {
 Options:
 --input-dir         Directory containing input files (defaults to current working directory)
 --output-dir        Output directory (defaults to input directory)
---config            Config path in JSON format, specifying metrics and thresholds (defaults to standard file)
+--config            Config path in JSON format (default taken from inipath)
 --dbpath            Path to pipeline.db file, to obtain plate names for each sample
---inipath           Path to .ini file for pipeline database
+--inipath           Path to .ini file for pipeline database, and for JSON config default
 --help              Print this help text and exit
 ";
     exit(0);
@@ -47,13 +49,15 @@ Options:
 
 $inputDir ||= '.';
 $outputDir ||= $inputDir;
-$configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+$iniPath ||= $DEFAULT_INI;
+$configPath ||= defaultJsonConfig($iniPath); 
 
 if ((!$dbPath) && (!$iniPath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
 if ($dbPath && not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
 if ($iniPath && not -r $iniPath) { croak "Cannot read .ini path $iniPath"; }
+if (not -r $configPath) { croak "Cannot read config path $configPath"; }
 
-my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+my %fileNames = readQCFileNames($configPath);
 my $outPath = $outputDir.'/'.$fileNames{'qc_results'};
 
 run($inputDir, $configPath, $dbPath, $iniPath, $outPath);
@@ -240,7 +244,6 @@ sub resultsMetricSd {
 	if ($values[$i] >= $min && $values[$i] <= $max) { $pass = 1; }
 	else { $pass = 0; }
 	$results{$samples[$i]} = [$pass, $values[$i]];
-	#if ($i % 100 == 0) { print join("\t", $i, $pass, $values[$i])."\n"; } ### test
     }
     return %results;
 }
@@ -284,13 +287,13 @@ sub run {
     # main method to run script
     my ($inputDir, $configPath, $dbPath, $iniPath, $outPath) = @_;
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
-    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray();
+    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray($configPath);
     my @metrics = ();
     foreach my $metric (@metricNames) { 
 	# use metrics with defined thresholds
 	if (defined($thresholds{$metric})) { push(@metrics, $metric); }
     } 
-    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs();
+    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs($configPath);
     my $out;
     open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
     writeResults($out, $inputDir, $dbPath, $iniPath, \@metrics, \%thresholds, \%inputNames);
