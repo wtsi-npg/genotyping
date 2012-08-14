@@ -16,22 +16,24 @@ use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Carp qw(confess);
-use WTSI::Genotyping::QC::QCPlotShared;
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
 use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, $comboText, $causeText, 
-    $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $title);
+    $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $title, $iniPath);
 
 GetOptions("config=s"      => \$configPath,
            "input=s"       => \$inPath,
 	   "cr-het=s"      => \$crHetPath,
 	   "help"          => \$help,
 	   "output-dir=s"  => \$outputDir,
+	   "inipath=s"     => \$iniPath,
 	   "title=s",      => \$title,
     );
 
 $inPath     ||= './qc_results.json';
-$configPath ||= $Bin."/../json/qc_threshold_defaults.json";
+$iniPath    ||= $INI_FILE_DEFAULT;
+$configPath ||= defaultJsonConfig($iniPath);
 $crHetPath  ||= './sample_cr_het.txt';
 $failText   ||= 'failTotals.txt';
 $comboText  ||= 'failCombos.txt';
@@ -49,6 +51,7 @@ if ($help) {
 Options:
 --input=PATH        Path to input file; defaults to ./qc_results.json
 --output-dir=PATH   Path to output directory; defaults to current working directory
+--config=PATH       Path to .json config file; local default found from $INI_FILE_DEFAULT
 --title=STRING      Title for experiment to display in plots
 --help              Print this help text and exit
 Unspecified options will receive default values.
@@ -129,10 +132,10 @@ sub sortFailCodes {
 sub writeFailCounts {
     # write counts of (individual and combined) failure causes
     # return array of failed sample names
-    my ($qcResultsRef, $failText, $comboText) = @_;
+    my ($qcResultsRef, $configPath, $failText, $comboText) = @_;
     my %results = %$qcResultsRef;
     my (%singleFails, %combinedFails, @failedSamples);
-    my %shortNames = WTSI::Genotyping::QC::QCPlotShared::readQCShortNameHash();
+    my %shortNames = WTSI::Genotyping::QC::QCPlotShared::readQCShortNameHash($configPath);
     foreach my $sample (keys(%results)) {
 	my %metricResults = %{$results{$sample}};
 	my @fails = ();
@@ -196,14 +199,14 @@ sub writeFailedCrHet {
 sub run {
     # find failure causes and write input for R scripts
     my ($inputPath, $qcConfigPath, $outputsRef, $title, $crHetPath) = @_;
-    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath);
+    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath, $qcConfigPath);
     unless (containsFailedSample(\%qcResults)) {
 	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
 	return 1;
     }
     my ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng) 
 	= @$outputsRef;
-    my @failedSamples = writeFailCounts(\%qcResults, $failText, $comboText);
+    my @failedSamples = writeFailCounts(\%qcResults, $qcConfigPath, $failText, $comboText);
     my $failTotal = @failedSamples;
     writeFailedCrHet(\@failedSamples, \%qcResults, $crHetPath, $crHetFail);
     # run R scripts to produce plots
