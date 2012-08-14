@@ -70,7 +70,7 @@ sub makePlots {
     # assume file names are of the form PREFIX_PLATE.txt
     # execute given script with input table, output path, and plate name as arguments
     # supply global min/max as arguments (not used except by XYdiff)
-    my ($inputDir, $plotScript, $expr, $prefix, $minMaxArgs, $test) = @_;
+    my ($inputDir, $plotScript, $expr, $prefix, $minMaxArgs) = @_;
     my @paths = glob($inputDir.'/'.$expr);
     my $allPlotsOK = 1;
     foreach my $path (@paths) {
@@ -86,7 +86,7 @@ sub makePlots {
 	my @args = ($plotScript, $path, $plate);
 	if ($minMaxArgs) { push(@args, ($comments{'PLOT_MIN'}, $comments{'PLOT_MAX'})); }
 	my @outputs = ($outPath, );
-	my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+	my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
 	if ($plotsOK==0) { $allPlotsOK = 0; }
     } 
     return $allPlotsOK;

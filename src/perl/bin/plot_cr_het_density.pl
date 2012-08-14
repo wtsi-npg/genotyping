@@ -100,7 +100,6 @@ sub writeTable {
 sub run {
     my $title = shift;
     my $outDir = shift;
-    my $test = shift;
     my @names = ('crHetDensityHeatmap.txt', 'crHetDensityHeatmap.png', 'crHet.txt', 
 		 'crHetDensityScatter.png', 'crHistogram.png', 'hetHistogram.png');
     my @paths = ();
@@ -118,7 +117,7 @@ sub run {
     close $output;
     @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax);
     @outputs = ($heatPng,);
-    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     ### do scatterplot & histograms ###
     if ($plotsOK) {
 	open $output, "> $scatterText" || die "Cannot open output path $scatterText: $!";
@@ -127,7 +126,7 @@ sub run {
 	my $scatterPlotScript = "plotCrHetDensity.R";
 	@args = ($scatterPlotScript, $scatterText, $title);
 	@outputs = ($scatterPng, $crHist, $hetHist);
-	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     }
     return $plotsOK;    
 }
