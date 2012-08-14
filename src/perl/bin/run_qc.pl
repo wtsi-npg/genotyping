@@ -50,7 +50,7 @@ Options:
 ### process options and validate inputs
 $plinkPrefix = processPlinkPrefix($ARGV[0]);
 $iniPath ||= $DEFAULT_INI;
-
+$iniPath = verifyAbsPath($iniPath);
 $configPath ||= defaultJsonConfig($iniPath);
 $configPath = verifyAbsPath($configPath);
 if ($simPath) { $simPath = verifyAbsPath($simPath); }
