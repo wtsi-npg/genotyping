@@ -11,7 +11,7 @@ use Carp;
 use Cwd qw/getcwd abs_path/;
 use JSON;
 use POSIX qw/strftime/;
-use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
+use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
 use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
@@ -21,10 +21,11 @@ our @dbInfoHeaders = qw/run project supplier snpset/;
 
 sub createReports {
     # 'main' method to write text and CSV files
-    my ($results, $db, $csv, $tex, $metrics, $qcDir, $title) = @_; # I/O paths
-    my $csvOK = writeCsv($results, $db, $csv);
+    my ($results, $db, $csv, $tex, $config, $qcDir, $title, $author) = @_; # I/O paths
+    $author ||= "";
+    my $csvOK = writeCsv($results, $db, $config, $csv);
     if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
-    writeSummaryLatex($tex, $results, $metrics, $db, $qcDir, $title);
+    writeSummaryLatex($tex, $results, $config, $db, $qcDir, $title, $author);
     my $pdfOK = texToPdf($tex);
     if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
     my $ok = $csvOK && $pdfOK;
@@ -83,9 +84,10 @@ sub findPlateFields {
 }
 
 sub getCsvHeaders {
+    my $config = shift;
     my @headers = @dbInfoHeaders;
     push @headers, qw/sample plate well pass/;
-    my @metricNames = readQCNameArray();
+    my @metricNames = readQCNameArray($config);
     foreach my $metric (@metricNames) {
 	my @suffixes;
 	if ($metric eq 'gender') {
@@ -103,7 +105,8 @@ sub getCsvHeaders {
 sub getPlateInfo {
     # for each plate, find: samples found, samples excluded, CR mean/median, het mean
     my %records = %{ shift() };
-    my @metricNames = readQCNameArray();
+    my $config = shift;
+    my @metricNames = readQCNameArray($config);
     my (%crByPlate, %hetByPlate, %passByPlate, %samplesByPlate, %plateStats, @cr, @het, $pass, $samples);
     foreach my $sample (keys(%records)) {
 	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
@@ -148,7 +151,8 @@ sub getSampleInfo {
     # for each sample, get plate, well, metric values and pass/fail status
     # also get overall sample pass/fail
     my %records = %{ shift() };
-    my @metricNames = readQCNameArray();
+    my $config = shift;
+    my @metricNames = readQCNameArray($config);
     # metric name order: ["call_rate","heterozygosity","duplicate","identity","gender","xydiff]"
     my @sampleFields;
     my @samples = keys(%records);
@@ -350,8 +354,9 @@ sub textForMetrics {
 
 sub textForPlates {
     my $resultPath = shift;
+    my $config = shift;
     my $resultsRef = readJson($resultPath);
-    my ($plateRef, $aggRef) = getPlateInfo($resultsRef);
+    my ($plateRef, $aggRef) = getPlateInfo($resultsRef, $config);
     my %plateStats = %$plateRef;
     my @aggregate = @$aggRef;
     my @plates = keys(%plateStats);
@@ -368,16 +373,15 @@ sub textForPlates {
 }
 
 sub textForCsv {
-    my ($resultPath, $dbPath) = @_;
+    my ($resultPath, $dbPath, $config) = @_;
     my $resultsRef = readJson($resultPath);
-    my @headers = getCsvHeaders();
+    my @headers = getCsvHeaders($config);
     my @text = (\@headers,);
-    my @sampleFields = getSampleInfo($resultsRef);
+    my @sampleFields = getSampleInfo($resultsRef, $config);
     my %dbInfo = dbSampleInfo($dbPath);
     foreach my $ref (@sampleFields) {
 	my @out = sampleFieldsToText($ref);
 	my $sample = $out[0];
-	unless ($dbInfo{$sample}) { print "### ".$sample."\n"; }
 	unshift(@out, @{$dbInfo{$sample}});
 	if ($#headers != $#out) { croak "Numbers of output headers and fields differ: $#headers != $#out"; }
 	push(@text, \@out);
@@ -406,8 +410,9 @@ sub texToPdf {
 }
 
 sub writeCsv {
-    my ($resultPath, $dbPath, $outPath) = @_;
-    my @text = textForCsv($resultPath, $dbPath);
+    my ($resultPath, $dbPath, $config, $outPath) = @_;
+    $config ||= defaultJsonConfig();
+    my @text = textForCsv($resultPath, $dbPath, $config);
     open my $out, ">", $outPath || croak "Cannot open output path $outPath";
     foreach my $lineRef (@text) {
 	print $out join(',', @$lineRef)."\n";
@@ -419,18 +424,19 @@ sub writeCsv {
 
 sub writeSummaryLatex {
     # write .tex input file for LaTeX; use to generate PDF
-    my ($texPath, $resultPath, $metricPath, $dbPath, $graphicsDir, $title, $author) = @_;
+    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Untitled";
     $author ||= "WTSI Genotyping Pipeline";
+    $config ||= defaultJsonConfig();
     $graphicsDir ||= ".";
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author, $graphicsDir);
     my @text = textForDatasets($dbPath);
     print $out latexTable(\@text);
-    @text = textForPlates($resultPath);
+    @text = textForPlates($resultPath, $config);
     print $out latexTable(\@text);
-    @text = textForMetrics($metricPath);
+    @text = textForMetrics($config);
     print $out latexTable(\@text);
     print $out "\\pagebreak\n";
     print $out "\\listoffigures\n\n";

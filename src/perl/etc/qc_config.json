@@ -1,0 +1,44 @@
+{ "title":"QC_config",
+  "file_names": {"xydiff":"xydiff.txt",
+                 "duplicate_input":"duplicate_summary.txt",
+                 "main_index":"index.html",
+                 "identity_input":"identity_check_results.txt",
+                 "sample_cr_het":"sample_cr_het.txt",
+                 "plate_index":"index.html",
+                 "plate_dir":"plate_heatmaps",
+                 "qc_results":"qc_results.json",
+                 "xydiff_expr":"/*XYdiff.txt",
+                 "gender":"sample_xhet_gender.txt"},
+  "input_names": {"heterozygosity":"sample_cr_het.txt",
+                  "call_rate":"sample_cr_het.txt",
+                  "xydiff":"xydiff.txt",
+                  "identity":"identity_check_results.txt",
+                  "duplicate":["sample_cr_het.txt","duplicate_summary.txt"],
+                  "gender":"sample_xhet_gender.txt"},
+  "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
+  "name_array":["call_rate","heterozygosity","duplicate","identity","gender","xydiff"],
+  "Threshold_types" : {
+      "heterozygosity" : "Standard deviations",
+      "xydiff" : "Standard deviations",
+      "call_rate" : "Minimum",
+      "identity" : "Maximum",
+      "duplicate" : "NA",
+      "gender" : "NA"
+   },
+   "Metric_descriptions" : {
+      "heterozygosity" : "Sample autosome heterozygosity rate",
+      "xydiff" : "Sample mean XY intensity difference",
+      "call_rate" : "Sample call rate",
+      "identity" : "Pairwise identity check of all samples",
+      "duplicate" : "Duplicate check against Sequenom database",
+      "gender" : "Comparison of inferred and supplied gender"
+   },
+   "Metrics_thresholds" : {
+      "heterozygosity" : 3,
+      "call_rate" : 0.95,
+      "xydiff" : 3,
+      "identity" : 0.95,
+      "duplicate" : "NA",
+      "gender" : "NA"
+   }
+}
