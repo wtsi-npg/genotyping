@@ -17,8 +17,12 @@ use warnings;
 use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
+use Log::Log4perl qw(:easy);
 use WTSI::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
+
+Log::Log4perl->easy_init($ERROR);
+my $log = Log::Log4perl->get_logger("genotyping");
 
 my ($mode, $type, $outDir, $title, $help, $test, $dbpath, $inipath);
 
@@ -56,7 +60,6 @@ $mode ||= "cr";
 $type = 'both';
 $outDir ||= '.';
 $title ||= "UNTITLED";
-$test ||= 1; # test mode is on by default
 
 unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") { die "Illegal mode argument: $mode: $!"; }
 unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal type argument: $type: $!"; }
@@ -86,7 +89,7 @@ sub writeBoxplotInput {
 
 sub runPlotScript {
     # run R script to create box/beanplot
-    my ($mode, $bean, $outDir, $title, $textPath, $test) = @_;
+    my ($mode, $bean, $outDir, $title, $textPath) = @_;
     my %beanPlotScripts = ( # R plotting scripts for each mode
 	cr     => 'beanplotCR.R',
 	het    => 'beanplotHet.R', 
@@ -107,14 +110,19 @@ sub runPlotScript {
     my @args = ($plotScript, $textPath, $title);
     my @outputs = ($pngOutPath,);
     if (!$bean && $mode eq 'cr') { push(@outputs, $outDir.'/total_samples_per_plate.png'); }
-    my $result = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
-    return $result;
+    my ($ok, $cmd, $info) = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, 1);
+    if (not $ok) {
+	# R script error should not be fatal; beanplot may fail on 'sparse' data
+	my $msg = "Warning: R script failure: Command \"$cmd\", output \"$info\"\n";
+	$log->error($msg);
+    }
+    return 1;
 }
 
 sub run {
     # mode = cr, het or xydiff
     # type = box, bean, or both
-    my ($mode, $type, $outDir, $title, $dbpath, $inipath, $test) = @_;
+    my ($mode, $type, $outDir, $title, $dbpath, $inipath) = @_;
     my %index = ( # index in whitespace-separated input data for each mode; use to write .txt input to R scripts
 	cr     => 1,
 	het    => 2, 
@@ -127,10 +135,10 @@ sub run {
     my $plotsOK = 0; 
     if ($inputOK) {
 	if ($type eq 'both' || $type eq 'box') {
-	    $plotsOK = runPlotScript($mode, 0,  $outDir, $title, $textOutPath, $test); # boxplot
+	    $plotsOK = runPlotScript($mode, 0,  $outDir, $title, $textOutPath); # boxplot
 	}
 	if ($plotsOK && ($type eq 'both' || $type eq 'bean')) {
-	    $plotsOK = runPlotScript($mode, 1,  $outDir, $title, $textOutPath, $test); # beanplot
+	    $plotsOK = runPlotScript($mode, 1,  $outDir, $title, $textOutPath); # beanplot
 	}
     } else {
 	croak "\tERROR: Cannot parse any plate names from standard input";
@@ -138,6 +146,6 @@ sub run {
     return $plotsOK;
 }
 
-my $ok = run($mode, $type, $outDir, $title, $dbpath, $inipath, $test);
+my $ok = run($mode, $type, $outDir, $title, $dbpath, $inipath);
 if ($ok) { exit(0); }
 else { exit(1); }
