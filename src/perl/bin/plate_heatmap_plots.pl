@@ -49,8 +49,8 @@ $mode ||= "cr";
 $outDir ||= 'platePlots';
 
 if ((!$dbPath) && (!$iniPath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
-if ($dbPath && not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
-if ($iniPath && not -r $iniPath) { croak "Cannot read .ini path $iniPath"; }
+if ($dbPath && !(-r $dbPath)) { croak "Cannot read pipeline database path $dbPath"; }
+if ($iniPath && !(-r $iniPath)) { croak "Cannot read .ini path $iniPath"; }
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -161,14 +161,14 @@ sub readComments {
     # header lines of the form '# KEY VALUE' ; VALUE may contain spaces!
     my $inPath = shift;
     my %comments = ();
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
-    while (<IN>) {
+    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!";
+    while (<$in>) {
 	chomp;
 	unless (/^#/) { next; }
 	my @words = split(/ /);
 	$comments{$words[1]} = join(' ', @words[2..$#words]); # value may contain spaces!
     }
-    close IN;
+    close $in;
     return %comments;
 }
 
@@ -180,10 +180,10 @@ sub writeGrid {
     my $plate = $comments{'PLATE_NAME'};
     $plate =~ s/\s+/_/; # get rid of spaces in plate name (if any)
     my $outPath = $outDir."/".$outPrefix.$plate.".txt";
-    open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
     my @keyList = keys(%comments);
     @keyList = sort(@keyList);
-    foreach my $key (@keyList) { print OUT "# $key $comments{$key}\n"; }
+    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+    foreach my $key (@keyList) { print $out "# $key $comments{$key}\n"; }
     for (my $y=1; $y<=$yMax; $y++) { # x, y counts start at 1
 	my @row = ();
 	for (my $x=1; $x<=$xMax; $x++) {
@@ -191,9 +191,10 @@ sub writeGrid {
 	    unless (defined($result)) { $result = 0; }
 	    push (@row, $result);
 	}
-	print OUT join("\t", @row)."\n";
+	print $out join("\t", @row)."\n";
     }
-    close OUT;
+    close $out;
+    return 1;
 }
 
 sub writePlateData {
@@ -213,6 +214,7 @@ sub writePlateData {
 	);
 	writeGrid($data{$plate}, $outDir, $prefix, $xMax, $yMax, \%comments); 
     }
+    return 1;
 }
 
 sub run {

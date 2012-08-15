@@ -34,9 +34,9 @@ Options:
 $verbose ||= 0; # defaults to quiet mode
 $probeNum ||= 10000; # number of probes to read in at one time
 
-if ($inPath) { open $fh, "< $inPath"; }
+if ($inPath) { open $fh, "<", $inPath; }
 else { $fh = \*STDIN; }
-open $out, "> $outPath";
+open $out, ">", $outPath;
 WTSI::Genotyping::QC::SimFiles::readWriteXYDiffs($fh, $out, $verbose, $probeNum);
 close $fh;
 close $out;

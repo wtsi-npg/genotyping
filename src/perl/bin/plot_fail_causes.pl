@@ -111,9 +111,10 @@ sub findHetMeanSd {
 sub sortFailCodes {
     # want to sort failure codes: all one-letter codes, then all two-letter, then all three-letter, etc.
     # groups "numbers of causes" together in plot
+    my @input = @_;
     my %codesByLen; # hash of arrays for each length
     my $max = 0;
-    foreach my $code (@_) { 
+    foreach my $code (@input) { 
 	my $len = length($code);
 	$codesByLen{$code} = $len;
 	if ($len>$max) { $max = $len; }
@@ -121,7 +122,7 @@ sub sortFailCodes {
     my @sorted;
     for (my $i=1;$i<=$max;$i++) {	
 	my @codes = ();
-	foreach my $code (@_) { # repeated loop is inefficient, but doesn't matter with <= 32 codes!
+	foreach my $code (@input) { # repeated loop is inefficient, but doesn't matter with <= 32 codes!
 	    if ($codesByLen{$code}==$i) { push(@codes, $code); }
 	}
 	push(@sorted, (sort(@codes)));
@@ -151,18 +152,18 @@ sub writeFailCounts {
 	    $combinedFails{$combo}++;
 	};
     }
-    open OUT, "> $failText" || die "Cannot open output file $failText: $!"; # individual failures
+    open my $out, ">", $failText || die "Cannot open output file $failText: $!"; # individual failures
     my @metrics = sort(keys(%singleFails));
     foreach my $metric (@metrics) {
-	print OUT $metric."\t".$singleFails{$metric}."\n";
+	print $out $metric."\t".$singleFails{$metric}."\n";
     }
-    close OUT;
+    close $out;
     my @failCombos = sort(keys(%combinedFails));
-    open OUT, "> $comboText" || die "Cannot open output file $failText: $!"; # combined failures
+    open $out, ">", $comboText || die "Cannot open output file $failText: $!"; # combined failures
     foreach my $combo (@failCombos) {
-	print OUT $combo."\t".$combinedFails{$combo}."\n";
+	print $out $combo."\t".$combinedFails{$combo}."\n";
     }
-    close OUT;
+    close $out;
     return @failedSamples;
 }
 
@@ -173,11 +174,11 @@ sub writeFailedCrHet {
     foreach my $sample (@$failedSamplesRef) { $failedSamples{$sample} = 1; }
     my %qcResults = %$qcResultsRef;
     my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
-    open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
     my @header = qw(sample cr het);
     my @keys = qw(duplicate gender identity xydiff);
     push(@header, @keys);
-    print OUT join("\t", @header)."\n";
+    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+    print $out join("\t", @header)."\n";
     foreach my $fieldsRef (@data) {
 	my @fields = splice(@$fieldsRef, 0, 3);
 	my $sample = $fields[0];
@@ -191,9 +192,10 @@ sub writeFailedCrHet {
 	    else { $pass = 1; } # may not have qc results for all (metric, sample) pairs
 	    push(@fields, $pass);
 	}
-	print OUT join("\t", @fields)."\n";
+	print $out join("\t", @fields)."\n";
     }
-    close OUT;  
+    close $out;
+    return 1;
 }
 
 sub run {

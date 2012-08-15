@@ -10,7 +10,7 @@ use strict;
 use WTSI::Genotyping::QC::SimFiles;
 
 my $fh;
-open $fh, "< $ARGV[0]";
+open $fh, "<", $ARGV[0];
 my $header = WTSI::Genotyping::QC::SimFiles::readHeader($fh);
 my @fields = WTSI::Genotyping::QC::SimFiles::unpackHeader($header);
 foreach my $field (@fields) { print $field."\n"; }
