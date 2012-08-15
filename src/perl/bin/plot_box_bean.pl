@@ -64,8 +64,8 @@ $title ||= "UNTITLED";
 unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") { die "Illegal mode argument: $mode: $!"; }
 unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal type argument: $type: $!"; }
 if ((!$dbpath) && (!$inipath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
-if ($dbpath && not -r $dbpath) { croak "Cannot read pipeline database path $dbpath"; }
-if ($inipath && not -r $inipath) { croak "Cannot read .ini path $inipath"; }
+if ($dbpath && !(-r $dbpath)) { croak "Cannot read pipeline database path $dbpath"; }
+if ($inipath && !(-r $inipath)) { croak "Cannot read .ini path $inipath"; }
 
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
@@ -129,7 +129,7 @@ sub run {
 	xydiff => 1, );
     my $input = \*STDIN;
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
-    open my $output, "> $textOutPath" || croak "Cannot open output file: $!";
+    open my $output, ">", $textOutPath || croak "Cannot open output file: $!";
     my $inputOK = writeBoxplotInput($input, $output, $index{$mode}, $dbpath, $inipath);
     close $output;
     my $plotsOK = 0; 

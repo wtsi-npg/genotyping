@@ -7,8 +7,8 @@
 # glob plate names & plot paths from given output directory
 # TODO replace hard-coded text patterns (for glob etc.) with a config data structure
 
+use warnings; 
 use strict;
-#use warnings; # raises warning for $fileGlob expression in getPlateInfo, but this is actually OK
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
 use Cwd;
 use WTSI::Genotyping::QC::QCPlotTests;
@@ -29,7 +29,8 @@ sub getPlateName {
     # extract plate name from plot filename
     # assume plot filenames are in the form plot_PREFIX_PLATE.png 
     # prefix may *not* contain _'s, plate may contain .'s and _'s)
-    my @items = split(/_/, $_[0]);
+    my $plotName = shift;
+    my @items = split(/_/, $plotName);
     my @tail = splice(@items, 2);
     my $tail = join('_', @tail);
     @items = split(/\./, $tail);
@@ -44,8 +45,8 @@ sub getPlateInfo {
     my $startDir = getcwd;
     chdir($plotDir);
     my (%plates, %crPlots, %hetPlots, %xydiffPlots);
-    my ($crExpr, $hetExpr, $xydiffExpr, $fileGlob) = qw(plot_cr_* plot_het_* plot_xydiff_* {cr,het,xydiff,}*.png);
-    my @files = glob($fileGlob);
+    my ($crExpr, $hetExpr, $xydiffExpr) = qw(plot_cr_* plot_het_* plot_xydiff_*);
+    my @files = glob('{cr,het,xydiff,}*.png');
     foreach my $file (@files) {
 	my $plate = getPlateName($file);
 	$plates{$plate} = 1;
@@ -94,22 +95,22 @@ my %xydiffPlots = %{shift(@refs)};
 my %textPaths = getTextPaths($plotDir, \@plates);
 # must write index to given plot directory -- otherwise links are broken
 my $outPath = $plotDir.'/'.$outFileName;
-open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
-print OUT header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
+open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+print $out header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
     start_html(-title=>"$experiment: Plate heatmap index",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',
 	       ),
     h1("$experiment: Plate heatmap index"), # level 1 header
     #p('Some body text goes here')
     ;
-print OUT start_table({-border=>1, -cellpadding=>4},);
-print OUT Tr({-align=>'CENTER',-valign=>'TOP'}, [ 
+print $out start_table({-border=>1, -cellpadding=>4},);
+print $out Tr({-align=>'CENTER',-valign=>'TOP'}, [ 
 		 th(['Plate', 'Sample CR','Sample het rate','Sample XYdiff', 'Plot inputs',
 		    ]),]);
 foreach my $plate (@plates) {
     # for each plate -- use plate name to look up CR, Het, and XYdiff filenames & generate links
     unless (defined($crPlots{$plate}) || defined($hetPlots{$plate}) || defined($xydiffPlots{$plate}) ) { next; }
-    print OUT Tr({-valign=>'TOP'}, [ td([$plate, 
+    print $out Tr({-valign=>'TOP'}, [ td([$plate, 
 					 getLinkThumbnail($crPlots{$plate}), 
 					 getLinkThumbnail($hetPlots{$plate}), 
 					 getLinkThumbnail($xydiffPlots{$plate}),
@@ -117,11 +118,11 @@ foreach my $plate (@plates) {
 					]),
 	]);
 }
-print OUT end_table();
-print OUT end_html();
-close OUT;
+print $out end_table();
+print $out end_html();
+close $out;
 
 # test output for XML validity
-open my $fh, "< $outPath";
+open my $fh, "<", $outPath;
 if (WTSI::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
 else { close $fh; exit(1); } # error found
