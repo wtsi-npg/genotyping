@@ -218,17 +218,19 @@ sub wrapPlotCommand {
     # wrapper to execute R script and check PNG output
     # @args = all other arguments (including paths to R executable and script)
     # @outputs = PNG output files (must come after other @args on command line)
-    my ($argsRef, $outputsRef) = @_;
+    my ($argsRef, $outputsRef, $returnOutput) = @_;
     my @args = @$argsRef;
     my @outputs = @$outputsRef;
+    $returnOutput ||= 0;
     my $plotsOK = 1;
     my $temp = mktemp("r_script_output_XXXXXX"); # creates temporary filename
     my $cmd = join(' ', @args).' '.join(' ', @outputs)." >& $temp"; # assumes csh for redirect
     my $startTime = time();
     my $result = system($cmd);
+    my $info;
     if ($result != 0) {
 	open my $in, "<", $temp || croak "Could not open temporary file $temp";
-	my $info = join("", <$in>);
+	$info = join("", <$in>);
 	close $in || croak "Could not close temporary file $temp";
 	carp "Warning: Non-zero return code from command \"$cmd\". Command output: \"$info\"";
 	$plotsOK = 0;
@@ -242,7 +244,8 @@ sub wrapPlotCommand {
 	}
     }
     system("rm -f $temp");
-    return $plotsOK;
+    if ($returnOutput) { return ($plotsOK, $cmd, $info); }
+    else { return $plotsOK; }
 }
 
 sub xmlOK {
