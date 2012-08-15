@@ -172,4 +172,5 @@ sub run {
     my $texPath = "pipeline_summary.tex";
     createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, ".", $title);
     chdir($startDir);
+    return 1;
 }

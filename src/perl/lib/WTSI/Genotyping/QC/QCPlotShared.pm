@@ -23,7 +23,6 @@ our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/defaultJsonConfig getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path $INI_FILE_DEFAULT/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
-#$ini_path = "$Bin/../etc/";
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
 $ini_path = defaultConfigDir($INI_FILE_DEFAULT);
 
@@ -181,7 +180,7 @@ sub parseLabel {
 sub readFileToString {
     # generic method to read a file (eg. json) into a single string variable
     my $inPath = shift();
-    if (not(defined($inPath)) || not -r $inPath) { carp "Cannot read input path \"$inPath\"\n"; }
+    if (!(defined($inPath)) || !(-r $inPath)) { carp "Cannot read input path \"$inPath\"\n"; }
     open my $in, "<", $inPath;
     my @lines = <$in>;
     close $in;

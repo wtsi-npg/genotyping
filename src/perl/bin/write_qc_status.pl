@@ -53,8 +53,8 @@ $iniPath ||= $DEFAULT_INI;
 $configPath ||= defaultJsonConfig($iniPath); 
 
 if ((!$dbPath) && (!$iniPath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
-if ($dbPath && not -r $dbPath) { croak "Cannot read pipeline database path $dbPath"; }
-if ($iniPath && not -r $iniPath) { croak "Cannot read .ini path $iniPath"; }
+if ($dbPath && !(-r $dbPath)) { croak "Cannot read pipeline database path $dbPath"; }
+if ($iniPath && !(-r $iniPath)) { croak "Cannot read .ini path $iniPath"; }
 if (not -r $configPath) { croak "Cannot read config path $configPath"; }
 
 my %fileNames = readQCFileNames($configPath);
@@ -103,16 +103,16 @@ sub readSampleNames {
     # read sample names from sample_cr_het.txt (or any other tab-delimited file with sample name as first field)
     # Now obsolete for this script! But may be useful to preserve sample order in human-readable output.
     my $inPath = shift;
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
+    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!";
     my $i = 0;
     my @samples = ();
-    while (<IN>) {
+    while (<$in>) {
 	if (/^#/) { next; } # comments start with a #
 	chomp;
 	my @words = split;
 	push(@samples, shift(@words));
     }
-    close IN;
+    close $in;
     return @samples;
 }
 
@@ -142,15 +142,15 @@ sub resultsDuplicate {
     my ($crHetPath, $duplicatePath, ) = @$inPathsRef;
     my (%duplicates, @pairs, %results);
     # read duplicate sample names
-    open IN, "< $duplicatePath" || die "Cannot open input path $duplicatePath: $!";
-    while (<IN>) {
+    open my $in, "<", $duplicatePath || die "Cannot open input path $duplicatePath: $!";
+    while (<$in>) {
 	if (/^#/) { next; } # comments start with a #
 	my @fields = split;
 	my @pair = ($fields[1], $fields[2]);
 	foreach my $sample (@pair) { $duplicates{$sample} = 1; }
 	push(@pairs, \@pair);
     }
-    close IN;
+    close $in;
     # read call rates for duplicated samples
     my (%duplicateCR, @samples);
     my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
@@ -281,6 +281,7 @@ sub writeResults {
     }
     my $resultString = encode_json(\%sampleResults);
     print $out $resultString;
+    return 1;
 }
 
 sub run {
@@ -295,9 +296,10 @@ sub run {
     } 
     my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs($configPath);
     my $out;
-    open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
+    open($out, ">", $outPath) || die "Cannot open output path $outPath: $!"; 
     writeResults($out, $inputDir, $dbPath, $iniPath, \@metrics, \%thresholds, \%inputNames);
     close($out);
+    return 1;
 }
 
 
