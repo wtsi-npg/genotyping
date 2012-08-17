@@ -75,11 +75,16 @@ module TestHelper
     asynchronizer.message_queue = name + '.' + $$.to_s
 
     Timeout.timeout(timeout) do
-      until return_available?(result) do
-        result = test.call
+
+      begin
+        until return_available?(result) do
+          result = test.call
+          memoizer.update_async_memos!
+          sleep(interval)
+          print('#')
+        end
+      ensure
         memoizer.update_async_memos!
-        sleep(interval)
-        print('#')
       end
     end
 
