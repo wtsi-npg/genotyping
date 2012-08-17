@@ -56,7 +56,7 @@ sub writePlotLinks {
 	print $out img({src=>$png, alt=>$png});
 	print $out p(a({href=>"#".$contents}, "Back to contents"));
     }
-    
+    return 1;
 }
 
 sub writeSummaryTable {
@@ -75,6 +75,7 @@ sub writeSummaryTable {
 	print $output Tr( th({align=>"left"}, $keys[$i]), td($values[$i]) );
     }
     print $output end_table();
+    return 1;
 }
 
 # TODO split descriptions into categories for table of contents; eg. boxplot, histogram, pass/fail, other
@@ -109,21 +110,21 @@ my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames($config);
 my $outPath = $fileNames{'main_index'};
 my @png = glob('*.png');
 @png = sort(@png);
-open OUT, "> $outPath" || die "Cannot open output path $outPath: $!";
-print OUT header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
+open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+print $out header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
     start_html(-title=>"$title: Summary of results",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',
 	       ),
     h1($title.": QC Results"), # level 1 header
     ;
 # table of basic summary stats (if available)
-if (-r $qcStatus) { writeSummaryTable($qcStatus, \*OUT, $config); }
-print OUT p('&nbsp;'); # spacer before next table
-writePlotLinks(\*OUT, \%descriptions, $config);
-print OUT end_html();
-close OUT;
+if (-r $qcStatus) { writeSummaryTable($qcStatus, $out, $config); }
+print $out p('&nbsp;'); # spacer before next table
+writePlotLinks($out, \%descriptions, $config);
+print $out end_html();
+close $out;
 
 # test output for XML validity
-open my $fh, "< $outPath";
+open my $fh, "<", $outPath;
 if (WTSI::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
 else { close $fh; exit(1); } # error found
