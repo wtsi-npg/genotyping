@@ -62,6 +62,16 @@ sub ipwd {
   return shift @wd;
 }
 
+=head2 get_object_checksum
+
+  Arg [1]    : iRODS data object name
+  Example    : $cs = get_object_checksum('/my/path/lorem.txt')
+  Description: Returns the MD5 checksum of an iRODS data object.
+  Returntype : string
+  Caller     : general
+
+=cut
+
 sub get_object_checksum {
   my ($object) = @_;
 
@@ -86,6 +96,18 @@ sub get_object_checksum {
 
   return $checksum;
 }
+
+
+=head2 checksum_object
+
+  Arg [1]    : iRODS data object name
+  Example    : checksum_object('/my/path/lorem.txt')
+  Description: Returns true if the MD5 checksum in the metadata of an iRODS
+               object is identical to the MD5 caluclated by iRODS.
+  Returntype : boolean
+  Caller     : general
+
+=cut
 
 sub checksum_object {
   my ($object) = @_;

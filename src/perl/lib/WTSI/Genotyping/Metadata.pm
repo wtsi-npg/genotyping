@@ -7,6 +7,15 @@ use warnings;
 use Carp;
 use File::Basename;
 
+our $SAMPLE_NAME_META_KEY             = 'sample';
+our $SAMPLE_ID_META_KEY               = 'sample_id';
+our $SAMPLE_COMMON_NAME_META_KEY      = 'sample_common_name';
+our $SAMPLE_ACCESSION_NUMBER_META_KEY = 'sample_accession_number';
+our $SAMPLE_CONSENT_META_KEY          = 'sample_consent';
+
+our $STUDY_ID_META_MEY                = 'study_id';
+our $STUDY_TITLE_META_KEY             = 'study_title';
+
 sub make_creation_metadata {
   my ($creation_time, $publisher) = @_;
 
@@ -29,22 +38,24 @@ sub make_warehouse_metadata {
   my $ss_sample = $ssdb->find_infinium_sample($if_barcode, $if_well);
   my @ss_studies = @{$ssdb->find_infinium_studies($if_barcode, $if_well)};
 
-  my @meta = ([sample => $ss_sample->{name}],
-              [sample_id => $ss_sample->{internal_id}],
-              ['dcterms:identifier' => $ss_sample->{sanger_sample_id}]);
+  my @meta = ([$SAMPLE_NAME_META_KEY    => $ss_sample->{name}],
+              [$SAMPLE_ID_META_KEY      => $ss_sample->{internal_id}],
+              [$SAMPLE_CONSENT_META_KEY => !$ss_sample->{consent_withdrawn}],
+              ['dcterms:identifier'     => $ss_sample->{sanger_sample_id}]);
 
   if (defined $ss_sample->{accession_number}) {
-    push(@meta, [sample_accession_number => $ss_sample->{accession_number}]);
+    push(@meta, [$SAMPLE_ACCESSION_NUMBER_META_KEY =>
+                 $ss_sample->{accession_number}]);
   }
   if (defined $ss_sample->{common_name}) {
-    push(@meta, [sample_common_name => $ss_sample->{common_name}]);
+    push(@meta, [$SAMPLE_COMMON_NAME_META_KEY => $ss_sample->{common_name}]);
   }
 
   foreach my $ss_study (@ss_studies) {
-    push(@meta, [study_id => $ss_study->{internal_id}]);
+    push(@meta, [$STUDY_ID_META_MEY => $ss_study->{internal_id}]);
 
     if (defined $ss_study->{study_title}) {
-      push(@meta, [study_title => $ss_study->{study_title}]);
+      push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
     }
   }
 

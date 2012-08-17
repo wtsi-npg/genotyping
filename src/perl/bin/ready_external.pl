@@ -121,6 +121,7 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $ex_name,
                                                 beadchip => $ex_chip,
                                                 include => 1});
+         $sample->add_to_genders($gender, {method => $supplied});
          $sample->add_to_states($pi_approved);
 
          $sample->add_to_results({method => $autocall,
