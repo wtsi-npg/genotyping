@@ -118,12 +118,10 @@ Returns:
       gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
                                  sjson, njson, args, async)
 
-      # FIXME: temporarily commented out all QC
-      # qcargs = {:run => run_name}.merge(args)
-      # gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs)
+      qcargs = {:run => run_name}.merge(args)
+      gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs)
 
-      # [gsfile, gsquality] if [gsfile, gsquality].all?
-      gsfile
+      [gsfile, gsquality] if [gsfile, gsquality].all?
     end
 
     :private
