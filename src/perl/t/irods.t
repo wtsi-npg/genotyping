@@ -57,6 +57,10 @@ ok(remove_collection($added_collection));
 is(list_collection($added_collection), undef);
 
 # put_collection
+my $dir1 = join q[/], $test_dir, 'dir1';
+my $dir2 = join q[/], $test_dir, 'dir2';
+mkdir $dir1;
+mkdir $dir2;
 my $put_collection = put_collection($test_dir, $test_collection);
 ok($put_collection);
 
@@ -141,3 +145,14 @@ is_deeply([add_object_meta($lorem_object, 'md5', $expected_checksum)],
 ok(checksum_object($lorem_object));
 
 ok(remove_object($lorem_object));
+
+END {
+  if ($dir1 && -d $dir1) {
+    `rmdir $dir1`;
+  }
+  if ($dir2 && -d $dir2) {
+    `rmdir $dir2`;
+  }
+}
+
+1;
