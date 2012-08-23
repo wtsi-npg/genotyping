@@ -77,8 +77,7 @@ Returns:
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
                                :chunk_size)
 
-      async_defaults = {:memory => 1024,
-                        :queue => :normal}
+      async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
