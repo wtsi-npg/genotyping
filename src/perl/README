@@ -7,7 +7,8 @@ applications may be run manually or within a pipeline defined by the
 Ruby Genotyping module.
 
 This software uses Module::Build to build, test and install its Perl
-packages.
+packages.  In addition, the install_R target will install the
+required R scripts.
 
 To install:
 
@@ -15,3 +16,4 @@ To install:
   ./Build test
   ./Build install --install_base <target directory>
   ./Build install_config --install_base <target directory>
+  ./Build install_R --install_base <target directory>

@@ -12,7 +12,7 @@ use File::Spec;
 use base 'Module::Build';
 
 #
-# Add an 'install_config' target to the build file.
+# Add 'install_config' and 'install_R' targets to the build file.
 #
 sub ACTION_install_config {
   my ($self) = @_;
@@ -21,6 +21,12 @@ sub ACTION_install_config {
   $self->process_ini_files;
   $self->process_sql_files;
 
+  return $self;
+}
+
+sub ACTION_install_R {
+  my ($self) = @_;
+  $self->process_R_files;
   return $self;
 }
 
@@ -39,10 +45,15 @@ sub process_sql_files {
   return $self->process_files_by_category('sql_files');
 }
 
+sub process_R_files {
+  my ($self) = @_;
+  return $self->process_files_by_category('R_files');
+}
+
 sub process_files_by_category {
   my ($self, $category) = @_;
 
-  if ($self->current_action eq 'install_config') {
+  if ($self->current_action eq 'install_config' || $self->current_action eq 'install_R') {
     my $translations = $self->{properties}->{$category};
     my $dest_base = $self->install_base;
 
@@ -57,7 +68,7 @@ sub process_files_by_category {
         print STDERR "Installing $file\n";
       }
     }
-
+  
     return @installed;
   }
 }
