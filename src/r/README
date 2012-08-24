@@ -1,0 +1,15 @@
+
+Components of the WTSI genotype analysis pipeline.
+
+This is the R component of the above pipeline.  It currently exists as a 
+collection of standalone scripts, not an R package.  In the pipeline, the 
+R scripts are invoked by system calls within Perl wrapper scripts.  The 
+Perl wrappers assume that the R scripts are available on the PATH 
+environment variable.
+
+As part of the Perl installation process executed by `./Build install', 
+the R scripts are copied to the bin subdirectory of the Perl installation 
+directory.  The Perl tests executed by `./Build test' also test 
+functionality of the R scripts, for example by confirming that the correct 
+plots are output.
+

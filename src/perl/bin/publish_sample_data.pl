@@ -18,12 +18,13 @@ use URI;
 
 use WTSI::Genotyping qw(collect_dirs
                         collect_files
-                        make_collector
                         modified_between
                         make_warehouse_metadata
                         make_infinium_metadata
                         make_file_metadata
-                        make_creation_metadata);
+                        make_creation_metadata
+                        publish_idat_files
+                        publish_gtc_files);
 use WTSI::Genotyping::iRODS qw(list_object
                                add_object
                                get_object_meta
@@ -33,7 +34,6 @@ use WTSI::Genotyping::iRODS qw(list_object
 
 use WTSI::Genotyping::Database::Infinium;
 use WTSI::Genotyping::Database::Warehouse;
-
 
 # Log::Log4perl::init('etc/log4perl.conf');
 Log::Log4perl->easy_init($ERROR);
@@ -89,7 +89,7 @@ sub run {
              " and ", $now->iso8601);
 
   my $file_test = modified_between($then->epoch(), $now->epoch());
-  my $file_regex = qr/.($type)$/msxi;
+  my $file_regex = qr{.($type)$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 1;
 
@@ -126,141 +126,17 @@ sub run {
 
   if ($type eq 'idat') {
     publish_idat_files(\@files, $publish_dest, $publisher_uri,
-                       $ifdb, $ssdb, $now, $log);
+                       $ifdb, $ssdb, $now);
   }
   elsif ($type eq 'gtc') {
     publish_gtc_files(\@files, $publish_dest, $publisher_uri,
-                      $ifdb, $ssdb, $now, $log);
+                      $ifdb, $ssdb, $now);
   }
   else {
     $log->logcroak("Unable to publish unknown data type '$type'");
   }
 
   return 0;
-}
-
-sub publish_idat_files {
-  my ($files, $publish_dest, $publisher_uri, $ifdb, $ssdb, $time, $log) = @_;
-
-  my $paired = paired_idat_files($files, $log);
-
-  my $pairs = scalar @$paired;
-  my $total = $pairs * 2;
-  my $published = 0;
-
-  $log->debug("Publishing $pairs pairs of idat files");
-
-  foreach my $pair (@$paired) {
-    my ($red) = grep { m{Red}msxi } @$pair;
-    my ($grn) = grep { m{Grn}msxi } @$pair;
-
-    my ($basename, $dir, $suffix) = fileparse($red);
-
-    $log->debug("Finding the sample for '$red' in the Infinium LIMS");
-    my $if_sample = $ifdb->find_scanned_sample($basename);
-
-    if ($if_sample) {
-      my @meta;
-      push(@meta, make_warehouse_metadata($if_sample, $ssdb));
-      push(@meta, make_infinium_metadata($if_sample));
-
-      foreach my $file ($red, $grn) {
-        eval {
-          publish_file($file, \@meta, $publish_dest, $publisher_uri->as_string,
-                       $time, $log);
-          ++$published;
-        };
-
-        if ($@) {
-          $log->error("Failed to publish '$red' to '$publish_dest': ", $@);
-        }
-      }
-    }
-    else {
-     $log->warn("Failed to find the sample for '$red' in the Infinium LIMS");
-    }
-  }
-
-  $log->info("Published $published/$total idat files to '$publish_dest'");
-
-  return $published;
-}
-
-sub publish_gtc_files {
-  my ($files, $publish_dest, $publisher_uri, $ifdb, $ssdb, $time, $log) = @_;
-
-  my $total = scalar @$files;
-  my $published = 0;
-
-  $log->debug("Publishing $total of GTC files");
-
-  foreach my $file (@$files) {
-    my ($basename, $dir, $suffix) = fileparse($file);
-
-    $log->debug("Finding the sample for '$file' in the Infinium LIMS");
-    my $if_sample = $ifdb->find_called_sample($basename);
-
-    if ($if_sample) {
-      my @meta;
-      push(@meta, make_warehouse_metadata($if_sample, $ssdb));
-      push(@meta, make_infinium_metadata($if_sample));
-
-      eval {
-        publish_file($file, \@meta, $publish_dest, $publisher_uri->as_string,
-                     $time, $log);
-        ++$published;
-      };
-
-      if ($@) {
-        $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
-      }
-    }
-    else {
-      $log->warn("Failed to find the sample for '$file' in the Infinium LIMS");
-    }
-  }
-
-  $log->info("Published $published/$total GTC files to '$publish_dest'");
-
-  return $published;
-}
-
-sub publish_file {
-  my ($file, $sample_meta, $publish_dest, $publisher, $time, $log) = @_;
-
-  my $basename = fileparse($file);
-  my $target = $publish_dest . '/' . $basename;
-
-  my @meta = @$sample_meta;
-
-  if (list_object($target)) {
-    if (checksum_object($target)) {
-      $log->info("Skipping publishing $target because checksum is unchanged");
-    }
-    else {
-      $log->info("Republishing $target because checksum is changed");
-      $target = add_object($file, $target);
-      push(@meta, make_modification_metadata($time));
-    }
-  }
-  else {
-    $log->info("Publishing $target");
-    push(@meta, make_creation_metadata($time, $publisher));
-    $target = add_object($file, $target);
-  }
-
-  my %current_meta = get_object_meta($target);
-
-  push(@meta, make_file_metadata($file, '.idat', '.gtc'));
-
-  foreach my $elt (@meta) {
-    my ($key, $value, $units) = @$elt;
-    unless (meta_exists($key, $value, %current_meta)) {
-      add_object_meta($target, $key, $value, $units);
-    }
-  }
-
-  return $target;
 }
 
 sub authorize {
@@ -280,49 +156,16 @@ sub authorize {
   return $name;
 }
 
-sub paired_idat_files {
-  my ($files, $log) = @_;
-
-  my %names;
-
-  # Determine unique 
-  foreach my $file (@$files) {
-    my ($stem, $colour, $suffix) = $file =~ m{^(\S+)_(Red|Grn)(.idat)$}msxi;
-
-    unless ($stem && $colour && $suffix) {
-      $log->warn("Found a non-idat file while sorting idat files: '$file'");
-    }
-
-    if (exists $names{$stem}) {
-      push(@{$names{$stem}}, $file);
-    }
-    else {
-      $names{$stem} = [$file];
-    }
-  }
-
-  my @paired;
-  foreach my $stem (sort keys %names) {
-    if (scalar @{$names{$stem}} == 2) {
-      push(@paired, $names{$stem});
-    }
-    else {
-      $log->warn("Ignoring an unpaired idat file with name stem '$stem'");
-    }
-  }
-
-  return \@paired;
-}
 
 __END__
 
 =head1 NAME
 
-ready_infinium
+publish_sample_data
 
 =head1 SYNOPSIS
 
-publish_sample [--config <database .ini file>] \
+publish_sample_data [--config <database .ini file>] \
    [--days <n>] --source <directory> --dest <irods collection>
    --type <data type>
 

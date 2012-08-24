@@ -116,9 +116,9 @@ Returns:
       gcifile, * = gtc_to_bed(sjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
-      # FIXME: temporarily commented out all QC
-      # qcargs = {:run => run_name}.merge(args)
-      # gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', qcargs)
+      qcargs = {:run => run_name,
+                :sim => smfile}.merge(args)
+      gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', qcargs)
 
       ilargs = {:size => chunk_size,
                 :group_size => 50,
@@ -127,8 +127,8 @@ Returns:
 
       ilchunks = nil
 
-      if smfile
-        ilchunks = chromosome_bounds(cjson).collect do |cspec|
+      if gcquality
+        ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec["chromosome"]
           pargs = {:chromosome => chr,
                    :start => cspec["start"],
@@ -136,23 +136,21 @@ Returns:
 
           call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
                           ilargs.merge(pargs), async)
-        end
+        }.flatten
 
-        ilchunks = ilchunks.flatten
+        unless ilchunks.all?
+          ilchunks = nil
+        end
       end
 
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      # ilquality = quality_control(ilfile, 'illuminus_qc',
-      #                            :work_dir => work_dir, :sim => smfile)
+      ilquality = quality_control(ilfile, 'illuminus_qc',
+                                  :work_dir => work_dir, :sim => smfile)
 
-      # if [gcsfile, ilfile, gcquality, ilquality].all?
-      #   [gcsfile, ilfile, gcquality, ilquality]
-      # end
-
-      if [gcsfile, ilfile].all?
-        [gcsfile, ilfile]
+      if [gcsfile, ilfile, gcquality, ilquality].all?
+         [gcsfile, ilfile, gcquality, ilquality]
       end
     end
 

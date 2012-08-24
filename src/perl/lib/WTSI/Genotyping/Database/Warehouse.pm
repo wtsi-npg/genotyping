@@ -76,7 +76,8 @@ sub find_infinium_sample {
     qq(SELECT
          sm.sanger_sample_id,
          sm.internal_id,
-         sm.uuid,
+         sm.consent_withdrawn,
+         HEX(sm.uuid),
          sm.name,
          sm.common_name,
          sm.accession_number,
@@ -108,7 +109,6 @@ sub find_infinium_sample {
 
   return shift @samples;
 }
-
 
 sub find_infinium_studies {
   my ($self, $plate_name, $map) = @_;

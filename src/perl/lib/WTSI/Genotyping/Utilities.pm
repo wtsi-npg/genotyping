@@ -5,6 +5,7 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use Cwd qw(abs_path);
 use File::Find;
 use Log::Log4perl;
 
@@ -18,6 +19,8 @@ use Exporter;
                 collect_dirs
                 make_collector
                 modified_between
+                md5sum
+                hash_path
                 run_command);
 
 my $log = Log::Log4perl->get_logger('genotyping');
@@ -89,12 +92,18 @@ sub collect_files {
 
   find({preprocess => sub {
           my $d = $File::Find::dir =~ tr[/][];
-          my @files = grep { -f } @_;
 
-          return @files if $d < $abs_depth;
+          my @elts;
+          if ($d < $abs_depth) {
+            @elts = grep { ! /^\.+$/ } @_;
+          }
+
+          return @elts;
         },
         wanted => sub {
-          if (-f) {
+          my $d = $File::Find::dir =~ tr[/][];
+
+          if ($d < $abs_depth && -f) {
             if ($regex) {
               $collector->($File::Find::name) if $_ =~ $regex;
             }
@@ -134,13 +143,20 @@ sub collect_dirs {
 
   find({preprocess => sub {
           my $d = $File::Find::name =~ tr[/][];
-          my @dirs = grep { -d } @_;
-          @dirs = grep { ! /\.+/ } @dirs;
 
-          return @dirs if $d < $abs_depth;
+          my @dirs;
+          if ($d < $abs_depth) {
+            @dirs = grep { -d && ! /^\.+$/ } @_;
+          }
+
+          return @dirs;
         },
         wanted => sub {
-          $collector->($File::Find::name) if -d;
+          my $d = $File::Find::name =~ tr[/][];
+
+          if ($d < $abs_depth) {
+            $collector->($File::Find::name);
+          }
         }
        }, $root);
 
@@ -197,6 +213,50 @@ sub modified_between {
 
     return ($start <= $mtime) && ($mtime <= $finish);
   }
+}
+
+=head2 md5sum
+
+  Arg [1]    : string path to a file
+  Example    : my $md5 = md5sum($filename)
+  Description: Calculates the MD5 checksum of a file.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub md5sum {
+  my ($file) = @_;
+
+  my @result = run_command("md5sum $file");
+  my $raw = shift @result;
+  my ($md5) = $raw =~ m{^(\S+)\s+\S+$}msx;
+
+  return $md5;
+}
+
+=head2 hash_path
+
+  Arg [1]    : string path to a file
+  Arg [2]    : MD5 checksum (optional)
+  Example    : my $path = hash_path($filename)
+  Description: Returns a hashed path 3 directories deep, each level having
+               a maximum of 256 subdirectories, calculated from the file's
+               MD5. If the optional MD5 argument is supplied, the MD5
+               calculation is skipped and the provided value is used instead.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub hash_path {
+  my ($file, $md5sum) = @_;
+
+  $md5sum ||= md5sum($file);
+
+  my @levels = $md5sum =~ m{\G(..)}gmsx;
+
+  return join('/', @levels[0..2]);
 }
 
 sub run_command {
