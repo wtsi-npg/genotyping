@@ -73,8 +73,7 @@ Returns:
       args[:work_dir] = maybe_work_dir(work_dir)
       manifest = args.delete(:manifest) # TODO: find manifest automatically
 
-      async_defaults = {:memory => 500,
-                        :queue => :normal}
+      async_defaults = {:memory => 500}
       async = lsf_args(args, async_defaults, :memory, :queue)
 
       sjname = run_name + '.sample.json'

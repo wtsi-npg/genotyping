@@ -77,10 +77,8 @@ class TestWorkflows < Test::Unit::TestCase
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           # :gender_method => 'Inferred',
                                            :gender_method => 'Supplied',
                                            :chunk_size => 4000,
-                                           :queue => :normal,
                                            :memory => 2048}]
       timeout = 720
       log = 'percolate.log'
@@ -105,7 +103,6 @@ class TestWorkflows < Test::Unit::TestCase
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :chunk_size => 2,
-                                           :queue => :normal,
                                            :memory => 2048}]
       timeout = 720
       log = 'percolate.log'
