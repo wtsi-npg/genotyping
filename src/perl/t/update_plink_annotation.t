@@ -117,7 +117,7 @@ is($num_samples_updated, 5);
 
 # Confirm expected FAM file
 open(my $smobs, '<', "$data_path/output.fam")
-  or die "Failed to open '$data_path/output.fam'";
+  or die "failed to open '$data_path/output.fam'";
 my @samples_observed = <$smobs>;
 close($smobs);
 
