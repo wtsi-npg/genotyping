@@ -1,4 +1,4 @@
-#! /usr/bin/perl
+#! /software/bin/perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # May 2012
