@@ -24,7 +24,8 @@ my $build = Build->new
                  'etc/relations.ini' => 'etc/relations.ini',
                  'etc/snpsets.ini' => 'etc/snpsets.ini',
                  'etc/states.ini' => 'etc/states.ini'},
-   conf_files => {'etc/log4perl.conf' => 'etc/log4perl.conf'},
+   conf_files => {'etc/log4perl.conf' => 'etc/log4perl.conf',
+		  'etc/qc_config.json' => 'etc/qc_config.json'},
    sql_files => {'sql/pipeline_ddl.sql' => 'etc/pipeline_ddl.sql'},
    R_files => {
        '../r/bin/beanplotCR.R' => 'bin/beanplotCR.R',
