@@ -77,7 +77,7 @@ sub getBoxBeanCommands {
     }
     my @cmds;
     for (my $i=0; $i<@modes; $i++) {
-	my $cmd = join(' ', ('cat', $inputs[$i], '|', 'perl', $boxPlotScript, '--mode='.$modes[$i], 
+	my $cmd = join(' ', ('cat', $inputs[$i], '|', $boxPlotScript, '--mode='.$modes[$i], 
 			   '--out_dir='.$outDir, '--title='.$title, $dbopt, '--inipath='.$iniPath,
 			   '--type='.$boxPlotType));
 	push(@cmds, $cmd);
@@ -98,10 +98,10 @@ sub getPlateHeatmapCommands {
 	push(@inputs, $fileNames{'xydiff'});
     }
     foreach my $i (0..@modes-1) {
-	push(@cmds, join(" ", ('cat', $inputs[$i], '|', "perl $Bin/plate_heatmap_plots.pl", "--mode=$modes[$i]", 
+	push(@cmds, join(" ", ('cat', $inputs[$i], '|', "$Bin/plate_heatmap_plots.pl", "--mode=$modes[$i]", 
 			       "--out_dir=$hmOut", $dbopt, "--inipath=$iniPath")));
     }
-    push (@cmds, "perl $Bin/plate_heatmap_index.pl $title $hmOut ".$fileNames{'plate_index'});
+    push (@cmds, "$Bin/plate_heatmap_index.pl $title $hmOut ".$fileNames{'plate_index'});
     return @cmds;
 }
 
@@ -135,11 +135,11 @@ sub run {
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("perl $Bin/check_identity_bed.pl $plinkPrefix",
+    my @cmds = ("$Bin/check_identity_bed.pl $plinkPrefix",
 		"$CR_STATS_EXECUTABLE $plinkPrefix",
-		"perl $Bin/check_duplicates_bed.pl $plinkPrefix",
+		"$Bin/check_duplicates_bed.pl $plinkPrefix",
 	);
-    my $genderCmd = "perl $Bin/check_xhet_gender.pl --input=$plinkPrefix";
+    my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix";
     if ($dbPath) { 
 	unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
 	$genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
@@ -147,19 +147,19 @@ sub run {
     push(@cmds, $genderCmd);
     my $xydiff = 0;
     if ($simPath) {
-	push(@cmds, "perl $Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
+	push(@cmds, "$Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
 	$xydiff = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
-    push(@cmds, "perl $Bin/write_qc_status.pl --config=$configPath $dbopt --inipath=$iniPath");
+    push(@cmds, "$Bin/write_qc_status.pl --config=$configPath $dbopt --inipath=$iniPath");
     ### plot generation ###
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, $xydiff, \%fileNames));
     push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, \%fileNames));
-    push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "perl $Bin/plot_cr_het_density.pl", 
+    push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "$Bin/plot_cr_het_density.pl", 
 			   "--title=".$title, "--out_dir=".$outDir)));
-    push(@cmds, "perl $Bin/plot_fail_causes.pl --title=$title");
-    push(@cmds, join(' ', ("perl $Bin/main_plot_index.pl", $outDir, $fileNames{'qc_results'}, $title)));
+    push(@cmds, "$Bin/plot_fail_causes.pl --title=$title");
+    push(@cmds, join(' ', ("$Bin/main_plot_index.pl", $outDir, $fileNames{'qc_results'}, $title)));
     ### execute commands ###
     chdir($outDir);
     foreach my $cmd (@cmds) { 
