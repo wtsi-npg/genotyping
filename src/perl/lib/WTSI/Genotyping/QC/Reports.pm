@@ -262,7 +262,41 @@ sub latexPlot {
     return $text;
 }
 
-sub latexTable {
+sub latexTables {
+	# convert array of arrays into one or more strings containing LaTeX tables
+	# enforce maximum number of rows per table, before starting a new table (allows breaking across pages)
+	# assume that first row is header; repeat header at start of each table
+    my ($rowsRef, $caption, $label, $maxRows) = @_;
+	$maxRows ||= 38;
+	my @rows = @$rowsRef;
+	my @tables = ();
+	print "### size ".@rows."\n";
+	if (@rows > $maxRows) {
+		my $headRef = shift(@rows);
+		my @outRows;
+		my $part = 1;
+		while (@rows > $maxRows) {
+			@outRows = ($headRef,);
+			push(@outRows, splice(@rows, 0, $maxRows));
+			my $newCaption;
+			if ($caption) { $newCaption = $caption." (Part $part)"; }
+			else { $newCaption = ""; }
+			push(@tables, latexTableSingle(\@outRows, $newCaption, $label));
+			$part++;
+		}
+		if (@rows>0) { # deal with remainder (if any)
+			unshift(@rows, $headRef);
+			if ($caption) { $newCaption = $caption." (Part $part)"; }
+			else { $newCaption = ""; }
+			push(@tables, latexTableSingle(\@rows, $newCaption, $label));
+		}
+	} else {
+		push(@tables, latexTableSingle(\@rows, $caption, $label));
+	}
+	return @tables;
+}
+
+sub latexTableSingle {
     # convert array of arrays into a (centred) table
     my ($rowsRef, $caption, $label) = @_;
     my @rows = @$rowsRef;
@@ -435,11 +469,11 @@ sub writeSummaryLatex {
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author, $graphicsDir);
     my @text = textForDatasets($dbPath);
-    print $out latexTable(\@text);
+	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     @text = textForPlates($resultPath, $config);
-    print $out latexTable(\@text);
+	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     @text = textForMetrics($config);
-    print $out latexTable(\@text);
+	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     print $out "\\pagebreak\n";
     print $out "\\listoffigures\n\n";
     print $out latexAllPlots($graphicsDir);
