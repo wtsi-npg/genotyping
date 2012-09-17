@@ -286,6 +286,7 @@ sub latexTables {
 		}
 		if (@rows>0) { # deal with remainder (if any)
 			unshift(@rows, $headRef);
+			my $newCaption;
 			if ($caption) { $newCaption = $caption." (Part $part)"; }
 			else { $newCaption = ""; }
 			push(@tables, latexTableSingle(\@rows, $newCaption, $label));
