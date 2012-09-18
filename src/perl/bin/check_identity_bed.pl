@@ -115,7 +115,7 @@ sub compareFailedPairs {
     my @failedSamples = @{ shift() };
     my (@count, @match);
     for (my $i = 0; $i < @failedSamples; $i++) {
-	for (my $j = $0; $j < @failedSamples; $j++) {
+	for (my $j = 0; $j < @failedSamples; $j++) {
 	    next if $i == $j; # (i,i) is guaranteed to match!
 	    my $sample_i = $failedSamples[$i];
 	    my $sample_j = $failedSamples[$j];
@@ -324,21 +324,23 @@ sub writeFailedPairCheck {
     $header .= join("\t", "Illumina", "Sequenom", "common SNPs", "matching calls", "concordance", "result")."\n";
     print $results $header;
     for (my $i = 0; $i < @samples; $i++) {
-	for (my $j = $0; $j < @samples; $j++) {
-	    next if $i == $j;
-	    my $status;
-	    if ($count[$i][$j]==0) { 
-		next; 
-	    } elsif ($match[$i][$j] / $count[$i][$j] < $minIdent) { 
-		$status = "NO_MATCH"; 
-	    } else { 
-		$status = "SWAP_WARNING"; 
-		push (@matchedPairs, [$i, $j]);
-	    }
-	    # print illumina sample name first, then sequenom
-	    print $results join("\t",  $samples[$j], $samples[$i], $count[$i][$j], $match[$i][$j], 
-			       sprintf("%.${digits}f", $match[$i][$j]/$count[$i][$j]), $status)."\n";
-	}
+        for (my $j = 0; $j < @samples; $j++) {
+            next if $i == $j;
+            my $status;
+            if ($count[$i][$j]==0) { 
+                next; 
+			} elsif ($match[$i][$j] / $count[$i][$j] < $minIdent) { 
+                $status = "NO_MATCH"; 
+			} else { 
+                $status = "SWAP_WARNING";
+                push (@matchedPairs, [$i, $j]);
+			}
+            # print illumina sample name first, then sequenom
+            my $metric = sprintf("%.${digits}f", $match[$i][$j]/$count[$i][$j]);
+            print $results join("\t",  $samples[$j], $samples[$i], 
+                                $count[$i][$j], $match[$i][$j], 
+                                $metric, $status)."\n";
+        }
     }
     close $results;
     # write details of matched pairs (possible swaps) to second output file

@@ -196,7 +196,7 @@ sub updateDatabase {
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
     my $run = $db->piperun->find({name => $runName});
-    unless ($runName) {
+    unless ($run) {
 	croak "Run '$runName' does not exist. Valid runs are: [" .
 	    join(", ", map { $_->name } $db->piperun->all) . "]\n";
     }
