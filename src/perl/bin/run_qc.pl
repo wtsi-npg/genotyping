@@ -59,7 +59,7 @@ $outDir ||= "./qc";
 if (not -e $outDir) { mkdir($outDir); }
 elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
-$title ||= "Untitled";
+$title ||= "Untitled"; ## TODO get default title from name of parent directory
 $boxtype ||= "both";
 
 ### run QC
