@@ -146,8 +146,8 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc',
-                                  :work_dir => work_dir, :sim => smfile)
+      
+      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]
