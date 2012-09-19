@@ -191,14 +191,14 @@ sub updateDatabase {
     my @genders = @$gendersRef;
     my %genders;
     for (my $i=0;$i<@uris;$i++) {
-	$genders{$uris[$i]} = $genders[$i];
+        $genders{$uris[$i]} = $genders[$i];
     }
     my $db = getDatabaseObject($dbfile);
     my $inferred = $db->method->find({name => 'Inferred'});
     my $run = $db->piperun->find({name => $runName});
     unless ($run) {
-	croak "Run '$runName' does not exist. Valid runs are: [" .
-	    join(", ", map { $_->name } $db->piperun->all) . "]\n";
+        croak "Run '$runName' does not exist. Valid runs are: [" .
+            join(", ", map { $_->name } $db->piperun->all) . "]\n";
     }
     # transaction to update sample genders
     my @datasets = $run->datasets->all;
@@ -206,20 +206,28 @@ sub updateDatabase {
 	my @samples = $ds->samples->all;
 	$db->in_transaction(sub {
 	    foreach my $sample (@samples) {
-		my $sample_uri = $sample->uri;
-		my $genderCode = $genders{$sample_uri};
-		unless (defined($genderCode)) { 
-		    croak "Error: Cannot find gender for sample \"$sample_uri\""; 
-		    #$genderCode = -1;
-		}
-		my $gender;
-		if ($genderCode==1) { $gender = $db->gender->find({name => 'Male'}); }
-		elsif ($genderCode==2) { $gender = $db->gender->find({name => 'Female'}); }
-		elsif ($genderCode==0) { $gender = $db->gender->find({name => 'Unknown'}); }
-		else { $gender = $db->gender->find({name => 'Not Available'}); }
-		$sample->add_to_genders($gender, {method => $inferred});
+            # if sample already has an inferred gender, do not update!
+            my $inferredGenders = 
+                $sample->sample_genders->find({method => $inferred});
+            if ($inferredGenders) { next; }
+            my $sample_uri = $sample->uri;
+            my $genderCode = $genders{$sample_uri};
+            unless (defined($genderCode)) { 
+                croak "Error: Cannot find gender for sample \"$sample_uri\""; 
+            }
+            my $gender;
+            if ($genderCode==1) { 
+                $gender = $db->gender->find({name => 'Male'}); 
+            } elsif ($genderCode==2) { 
+                $gender = $db->gender->find({name => 'Female'}); 
+            } elsif ($genderCode==0) { 
+                $gender = $db->gender->find({name => 'Unknown'}); 
+            } else { 
+                $gender = $db->gender->find({name => 'Not Available'}); 
+            }
+            $sample->add_to_genders($gender, {method => $inferred});
 	    }
-			    });
+                        });
     }
     $db->disconnect();
     return 1;
