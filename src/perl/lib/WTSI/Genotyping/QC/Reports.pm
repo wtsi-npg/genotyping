@@ -270,7 +270,6 @@ sub latexTables {
 	$maxRows ||= 38;
 	my @rows = @$rowsRef;
 	my @tables = ();
-	print "### size ".@rows."\n";
 	if (@rows > $maxRows) {
 		my $headRef = shift(@rows);
 		my @outRows;
