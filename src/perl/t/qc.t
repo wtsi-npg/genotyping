@@ -121,7 +121,8 @@ system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
 
 ## check run_qc.pl bootstrap script
-$cmd = "perl $bin/run_qc.pl --output-dir=. --title=$titleA --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun --inipath=$iniPath";
+# omit --title argument, to test default title function
+$cmd = "perl $bin/run_qc.pl --output-dir=. --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun --inipath=$iniPath"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again

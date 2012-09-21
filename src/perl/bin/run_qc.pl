@@ -59,7 +59,7 @@ $outDir ||= "./qc";
 if (not -e $outDir) { mkdir($outDir); }
 elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
-$title ||= "Untitled"; ## TODO get default title from name of parent directory
+$title ||= getDefaultTitle($outDir); 
 $boxtype ||= "both";
 
 ### run QC
@@ -83,6 +83,16 @@ sub getBoxBeanCommands {
 	push(@cmds, $cmd);
     }
     return @cmds;
+}
+
+sub getDefaultTitle {
+    # default title made up of last 2 non-empty items in path
+    my $outDir = shift;
+    $outDir = abs_path($outDir);
+    my @terms = split(/\//, $outDir);
+    my $total = @terms;
+    my $title = $terms[$total-2]."/".$terms[$total-1];
+    return $title;
 }
 
 sub getPlateHeatmapCommands {
@@ -147,8 +157,8 @@ sub run {
     push(@cmds, $genderCmd);
     my $xydiff = 0;
     if ($simPath) {
-	push(@cmds, "$Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
-	$xydiff = 1;
+        push(@cmds, "$Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
+        $xydiff = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
