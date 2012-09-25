@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultJsonConfig getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash $ini_path $INI_FILE_DEFAULT/;
+our @EXPORT_OK = qw/defaultJsonConfig getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readQCFileNames readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
