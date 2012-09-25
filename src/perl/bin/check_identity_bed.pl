@@ -2,10 +2,11 @@
 
 use warnings;
 use strict;
+use Carp;
 use WrapDBI;
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
-use WTSI::Genotyping::QC::QCPlotShared;
+use WTSI::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 # Check identity of genotyped data against sequenom
 # Input: files of genotypes in tab-delimited format, one row per SNP
@@ -20,10 +21,12 @@ use WTSI::Genotyping::QC::QCPlotShared;
 # can have both flip and swap, eg. GA ~ CT
 
 my $help;
-my ($outputGT, $outputResults,  $outputFail, $outputFailedPairs, $outputFailedPairsMatch, 
-    $minCheckedSNPs, $minIdent, $log); # arguments to run()
+my ($outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
+    $outputFailedPairsMatch, $configPath,
+    $minCheckedSNPs, $minIdent, $log);
 
 GetOptions("results=s"   => \$outputResults,
+           "config=s"    => \$configPath,
            "fail=s"      => \$outputFail,
            "gt=s"        => \$outputGT,
            "min_snps=i"  => \$minCheckedSNPs,
@@ -39,8 +42,9 @@ Options:
 --fail=PATH         Output path for failures
 --gt=PATH           Output path for genotypes by SNP and sample
 --log=PATH          Output path for log file
+--config=PATH       Config path in .json format with QC thresholds; at least one of config or min_ident must be given.
 --min_snps=NUMBER   Minimum number of SNPs for comparison
---min_ident=NUMBER  Minimum threshold of SNP matches for identity; 0 <= NUMBER <= 1
+--min_ident=NUMBER  Minimum threshold of SNP matches for identity; if given, overrides value in config file; 0 <= NUMBER <= 1
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to current directory.
 ";
@@ -55,7 +59,14 @@ $outputFailedPairs ||= 'identity_check_failed_pairs.txt';
 $outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
 $log ||= 'identity_check.log';
 $minCheckedSNPs ||= 10;
-$minIdent ||= 0.9;
+if (!$minIdent) {
+    if ($configPath) {
+        my %thresholds = readThresholds($configPath);
+        $minIdent = $thresholds{'identity'};
+    } else {
+        croak("Must supply a value for either --min_ident or --config");
+    }
+}
 
 run($outputGT, $outputResults,  $outputFail, $outputFailedPairs, $outputFailedPairsMatch, 
     $minCheckedSNPs, $minIdent, $log);

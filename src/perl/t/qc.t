@@ -22,6 +22,7 @@ my $titleA = "Alpha";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbnameA = "alpha_pipeline.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
+my $config = "$bin/../etc/qc_config.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -40,7 +41,7 @@ system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/*'); # 
 print "Testing dataset Alpha.\n";
 
 ## test identity check
-$status = system("perl $bin/check_identity_bed.pl $plinkA");
+$status = system("perl $bin/check_identity_bed.pl --config $config $plinkA");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation

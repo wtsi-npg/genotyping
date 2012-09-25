@@ -145,7 +145,7 @@ sub run {
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl $plinkPrefix",
+    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix",
 		"$CR_STATS_EXECUTABLE $plinkPrefix",
 		"$Bin/check_duplicates_bed.pl $plinkPrefix",
 	);
