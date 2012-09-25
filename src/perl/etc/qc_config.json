@@ -37,7 +37,7 @@
       "heterozygosity" : 3,
       "call_rate" : 0.95,
       "xydiff" : 3,
-      "identity" : 0.95,
+      "identity" : 0.90,
       "duplicate" : "NA",
       "gender" : "NA"
    }
