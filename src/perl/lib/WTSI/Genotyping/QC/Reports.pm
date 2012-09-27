@@ -21,11 +21,13 @@ our @dbInfoHeaders = qw/run project supplier snpset/;
 
 sub createReports {
     # 'main' method to write text and CSV files
-    my ($results, $db, $csv, $tex, $config, $qcDir, $title, $author) = @_; # I/O paths
+    my ($results, $db, $csv, $tex, $config, $qcDir, $title, $author, 
+        $introPath) = @_; # I/O paths
     $author ||= "";
     my $csvOK = writeCsv($results, $db, $config, $csv);
     if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
-    writeSummaryLatex($tex, $results, $config, $db, $qcDir, $title, $author);
+    writeSummaryLatex($tex, $results, $config, $db, $qcDir, $title, $author,
+        $introPath);
     my $pdfOK = texToPdf($tex);
     if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
     my $ok = $csvOK && $pdfOK;
@@ -176,6 +178,7 @@ sub getSampleInfo {
     }
     return @sampleFields;
 }
+
 
 sub latexAllPlots {
     my $graphicsDir = shift;
@@ -348,6 +351,14 @@ sub readJson {
     return $ref;
 }
 
+sub readFileToString {
+    my $inPath = shift;
+    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
+    my $string = join("", <$in>);
+    close $in || croak "Cannot close input path $inPath";
+    return $string;
+}
+
 sub sampleFieldsToText {
     # convert unformatted results to array of formatted text fields
     my @fields = @{ shift() };
@@ -374,14 +385,14 @@ sub textForMetrics {
     my $jsonPath = shift;
     my %doc = %{readJson($jsonPath)};
     my %thresh = %{$doc{'Metrics_thresholds'}};
-    my @names = keys(%thresh);
-    @names = sort @names;
     my @headers = qw/metric threshold type description/;
     my %descs = %{$doc{'Metric_descriptions'}};
     my %types = %{$doc{'Threshold_types'}};
     my @text = (\@headers,);
+    my @names;
+    @names = qw(duplicate identity gender call_rate heterozygosity magnitude);
     foreach my $name (@names) {
-	push(@text, [$name, $thresh{$name}, $types{$name}, $descs{$name}]);
+        push(@text, [$name, $thresh{$name}, $types{$name}, $descs{$name}]);
     }
     return @text;
 }
@@ -460,20 +471,29 @@ sub writeCsv {
 
 sub writeSummaryLatex {
     # write .tex input file for LaTeX; use to generate PDF
-    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author) = @_;
+    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author,
+        $introPath) = @_;
     $texPath ||= "pipeline_summary.tex";
-    $title ||= "Untitled";
-    $author ||= "WTSI Genotyping Pipeline";
+    $title ||= "Genotyping QC Report";
+    $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
     $config ||= defaultJsonConfig();
     $graphicsDir ||= ".";
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author, $graphicsDir);
+    print $out "\\section{Input data}\n\n";
     my @text = textForDatasets($dbPath);
 	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
-    @text = textForPlates($resultPath, $config);
-	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
+    print $out readFileToString($introPath); # new section = Introduction
+    print $out "\\subsection{Summary of metrics and thresholds}";
+    print $out "\\label{sec:metric-summary}\n\n";
     @text = textForMetrics($config);
 	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
+    print $out "\\pagebreak\n";
+    print $out "\\section{Results}\n\n";
+    @text = textForPlates($resultPath, $config);
+    print $out "\\subsection{Plates}\n\n";
+	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
+    # TODO "Sample number and release summary" goes here
     print $out "\\pagebreak\n";
     print $out "\\listoffigures\n\n";
     print $out latexAllPlots($graphicsDir);

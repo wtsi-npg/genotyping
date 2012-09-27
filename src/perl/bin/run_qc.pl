@@ -12,7 +12,7 @@ use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig readQCFileNames);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -61,9 +61,11 @@ elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
 $title ||= getDefaultTitle($outDir); 
 $boxtype ||= "both";
+my $texIntroPath = defaultTexIntroPath($iniPath);
+$texIntroPath = verifyAbsPath($texIntroPath);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype, $texIntroPath);
 
 sub getBoxBeanCommands {
     my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
@@ -141,7 +143,7 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxPlotType) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxPlotType, $texIntroPath) = @_;
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
@@ -180,7 +182,11 @@ sub run {
     my $resultPath = "qc_results.json";
     my $csvPath = "pipeline_summary.csv";
     my $texPath = "pipeline_summary.tex";
-    createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, ".", $title);
+    $title = ""; # use default title
+    my $author = "";
+
+    createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, 
+                  ".", $title, $author, $texIntroPath);
     chdir($startDir);
     return 1;
 }
