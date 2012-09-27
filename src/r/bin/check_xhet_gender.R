@@ -137,10 +137,10 @@ consensus.model <- function(xhet.train, trials) {
 
 sanity.check <- function(m, n, min.weight, max.err) {
   ### sanity checks on mixture model ###
-  # require low chance of sample 'misclassification'; implies clear separation between components
+  # require clear separation between components (low simulated error)
   # also require minimum weight for each component
   # possible cause of failure is a set of samples from only one gender
-  # if conditions not met, then exit
+  # if conditions not met, throw an error (caught by find.thresholds)
   cat("Performing sanity checks on model.\n") 
   err <- mix.error(m, mix.sample(m, n))
   cat(paste("Simulated model error:", err, "\n"))
@@ -153,20 +153,23 @@ sanity.check <- function(m, n, min.weight, max.err) {
   }
 }
 
-mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials) {
+mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title,
+                                sanityCheck, clip, trials) {
   # construct mixture model and find m.max, f.min thresholds
   total <- length(xhet.train)
-  if (clip>0 & total >= 100) { # clip away high values; female has mostly low xhet for some chips (eg. exome)
+  if (clip>0 & total >= 100) {
+    # clip away high values; female has low xhet for some chips (eg. exome)
     xhet.train <- sort(xhet.train)
     remove <- round(total*clip)
-    xhet.train <- xhet.train[0:(total-remove)] # do not update total; xhet.train used for model training only
+    xhet.train <- xhet.train[0:(total-remove)]
+    # do not update total; xhet.train used for model training only
   }
   # import "mixtools" package and train mixture model
   library(mixtools)
   cat("Constructing 2-component mixture model.\n")
   m <- consensus.model(xhet.train, trials)
   cat(summary(m))
-  cat(paste("loglik_final", signif(m$loglik, 8), "\n")) # use to parse loglikelihood from output
+  cat(paste("loglik_final", signif(m$loglik, 8), "\n")) # parse loglikelihood
   # infer male/female boundaries from model
   i.m <- which.min(m$mu) # indices for male, female components
   i.f <- which.max(m$mu)
@@ -178,7 +181,7 @@ mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanity
     f.min <- midpoint+0.1*dist
     m.max <- midpoint-0.1*dist
   }
-  mix.plot(m, plotPath, title, m.max, f.min, i.m, i.f) # write plot of mixture model
+  mix.plot(m, plotPath, title, m.max, f.min, i.m, i.f) # write PNG plot
   if (sanityCheck) {
     n <- 10000
     max.err <- 0.025
@@ -188,31 +191,37 @@ mixmodel.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanity
   return(c(m.max, f.min))
 }
 
-zero.thresholds <- function(xhet, boundary.sd) {
+default.thresholds <- function(xhet, default.params)  {
   # find thresholds where high population has negligible xhet
-  m.max <- 0.05 # corresponds to a 5% calling error in male samples which "should" have zero xhet
+  m.max <- default.params[1]
+  f.min.default <- default.params[2]
+  boundary.sd <- default.params[3]
   non.male <- xhet[xhet>=m.max]
-  if (length(non.male) > 100) { # require at least 100 "non-male" samples to try finding ambiguity zone
+  if (length(non.male) > 100) { # try to find "ambiguity zone"
     f.min <- mean(non.male) - boundary.sd*sd(non.male)
-    if (f.min < m.max) { f.min <- m.max }
+    if (f.min < m.max) { f.min <- f.min.default }
   } else {
-    f.min <- 0.05
+    f.min <- f.min.default
   }
   return(c(m.max, f.min))
 }
 
-find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials) {
+find.thresholds <- function(xhet, boundary.sd, plotPath, title,
+                            sanityCheck, clip, trials, default.params) {
   # find appropriate m.max, f.min thresholds for xhet
-  zero.boundary.sd <- 5
-  zeroCount <- length(xhet.train[xhet.train<=0.001]) # 'zeroes' could have a very small number of xhet hits
-  smallCount <- length(xhet.train[xhet.train<=0.05])
-  total <- length(xhet.train)
-  if (zeroCount/total >= 0.1 & (smallCount-zeroCount)/total <= 0.1) {
-    # large population with xhet (almost) zero and few close outliers; mixture model won't work
-    cat(paste(signif(zeroCount*100/total, 4), "% of samples have negligible xhet; omitting mixture model.\n", sep=""))
-    thresholds <- zero.thresholds(xhet.train, zero.boundary.sd)
-  } else { # train and apply mixture model
-    thresholds <- mixmodel.thresholds(xhet.train, boundary.sd, plotPath, title, sanityCheck, clip, trials)
+  # run mixture model -- in case of error, use default values
+  thresholds <- tryCatch({
+    thresholds <- mixmodel.thresholds(xhet, boundary.sd, plotPath, title,
+                                      sanityCheck, clip, trials)
+  }, error = function(err) {
+    cat(paste("WARNING:  ",err))
+    thresholds <- c(0,0)
+  }
+                         )
+  if (all(thresholds==0)) {
+    cat("Applying default thresholds.\n")
+    xhet <- args[0]
+    thresholds <- default.thresholds(xhet, default.params)
   }
   return(thresholds)
 }
@@ -220,16 +229,20 @@ find.thresholds <- function(xhet.train, boundary.sd, plotPath, title, sanityChec
 ########################################################
 
 args <- commandArgs(TRUE)
-data <- read.table(args[1], header=TRUE) # read sample_xhet_gender.txt with standard column headers
+data <- read.table(args[1], header=TRUE) # sample_xhet_gender.txt
 textPath <- args[2]
 plotPath <- args[3]
 title <- args[4]
-sanityCheck <- as.logical(args[5]) # convert string 'TRUE' or 'FALSE' to boolean value
-clip <- as.numeric(args[6]) # proportion of high values to clip; can be zero; recommend 0.5%
-trials <- as.numeric(args[7])  #10 # number of trials for consensus; TODO read from command line args
-boundary.sd <- 3 # number of standard deviations for max male / min female boundaries
+sanityCheck <- as.logical(args[5]) # convert string 'TRUE' or 'FALSE' to boolean
+clip <- as.numeric(args[6]) # high values to clip; can be zero; recommend 0.5%
+trials <- as.numeric(args[7])  # number of trials for consensus; recommend 10
+boundary.sd <- 3 # standard deviations for max male / min female boundaries
 
-thresholds <- find.thresholds(data$xhet, boundary.sd, plotPath, title, sanityCheck, clip, trials)
+xhet <- data$xhet
+default.params <- c(0.02, 0.03, 5) # defaults for: mMax, fMin, boundary.sd
+
+thresholds <- find.thresholds(xhet, boundary.sd, plotPath, title,
+                              sanityCheck, clip, trials, default.params)
 m.max <- thresholds[1]
 f.min <- thresholds[2]
 cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
