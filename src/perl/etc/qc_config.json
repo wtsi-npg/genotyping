@@ -16,10 +16,10 @@
                   "duplicate":["sample_cr_het.txt","duplicate_summary.txt"],
                   "gender":"sample_xhet_gender.txt"},
   "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
-  "name_array":["call_rate","heterozygosity","duplicate","identity","gender","xydiff"],
+  "name_array":["call_rate","heterozygosity","duplicate","identity","gender","magnitude","xydiff"],
   "Threshold_types" : {
       "heterozygosity" : "Standard deviations",
-      "xydiff" : "Standard deviations",
+      "magnitude" : "Minimum",
       "call_rate" : "Minimum",
       "identity" : "Maximum",
       "duplicate" : "NA",
@@ -27,7 +27,7 @@
    },
    "Metric_descriptions" : {
       "heterozygosity" : "Sample autosome heterozygosity rate",
-      "xydiff" : "Sample mean XY intensity difference",
+      "magnitude" : "Mean normalised magnitude of intensity",
       "call_rate" : "Sample call rate",
       "identity" : "Pairwise identity check of all samples",
       "duplicate" : "Duplicate check against Sequenom database",
@@ -36,9 +36,10 @@
    "Metrics_thresholds" : {
       "heterozygosity" : 3,
       "call_rate" : 0.95,
-      "xydiff" : 3,
+      "magnitude" : 0.90,
       "identity" : 0.90,
       "duplicate" : "NA",
-      "gender" : "NA"
+      "gender" : "NA",
+      "xydiff" : 3
    }
 }
