@@ -95,7 +95,7 @@ sub findMetricResults {
 	%results = resultsGender($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'xydiff') { 
 	%results = resultsXydiff($threshold, $inputDir.'/'.$input);
-    } else { die "Unknown QC metric $metric: $!"; }
+    } else { carp "WARNING: Unknown QC metric $metric: $!"; }
      return %results;
 }
 
