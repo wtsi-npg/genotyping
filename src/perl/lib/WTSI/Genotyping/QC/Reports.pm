@@ -22,12 +22,16 @@ our @dbInfoHeaders = qw/run project supplier snpset/;
 sub createReports {
     # 'main' method to write text and CSV files
     my ($results, $db, $csv, $tex, $config, $qcDir, $title, $author, 
-        $introPath) = @_; # I/O paths
+        $introPath, $qcName) = @_; # I/O paths
     $author ||= "";
+    if (!$qcName) { 
+        my @items = split('/', abs_path($qcDir));
+        $qcName = pop(@items);
+    }
     my $csvOK = writeCsv($results, $db, $config, $csv);
     if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
     writeSummaryLatex($tex, $results, $config, $db, $qcDir, $title, $author,
-        $introPath);
+        $introPath, $qcName);
     my $pdfOK = texToPdf($tex);
     if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
     my $ok = $csvOK && $pdfOK;
@@ -472,15 +476,17 @@ sub writeCsv {
 sub writeSummaryLatex {
     # write .tex input file for LaTeX; use to generate PDF
     my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author,
-        $introPath) = @_;
+        $introPath, $qcName) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
     $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
     $config ||= defaultJsonConfig();
     $graphicsDir ||= ".";
+    $qcName ||= "Unknown";
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author, $graphicsDir);
     print $out "\\section{Input data}\n\n";
+    print $out "\\paragraph*{Directory name:} $qcName\n";
     my @text = textForDatasets($dbPath);
 	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     print $out readFileToString($introPath); # new section = Introduction
