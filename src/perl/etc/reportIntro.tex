@@ -1,0 +1,43 @@
+
+% LaTeX fragment containing introductory section for PDF report document
+
+\section{Preface}
+
+\subsection{Resources}
+
+This QC (quality control) report accompanies two further QC resources:
+\begin{enumerate}
+\item Summary of sample metadata and QC results: illumina\_genotyping.csv.  A comma-separated text file (.csv) comprising one line per sample, with associated annotation and QC status.  The .csv file can be viewed in any spreadsheet application.
+\item Detailed QC datafiles and companion plots within the release.
+% TODO Reference to detailed QC documentation
+\end{enumerate}
+
+\subsection{Metrics}
+
+Six QC metrics are used to determine sample quality and handling effects.  All are summarised in this report.
+
+Each metric requires appropriate threshold criteria to include or exclude samples.  For the \textbf{duplicate} metric the threshold is fixed, and for the \textbf{gender} metric it is calculated independently for each pipeline analysis.  Other thresholds are configured before the pipeline is run; see Section \ref{sec:metric-summary} for the values used.
+
+\subsubsection*{Metric descriptions}
+
+\begin{enumerate}
+\item \textbf{Duplicate:}  Calls for each sample are compared with all other samples.  Pairs of samples with a SNP concordance $>$ 0.98 are flagged as duplicates (unless otherwise stated).  The sample with the lowest call rate of the pair is recommended for exclusion.  Note, pairs of samples with a similarity score $>$ 0.70 are flagged also but not recommended for exclusion.
+
+\item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  Samples are recommended for exclusion where identity cannot be confirmed, defined as SNP concordance falling below a given minimum threshold.  
+
+See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
+
+\item \textbf{Gender:} Supplied gender is compared to the inferred gender. Gender is inferred using heterozygosity on sample chrX, which is the proportion of chrX SNPs called AB. A Gaussian mixture model is used to find adaptive thresholds $M_{max}$ and $F_{min}$, respectively the maximum male and minimum female heterozygosity on chrX.  Samples above $M_{max}$ and below $F_{min}$ are considered to be of ambiguous gender.  Any sample whose inferred gender is ambiguous, or conflicts with the supplied gender, is recommended for exclusion.
+
+\item \textbf{Call rate:} Sample call rate is calculated as the proportion of SNPs called successfully for that sample.  Samples with call rate below a given threshold are excluded (unless otherwise stated). 
+
+See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
+
+\item \textbf{Autosomal heterozygosity:}  Sample heterozygosity is calculated as the proportion of all SNPs with an AB call.  Samples with an autosomal heterozygosity score more than a given number of standard deviations away from the mean are recommended for exclusion (unless otherwise stated).  
+
+See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
+
+\item \textbf{Magnitude of intensity:} Samples are recommended for exclusion where the normalised magnitude of intensity signal in both channels falls below the given threshold (unless otherwise stated). 
+
+See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
+\end{enumerate}
