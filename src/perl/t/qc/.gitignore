@@ -1,6 +1,7 @@
 *.log
 *.png
 *.txt
+*.txt.gz
 *.html
 *.json
 *.csv
