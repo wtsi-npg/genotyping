@@ -14,7 +14,8 @@
                   "xydiff":"xydiff.txt",
                   "identity":"identity_check_results.txt",
                   "duplicate":["sample_cr_het.txt","duplicate_summary.txt"],
-                  "gender":"sample_xhet_gender.txt"},
+                  "gender":"sample_xhet_gender.txt",
+                  "magnitude":"intensity_metrics.txt"},
   "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
   "name_array":["call_rate","heterozygosity","duplicate","identity","gender","magnitude","xydiff"],
   "Threshold_types" : {
