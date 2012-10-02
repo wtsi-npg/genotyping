@@ -14,6 +14,11 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/run/;
 
+sub getCsvLine {
+    # get CSV line with stats for given plate
+
+}
+
 sub getMetricIndex {
     # which field in text input contains metric values?
     my $metric = shift;
@@ -34,11 +39,13 @@ sub getOutputFiles {
     my $outPath = $outDir."/scatter_".$metric."_".$index.".txt";
     my $pbPath = $outDir."/plate_boundaries_".$metric."_".$index.".txt";
     my $pnPath = $outDir."/plate_names_".$metric."_".$index.".txt";
+    my $csvPath = $outDir."/plate_stats_".$metric."_".$index.".csv";
     open my $out, ">", $outPath || croak "Cannot open output \"$outPath\": $!";
     open my $pb, ">", $pbPath || croak "Cannot open output \"$pbPath\": $!";
     open my $pn, ">", $pnPath || croak "Cannot open output \"$pnPath\": $!";
+    open my $csv, ">", $csvPath || croak "Cannot open output \"$csvPath\": $!";
     print $pb "Start\tEnd\n"; # header for R
-    return ($out, $pb, $pn);
+    return ($out, $pb, $pn, $csv);
 }
 
 sub getPassFailStatus {
@@ -98,12 +105,12 @@ sub readMetric {
 
 sub resetOutputs {
     # convenience method for writePlotInputs
-    my ($outDir, $metric, $batchNum, $out, $pb, $pn) = @_;
-    foreach my $fh ($out, $pb, $pn) {
+    my ($outDir, $metric, $batchNum, $out, $pb, $pn, $csv) = @_;
+    foreach my $fh ($out, $pb, $pn, $csv) {
         close $fh || croak "Cannot close output: $!";
     }
-    ($out, $pb, $pn) = getOutputFiles($outDir, $metric, $batchNum);
-    return ($out, $pb, $pn);
+    ($out, $pb, $pn, $csv) = getOutputFiles($outDir, $metric, $batchNum);
+    return ($out, $pb, $pn, $csv);
 }
 
 sub runPlotScript {
@@ -123,6 +130,7 @@ sub writePlotInputs {
     # * Sample count, metric value, and pass/fail status for each sample
     # * Plate boundaries (even-numbered plates only, for plot shading)
     # * Plate names and midpoints, for plot labels
+    # * CSV file containing plate pass/fail stats for each plate
     # for large number of samples, split plates into multiple files
     my ($dbPath, $iniPath, $metric, $metricPath, $metricIndex, $outDir,
         $passFailRef, $maxBatchSize) = @_;
@@ -133,7 +141,7 @@ sub writePlotInputs {
     # if file too big, close current file and open next before buffer output
     my ($batchNum, $batchSize, $plateStart, $writeStartFinish) = (0,0,0,0);
     my @plateLines = ();
-    my ($out, $pb, $pn) = getOutputFiles($outDir, $metric, $batchNum);
+    my ($out, $pb, $pn, $csv) = getOutputFiles($outDir, $metric, $batchNum);
     my %passFail = %$passFailRef;
     my $i = 0;
     foreach my $plate (@plates) {
@@ -150,12 +158,13 @@ sub writePlotInputs {
             # close current files, open next ones, reset counters/flags
             $batchNum++;
             ($batchSize, $plateStart, $writeStartFinish) = (0,0,0);
-            ($out, $pb, $pn) = resetOutputs($outDir, $metric, $batchNum,
-                                            $out, $pb, $pn);
+            ($out, $pb, $pn, $csv) = resetOutputs($outDir, $metric, $batchNum,
+                                                  $out, $pb, $pn, $csv);
         }
         for (my $j=0;$j<@plateLines;$j++) { # prepend sample count to line
             print $out ($batchSize+$j)."\t".$plateLines[$j];
         }
+        print $csv getCsvLine(); # TODO what are relevant plate stats??
         $batchSize += @plateLines;
         my $plateFinish = $plateStart + @plateLines;
         my $midPoint = $plateStart + (@plateLines/2);
@@ -170,7 +179,7 @@ sub writePlotInputs {
         $plateStart = $plateFinish+1;
         $i++;
     }
-    foreach my $fh ($out, $pb, $pn) {
+    foreach my $fh ($out, $pb, $pn, $csv) {
         close $fh || croak "Cannot close output: $!";
     }
 }
