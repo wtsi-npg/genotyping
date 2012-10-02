@@ -23,9 +23,9 @@ metric <- data$V2
 pass <- data$V3
 
 sdLimit <- 10
-if (sdThresh) { # heterozygosity
-  ymin <- metricMean - sdLimit*metricSd
-  ymax <- (metricMean + sdLimit*metricSd)*1.1 # allow space for legend
+if (metricName=='heterozygosity') { # heterozygosity
+  ymin <- 0
+  ymax <- 1.15 # allow space for legend
 } else { # magnitude, identity, call_rate
   ymin <- 0.8
   ymax <- 1.04
@@ -39,13 +39,33 @@ if (sdThresh) {
   xmax = 1.15*max(index)
 }
 
-write.plot <- function(index, metric, pass, pn, pb, metricName, metricMean,
-                       metricSd, metricThresh, sdThresh,
-                       plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath) {
-  #png(outPath, width=myWidth, height=myHeight, pointsize=myPointsize)
+sd.lines <- function(metricMean, metricSd, metricThresh) {
+  # draw horizontal lines to show standard deviations
+  metricMax <- metricMean+metricThresh*metricSd
+  metricMin <- metricMean-metricThresh*metricSd
+  abline(h=metricMean, lty=2)
+  for (i in 1:(floor(metricThresh) - 1)) {
+    high = metricMean+i*metricSd
+    low = metricMean-i*metricSd
+    abline(h=high, col="black", lty=3)
+    abline(h=low, col="black", lty=3)
+    text(max(index), high, paste("Mean +", i, "SD\n"), pos=4, cex=0.6)
+    text(max(index), low, paste("Mean -", i, "SD\n"), pos=4, cex=0.6)
+  }
+  abline(h=metricMax, col="red", lty=2)
+  abline(h=metricMin, col="red", lty=2)
+  mt <- metricThresh
+  text(max(index), metricMax, paste("Mean +", mt, "SD\n"), pos=4, cex=0.6)
+  text(max(index), metricMin, paste("Mean -", mt, "SD\n"), pos=4, cex=0.6)
+  text(max(index), metricMean, "Mean\n", pos=4, cex=0.6) 
+}
+
+plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
+                     metricSd, metricThresh, sdThresh,
+                     plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath) {
   pdf(outPath)
   bottomMargin = 9
-  par('mar'=c(bottomMargin,4,4,2)+0.1)
+  par('mar'=c(bottomMargin,6,4,2)+0.1)
   myTitle = paste("Sample",metricName,"by plate: Plot",plotNum,"of",plotTotal)
   plot(index, metric, type="n",  xlim=c(0,xmax), ylim=c(ymin,ymax),
        xaxt="n", xlab="", ylab=metricName, main=myTitle) # blank plotting area
@@ -61,21 +81,7 @@ write.plot <- function(index, metric, pass, pn, pb, metricName, metricMean,
   points(index[pass==1], metric[pass==1],col="blue") # points on top of shading
   points(index[pass==0], metric[pass==0], col="darkred", pch=16)
   if (sdThresh) {
-    metricMax <- metricMean+metricThresh*metricSd
-    metricMin <- metricMean-metricThresh*metricSd
-    abline(h=metricMean, lty=2)
-    if (floor(metricThresh) < metricThresh) { foo = floor(metricThresh) }
-    else { foo = metricThresh - 1 }
-    for (i in 1:foo) {
-      abline(h=metricMean+i*metricSd, col="black", lty=3)
-      abline(h=metricMean-i*metricSd, col="black", lty=3)
-    }
-    abline(h=metricMax, col="red", lty=2)
-    abline(h=metricMin, col="red", lty=2)
-    mt <- metricThresh
-    text(max(index), metricMax, paste("mean +", mt, "sd\n"), pos=4, cex=0.6)
-    text(max(index), metricMin, paste("mean -", mt, "sd\n"), pos=4, cex=0.6)
-    text(max(index), metricMean, "mean\n", pos=4, cex=0.6)    
+    sd.lines(metricMean, metricSd, metricThresh)
   } else {
     abline(h=metricThresh, col="red", lty=2)
     if (metricName=='call_rate' || metricName=='magnitude') {
@@ -89,9 +95,13 @@ write.plot <- function(index, metric, pass, pn, pb, metricName, metricMean,
          c("Pass/fail threshold for this metric", "Passed all other metrics",
            "Failed at least one other metric"), bg="white",
          pch=c(NA,1,16), col=c("red","blue","darkred"),lty=c(2,NA,NA),cex=0.7)
+  legend("topleft",
+         c(paste("Mean =", signif(metricMean,4)),
+           paste("SD =", signif(metricSd,4))),
+         bg="white", cex=0.7)
   dev.off()
 }
 
-write.plot(index, metric, pass, pn, pb, metricName, metricMean,
-           metricSd, metricThresh, sdThresh,
-           plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath)
+plot.pdf(index, metric, pass, pn, pb, metricName, metricMean,
+         metricSd, metricThresh, sdThresh,
+         plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath)
