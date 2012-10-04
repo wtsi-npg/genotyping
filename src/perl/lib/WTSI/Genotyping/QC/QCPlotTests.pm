@@ -19,7 +19,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames $ini_path/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames wrapPlotCommand $ini_path/;
 
 sub createTestDatabase {
     # create temporary test database with given sample names
@@ -243,7 +243,7 @@ sub wrapPlotCommand {
 	    }
 	}
     }
-    system("rm -f $temp");
+    if ($plotsOK) { system("rm -f $temp"); }
     if ($returnOutput) { return ($plotsOK, $cmd, $info); }
     else { return $plotsOK; }
 }
