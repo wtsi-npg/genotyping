@@ -226,6 +226,12 @@ find.thresholds <- function(xhet, boundary.sd, plotPath, title,
   return(thresholds)
 }
 
+write.thresholds <- function(m.max, f.min, thresh.path) {
+  thresholds = c(m.max, f.min)
+  names = c("M_max", "F_min")
+  write.table(data.frame(thresholds, row.names = names), thresh.path)
+}
+
 ########################################################
 
 args <- commandArgs(TRUE)
@@ -247,6 +253,7 @@ m.max <- thresholds[1]
 f.min <- thresholds[2]
 cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
 cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
+write.thresholds(m.max, f.min, '/tmp/gender_thresholds.txt'); # TODO fix path
 
 ### compute gender assignments for all input xhet values ###
 cat("### Gender model results ###\n")
