@@ -264,7 +264,7 @@ sub latexPlot {
     $caption ||= $defaultLabel;
     $label ||= $defaultLabel; 
     my $text = '
-\begin{figure}[p]
+\begin{figure}[!h]
 \includegraphics[height='.$height.'px]{'.$plot.'}';
     if ($caption) { $text.="\n\\caption{".$caption."}"; }
     if ($label) { $text.="\n\\label{".$label."}"; }
@@ -296,31 +296,61 @@ sub latexSectionMetrics {
 }
 
 sub latexSectionResults {
-    my ($config, $qcDir) = @_;
+    my ($config, $qcDir, $plotDescPath) = @_;
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
+    # TODO more detailed explanatory text
+    # list of following figures
+    push @lines, "\\subsection{Plot format}\n";
+    push @lines, "The following pages contain plots for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plot(s) may be blank if Sequenom results are not available.\n";
+    #push @lines, readFileToString($plotDescPath); # TODO more details in file
     my @metrics = readQCNameArray($config);
+    push @lines, "\\subsection{Summary of plots}\n";
+    push @lines, "\\begin{itemize}\n";
+    push @lines, "\\item Metric scatterplots:\n";
+    push @lines, "\\begin{itemize}\n";
+    my @includeLines = ();
     foreach my $metric (@metrics) {
         my @plotPaths = sort(glob($qcDir."/scatter_".$metric."*.pdf"));
-        my @csvPaths = sort(glob($qcDir."/plate_stats_".$metric."*.csv"));
+        foreach my $plotPath (@plotPaths) {
+            push(@includeLines, "\\includepdf[pages={1}]{".$plotPath."}\n");
+        }
+        my $total = @plotPaths;
         my $metricLatex = $metric; 
         $metricLatex =~ s/_/\\_/g; # LaTeX doesn't like underscores
-        push(@lines, "\\subsection{$metricLatex}\n\n");
-        my $plotTotal = @plotPaths;
-        for (my $i=0;$i<$plotTotal;$i++) {
-            if (!(-e $plotPaths[$i] && -e $csvPaths[$i])) {
-                carp "WARNING: Plot $plotPaths[$i] or CSV $csvPaths[$i]".
-                    "missing; no report output for $metric";
-            }
-            push(@lines, "\\includepdf[pages={1}]{".$plotPaths[$i]."}\n");
-            my @rows = readCsv($csvPaths[$i]);
-            my $num = $i+1;
-            my $caption = "$metricLatex pass/fail status. Table $num of $plotTotal for this metric. (P, F, \\%) are passes, fails, and pass percentage for $metricLatex. Similarly, (OthP, OthF, Oth\\%) refer to the other metrics; and (AllP, AllF, All\\%) refer to all metrics including $metricLatex.";
-            my $label = "table:$metric-$i";
-            push (@lines, latexTables(\@rows, $caption, $label));
-            push @lines, "\\pagebreak\n\n";
-        }
+        my $word;
+        if ($total==1) { $word = "plot"; }
+        else { $word = "plots"; }
+        push @lines, "\\item $metricLatex: $total $word\n";
     }
+    push @lines, "\\end{itemize}\n";
+    push @lines, "\\item Call rate versus heterozygosity:\n";
+    push @lines, "\\begin{itemize}\n";
+    push @lines, "\\item All samples (heatmap)\n";
+    push @lines, "\\item All samples (scatterplot)\n";
+    push @lines, "\\item Failed samples\n";
+    push @lines, "\\item Failed samples passing call rate and ".
+        "heterozygosity metrics\n";
+    push @lines, "\\end{itemize}\n";
+    push @lines, "\\item Causes of QC failure (if any):\n";
+    push @lines, "\\begin{itemize}\n";
+    push @lines, "\\item Individual\n";
+    push @lines, "\\item Combined\n";
+    push @lines, "\\end{itemize}\n";
+    push @lines, "\\end{itemize}\n";
+    my @morePlots = qw(crHetDensityHeatmap.png crHetDensityScatter.png 
+  failScatterPlot.png  failScatterDetail.png   failsIndividual.png 
+  failsCombined.png);
+    my $height = 400;
+    foreach my $plot (@morePlots) {
+        my $text = '
+\begin{figure}[p]
+\includegraphics[height='.$height.'px]{'.$plot.'}';
+    $text .= "\n\\end{figure}\n";
+        push @includeLines, $text;
+
+    }
+    push @lines, @includeLines;
     return join("", @lines);
 }
 
@@ -363,7 +393,7 @@ sub latexTableSingle {
     my ($rowsRef, $caption, $label) = @_;
     my @rows = @$rowsRef;
     my $cols = @{$rows[0]};
-    my $table = "\n\\begin{table}[ht]\n\\centering\n\\begin{tabular}{|";
+    my $table = "\n\\begin{table}[!h]\n\\centering\n\\begin{tabular}{|";
     foreach my $i (1..$cols) { $table.=" l |"; }
     $table.="} \\hline\n";
     my $first = 1;
@@ -581,13 +611,14 @@ sub writeSummaryLatex {
 
 sub writeSummaryLatexNew {
     # test of new format, will later replace old one
-    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author,
-        $introPath, $qcName) = @_;
+    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $pdfDir, 
+        $title, $author, $introPath, $plotDescPath, $qcName) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
     $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
     $config ||= defaultJsonConfig();
     $graphicsDir ||= ".";
+    $pdfDir ||= $graphicsDir;
     $qcName ||= "Unknown";
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author, $graphicsDir);
@@ -595,7 +626,10 @@ sub writeSummaryLatexNew {
     print $out readFileToString($introPath); # new section = Preface
     print $out latexSectionMetrics($config);
     print $out "\\pagebreak\n";
-    print $out latexSectionResults($config, $graphicsDir);
+    print $out latexSectionResults($config, $pdfDir, $plotDescPath);
+    my @text = textForPlates($resultPath, $config);
+    print $out "\\subsection{Plates}\n\n";
+	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
 
