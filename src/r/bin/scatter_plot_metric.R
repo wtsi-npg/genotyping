@@ -73,7 +73,8 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   pdf(outPath)
   bottomMargin = 9
   par('mar'=c(bottomMargin,6,4,2)+0.1)
-  myTitle = paste("Sample",metricName,"by plate\nPlot",plotNum,"of",plotTotal)
+  myTitle = paste("Sample",metricName,"by plate\nPlot",plotNum,"of",
+    plotTotal,"for",metricName)
   # start with blank plotting area
   if (metricName=='gender') { ylab.name <- "chr_X heterozygosity" }
   else { ylab.name <- metricName }
