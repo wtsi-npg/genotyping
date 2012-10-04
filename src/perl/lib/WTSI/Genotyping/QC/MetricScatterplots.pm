@@ -16,7 +16,18 @@ our @EXPORT_OK = qw/run/;
 
 sub getCsvLine {
     # get CSV line with stats for given plate
-
+    # fields: index, plate, total samples, and
+    #  (pass/fail/percent) for current, other, and all metrics
+    my ($index, $plate, $countsRef, $total) = @_;
+    my @passCounts = @$countsRef;
+    my @fields = ($index+1, $plate, $total); # count from 1, not 0
+    for (my $i=0;$i<@passCounts;$i++) {
+        my $failCount = $total - $passCounts[$i];
+        my $passPercent = sprintf("%.2f", ($passCounts[$i]/$total)*100);
+        push(@fields, ($passCounts[$i], $failCount, $passPercent));
+    }
+    my $line = join(",", @fields)."\n";
+    return $line;
 }
 
 sub getMetricIndex {
@@ -44,28 +55,34 @@ sub getOutputFiles {
     open my $pb, ">", $pbPath || croak "Cannot open output \"$pbPath\": $!";
     open my $pn, ">", $pnPath || croak "Cannot open output \"$pnPath\": $!";
     open my $csv, ">", $csvPath || croak "Cannot open output \"$csvPath\": $!";
-    print $pb "Start\tEnd\n"; # header for R
+    # print headers
+    print $pb "Start\tEnd\n"; # used in R script, allows empty boundary file
+    my @csvHeaders = ("Index", "Plate", "Total", "P", "F",
+                      "%", "OthP", "OthF", "Oth%", "AllP", "AllF", "All%");
+    print $csv join(",", @csvHeaders)."\n";
     return ($out, $pb, $pn, $csv);
 }
 
-sub getPassFailStatus {
-    # find pass/fail status wrt other metrics for each sample
+sub getPassStatus {
+    # find pass/fail status wrt current metric, all other metrics, and overall
+    # current/other fails may overlap, so overall is not simply current+other
     my ($metric, $resultPath, $configPath) = @_;
-    my %pass;
+    my %allStatus;
     my %results = readMetricResultHash($resultPath, $configPath);
     foreach my $sample (keys(%results)) {
-        $pass{$sample} = 1;
+        my @status = (1,1,1); # current; others; all
         my %resultsByMetric = %{$results{$sample}};
         foreach my $key (keys(%resultsByMetric)) {
-            if ($key eq $metric) { next; }
             my ($pass, $value) = @{$resultsByMetric{$key}};
             if (!$pass) {
-                $pass{$sample} = 0;
-                last;
+                $status[2] = 0;
+                if ($key eq $metric) { $status[0] = 0; }
+                else { $status[1] = 0; }
             }
         }
+        $allStatus{$sample} = \@status; 
     }
-    return %pass;
+    return %allStatus;
 }
 
 sub plateLabel {
@@ -83,13 +100,16 @@ sub plateLabel {
 sub readMetric {
     # read metric values from QC output file
     # return hash indexed by plate
-    my ($metricPath, $metricIndex, $locsRef) = @_;
+    my ($metricPath, $metricIndex, $locsRef, $skipFirst) = @_;
+    $skipFirst ||= 0;
     my %plateLocations = %$locsRef;
     my %inputs;
     open my $in, "<", $metricPath || 
         croak "Cannot open input \"$metricPath\": $!";
+    my $first = 1;
     while (<$in>) {
         if (/^#/) { next; }
+        elsif ($skipFirst && $first) { $first = 0; next; }
         chomp;
         my @words = split;
         my $sample = $words[0];
@@ -118,37 +138,40 @@ sub runPlotScript {
     my ($metric, $plotText, $plotPng) = @_;
 }
 
-sub writeCsv {
-    # write pass/fail stats by plate for given metric to a .csv file
-    # later read in to produce table in PDF output
-
-}
-
 sub writePlotInputs {
     # create input for R plotting script
     # outputs:
     # * Sample count, metric value, and pass/fail status for each sample
     # * Plate boundaries (even-numbered plates only, for plot shading)
     # * Plate names and midpoints, for plot labels
-    # * CSV file containing plate pass/fail stats for each plate
+    # * CSV file containing pass/fail stats for each plate
     # for large number of samples, split plates into multiple files
     my ($dbPath, $iniPath, $metric, $metricPath, $metricIndex, $outDir,
-        $passFailRef, $maxBatchSize) = @_;
+        $passRef, $maxBatchSize) = @_;
     my %plateLocations = getPlateLocationsFromPath($dbPath, $iniPath);
-    my %inputs = readMetric($metricPath, $metricIndex, \%plateLocations);
+    my $skipFirst;
+    if ($metric eq 'gender') { $skipFirst = 1; }
+    else { $skipFirst = 0; }
+    my %inputs = readMetric($metricPath, $metricIndex, \%plateLocations,
+                            $skipFirst);
     my @plates = sort(keys(%inputs));
     # each plate goes into buffer; check file size before plate output
     # if file too big, close current file and open next before buffer output
-    my ($batchNum, $batchSize, $plateStart, $writeStartFinish) = (0,0,0,0);
+    my ($batchNum, $batchSize, $plateStart, $writeStartFinish, $i) = 
+        (0,0,0,0,0);
     my @plateLines = ();
     my ($out, $pb, $pn, $csv) = getOutputFiles($outDir, $metric, $batchNum);
-    my %passFail = %$passFailRef;
-    my $i = 0;
+    my %passStatus = %$passRef;
+    my @passCounts = (0,0,0);
     foreach my $plate (@plates) {
         my %metricBySample = %{$inputs{$plate}};
         my @samples = sort(keys(%metricBySample));
-        foreach my $sample(@samples) {
-            my $line = $metricBySample{$sample}."\t".$passFail{$sample}."\n";
+        foreach my $sample (@samples) {
+            my @status = @{$passStatus{$sample}};
+            for (my $j=0;$j<@passCounts;$j++) {
+                if ($status[$j]) { $passCounts[$j]++; }
+            }
+            my $line=$metricBySample{$sample}."\t".$status[1]."\n";
             push(@plateLines, $line);
         }
         if (@plateLines > $maxBatchSize) {
@@ -164,7 +187,9 @@ sub writePlotInputs {
         for (my $j=0;$j<@plateLines;$j++) { # prepend sample count to line
             print $out ($batchSize+$j)."\t".$plateLines[$j];
         }
-        print $csv getCsvLine(); # TODO what are relevant plate stats??
+        my $total = @samples;
+        print $csv getCsvLine($i, $plate, \@passCounts, $total); 
+        @passCounts = (0,0,0);
         $batchSize += @plateLines;
         my $plateFinish = $plateStart + @plateLines;
         my $midPoint = $plateStart + (@plateLines/2);
@@ -186,16 +211,14 @@ sub writePlotInputs {
 
 sub run {
     my ($metric, $qcDir, $outDir, $config, $dbpath, $inipath, $maxBatch) = @_;
-    $maxBatch ||= 2000; # 480
+    $maxBatch ||= 2000; # was 480
     my %inputs = readQCMetricInputs($config);
     my $inputName = $inputs{$metric};
     if (!$inputName) { croak "No input name in $config for $metric: $!"; }
     my $metricPath = $qcDir."/".$inputName;
     my $metricIndex = getMetricIndex($metric);
-    my $plotPng = $qcDir."/scatter_".$metric.".png";
-    my %passFail = getPassFailStatus($metric, $qcDir."/qc_results.json",
-                                     $config);
+    my %passStatus = getPassStatus($metric, $qcDir."/qc_results.json", $config);
     writePlotInputs($dbpath, $inipath, $metric, $metricPath, $metricIndex, 
-                    $outDir, \%passFail, $maxBatch);
+                    $outDir, \%passStatus, $maxBatch);
     #runPlotScript($metric, $plotText, $plotPng);
 }

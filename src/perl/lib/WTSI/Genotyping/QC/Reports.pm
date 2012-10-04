@@ -16,7 +16,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/createReports/;
+our @EXPORT_OK = qw/createReports writeSummaryLatexNew/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
 
 sub createReports {
@@ -234,6 +234,7 @@ sub latexFooter {
 sub latexHeader {
     my ($title, $author, $graphicsDir) = @_;
     my $date = strftime("%Y-%m-%d %H:%M", localtime(time()));
+    # TODO graphicx not needed if we convert all plots to PDF
     my $header = '\documentclass{article} 
 \title{'.$title.'}
 \author{'.$author.'}
@@ -241,6 +242,8 @@ sub latexHeader {
 
 \usepackage{graphicx}
 \graphicspath{{'.$graphicsDir.'}}
+
+\usepackage{pdfpages}
 
 \renewcommand{\familydefault}{\sfdefault} % sans serif font
 
@@ -267,6 +270,58 @@ sub latexPlot {
     if ($label) { $text.="\n\\label{".$label."}"; }
     $text .= "\n\\end{figure}\n";
     return $text;
+}
+
+
+sub latexSectionInput {
+    # .tex for "Inputs" section
+    my ($qcName, $dbPath) = @_;
+    my @lines = ();
+    push @lines, "\\section{Input data}\n\n";
+    push @lines, "\\paragraph*{Name:} \\verb+$qcName+\n";
+    my @text = textForDatasets($dbPath);
+	foreach my $table (latexTables(\@text)) { push(@lines, $table."\n"); }
+    return join("", @lines);
+}
+
+sub latexSectionMetrics {
+    my $config = shift;
+    my @lines = ();
+    push @lines, "\\subsection{Summary of metrics and thresholds}";
+    push @lines, "\\label{sec:metric-summary}\n\n";
+    my @text = textForMetrics($config);
+	foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
+    return join("", @lines);
+    
+}
+
+sub latexSectionResults {
+    my ($config, $qcDir) = @_;
+    my @lines = ();
+    push @lines, "\\section{Results}\n\n";
+    my @metrics = readQCNameArray($config);
+    foreach my $metric (@metrics) {
+        my @plotPaths = sort(glob($qcDir."/scatter_".$metric."*.pdf"));
+        my @csvPaths = sort(glob($qcDir."/plate_stats_".$metric."*.csv"));
+        my $metricLatex = $metric; 
+        $metricLatex =~ s/_/\\_/g; # LaTeX doesn't like underscores
+        push(@lines, "\\subsection{$metricLatex}\n\n");
+        my $plotTotal = @plotPaths;
+        for (my $i=0;$i<$plotTotal;$i++) {
+            if (!(-e $plotPaths[$i] && -e $csvPaths[$i])) {
+                carp "WARNING: Plot $plotPaths[$i] or CSV $csvPaths[$i]".
+                    "missing; no report output for $metric";
+            }
+            push(@lines, "\\includepdf[pages={1}]{".$plotPaths[$i]."}\n");
+            my @rows = readCsv($csvPaths[$i]);
+            my $num = $i+1;
+            my $caption = "$metricLatex pass/fail status. Table $num of $plotTotal for this metric. (P, F, \\%) are passes, fails, and pass percentage for $metricLatex. Similarly, (OthP, OthF, Oth\\%) refer to the other metrics; and (AllP, AllF, All\\%) refer to all metrics including $metricLatex.";
+            my $label = "table:$metric-$i";
+            push (@lines, latexTables(\@rows, $caption, $label));
+            push @lines, "\\pagebreak\n\n";
+        }
+    }
+    return join("", @lines);
 }
 
 sub latexTables {
@@ -313,15 +368,15 @@ sub latexTableSingle {
     $table.="} \\hline\n";
     my $first = 1;
     foreach my $ref (@rows) {
-	my @row = @$ref;
-	foreach my $item (@row) {
-	    $item =~ s/[_]/\\_/g;
-	    $item =~ s/%/\\%/g;
-	    if ($first) { $item = "\\textbf{".$item."}"; }
-	}
-	$table.=join(" & ", @row)." \\\\ \\hline";
-	if ($first) { $table .= ' \hline'; $first = 0; }
-	$table.="\n";
+        my @row = @$ref;
+        foreach my $item (@row) {
+            $item =~ s/[_]/\\_/g;
+            $item =~ s/%/\\%/g;
+            if ($first) { $item = "\\textbf{".$item."}"; } # first row is header
+        }
+        $table.=join(" & ", @row)." \\\\ \\hline";
+        if ($first) { $table .= ' \hline'; $first = 0; } 
+        $table.="\n";
     }
     $table.="\\end{tabular}\n";
     if ($caption) { $table.="\\caption{".$caption."}\n"; }
@@ -343,6 +398,21 @@ sub plateFieldsToText {
 	push(@out, $stat);
     }
     return @out;
+}
+
+sub readCsv {
+    # read .csv file into array of arrays
+    my $csvPath = shift;
+    my @rows;
+    open my $in, "<", $csvPath || croak "Cannot open $csvPath";
+    while (<$in>) {
+        chomp;
+        my @fields = split(/,/);
+        push(@rows, \@fields);
+    }
+    close $in || croak "Cannot close $csvPath";
+    return @rows;
+
 }
 
 sub readJson {
@@ -506,6 +576,29 @@ sub writeSummaryLatex {
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
     return 1;
+}
+
+
+sub writeSummaryLatexNew {
+    # test of new format, will later replace old one
+    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author,
+        $introPath, $qcName) = @_;
+    $texPath ||= "pipeline_summary.tex";
+    $title ||= "Genotyping QC Report";
+    $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
+    $config ||= defaultJsonConfig();
+    $graphicsDir ||= ".";
+    $qcName ||= "Unknown";
+    open my $out, ">", $texPath || croak "Cannot open output path $texPath";
+    print $out latexHeader($title, $author, $graphicsDir);
+    print $out latexSectionInput($qcName, $dbPath);
+    print $out readFileToString($introPath); # new section = Preface
+    print $out latexSectionMetrics($config);
+    print $out "\\pagebreak\n";
+    print $out latexSectionResults($config, $graphicsDir);
+    print $out latexFooter();
+    close $out || croak "Cannot close output path $texPath";
+
 }
 
 1;
