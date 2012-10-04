@@ -5,16 +5,17 @@
 
 args <- commandArgs(TRUE)
 data <- read.table(args[1]) # metric values
-pn <- read.table(args[2]) # plate names
-pb <- read.table(args[3], header=TRUE) # plate boundaries
+pb <- read.table(args[2], header=TRUE) # plate boundaries
+pn <- read.table(args[3]) # plate names
 metricName <- args[4]
 metricMean <- as.numeric(args[5])
 metricSd <- as.numeric(args[6])
-metricThresh <- as.numeric(args[7])
-sdThresh <- as.logical(args[8]) # boolean; is threshold in standard deviations?
-plotNum <- args[9]
-plotTotal <- args[10]
-outPath <- args[11]
+metricThresh1 <- as.numeric(args[7]) 
+metricThresh2 <- as.numeric(args[8]) ## for gender; NA otherwise
+sdThresh <- as.logical(args[9]) # boolean; is threshold in standard deviations?
+plotNum <- args[10]
+plotTotal <- args[11]
+outPath <- args[12]
 # metricMean, metricSd refer to whole dataset, not just current plates
 # can be NA if sdThresh is FALSE
 
@@ -26,7 +27,13 @@ sdLimit <- 10
 if (metricName=='heterozygosity') { # heterozygosity
   ymin <- 0
   ymax <- 1.15 # allow space for legend
-} else { # magnitude, identity, call_rate
+} else if (metricName=='gender') {
+  ymin <- 0
+  ymax <- 0.54
+} else if (metricName=='identity') {
+  ymin <- 0
+  ymax <- 1.2
+} else { # magnitude, call_rate
   ymin <- 0.8
   ymax <- 1.04
 }
@@ -61,14 +68,17 @@ sd.lines <- function(metricMean, metricSd, metricThresh) {
 }
 
 plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
-                     metricSd, metricThresh, sdThresh,
+                     metricSd, metricThresh1, metricThresh2, sdThresh,
                      plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath) {
   pdf(outPath)
   bottomMargin = 9
   par('mar'=c(bottomMargin,6,4,2)+0.1)
-  myTitle = paste("Sample",metricName,"by plate: Plot",plotNum,"of",plotTotal)
+  myTitle = paste("Sample",metricName,"by plate\nPlot",plotNum,"of",plotTotal)
+  # start with blank plotting area
+  if (metricName=='gender') { ylab.name <- "chr_X heterozygosity" }
+  else { ylab.name <- metricName }
   plot(index, metric, type="n",  xlim=c(0,xmax), ylim=c(ymin,ymax),
-       xaxt="n", xlab="", ylab=metricName, main=myTitle) # blank plotting area
+       xaxt="n", xlab="", ylab=ylab.name, main=myTitle)
   axis(1, pn$V2, pn$V1, las=3, cex.axis=0.7) # plate names
   mtext("Plate", side=1, line=bottomMargin - 2)
   shade <- rgb(190, 190, 190, alpha=80, maxColorValue=255)
@@ -81,15 +91,20 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   points(index[pass==1], metric[pass==1],col="blue") # points on top of shading
   points(index[pass==0], metric[pass==0], col="darkred", pch=16)
   if (sdThresh) {
-    sd.lines(metricMean, metricSd, metricThresh)
+    sd.lines(metricMean, metricSd, metricThresh1)
+  } else if (metricName=='gender') {
+    abline(h=metricThresh1, col="red", lty=2)
+    abline(h=metricThresh2, col="red", lty=2)
+    #text(max(index), metricThresh1, "M_max\n", pos=4, cex=0.6)
+    #text(max(index), metricThresh1, "F_min\n", pos=4, cex=0.6)
   } else {
-    abline(h=metricThresh, col="red", lty=2)
+    abline(h=metricThresh1, col="red", lty=2)
     if (metricName=='call_rate' || metricName=='magnitude') {
       label="minimum\n"
     } else if (metricName=='identity') {
       label="maximum\n"
     }
-    text(max(index), metricThresh, label, pos=4, cex=0.6)
+    text(max(index), metricThresh1, label, pos=4, cex=0.6)
   }
   legend("topright",
          c("Pass/fail threshold for this metric", "Passed all other metrics",
@@ -103,5 +118,5 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
 }
 
 plot.pdf(index, metric, pass, pn, pb, metricName, metricMean,
-         metricSd, metricThresh, sdThresh,
+         metricSd, metricThresh1, metricThresh2, sdThresh,
          plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath)
