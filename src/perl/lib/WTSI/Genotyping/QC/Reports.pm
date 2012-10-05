@@ -338,17 +338,12 @@ sub latexSectionResults {
     push @lines, "\\item Combined\n";
     push @lines, "\\end{itemize}\n";
     push @lines, "\\end{itemize}\n";
-    my @morePlots = qw(crHetDensityHeatmap.png crHetDensityScatter.png 
-  failScatterPlot.png  failScatterDetail.png   failsIndividual.png 
-  failsCombined.png);
-    my $height = 400;
-    foreach my $plot (@morePlots) {
-        my $text = '
-\begin{figure}[p]
-\includegraphics[height='.$height.'px]{'.$plot.'}';
-    $text .= "\n\\end{figure}\n";
-        push @includeLines, $text;
-
+    my @morePdf =  qw(crHetDensityHeatmap.pdf  crHetDensityScatter.pdf 
+  failsIndividual.pdf failsCombined.pdf failScatterPlot.pdf  
+  failScatterDetail.pdf);
+    foreach my $name (@morePdf) {
+        my $plotPath = $qcDir."/".$name;
+        push(@includeLines, "\\includepdf[pages={1}]{".$plotPath."}\n");
     }
     push @lines, @includeLines;
     return join("", @lines);
@@ -628,7 +623,7 @@ sub writeSummaryLatexNew {
     print $out "\\pagebreak\n";
     print $out latexSectionResults($config, $pdfDir, $plotDescPath);
     my @text = textForPlates($resultPath, $config);
-    print $out "\\subsection{Plates}\n\n";
+    print $out "\\subsection{Plate results table}\n\n";
 	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";

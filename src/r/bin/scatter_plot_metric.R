@@ -30,7 +30,7 @@ if (metricName=='heterozygosity') { # heterozygosity
 } else if (metricName=='gender') {
   ymin <- 0
   ymax <- 0.54
-} else if (metricName=='identity') {
+} else if (metricName=='identity' || metricName=='duplicate') {
   ymin <- 0
   ymax <- 1.2
 } else { # magnitude, call_rate
@@ -67,6 +67,19 @@ sd.lines <- function(metricMean, metricSd, metricThresh) {
   text(max(index), metricMean, "Mean\n", pos=4, cex=0.6) 
 }
 
+ylab.name <- function(metricName) {
+  if (metricName=='gender') {
+    ylab.name <- "chr_X heterozygosity"
+  } else if (metricName=='duplicate') {
+    ylab.name <- "maximum similarity on test panel"
+  } else if (metricName=='identity') {
+    ylab.name <- "identity with Sequenom results (if available)"
+  } else {
+    ylab.name <- metricName
+  }
+  return(ylab.name)
+}
+
 plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
                      metricSd, metricThresh1, metricThresh2, sdThresh,
                      plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath) {
@@ -75,11 +88,10 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   par('mar'=c(bottomMargin,6,4,2)+0.1)
   myTitle = paste("Sample",metricName,"by plate\nPlot",plotNum,"of",
     plotTotal,"for",metricName)
+  myYlab = ylab.name(metricName)
   # start with blank plotting area
-  if (metricName=='gender') { ylab.name <- "chr_X heterozygosity" }
-  else { ylab.name <- metricName }
   plot(index, metric, type="n",  xlim=c(0,xmax), ylim=c(ymin,ymax),
-       xaxt="n", xlab="", ylab=ylab.name, main=myTitle)
+       xaxt="n", xlab="", ylab=myYlab, main=myTitle)
   axis(1, pn$V2, pn$V1, las=3, cex.axis=0.7) # plate names
   mtext("Plate", side=1, line=bottomMargin - 2)
   shade <- rgb(190, 190, 190, alpha=80, maxColorValue=255)
@@ -96,13 +108,13 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   } else if (metricName=='gender') {
     abline(h=metricThresh1, col="red", lty=2)
     abline(h=metricThresh2, col="red", lty=2)
-    #text(max(index), metricThresh1, "M_max\n", pos=4, cex=0.6)
-    #text(max(index), metricThresh1, "F_min\n", pos=4, cex=0.6)
+    text(max(index), metricThresh1, "\n\nM_max", pos=4, cex=0.6)
+    text(max(index), metricThresh2, "F_min\n", pos=4, cex=0.6)
   } else {
     abline(h=metricThresh1, col="red", lty=2)
     if (metricName=='call_rate' || metricName=='magnitude') {
       label="minimum\n"
-    } else if (metricName=='identity') {
+    } else if (metricName=='identity' || metricName=='duplicate') {
       label="maximum\n"
     }
     text(max(index), metricThresh1, label, pos=4, cex=0.6)

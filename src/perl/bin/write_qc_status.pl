@@ -19,6 +19,7 @@ use warnings;
 use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
+use IO::Uncompress::Gunzip; # for duplicate_full.txt.gz
 use JSON;
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames);
 
@@ -76,27 +77,53 @@ sub convertResults {
     return %sampleResults;
 }
 
+sub findMaxSimilarity {
+    # find max pairwise similarity for each sample from duplicate_full.txt.gz
+    my $inPath = shift;
+    if (!(-e $inPath)) { croak "Input path $inPath does not exist!"; }
+    my (%max, $GunzipError);
+    my $z = new IO::Uncompress::Gunzip $inPath || 
+        croak "gunzip failed: $GunzipError\n";
+    while (<$z>) {
+        chomp;
+        my @words = split;
+        my @samples = ($words[1], $words[2]);
+        my $sim = $words[3];
+        # redudant pairwise comparisons are omitted, so check both
+        foreach my $sample (@samples) {
+            my $lastMax = $max{$sample};
+            if ((!$lastMax) || $sim > $lastMax) {
+                $max{$sample} = $sim;
+            }
+        }
+    }
+    $z->close();
+    return %max;
+}
+
 sub findMetricResults {
     # find input path(s) and QC results for given metric
     my ($inputDir, $metric, $threshold, $input) = @_;
     my %results;
     if ($metric eq 'call_rate') { 
-	%results = resultsCr($threshold, $inputDir.'/'.$input);
+        %results = resultsCr($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'heterozygosity') { 
-	%results = resultsHet($threshold, $inputDir.'/'.$input);
+        %results = resultsHet($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'duplicate') { 
-	my @input = @$input;
-	my @paths = ();
-	foreach my $name (@input) { push(@paths, $inputDir."/".$name); } 
-	%results = resultsDuplicate($threshold, \@paths);	    
+        my @input = @$input;
+        my @paths = ();
+        foreach my $name (@input) { push(@paths, $inputDir."/".$name); } 
+        %results = resultsDuplicate($threshold, \@paths);	    
     } elsif ($metric eq 'identity') { 
-	%results = resultsIdentity($threshold, $inputDir.'/'.$input);
+        %results = resultsIdentity($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'gender') { 
-	%results = resultsGender($threshold, $inputDir.'/'.$input);
+        %results = resultsGender($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'xydiff') { 
-	%results = resultsXydiff($threshold, $inputDir.'/'.$input);
-    } else { carp "WARNING: Unknown QC metric $metric: $!"; }
-     return %results;
+        %results = resultsXydiff($threshold, $inputDir.'/'.$input);
+    } else { 
+        carp "WARNING: Unknown QC metric $metric: $!"; 
+    }
+    return %results;
 }
 
 sub readSampleNames {
@@ -139,41 +166,49 @@ sub resultsDuplicate {
     # read call rates from sample_cr_het.txt
     # $threshold is not used
     my ($threshold, $inPathsRef) = @_;
-    my ($crHetPath, $duplicatePath, ) = @$inPathsRef;
+    my ($crHetPath, $duplicatePath, $duplicateFull) = @$inPathsRef;
     my (%duplicates, @pairs, %results);
+    my %maxSimilarity = findMaxSimilarity($duplicateFull);
     # read duplicate sample names
     open my $in, "<", $duplicatePath || die "Cannot open input path $duplicatePath: $!";
     while (<$in>) {
-	if (/^#/) { next; } # comments start with a #
-	my @fields = split;
-	my @pair = ($fields[1], $fields[2]);
-	foreach my $sample (@pair) { $duplicates{$sample} = 1; }
-	push(@pairs, \@pair);
+        if (/^#/) { next; } # comments start with a #
+        my @fields = split;
+        my @pair = ($fields[1], $fields[2]);
+        foreach my $sample (@pair) { $duplicates{$sample} = 1; }
+        push(@pairs, \@pair);
     }
     close $in;
     # read call rates for duplicated samples
     my (%duplicateCR, @samples);
     my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $cr) = ($fields[0], $fields[1]);
-	if ($duplicates{$sample}) { $duplicateCR{$sample} = $cr; }
-	push(@samples, $sample);
+        my @fields = @$ref;
+        my ($sample, $cr) = ($fields[0], $fields[1]);
+        if ($duplicates{$sample}) { $duplicateCR{$sample} = $cr; }
+        push(@samples, $sample);
     }
     # choose which duplicates to keep/discard
     my %pass;
     foreach my $pairRef (@pairs) {
-	my ($sam1, $sam2) = @$pairRef;
-	if ($duplicateCR{$sam1} > $duplicateCR{$sam2}) { $pass{$sam1} = 1; $pass{$sam2} = 0; }
-	elsif ($duplicateCR{$sam1} < $duplicateCR{$sam2}) { $pass{$sam1} = 0; $pass{$sam2} = 1; } 
-	elsif ($sam1 lt $sam2) { $pass{$sam1} = 1; $pass{$sam2} = 0; }
-	else { $pass{$sam1} = 0; $pass{$sam2} = 1; } 
+        my ($sam1, $sam2) = @$pairRef;
+        if ($duplicateCR{$sam1} > $duplicateCR{$sam2}) { 
+            $pass{$sam1} = 1; $pass{$sam2} = 0; 
+        } elsif ($duplicateCR{$sam1} < $duplicateCR{$sam2}) { 
+            $pass{$sam1} = 0; $pass{$sam2} = 1; 
+        } 
+        elsif ($sam1 lt $sam2) { 
+            $pass{$sam1} = 1; $pass{$sam2} = 0; 
+        } else { 
+            $pass{$sam1} = 0; $pass{$sam2} = 1; 
+        } 
     }
-    # fill in results for all samples; use 0/1 for not_duplicate/duplicate metric values
+    # fill in results for all samples; metric = max similarity
     foreach my $sample (@samples) {
-	if (!$duplicates{$sample}) { $results{$sample}=[1,0]; }
-	elsif ($pass{$sample}) { $results{$sample} = [1,1]; }
-	else { $results{$sample}=[0, 1]; }
+        my $metric = $maxSimilarity{$sample};
+        if (!$duplicates{$sample}) { $results{$sample}=[1,$metric]; }
+        elsif ($pass{$sample}) { $results{$sample} = [1,$metric]; }
+        else { $results{$sample}=[0,$metric]; }
     }
     return %results;
 }

@@ -19,8 +19,10 @@ use Carp qw(confess);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, $comboText, $causeText, 
-    $crHetFail, $comboPng, $causePng, $scatterPng, $detailPng, $minCR, $maxHetSd, $title, $iniPath);
+my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
+    $comboText, $causeText, $crHetFail,  $comboPdf, $causePdf, $comboPng, 
+    $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng, $minCR, 
+    $maxHetSd, $title, $iniPath);
 
 GetOptions("config=s"      => \$configPath,
            "input=s"       => \$inPath,
@@ -39,8 +41,12 @@ $failText   ||= 'failTotals.txt';
 $comboText  ||= 'failCombos.txt';
 $causeText  ||= 'failCauses.txt';
 $crHetFail  ||= 'failedSampleCrHet.txt';
+$comboPdf   ||= 'failsCombined.pdf';
+$causePdf   ||= 'failsIndividual.pdf';
 $comboPng   ||= 'failsCombined.png';
 $causePng   ||= 'failsIndividual.png';
+$scatterPdf ||= 'failScatterPlot.pdf';
+$detailPdf  ||= 'failScatterDetail.pdf';
 $scatterPng ||= 'failScatterPlot.png';
 $detailPng  ||= 'failScatterDetail.png';
 $outputDir  ||= '.';
@@ -60,7 +66,7 @@ Unspecified options will receive default values.
 }
 
 my @outputPaths;
-my @outNames = ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng);
+my @outNames = ($failText, $comboText, $causeText, $comboPdf, $causePdf, $comboPng, $causePng, $crHetFail, $scatterPdf, $detailPdf, $scatterPng, $detailPng);
 if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
 
@@ -206,26 +212,30 @@ sub run {
 	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
 	return 1;
     }
-    my ($failText, $comboText, $causeText, $comboPng, $causePng, $crHetFail, $scatterPng, $detailPng) 
-	= @$outputsRef;
-    my @failedSamples = writeFailCounts(\%qcResults, $qcConfigPath, $failText, $comboText);
+    my ($failText, $comboText, $causeText, $comboPdf, $causePdf, 
+        $comboPng, $causePng, $crHetFail, $scatterPdf, $detailPdf, 
+        $scatterPng, $detailPng) = @$outputsRef;
+    my @failedSamples = writeFailCounts(\%qcResults, $qcConfigPath, 
+                                        $failText, $comboText);
     my $failTotal = @failedSamples;
     writeFailedCrHet(\@failedSamples, \%qcResults, $crHetPath, $crHetFail);
     # run R scripts to produce plots
     # barplot individual failures
-    my @args = ("plotIndividualFails.R", $failText, $failTotal, $title);
+    # "outputs" must be PNG files for format check
+    my @args = ("plotIndividualFails.R", $failText, $failTotal, $title, 
+                $causePdf);
     my @outputs = ($causePng,);
     my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for individual failure barplot: $!"; }
     # barplot combined failures
-    @args = ("plotCombinedFails.R", $comboText, $title);
+    @args = ("plotCombinedFails.R", $comboText, $title, $comboPdf);
     @outputs = ($comboPng,);
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for combined failure barplot: $!"; }    
     my %thresholds =  WTSI::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
     my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
     my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
-    @args = ("scatterPlotFails.R", $crHetFail, $hetMean, $hetMaxDist, $thresholds{'call_rate'}, $title);
+    @args = ("scatterPlotFails.R", $crHetFail, $hetMean, $hetMaxDist, $thresholds{'call_rate'}, $title, $scatterPdf, $detailPdf);
     @outputs = ($scatterPng, $detailPng);
     $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for failure scatterplot: $!"; }

@@ -253,7 +253,7 @@ sub runAllMetrics {
     my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
         $maxBatch) = @_;
     #my @metrics = readQCNameArray($config);
-    my @metrics = qw(call_rate heterozygosity identity gender);
+    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 
                   $resultPath, $maxBatch);

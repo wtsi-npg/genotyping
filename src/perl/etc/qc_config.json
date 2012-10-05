@@ -13,7 +13,7 @@
                   "call_rate":"sample_cr_het.txt",
                   "xydiff":"xydiff.txt",
                   "identity":"identity_check_results.txt",
-                  "duplicate":["sample_cr_het.txt","duplicate_summary.txt"],
+                  "duplicate":["sample_cr_het.txt","duplicate_summary.txt","duplicate_full.txt.gz"],
                   "gender":"sample_xhet_gender.txt",
                   "magnitude":"intensity_metrics.txt"},
   "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
@@ -39,7 +39,7 @@
       "call_rate" : 0.95,
       "magnitude" : 0.90,
       "identity" : 0.90,
-      "duplicate" : "NA",
+      "duplicate" : 0.98,
       "gender" : "NA",
       "xydiff" : 3
    }
