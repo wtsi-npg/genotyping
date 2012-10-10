@@ -238,13 +238,16 @@ sub runMetric {
     my $batchNum = writePlotInputs($metric, $dbPath, $iniPath, $resultPath, 
                                    $config, $outDir, $maxBatch);
     my $inputTotal = $batchNum+1;
-    my @results = metricMeanSd($metric, $resultPath, $config);
     my ($mean, $sd);
-    if (@results!=0) { ($mean, $sd) = @results; }
-    else { ($mean, $sd) = ("NA", "NA"); }
-    my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config);
-    runPlotScript($metric, $outDir, $inputTotal, $mean, $sd, 
-                  $thresh1, $thresh2);
+    my @results = metricMeanSd($metric, $resultPath, $config);
+    if (@results==0) { 
+        carp "No results for metric $metric; omitting plots.\n";
+    } else { 
+        ($mean, $sd) = @results; 
+        my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config);
+        runPlotScript($metric, $outDir, $inputTotal, $mean, $sd, 
+                      $thresh1, $thresh2);
+    }
 }
 
 

@@ -18,6 +18,10 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/createReports writeSummaryLatexNew/;
 our @dbInfoHeaders = qw/run project supplier snpset/;
+our $allMetricsName = "ALL_METRICS";
+our $allPlatesName = "ALL_PLATES";
+our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
+  magnitude/;
 
 sub createReports {
     # 'main' method to write text and CSV files
@@ -93,8 +97,7 @@ sub getCsvHeaders {
     my $config = shift;
     my @headers = @dbInfoHeaders;
     push @headers, qw/sample plate well pass/;
-    my @metricNames = readQCNameArray($config);
-    foreach my $metric (@metricNames) {
+    foreach my $metric (@METRIC_NAMES) {
 	my @suffixes;
 	if ($metric eq 'gender') {
 	    @suffixes = qw/pass xhet inferred supplied/;
@@ -108,58 +111,48 @@ sub getCsvHeaders {
     return @headers;
 }
 
+sub getMetricTableHeader {
+    my $metric = shift;
+    my %shortNames = %{ shift() };
+    my $header;
+    if ($shortNames{$metric}) { 
+        $header = $shortNames{$metric}; 
+    } else { 
+        $header = lc($metric);
+        $header =~ s/_/ /g;
+    }
+    return $header;
+}
+
 sub getPlateInfo {
-    # for each plate, find: samples found, samples excluded, CR mean/median, het mean
+    # foreach plate, get failure counts and percentage
+    # want stats for each individual metric, and for all metrics combined
     my %records = %{ shift() };
-    my $config = shift;
-    my @metricNames = readQCNameArray($config);
-    my (%crByPlate, %hetByPlate, %passByPlate, %samplesByPlate, %plateStats, @cr, @het, $pass, $samples);
+    my (%passCounts, %sampleCounts, %passRates, $key);
     foreach my $sample (keys(%records)) {
-	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
-	my %record = %{$records{$sample}};
-	my $plate = $record{'plate'};
-	my $samplePass = 1;
-	foreach my $metric (@metricNames) {
-	    my @values;
-	    my ($pass, $val);
-	    if ($record{$metric}) {
-		($pass, $val) = @{$record{$metric}};
-	    } else {
-		($pass, $val) = (1, "NA"); # placeholders if metric not in use
-	    }
-	    if ($pass==0) { $samplePass = 0; }
-	    if ($metric eq 'call_rate') { 
-		if ($crByPlate{$plate}) { push @{$crByPlate{$plate}}, $val; }
-		else { $crByPlate{$plate} = [$val]; }
-		push @cr, $val;
-	    } elsif ($metric eq 'heterozygosity') {  
-		if ($hetByPlate{$plate}) { push @{$hetByPlate{$plate}}, $val; }
-		else { $hetByPlate{$plate} = [$val]; }
-		push @het, $val;
-	    }
-	}
-	$passByPlate{$plate} += $samplePass;
-	$pass += $samplePass;
-	$samplesByPlate{$plate}++;
-	$samples++;
+        my %record = %{$records{$sample}};
+        my $plate = $record{'plate'};
+        my $samplePass = 1;
+        foreach my $metric (@METRIC_NAMES) {
+            my ($pass, $val);
+            if ($record{$metric}) {
+                ($pass, $val) = @{$record{$metric}};
+            } else {
+                ($pass, $val) = (1, "NA"); # placeholders if metric not in use
+            }
+            if ($pass==0) { $samplePass = 0; }
+            $passCounts{$plate}{$metric} += $pass;
+        }
+        $passCounts{$plate}{$allMetricsName} += $samplePass;
+        $sampleCounts{$plate}++;
     }
-    # stats for each plate
-    foreach my $plate (keys(%samplesByPlate)) {
-	my @fields = findPlateFields($samplesByPlate{$plate}, $passByPlate{$plate}, $crByPlate{$plate},
-				     $hetByPlate{$plate});
-	$plateStats{$plate} = [@fields];
-    }
-    my @aggregate = findPlateFields($samples, $pass, \@cr, \@het);  # aggregate stats for all plates
-    return (\%plateStats, \@aggregate);
+    return (\%passCounts, \%sampleCounts);
 }
 
 sub getSampleInfo {
     # for each sample, get plate, well, metric values and pass/fail status
     # also get overall sample pass/fail
     my %records = %{ shift() };
-    my $config = shift;
-    my @metricNames = readQCNameArray($config);
-    # metric name order: ["call_rate","heterozygosity","duplicate","identity","gender","xydiff]"
     my @sampleFields;
     my @samples = keys(%records);
     @samples = sort @samples;
@@ -168,7 +161,7 @@ sub getSampleInfo {
 	my %record = %{$records{$sample}};
 	my $samplePass = 1;
 	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); # $samplePass is placeholder
-	foreach my $metric (@metricNames) {
+	foreach my $metric (@METRIC_NAMES) {
 	    if (not $record{$metric}) { 
 		push(@fields, (1, "NA")); # no results found; use placeholders for pass/fail and metric value
 	    } else {
@@ -278,69 +271,61 @@ sub latexSectionInput {
     my ($qcName, $dbPath) = @_;
     my @lines = ();
     push @lines, "\\section{Input data}\n\n";
-    push @lines, "\\paragraph*{Name:} \\verb+$qcName+\n";
-    my @text = textForDatasets($dbPath);
+    my @text = textForDatasets($dbPath, $qcName);
 	foreach my $table (latexTables(\@text)) { push(@lines, $table."\n"); }
     return join("", @lines);
 }
 
 sub latexSectionMetrics {
     my $config = shift;
+    my $gtPath = shift; # gender thresholds
+    my ($mMax, $fMin) = readGenderThreholds($gtPath);
     my @lines = ();
+    push @lines, "\\pagebreak\n\n";
     push @lines, "\\subsection{Summary of metrics and thresholds}";
     push @lines, "\\label{sec:metric-summary}\n\n";
-    my @text = textForMetrics($config);
+    my @text = textForMetrics($config, $mMax, $fMin);
 	foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
     return join("", @lines);
     
 }
 
 sub latexSectionResults {
-    my ($config, $qcDir, $plotDescPath) = @_;
+    my ($config, $qcDir, $plotDescPath, $resultPath) = @_;
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
-    # TODO more detailed explanatory text
-    # list of following figures
-    push @lines, "\\subsection{Plot format}\n";
-    push @lines, "The following pages contain plots for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plot(s) may be blank if Sequenom results are not available.\n";
+    push @lines, "\\subsection{Tables}\n\n";
+    my @titles = ("Key to metric abbreviations", 
+                  "Total samples passing filters",
+                  "Sample pass rates");
+    my @refs = textForPlates($resultPath, $config);
+    for (my $i=0;$i<@refs;$i++) {
+        push @lines, "\\subsubsection*{".$titles[$i]."}\n";
+        my @text = @{$refs[$i]};
+        foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
+        push(@lines, "\n\n");
+    }
+    push @lines, "\\subsection{Plots}\n";
+    push @lines, "\\subsubsection*{Metric scatterplots}\n";
+    push @lines, "Scatterplots are produced for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plots may be absent if Sequenom results are not available.\n\n";
+    push @lines, "\\subsubsection*{Other}\n";
+    push @lines, "The following additional plots are included:\n";
+    push @lines, "\\begin{itemize}\n";
+    push @lines, "\\item Causes of sample failure: Individual and combined\n";
+    push @lines, "\\item Scatterplots of call rate versus heterozygosity: All samples, failed samples, and failed samples passing call rate and heterozygosity filters\n";
+    push @lines, "\\end{itemize}\n";
     #push @lines, readFileToString($plotDescPath); # TODO more details in file
     my @metrics = readQCNameArray($config);
-    push @lines, "\\subsection{Summary of plots}\n";
-    push @lines, "\\begin{itemize}\n";
-    push @lines, "\\item Metric scatterplots:\n";
-    push @lines, "\\begin{itemize}\n";
     my @includeLines = ();
     foreach my $metric (@metrics) {
         my @plotPaths = sort(glob($qcDir."/scatter_".$metric."*.pdf"));
         foreach my $plotPath (@plotPaths) {
-            push(@includeLines, "\\includepdf[pages={1}]{".$plotPath."}\n");
+            push(@includeLines, "\\includepdf[landscape=true]{".
+                 $plotPath."}\n");
         }
-        my $total = @plotPaths;
-        my $metricLatex = $metric; 
-        $metricLatex =~ s/_/\\_/g; # LaTeX doesn't like underscores
-        my $word;
-        if ($total==1) { $word = "plot"; }
-        else { $word = "plots"; }
-        push @lines, "\\item $metricLatex: $total $word\n";
     }
-    push @lines, "\\end{itemize}\n";
-    push @lines, "\\item Call rate versus heterozygosity:\n";
-    push @lines, "\\begin{itemize}\n";
-    push @lines, "\\item All samples (heatmap)\n";
-    push @lines, "\\item All samples (scatterplot)\n";
-    push @lines, "\\item Failed samples\n";
-    push @lines, "\\item Failed samples passing call rate and ".
-        "heterozygosity metrics\n";
-    push @lines, "\\end{itemize}\n";
-    push @lines, "\\item Causes of QC failure (if any):\n";
-    push @lines, "\\begin{itemize}\n";
-    push @lines, "\\item Individual\n";
-    push @lines, "\\item Combined\n";
-    push @lines, "\\end{itemize}\n";
-    push @lines, "\\end{itemize}\n";
-    my @morePdf =  qw(crHetDensityHeatmap.pdf  crHetDensityScatter.pdf 
-  failsIndividual.pdf failsCombined.pdf failScatterPlot.pdf  
-  failScatterDetail.pdf);
+    my @morePdf =  qw(failsIndividual.pdf failsCombined.pdf 
+  crHetDensityScatter.pdf failScatterPlot.pdf failScatterDetail.pdf);
     foreach my $name (@morePdf) {
         my $plotPath = $qcDir."/".$name;
         push(@includeLines, "\\includepdf[pages={1}]{".$plotPath."}\n");
@@ -440,6 +425,22 @@ sub readCsv {
 
 }
 
+sub readGenderThreholds {
+    # read sample_xhet_gender_thresholds.txt
+    my $inPath = shift;
+    my ($mMax, $fMin);
+    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
+    while (<$in>) {
+        chomp;
+        my @words = split();
+        my $thresh = pop(@words);
+        if (/^M_max/) { $mMax = $thresh; }
+        if (/^F_min/) { $fMin = $thresh; }
+    }
+    close $in || croak "Cannot close input path $inPath";
+    return ($mMax, $fMin);
+}
+
 sub readJson {
     my $inPath = shift;
     my @lines;
@@ -469,53 +470,6 @@ sub sampleFieldsToText {
     return @out;
 }
 
-sub textForDatasets {
-    # text for datasets table
-    my $dbPath = shift;
-    my @text = (\@dbInfoHeaders, );
-    my @datasetInfo = dbDatasetInfo($dbPath);
-    foreach my $ref (@datasetInfo) {
-	push(@text, $ref);
-    }
-    return @text;
-}
-
-sub textForMetrics {
-    my $jsonPath = shift;
-    my %doc = %{readJson($jsonPath)};
-    my %thresh = %{$doc{'Metrics_thresholds'}};
-    my @headers = qw/metric threshold type description/;
-    my %descs = %{$doc{'Metric_descriptions'}};
-    my %types = %{$doc{'Threshold_types'}};
-    my @text = (\@headers,);
-    my @names;
-    @names = qw(duplicate identity gender call_rate heterozygosity magnitude);
-    foreach my $name (@names) {
-        push(@text, [$name, $thresh{$name}, $types{$name}, $descs{$name}]);
-    }
-    return @text;
-}
-
-sub textForPlates {
-    my $resultPath = shift;
-    my $config = shift;
-    my $resultsRef = readJson($resultPath);
-    my ($plateRef, $aggRef) = getPlateInfo($resultsRef, $config);
-    my %plateStats = %$plateRef;
-    my @aggregate = @$aggRef;
-    my @plates = keys(%plateStats);
-    @plates = sort @plates;
-    my @headers = qw/plate samples excluded excl% cr_mean cr_median het_mean/;
-    my @text = (\@headers, );
-    foreach my $plate (@plates) {
-	my @out = plateFieldsToText($plate, $plateStats{$plate});
-	push(@text, \@out);
-    }
-    my @out = plateFieldsToText("ALL_PLATES", \@aggregate);
-    push(@text, \@out);
-    return @text;
-}
-
 sub textForCsv {
     my ($resultPath, $dbPath, $config) = @_;
     my $resultsRef = readJson($resultPath);
@@ -531,6 +485,121 @@ sub textForCsv {
 	push(@text, \@out);
     }
     return @text;
+}
+
+sub textForDatasets {
+    # text for datasets table
+    my $dbPath = shift;
+    my $qcDir = shift;
+    my @headers;
+    push @headers, @dbInfoHeaders;
+    if ($qcDir) { push(@headers, "directory"); }
+    my @text = (\@headers, );
+    my @datasetInfo = dbDatasetInfo($dbPath);
+    foreach my $ref (@datasetInfo) {
+        my @items = @$ref;
+        if ($qcDir) { push(@items, $qcDir); }
+        push(@text, \@items);
+    }
+    return @text;
+}
+
+sub textForMetrics {
+    my ($jsonPath, $mMax, $fMin) = @_;
+    $mMax = sprintf("%.3f", $mMax);
+    $fMin = sprintf("%.3f", $fMin);
+    my %doc = %{readJson($jsonPath)};
+    my %thresh = %{$doc{'Metrics_thresholds'}};
+    my @headers = qw/metric threshold description/;
+    my %descs = %{$doc{'Metric_descriptions'}};
+    my %types = %{$doc{'Threshold_types'}};
+    my @text = (\@headers,);
+    my @names = @METRIC_NAMES;
+    foreach my $name (@names) {
+        my $thresholdTex;
+        if ($name eq 'gender') {
+            $thresholdTex = "M\_max=".$mMax."; F\_min=".$fMin;
+        } else {
+            $thresholdTex = $thresh{$name}." ".lc($types{$name});
+        }
+        push(@text, [$name, $thresholdTex, $descs{$name}]);
+    }
+    return @text;
+}
+
+sub textForMetricKey {
+    my %shortNames = @_;
+    my @headers = qw(metric abbreviation);
+    my @text = (\@headers,);
+    foreach my $metric (@METRIC_NAMES) {
+        my @fields = ($metric, $shortNames{$metric});
+        push(@text, \@fields);
+    }
+    return @text;
+}
+
+sub textForPass {
+    # find total number of samples passing filters for each metric
+    # also find pass rates
+    # return text for tables
+    my %shortNames = %{ shift() };
+    my %passCounts = %{ shift() };
+    my %sampleCounts = %{ shift() };
+    my @headers1 = qw/plate samples/;
+    my @headers2 = qw/plate/;
+    my @metricNames = ();
+    foreach my $name (@METRIC_NAMES) { push(@metricNames, $name); }
+    push(@metricNames, $allMetricsName);
+    foreach my $metric (@metricNames) { 
+        push @headers1, getMetricTableHeader($metric, \%shortNames);
+        push @headers2, getMetricTableHeader($metric, \%shortNames);
+    }
+    my @text1 = (\@headers1, );
+    my @text2 = (\@headers2, );
+    my $sampleTotal = 0;
+    my %passTotals;
+    my @plates = keys(%sampleCounts);
+    @plates = sort @plates;
+    foreach my $plate (@plates) { # count of passed/failed samples by plate
+        my @fields1 = ($plate, $sampleCounts{$plate});
+        my @fields2 = ($plate, );
+        $sampleTotal += $sampleCounts{$plate};
+        foreach my $metric (@metricNames) {
+            push(@fields1, $passCounts{$plate}{$metric});
+            my $rate = $passCounts{$plate}{$metric} / $sampleCounts{$plate};
+            push(@fields2,  sprintf("%.3f", $rate));
+            $passTotals{$metric} += $passCounts{$plate}{$metric};
+        }
+        push(@text1, \@fields1);
+        push(@text2, \@fields2);
+    }
+    my $name =  "\\textbf{".lc($allPlatesName)."}"; 
+    $name =~ s/_/ /g;
+    my @fields1 = ($name, $sampleTotal);
+    my @fields2 = ($name, );
+    foreach my $metric (@metricNames) {
+        push(@fields1, $passTotals{$metric});
+        my $rate = $passTotals{$metric} / $sampleTotal;
+        push(@fields2,  sprintf("%.3f", $rate));
+    }
+    push(@text1, \@fields1);
+    push(@text2, \@fields2);
+    return (\@text1, \@text2);
+}
+
+sub textForPlates {
+    # produce text for two tables: pass counts and pass rates
+    my $resultPath = shift;
+    my $config = shift;
+    my $resultsRef = readJson($resultPath);
+    my @refs = getPlateInfo($resultsRef, $config);
+    my %passCounts = %{$refs[0]};
+    my %sampleCounts = %{$refs[1]};
+    my %shortNames = readQCShortNameHash($config);
+    my @textKey = textForMetricKey(%shortNames);
+    my ($textRef1, $textRef2) = textForPass(\%shortNames, \%passCounts, 
+                                            \%sampleCounts);
+    return (\@textKey, $textRef1, $textRef2);
 }
 
 sub texToPdf {
@@ -589,7 +658,7 @@ sub writeSummaryLatex {
     print $out "\\label{sec:metric-summary}\n\n";
     @text = textForMetrics($config);
 	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
-    print $out "\\pagebreak\n";
+    #print $out "\\pagebreak\n";
     print $out "\\section{Results}\n\n";
     @text = textForPlates($resultPath, $config);
     print $out "\\subsection{Plates}\n\n";
@@ -606,8 +675,9 @@ sub writeSummaryLatex {
 
 sub writeSummaryLatexNew {
     # test of new format, will later replace old one
-    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $pdfDir, 
-        $title, $author, $introPath, $plotDescPath, $qcName) = @_;
+    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath,
+        $graphicsDir, $pdfDir, $title, $author, $introPath, $plotDescPath, 
+        $qcName) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
     $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
@@ -619,12 +689,9 @@ sub writeSummaryLatexNew {
     print $out latexHeader($title, $author, $graphicsDir);
     print $out latexSectionInput($qcName, $dbPath);
     print $out readFileToString($introPath); # new section = Preface
-    print $out latexSectionMetrics($config);
-    print $out "\\pagebreak\n";
-    print $out latexSectionResults($config, $pdfDir, $plotDescPath);
-    my @text = textForPlates($resultPath, $config);
-    print $out "\\subsection{Plate results table}\n\n";
-	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
+    print $out latexSectionMetrics($config, $genderThresholdPath);
+    print $out latexSectionResults($config, $pdfDir, $plotDescPath, 
+                                   $resultPath);
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
 

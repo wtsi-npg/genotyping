@@ -83,10 +83,10 @@ ylab.name <- function(metricName) {
 plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
                      metricSd, metricThresh1, metricThresh2, sdThresh,
                      plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath) {
-  pdf(outPath)
+  pdf(outPath, width=11.5, height=8.1, paper="a4r") # landscape format
   bottomMargin = 9
   par('mar'=c(bottomMargin,6,4,2)+0.1)
-  myTitle = paste("Sample",metricName,"by plate\nPlot",plotNum,"of",
+  myTitle = paste(metricName,"by sample and plate\nPlot",plotNum,"of",
     plotTotal,"for",metricName)
   myYlab = ylab.name(metricName)
   # start with blank plotting area
@@ -101,8 +101,9 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
       rect(pb$Start[i], ymin, pb$End[i], ymax, density=100, col=shade)
     }
   }
-  points(index[pass==1], metric[pass==1],col="blue") # points on top of shading
-  points(index[pass==0], metric[pass==0], col="darkred", pch=16)
+  # plot points on top of shading
+  points(index[pass==1], metric[pass==1], cex=0.6, col="black") 
+  points(index[pass==0], metric[pass==0], cex=0.6, col="darkred", pch=16)
   if (sdThresh) {
     sd.lines(metricMean, metricSd, metricThresh1)
   } else if (metricName=='gender') {
@@ -122,7 +123,7 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   legend("topright",
          c("Pass/fail threshold for this metric", "Passed all other metrics",
            "Failed at least one other metric"), bg="white",
-         pch=c(NA,1,16), col=c("red","blue","darkred"),lty=c(2,NA,NA),cex=0.7)
+         pch=c(NA,1,16), col=c("red","black","darkred"),lty=c(2,NA,NA),cex=0.7)
   legend("topleft",
          c(paste("Mean =", signif(metricMean,4)),
            paste("SD =", signif(metricSd,4))),

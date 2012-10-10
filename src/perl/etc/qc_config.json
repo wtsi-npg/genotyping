@@ -16,14 +16,14 @@
                   "duplicate":["sample_cr_het.txt","duplicate_summary.txt","duplicate_full.txt.gz"],
                   "gender":"sample_xhet_gender.txt",
                   "magnitude":"intensity_metrics.txt"},
-  "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
-  "name_array":["call_rate","heterozygosity","duplicate","identity","gender","magnitude","xydiff"],
+  "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G","magnitude":"M"},
+  "name_array":["identity","duplicate","gender","call_rate","heterozygosity","magnitude","xydiff"],
   "Threshold_types" : {
       "heterozygosity" : "Standard deviations",
       "magnitude" : "Minimum",
       "call_rate" : "Minimum",
       "identity" : "Maximum",
-      "duplicate" : "NA",
+      "duplicate" : "Maximum",
       "gender" : "NA"
    },
    "Metric_descriptions" : {

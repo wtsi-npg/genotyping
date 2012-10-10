@@ -21,13 +21,15 @@ Each metric requires appropriate threshold criteria to include or exclude sample
 \subsubsection*{Metric descriptions}
 
 \begin{enumerate}
-\item \textbf{Duplicate:}  Calls for each sample are compared with all other samples.  Pairs of samples with a SNP concordance $>$ 0.98 are flagged as duplicates (unless otherwise stated).  The sample with the lowest call rate of the pair is recommended for exclusion.  Note, pairs of samples with a similarity score $>$ 0.70 are flagged also but not recommended for exclusion.
-
 \item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  Samples are recommended for exclusion where identity cannot be confirmed, defined as SNP concordance falling below a given minimum threshold.  
 
 See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
 
+\item \textbf{Duplicate:}  Calls for each sample are compared with all other samples.  Pairs of samples with a SNP concordance $>$ 0.98 are flagged as duplicates (unless otherwise stated).  The sample with the lowest call rate of the pair is recommended for exclusion.  Note, pairs of samples with a similarity score $>$ 0.70 are flagged also but not recommended for exclusion.
+
 \item \textbf{Gender:} Supplied gender is compared to the inferred gender. Gender is inferred using heterozygosity on sample chrX, which is the proportion of chrX SNPs called AB. A Gaussian mixture model is used to find adaptive thresholds $M_{max}$ and $F_{min}$, respectively the maximum male and minimum female heterozygosity on chrX.  Samples above $M_{max}$ and below $F_{min}$ are considered to be of ambiguous gender.  Any sample whose inferred gender is ambiguous, or conflicts with the supplied gender, is recommended for exclusion.
+
+See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
 
 \item \textbf{Call rate:} Sample call rate is calculated as the proportion of SNPs called successfully for that sample.  Samples with call rate below a given threshold are excluded (unless otherwise stated). 
 

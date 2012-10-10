@@ -227,9 +227,10 @@ find.thresholds <- function(xhet, boundary.sd, plotPath, title,
 }
 
 write.thresholds <- function(m.max, f.min, thresh.path) {
-  thresholds = c(m.max, f.min)
-  names = c("M_max", "F_min")
-  write.table(data.frame(thresholds, row.names = names), thresh.path)
+  sink(thresh.path, append=FALSE, split=FALSE)
+  cat("M_max\t", m.max, "\n", sep="")
+  cat("F_min\t", f.min, "\n", sep="")
+  sink()
 }
 
 ########################################################
@@ -238,10 +239,11 @@ args <- commandArgs(TRUE)
 data <- read.table(args[1], header=TRUE) # sample_xhet_gender.txt
 textPath <- args[2]
 plotPath <- args[3]
-title <- args[4]
-sanityCheck <- as.logical(args[5]) # convert string 'TRUE' or 'FALSE' to boolean
-clip <- as.numeric(args[6]) # high values to clip; can be zero; recommend 0.5%
-trials <- as.numeric(args[7])  # number of trials for consensus; recommend 10
+threshPath <- args[4]
+title <- args[5]
+sanityCheck <- as.logical(args[6]) # convert string 'TRUE' or 'FALSE' to boolean
+clip <- as.numeric(args[7]) # high values to clip; can be zero; recommend 0.5%
+trials <- as.numeric(args[8])  # number of trials for consensus; recommend 10
 boundary.sd <- 3 # standard deviations for max male / min female boundaries
 
 xhet <- data$xhet
@@ -253,7 +255,7 @@ m.max <- thresholds[1]
 f.min <- thresholds[2]
 cat(paste('Max_xhet_M', signif(m.max,4), "\n"))
 cat(paste('Min_xhet_F', signif(f.min,4), "\n"))
-write.thresholds(m.max, f.min, '/tmp/gender_thresholds.txt'); # TODO fix path
+write.thresholds(m.max, f.min, threshPath);
 
 ### compute gender assignments for all input xhet values ###
 cat("### Gender model results ###\n")

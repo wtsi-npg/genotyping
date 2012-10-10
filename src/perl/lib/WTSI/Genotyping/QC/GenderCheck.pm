@@ -173,11 +173,14 @@ sub runGenderModel {
     my $scratchDir = tempdir(CLEANUP => 1);
     my $textPath = $scratchDir."/sample_xhet_gender_model_output.txt";
     my $pngPath = $modelOutputDir."/sample_xhet_gender.png";
+    my $threshPath = $modelOutputDir."/sample_xhet_gender_thresholds.txt";
     my $logPath = $modelOutputDir."/sample_xhet_gender.log";
     my $sanityOpt;
     if ($sanityCancel) { $sanityOpt='FALSE'; }
     else { $sanityOpt='TRUE'; }
-    my $cmd = join(' ', ("check_xhet_gender.R", $tempFile, $textPath, $pngPath, $title, $sanityOpt, $clip, $trials, ">& ".$logPath) ); # $cmd uses csh redirect
+    my $cmd = join(' ', ("check_xhet_gender.R", $tempFile, $textPath, $pngPath, 
+                         $threshPath, $title, $sanityOpt, $clip, $trials, 
+                         ">& ".$logPath) ); # $cmd uses csh redirect
     system($cmd);
     my @inferred = readModelGenders($textPath);
     return @inferred;
