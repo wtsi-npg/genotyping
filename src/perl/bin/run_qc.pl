@@ -182,11 +182,10 @@ sub run {
     my $resultPath = "qc_results.json";
     my $csvPath = "pipeline_summary.csv";
     my $texPath = "pipeline_summary.tex";
-    $title = ""; # use default title
-    my $author = "";
-
-    createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, 
-                  ".", $title, $author, $texIntroPath);
+    my $genderThresholdPath = "sample_xhet_gender_thresholds.txt";
+    my $qcDir = ".";
+    createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
+                  $genderThresholdPath, $qcDir, $texIntroPath);
     chdir($startDir);
     return 1;
 }
