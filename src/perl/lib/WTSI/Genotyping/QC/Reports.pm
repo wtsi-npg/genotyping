@@ -11,7 +11,8 @@ use Carp;
 use Cwd qw/getcwd abs_path/;
 use JSON;
 use POSIX qw/strftime/;
-use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
+use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject 
+  getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
 use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
@@ -25,18 +26,19 @@ our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity
 
 sub createReports {
     # 'main' method to write text and CSV files
-    my ($results, $db, $csv, $tex, $config, $qcDir, $title, $author, 
-        $introPath, $qcName) = @_; # I/O paths
-    $author ||= "";
+    my ($csvPath, $texPath, $resultPath, $config, $dbPath, 
+        $genderThresholdPath, $qcDir, $introPath, $qcName, $title, 
+        $author) = @_;
     if (!$qcName) { 
         my @items = split('/', abs_path($qcDir));
         $qcName = pop(@items);
     }
-    my $csvOK = writeCsv($results, $db, $config, $csv);
+    my $csvOK = writeCsv($resultPath, $dbPath, $config, $csvPath);
     if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
-    writeSummaryLatex($tex, $results, $config, $db, $qcDir, $title, $author,
-        $introPath, $qcName);
-    my $pdfOK = texToPdf($tex);
+    writeSummaryLatex($texPath, $resultPath, $config, $dbPath, 
+                      $genderThresholdPath, $qcDir, $introPath,
+                      $qcName, $title, $author);
+    my $pdfOK = texToPdf($texPath);
     if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
     my $ok = $csvOK && $pdfOK;
     return $ok;
@@ -112,6 +114,7 @@ sub getCsvHeaders {
 }
 
 sub getMetricTableHeader {
+    # header for pass/fail count tables; use short names if available
     my $metric = shift;
     my %shortNames = %{ shift() };
     my $header;
@@ -159,13 +162,13 @@ sub getSampleInfo {
     foreach my $sample (@samples) {
 	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
 	my %record = %{$records{$sample}};
-	my $samplePass = 1;
-	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); # $samplePass is placeholder
+	my $samplePass = 1; # $samplePass is placeholder
+	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); 
 	foreach my $metric (@METRIC_NAMES) {
 	    if (not $record{$metric}) { 
-		push(@fields, (1, "NA")); # no results found; use placeholders for pass/fail and metric value
+		push(@fields, (1, "NA")); # no results found; use placeholders
 	    } else {
-		my @status =  @{$record{$metric}}; # pass/fail and one or more metric values
+		my @status =  @{$record{$metric}}; # pass/fail and metric value(s)
 		if ($status[0]==0) { $samplePass = 0; }
 		push(@fields, @status); 
 	    }
@@ -176,65 +179,19 @@ sub getSampleInfo {
     return @sampleFields;
 }
 
-
-sub latexAllPlots {
-    my $graphicsDir = shift;
-    my @plots = qw/failsIndividual.png failsCombined.png failScatterPlot.png failScatterDetail.png sample_xhet_gender.png cr_boxplot.png het_boxplot.png xydiff_boxplot.png crHetDensityHeatmap.png crHetDensityScatter.png crHistogram.png hetHistogram.png/;
-    my %captions = (
-	"failsIndividual.png" => "Individual causes of sample failure",
-	"failsCombined.png" => "Combined causes of sample failure",
-	"failScatterPlot.png" => "Scatterplot of failed samples",
-	"failScatterDetail.png" => "Scatterplot of failed samples passing CR/Het thresholds",
-	"sample_xhet_gender.png" => "Gender model",
-	"cr_boxplot.png" => "Call rate (CR) boxplot",
-	"het_boxplot.png" => "Heterozygosity (het) boxplot",
-	"xydiff_boxplot.png" => "XY intensity difference boxplot",
-	"crHetDensityHeatmap.png" => "Heatmap of sample density by CR/Het",
-	"crHetDensityScatter.png" => "Scatterplot of samples by CR/Het",
-	"crHistogram.png" => "Histogram of CR",
-	"hetHistogram.png" => "Histogram of heterozygosity",
-	);
-    my (@text, @missing); # gender plot is missing if mixture model fails sanity checks
-    foreach my $plot (@plots) {
-	if (-r $graphicsDir."/".$plot) {
-	    push(@text, latexPlot($plot, $captions{$plot}));
-	} else {
-	    carp "Cannot read plot ".$graphicsDir."/".$plot;
-	    push(@missing, $plot);
-	    next;
-	}
-    }
-    if (@missing>0) {
-	push(@text, "\n\\paragraph*{Missing plots:}");
-	push(@text, "\\begin{itemize}");
-	foreach my $plot (@missing) { 
-	    my $item = $plot;
-	    $item =~ s/_/\\_/g;
-	    $item = "\\item ".$item;
-	    if ($captions{$plot}) { $item .= ": ".$captions{$plot}; }
-	    push @text, $item;
-	}
-	push(@text, "\\end{itemize}\n");
-    }
-    return join("\n", @text)."\n";
-}
-
 sub latexFooter {
     my $footer = "\n\\end{document}\n";
     return $footer;
 }
 
 sub latexHeader {
-    my ($title, $author, $graphicsDir) = @_;
+    my ($title, $author) = @_;
     my $date = strftime("%Y-%m-%d %H:%M", localtime(time()));
-    # TODO graphicx not needed if we convert all plots to PDF
+    # formerly used graphicx, but all plots are now pdf
     my $header = '\documentclass{article} 
 \title{'.$title.'}
 \author{'.$author.'}
 \date{'.$date.'}
-
-\usepackage{graphicx}
-\graphicspath{{'.$graphicsDir.'}}
 
 \usepackage{pdfpages}
 
@@ -246,25 +203,6 @@ sub latexHeader {
 ';
     return $header;
 }
-
-sub latexPlot {
-    # .tex for a single plot entry
-    # TODO check existence of plot file?
-    my ($plot, $caption, $label, $height) = @_;
-    $height ||= 400;
-    my $defaultLabel = $plot;
-    $defaultLabel =~ s/_//g;
-    $caption ||= $defaultLabel;
-    $label ||= $defaultLabel; 
-    my $text = '
-\begin{figure}[!h]
-\includegraphics[height='.$height.'px]{'.$plot.'}';
-    if ($caption) { $text.="\n\\caption{".$caption."}"; }
-    if ($label) { $text.="\n\\label{".$label."}"; }
-    $text .= "\n\\end{figure}\n";
-    return $text;
-}
-
 
 sub latexSectionInput {
     # .tex for "Inputs" section
@@ -287,11 +225,10 @@ sub latexSectionMetrics {
     my @text = textForMetrics($config, $mMax, $fMin);
 	foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
     return join("", @lines);
-    
 }
 
 sub latexSectionResults {
-    my ($config, $qcDir, $plotDescPath, $resultPath) = @_;
+    my ($config, $qcDir, $resultPath) = @_;
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
     push @lines, "\\subsection{Tables}\n\n";
@@ -314,7 +251,6 @@ sub latexSectionResults {
     push @lines, "\\item Causes of sample failure: Individual and combined\n";
     push @lines, "\\item Scatterplots of call rate versus heterozygosity: All samples, failed samples, and failed samples passing call rate and heterozygosity filters\n";
     push @lines, "\\end{itemize}\n";
-    #push @lines, readFileToString($plotDescPath); # TODO more details in file
     my @metrics = readQCNameArray($config);
     my @includeLines = ();
     foreach my $metric (@metrics) {
@@ -336,7 +272,8 @@ sub latexSectionResults {
 
 sub latexTables {
 	# convert array of arrays into one or more strings containing LaTeX tables
-	# enforce maximum number of rows per table, before starting a new table (allows breaking across pages)
+	# enforce maximum number of rows per table, before starting a new table 
+    # (allows breaking across pages)
 	# assume that first row is header; repeat header at start of each table
     my ($rowsRef, $caption, $label, $maxRows) = @_;
 	$maxRows ||= 38;
@@ -395,36 +332,6 @@ sub latexTableSingle {
     return $table;
 }
 
-sub plateFieldsToText {
-    # convert title and unformatted results to array of formatted text fields
-    my $title = shift;
-    my @stats = @{ shift() };
-    my @out = ($title, );
-    for (my $i=0;$i<@stats;$i++) {
-	my $stat;
-	if ($i>2) { $stat = sprintf("%.3f", $stats[$i]); }
-	elsif ($i==2) { $stat = sprintf("%.1f", $stats[$i]); }
-	else { $stat = $stats[$i]; }
-	push(@out, $stat);
-    }
-    return @out;
-}
-
-sub readCsv {
-    # read .csv file into array of arrays
-    my $csvPath = shift;
-    my @rows;
-    open my $in, "<", $csvPath || croak "Cannot open $csvPath";
-    while (<$in>) {
-        chomp;
-        my @fields = split(/,/);
-        push(@rows, \@fields);
-    }
-    close $in || croak "Cannot close $csvPath";
-    return @rows;
-
-}
-
 sub readGenderThreholds {
     # read sample_xhet_gender_thresholds.txt
     my $inPath = shift;
@@ -464,8 +371,11 @@ sub sampleFieldsToText {
     my @fields = @{ shift() };
     my @out;
     for (my $i=0;$i<@fields;$i++) {
-	if ($fields[$i] =~ /^\d+$/ || $fields[$i] =~ /[a-zA-Z]+/) { push(@out, $fields[$i]); } # text or integers
-	else { push(@out, sprintf('%.4f', $fields[$i])); }
+        if ($fields[$i] =~ /^\d+$/ || $fields[$i] =~ /[a-zA-Z]+/) { 
+            push(@out, $fields[$i]);  # text or integers
+        } else { 
+            push(@out, sprintf('%.4f', $fields[$i])); 
+        }
     }
     return @out;
 }
@@ -488,7 +398,7 @@ sub textForCsv {
 }
 
 sub textForDatasets {
-    # text for datasets table
+    # text for datasets table; includes optional directory name
     my $dbPath = shift;
     my $qcDir = shift;
     my @headers;
@@ -505,6 +415,7 @@ sub textForDatasets {
 }
 
 sub textForMetrics {
+    # text for metric threshold/description table
     my ($jsonPath, $mMax, $fMin) = @_;
     $mMax = sprintf("%.3f", $mMax);
     $fMin = sprintf("%.3f", $fMin);
@@ -539,8 +450,7 @@ sub textForMetricKey {
 }
 
 sub textForPass {
-    # find total number of samples passing filters for each metric
-    # also find pass rates
+    # find pass/fail numbers and rates for each metric
     # return text for tables
     my %shortNames = %{ shift() };
     my %passCounts = %{ shift() };
@@ -611,13 +521,13 @@ sub texToPdf {
     my $file = pop @terms;
     my $texDir = join('/', @terms);
     my $startDir = getcwd();
-    # run pdflatex twice; needed to get cross-references correct, eg. in list of figures
+    # run pdflatex twice; needed to get cross-references correct
     chdir($texDir);
-    system('pdflatex -draftmode '.$file.' > /dev/null'); # first pass; draft mode is faster
-    my $result = system('pdflatex '.$file.' > /dev/null'); # second pass
+    system('pdflatex -draftmode '.$file.' > /dev/null'); # draftmode is faster
+    my $result = system('pdflatex '.$file.' > /dev/null');
     if ($cleanup) {
-	my @rm = qw/*.aux *.dvi *.lof/; # remove intermediate LaTeX files; keeps .log, .tex, .pdf
-	system('rm -f '.join(' ', @rm));
+        my @rm = qw/*.aux *.dvi *.lof/; # keeps .log, .tex, .pdf
+        system('rm -f '.join(' ', @rm));
     }
     chdir($startDir);
     if ($result==0) { return 1; }
@@ -630,7 +540,7 @@ sub writeCsv {
     my @text = textForCsv($resultPath, $dbPath, $config);
     open my $out, ">", $outPath || croak "Cannot open output path $outPath";
     foreach my $lineRef (@text) {
-	print $out join(',', @$lineRef)."\n";
+        print $out join(',', @$lineRef)."\n";
     }
     close $out || croak  "Cannot close output path $outPath";
     if (@text > 0) { return 1; } # at least one line written without croak
@@ -638,63 +548,24 @@ sub writeCsv {
 }
 
 sub writeSummaryLatex {
-    # write .tex input file for LaTeX; use to generate PDF
-    my ($texPath, $resultPath, $config, $dbPath, $graphicsDir, $title, $author,
-        $introPath, $qcName) = @_;
-    $texPath ||= "pipeline_summary.tex";
-    $title ||= "Genotyping QC Report";
-    $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
-    $config ||= defaultJsonConfig();
-    $graphicsDir ||= ".";
-    $qcName ||= "Unknown";
-    open my $out, ">", $texPath || croak "Cannot open output path $texPath";
-    print $out latexHeader($title, $author, $graphicsDir);
-    print $out "\\section{Input data}\n\n";
-    print $out "\\paragraph*{Directory name:} $qcName\n";
-    my @text = textForDatasets($dbPath);
-	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
-    print $out readFileToString($introPath); # new section = Introduction
-    print $out "\\subsection{Summary of metrics and thresholds}";
-    print $out "\\label{sec:metric-summary}\n\n";
-    @text = textForMetrics($config);
-	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
-    #print $out "\\pagebreak\n";
-    print $out "\\section{Results}\n\n";
-    @text = textForPlates($resultPath, $config);
-    print $out "\\subsection{Plates}\n\n";
-	foreach my $table (latexTables(\@text)) { print $out $table."\n"; }
-    # TODO "Sample number and release summary" goes here
-    print $out "\\pagebreak\n";
-    print $out "\\listoffigures\n\n";
-    print $out latexAllPlots($graphicsDir);
-    print $out latexFooter();
-    close $out || croak "Cannot close output path $texPath";
-    return 1;
-}
-
-
-sub writeSummaryLatexNew {
-    # test of new format, will later replace old one
+    # write .tex file for report
     my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath,
-        $graphicsDir, $pdfDir, $title, $author, $introPath, $plotDescPath, 
-        $qcName) = @_;
+        $qcDir, $introPath, $qcName, $title, $author) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
-    $author ||= "Wellcome Trust Sanger Institute\\\\\nIllumina Beadchip Genotyping Pipeline";
+    $author ||= "Wellcome Trust Sanger Institute\\\\\n".
+        "Illumina Beadchip Genotyping Pipeline";
     $config ||= defaultJsonConfig();
-    $graphicsDir ||= ".";
-    $pdfDir ||= $graphicsDir;
+    $qcDir ||= ".";
     $qcName ||= "Unknown";
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
-    print $out latexHeader($title, $author, $graphicsDir);
+    print $out latexHeader($title, $author);
     print $out latexSectionInput($qcName, $dbPath);
     print $out readFileToString($introPath); # new section = Preface
     print $out latexSectionMetrics($config, $genderThresholdPath);
-    print $out latexSectionResults($config, $pdfDir, $plotDescPath, 
-                                   $resultPath);
+    print $out latexSectionResults($config, $qcDir, $resultPath);
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
-
 }
 
 1;
