@@ -36,35 +36,44 @@ sub extractSampleRange {
 }
 
 sub findMeanXYDiff {
-    # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
-    # data for all probes may not fit in memory, and reading one probe at a time is too slow!
-    # compromise; seek to required location and unpack data for groups of probes (intensity pairs)
+    # find mean xydiff metric, assuming exactly 2 channels
+    # data for all probes may not fit in memory
+    # reading one probe at a time is too slow!
+    # seek to required location, read groups of probes (intensity pairs)
     my ($fh, $nameLength, $numberType, $sampleOffset, $sampleBlockSize, $probes, $groupNum) = @_;
     my ($data, $xyDiffTotal, $xyDiffCount);
     my $numericBytes = numericBytesByFormat($numberType);
-    my $start = 16 + $sampleOffset*$sampleBlockSize + $nameLength; # 16 = length of header
-    if ($groupNum > $probes) { $groupNum = $probes; } #  $groupNum = number of probes in group
+    # 16 = length of header
+    my $start = 16 + $sampleOffset*$sampleBlockSize + $nameLength; 
+    # $groupNum = number of probes in group
+    if ($groupNum > $probes) { $groupNum = $probes; }
     my $groups = ceil($probes/$groupNum); # total number of groups
     my $readProbes = $groupNum; # number of probes to read in at one time
-    my $groupSize = 2*$groupNum*$numericBytes; # generic size of groups (applies to all but last one)
+    # generic size of groups (applies to all but last one)
+    my $groupSize = 2*$groupNum*$numericBytes; 
     my $remainderGroup = 0;
     if ($probes % $groupNum != 0) { $remainderGroup = 1; }
     for (my $i=0;$i<$groups;$i++) {
-	if ($i>0 && $i+1==$groups && $remainderGroup) { $readProbes = $probes % $groupNum; } # final group
-	my $size = 2*$readProbes*$numericBytes;
-	my $groupStart = $start + ($i*$groupSize);
-	seek($fh, $groupStart, 0); 
-	my $dataLength = read($fh, $data, $size);
-	my @signals = unpackSignals($data, $numericBytes, $numberType);
-	while (@signals) {
-	    my @pair = splice(@signals, 0, 2);
-	    $xyDiffTotal+= ($pair[1] - $pair[0]);
-	    $xyDiffCount++;
-	}
+        if ($i>0 && $i+1==$groups && $remainderGroup) { 
+            $readProbes = $probes % $groupNum;  # final group
+        }
+        my $size = 2*$readProbes*$numericBytes;
+        my $groupStart = $start + ($i*$groupSize);
+        seek($fh, $groupStart, 0); 
+        my $dataLength = read($fh, $data, $size);
+        my @signals = unpackSignals($data, $numericBytes, $numberType);
+        while (@signals) {
+            my @pair = splice(@signals, 0, 2);
+            $xyDiffTotal+= ($pair[1] - $pair[0]);
+            $xyDiffCount++;
+        }
     }
     my $xyDiffMean = 0;
-    if ($xyDiffCount > 0) { $xyDiffMean = $xyDiffTotal / $xyDiffCount; }
-    else { carp("WARNING: No intensities found for xydiff at sample $sampleOffset"); }
+    if ($xyDiffCount > 0) { 
+        $xyDiffMean = $xyDiffTotal / $xyDiffCount; 
+    } else { 
+        carp("WARNING: No intensities found at sample $sampleOffset"); 
+    }
     return $xyDiffMean;
 }
 
@@ -139,27 +148,30 @@ sub readWriteXYDiffs {
     my @means;
     my $maxBlocks = 50;
     while (!eof($in)) {
-	my $name = readName($in, $nameLength, $i, $blockSize);
-	$name =~ s/\0//g; # strip off null padding
-	if ($name) {
-	    my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, $blockSize, $probes, $groupNum);
-	    push(@samples, $name);
-	    push(@means, $xydiff);
-	    if ($verbose && $i % 20 == 0) { print $i."\t".$name."\t".$xydiff."\n"; }
-	} else {
-	    carp "Warning: No name found for sample $i\n";
-	}
-	$i++;	
-	if (@samples==$maxBlocks || eof($in)) {
-	    # print buffers to output filehandle
-	    for (my $j=0;$j<@samples;$j++) {
-		$name = $samples[$j];
-		printf($out "%s\t%.8f\n", ($name, $means[$j])); 
-	    }
-	    if ($verbose) { print $i." samples written.\n"; }
-	    @samples = ();
-	    @means = ();
-	}
+        my $name = readName($in, $nameLength, $i, $blockSize);
+        $name =~ s/\0//g; # strip off null padding
+        if ($name) {
+            my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, 
+                                        $blockSize, $probes, $groupNum);
+            push(@samples, $name);
+            push(@means, $xydiff);
+            if ($verbose && $i % 20 == 0) { 
+                print $i."\t".$name."\t".$xydiff."\n"; 
+            }
+        } else {
+            carp "Warning: No name found for sample $i\n";
+        }
+        $i++;	
+        if (@samples==$maxBlocks || eof($in)) {
+            # print buffers to output filehandle
+            for (my $j=0;$j<@samples;$j++) {
+                $name = $samples[$j];
+                printf($out "%s\t%.8f\n", ($name, $means[$j])); 
+            }
+            if ($verbose) { print $i." samples written.\n"; }
+            @samples = ();
+            @means = ();
+        }
     }
     return $i;
 }
