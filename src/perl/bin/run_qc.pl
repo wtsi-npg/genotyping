@@ -159,7 +159,7 @@ sub run {
     push(@cmds, $genderCmd);
     my $xydiff = 0;
     if ($simPath) {
-        push(@cmds, "$Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
+        push(@cmds, "$Bin/intensity_metrics.pl --input=$simPath --magnitude=magnitude.txt --xydiff=xydiff.txt");
         $xydiff = 1;
     }
     my $dbopt = "";

@@ -120,6 +120,8 @@ sub findMetricResults {
         %results = resultsGender($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'xydiff') { 
         %results = resultsXydiff($threshold, $inputDir.'/'.$input);
+    } elsif ($metric eq 'magnitude') { 
+        %results = resultsMagnitude($threshold, $inputDir.'/'.$input);
     } else { 
         carp "WARNING: Unknown QC metric $metric: $!"; 
     }
@@ -146,18 +148,7 @@ sub readSampleNames {
 
 sub resultsCr {
     # find call rate (CR) and pass/fail status of each sample
-    my ($threshold, $inPath) = @_;
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
-    my %results;
-    foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $cr) = ($fields[0], $fields[1]);
-	my $pass;
-	if ($cr >= $threshold) { $pass = 1; }
-	else { $pass = 0; }
-	$results{$sample} = [$pass, $cr];
-    }
-    return %results;
+    return resultsMinimum(@_);
 }
 
 sub resultsDuplicate {
@@ -259,6 +250,27 @@ sub resultsIdentity {
     }
     return %results;
 }
+
+sub resultsMagnitude {
+    return resultsMinimum(@_);
+}
+sub resultsMinimum {
+    # read simple results file and apply minimum threshold
+    # use for cr, normalised magnitude
+    my ($threshold, $inPath) = @_;
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my %results;
+    foreach my $ref (@data) {
+        my @fields = @$ref;
+        my ($sample, $metric) = ($fields[0], $fields[1]);
+        my $pass;
+        if ($metric >= $threshold) { $pass = 1; }
+        else { $pass = 0; }
+        $results{$sample} = [$pass, $metric];
+    }
+    return %results;
+}
+
 
 sub resultsMetricSd {
     # find results for given field, fail samples too far from the mean; use for het rate, xydiff

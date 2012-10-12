@@ -58,8 +58,8 @@ $status = system("perl $bin/check_xhet_gender.pl --input=$plinkA");
 is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test xydiff computation
-$status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
-is($status, 0, "xydiff.pl exit status");
+$status = system("perl $bin/intensity_metrics.pl --input=$simA --magnitude=magnitude.txt --xydiff=xydiff.txt");
+is($status, 0, "intensity_metrics.pl exit status");
 
 ## test collation into summary
 $status = system("perl $bin/write_qc_status.pl --dbpath=$dbfileA --inipath=$iniPath");
