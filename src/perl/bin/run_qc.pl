@@ -166,6 +166,7 @@ sub run {
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
     push(@cmds, "$Bin/write_qc_status.pl --config=$configPath $dbopt --inipath=$iniPath");
     ### plot generation ###
+    if ($dbopt) { push(@cmds, "plot_metric_scatter.pl $dbopt"); }
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, $xydiff, \%fileNames));
     push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, \%fileNames));
     push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "$Bin/plot_cr_het_density.pl", 

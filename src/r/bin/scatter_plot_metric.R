@@ -33,7 +33,10 @@ if (metricName=='heterozygosity') { # heterozygosity
 } else if (metricName=='identity' || metricName=='duplicate') {
   ymin <- 0
   ymax <- 1.2
-} else { # magnitude, call_rate
+} else if (metricName=='magnitude') {
+  ymin <- 0.8
+  ymax <- 1.25
+} else { # call_rate
   ymin <- 0.8
   ymax <- 1.04
 }

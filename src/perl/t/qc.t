@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 89;
+use Test::More tests => 95;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -68,6 +68,16 @@ is($status, 0, "write_qc_status.pl exit status");
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 
 ### test creation of plots ###
+
+## PDF scatterplots for each metric
+$status = system("plot_metric_scatter.pl --dbpath=$dbfileA");
+is($status, 0, "plot_metric_scatter.pl exit status");
+
+# identity plot expected to be missing!
+my @metrics = qw(call_rate duplicate heterozygosity gender magnitude);
+foreach my $metric (@metrics) {
+    ok((-e 'scatter_'.$metric.'_000.pdf'), "PDF scatterplot exists: $metric");
+}
 
 ## plate heatmap plots
 my @modes = qw/cr het xydiff/;

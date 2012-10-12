@@ -6,10 +6,11 @@ use warnings;
 use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
+use File::Temp qw(tempdir);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
  getPlateLocationsFromPath meanSd readMetricResultHash readQCMetricInputs
  readThresholds $INI_FILE_DEFAULT);
-use WTSI::Genotyping::QC::QCPlotTests qw(wrapPlotCommand);
+use WTSI::Genotyping::QC::QCPlotTests qw(wrapCommand wrapPlotCommand);
 use Exporter;
 
 our @ISA = qw/Exporter/;
@@ -166,9 +167,7 @@ sub runPlotScript {
         my @args = ($script, $scPath, $pbPath, $pnPath, $metric, 
                     $mean, $sd, $thresh1, $thresh2, $sdThresh,
                     $i+1, $inputTotal, $outPath);
-        my $cmd = join(" ", @args);
-        print $cmd."\n";
-        eval(system($cmd));
+        wrapCommand(@args);
     }
 }
 
@@ -241,7 +240,7 @@ sub runMetric {
     my ($mean, $sd);
     my @results = metricMeanSd($metric, $resultPath, $config);
     if (@results==0) { 
-        carp "No results for metric $metric; omitting plots.\n";
+        carp "No results for metric $metric; omitting scatterplot.\n";
     } else { 
         ($mean, $sd) = @results; 
         my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config);
@@ -254,7 +253,8 @@ sub runMetric {
 sub runAllMetrics {
     my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
         $maxBatch) = @_;
-    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
+    my @metrics = qw(call_rate duplicate heterozygosity identity gender 
+ magnitude);
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 
                   $resultPath, $maxBatch);
