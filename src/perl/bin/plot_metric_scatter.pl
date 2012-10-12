@@ -63,5 +63,3 @@ foreach my $path (@paths) {
 
 runAllMetrics($qcDir, $outDir, $config, $dbpath, $inipath, $resultpath);
 
-system("rm -f Rplots.pdf");
-# remove empty R output; TODO find out how to suppress Rplots.pdf in R script
