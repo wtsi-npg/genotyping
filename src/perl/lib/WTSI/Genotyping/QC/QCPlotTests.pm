@@ -230,6 +230,7 @@ sub wrapCommand {
             "Command output: \"$info\"";
         $ok = 0;
     }
+    if ($ok) { system("rm -f $temp"); }
     return $ok;
 }
 
