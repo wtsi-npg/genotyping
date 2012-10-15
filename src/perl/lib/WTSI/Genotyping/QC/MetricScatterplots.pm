@@ -9,7 +9,7 @@ use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
  getPlateLocationsFromPath meanSd readMetricResultHash readQCMetricInputs
- readThresholds $INI_FILE_DEFAULT);
+ readThresholds plateLabel $INI_FILE_DEFAULT);
 use WTSI::Genotyping::QC::QCPlotTests qw(wrapCommand wrapPlotCommand);
 use Exporter;
 
@@ -110,18 +110,6 @@ sub otherMetricPass {
         }
     }
     return $allPass;
-}
-
-sub plateLabel {
-    # label each plate with plate count and (possibly truncated) plate name
-    # ensures meaningful representation of very long plate names
-    my ($plate, $i, $maxLen) = @_;
-    $maxLen ||= 20;
-    my $num = sprintf("%03d", $i);
-    my @chars = split(//, $plate);
-    my @head = splice(@chars, 0, $maxLen);
-    my $name = join('', @head);
-    return $num.":".$name;
 }
 
 sub readThresholdsForMetric {
@@ -252,9 +240,9 @@ sub runMetric {
 
 sub runAllMetrics {
     my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
-        $maxBatch) = @_;
-    my @metrics = qw(call_rate duplicate heterozygosity identity gender 
- magnitude);
+        $maxBatch, $noIntensity) = @_;
+    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
+    if (!$noIntensity) { push(@metrics, 'magnitude'); }
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 
                   $resultPath, $maxBatch);
