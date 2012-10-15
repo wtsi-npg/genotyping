@@ -54,20 +54,25 @@ sd.lines <- function(metricMean, metricSd, metricThresh) {
   metricMax <- metricMean+metricThresh*metricSd
   metricMin <- metricMean-metricThresh*metricSd
   abline(h=metricMean, lty=2)
-  for (i in 1:(floor(metricThresh) - 1)) {
-    high = metricMean+i*metricSd
-    low = metricMean-i*metricSd
-    abline(h=high, col="black", lty=3)
-    abline(h=low, col="black", lty=3)
-    text(max(index), high, paste("Mean +", i, "SD\n"), pos=4, cex=0.6)
-    text(max(index), low, paste("Mean -", i, "SD\n"), pos=4, cex=0.6)
+  minTextHeight <- 0.04
+  if (metricSd > minTextHeight) {
+    for (i in 1:(floor(metricThresh) - 1)) {
+      high = metricMean+i*metricSd
+      low = metricMean-i*metricSd
+      abline(h=high, col="black", lty=3)
+      abline(h=low, col="black", lty=3)
+      text(max(index), high, paste("Mean +", i, "SD\n"), pos=4, cex=0.6)
+      text(max(index), low, paste("Mean -", i, "SD\n"), pos=4, cex=0.6)
+    }
   }
   abline(h=metricMax, col="red", lty=2)
   abline(h=metricMin, col="red", lty=2)
   mt <- metricThresh
-  text(max(index), metricMax, paste("Mean +", mt, "SD\n"), pos=4, cex=0.6)
-  text(max(index), metricMin, paste("Mean -", mt, "SD\n"), pos=4, cex=0.6)
-  text(max(index), metricMean, "Mean\n", pos=4, cex=0.6) 
+  if (metricSd*mt > minTextHeight) {
+    text(max(index), metricMax, paste("Mean +", mt, "SD\n"), pos=4, cex=0.6)
+    text(max(index), metricMin, paste("Mean -", mt, "SD\n"), pos=4, cex=0.6)
+    text(max(index), metricMean, "Mean\n", pos=4, cex=0.6)
+  }
 }
 
 ylab.name <- function(metricName) {
@@ -116,9 +121,10 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
     text(max(index), metricThresh2, "F_min\n", pos=4, cex=0.6)
   } else {
     abline(h=metricThresh1, col="red", lty=2)
-    if (metricName=='call_rate' || metricName=='magnitude') {
+    if (metricName=='call_rate' || metricName=='magnitude' ||
+        metricName=='identity') {
       label="minimum\n"
-    } else if (metricName=='identity' || metricName=='duplicate') {
+    } else if (metricName=='duplicate') {
       label="maximum\n"
     }
     text(max(index), metricThresh1, label, pos=4, cex=0.6)
