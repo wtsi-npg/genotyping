@@ -2,7 +2,7 @@
 # May 2012
 
 # module to read .sim intensity files
-# initially use to find xydiff stats for QC, may have other uses
+# use to find magnitude & xydiff metrics for QC
 
 package WTSI::Genotyping::QC::SimFiles;
 
@@ -10,7 +10,7 @@ use strict;
 use warnings;
 use Carp;
 use bytes;
-use POSIX;
+use POSIX qw(ceil ctime);
 use Exporter;
 
 our @ISA = qw/Exporter/;
@@ -62,13 +62,17 @@ sub findMetrics {
     # read blocks of probes; find mean magnitude for each probe to normalize
     # update running totals by sample for each block
     my $in = shift;
+    my $log = shift;
+    select $log; $|++; # flush log immediately for each output
     my %params = %{ shift()};
     my $probesInBlock = shift;
     $probesInBlock ||= 1000;
     my $probes = $params{'probes'};
+    my $blocks = ceil($probes / $probesInBlock);
     my @names = readSampleNames($in, \%params);
     my (%magTotals, %xyTotals);
     my $i = 0; # probe offset
+    my $block = 0; # block count
     while ($i < $probes) {
         if ($probesInBlock > $probes - $i) {
             $probesInBlock = $probes - $i; # reduce size for final block
@@ -82,6 +86,13 @@ sub findMetrics {
             $xyTotals{$names[$j]} += $xy[$j];
         }
         $i += $probesInBlock;
+        $block++;
+        if ($block % 10 == 0 || $i == $probes) {
+            my $timeStamp = ctime(time()); # ends with \n
+            my $msg = "Metrics found for block $block of $blocks, ".
+                "probe $i of $probes: $timeStamp";
+            print $log $msg;
+        }
     }
     foreach my $name (@names) { # find mean values across probes
         $magTotals{$name} = $magTotals{$name} / $probes;
@@ -238,15 +249,31 @@ sub unpackSignals {
 
 sub writeIntensityMetrics {
     # find xydiff and normalised magnitude, and write to file
-    my ($in, $outMag, $outXY, $probesInBlock) = @_;
+    # arguments: paths for input/output; if no input path, use STDIN
+    my ($inPath, $outPathMag, $outPathXY, $logPath, $probesInBlock) = @_;
+    my $in;
+    if ($inPath) { open $in, "<", $inPath; }
+    else { $in = \*STDIN; $inPath = "STDIN"; }
+    $logPath ||= "intensity_metrics.log";
+    open my $log, ">", $logPath;
+    print $log "Started: ".
+        ctime(time())."Input: $inPath\n";
     my %params = headerParams($in);
-    my ($magRef, $xyRef) = findMetrics($in, \%params, $probesInBlock);
+    my ($magRef, $xyRef) = findMetrics($in, $log, \%params, $probesInBlock);
+    close $in || croak("Cannot close filehandle!");
     my %mag = %{$magRef};
     my %xy = %{$xyRef};
     my @samples = sort(keys(%mag));
+    print $log "Opening output files: $outPathMag $outPathXY\n";
+    open my $outMag, ">", $outPathMag;
+    open my $outXY, ">", $outPathXY;
     foreach my $sample (@samples) {
         printf($outMag "%s\t%.8f\n", ($sample, $mag{$sample})); 
         printf($outXY "%s\t%.8f\n", ($sample, $xy{$sample})); 
+    }
+    print $log "Finished: ".ctime(time());
+    foreach my $fh ($log, $outMag, $outXY) {
+        close $fh || croak("Cannot close filehandle!");
     }
     return 1;
 }
