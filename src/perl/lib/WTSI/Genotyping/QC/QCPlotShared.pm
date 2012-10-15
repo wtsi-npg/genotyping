@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT/;
+our @EXPORT_OK = qw/defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -181,6 +181,27 @@ sub parseLabel {
 	$y =~ s/^0+//; # remove leading zeroes from $y
     }
     return ($x, $y);
+}
+
+sub plateLabel {
+    # label each plate with plate count and (possibly truncated) plate name
+    # ensures meaningful representation of very long plate names
+    # also remove whitespace from plate names (prevents error in R script)
+    my ($plate, $i, $maxLen, $addPrefix) = @_;
+    $maxLen ||= 20;
+    $addPrefix ||= 1;
+    $plate =~ s/\W+/_/g; # get rid of nonword characters, for LaTeX
+    my $label;
+    my @chars = split(//, $plate);
+    my @head = splice(@chars, 0, $maxLen);
+    my $name = join('', @head);
+    if ($addPrefix) {
+        my $num = sprintf("%03d", $i);
+        $label = $num.":".$name;
+    } else {
+        $label = $name;
+    }
+    return $label;
 }
 
 sub readFileToString {
