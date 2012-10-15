@@ -22,7 +22,7 @@
       "heterozygosity" : "Standard deviations",
       "magnitude" : "Minimum",
       "call_rate" : "Minimum",
-      "identity" : "Maximum",
+      "identity" : "Minimum",
       "duplicate" : "Maximum",
       "gender" : "NA"
    },
