@@ -12,7 +12,8 @@ use Cwd qw/getcwd abs_path/;
 use JSON;
 use POSIX qw/strftime/;
 use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject 
-  getSummaryStats meanSd median readQCNameArray readQCShortNameHash/; 
+  getSummaryStats meanSd median readQCNameArray readQCShortNameHash 
+  plateLabel/; 
 use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
@@ -220,7 +221,7 @@ sub latexSectionMetrics {
     my ($mMax, $fMin) = readGenderThreholds($gtPath);
     my @lines = ();
     push @lines, "\\pagebreak\n\n";
-    push @lines, "\\subsection{Summary of metrics and thresholds}";
+    push @lines, "\\subsection{Summary of metrics and thresholds}\n";
     push @lines, "\\label{sec:metric-summary}\n\n";
     my @text = textForMetrics($config, $mMax, $fMin);
 	foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
@@ -237,9 +238,11 @@ sub latexSectionResults {
                   "Sample pass rates");
     my @refs = textForPlates($resultPath, $config);
     for (my $i=0;$i<@refs;$i++) {
+        if ($i>0) { push @lines, "\\pagebreak\n\n"; }
         push @lines, "\\subsubsection*{".$titles[$i]."}\n";
         my @text = @{$refs[$i]};
         foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
+        push @lines, "\\clearpage\n\n"; # flush table buffer to output
         push(@lines, "\n\n");
     }
     push @lines, "\\subsection{Plots}\n";
@@ -251,6 +254,7 @@ sub latexSectionResults {
     push @lines, "\\item Causes of sample failure: Individual and combined\n";
     push @lines, "\\item Scatterplots of call rate versus heterozygosity: All samples, failed samples, and failed samples passing call rate and heterozygosity filters\n";
     push @lines, "\\end{itemize}\n";
+    push @lines, "\\clearpage\n"; # flush table buffer to output
     my @metrics = readQCNameArray($config);
     my @includeLines = ();
     foreach my $metric (@metrics) {
@@ -417,8 +421,8 @@ sub textForDatasets {
 sub textForMetrics {
     # text for metric threshold/description table
     my ($jsonPath, $mMax, $fMin) = @_;
-    $mMax = sprintf("%.3f", $mMax);
-    $fMin = sprintf("%.3f", $fMin);
+    $mMax = sprintf("%.4f", $mMax);
+    $fMin = sprintf("%.4f", $fMin);
     my %doc = %{readJson($jsonPath)};
     my %thresh = %{$doc{'Metrics_thresholds'}};
     my @headers = qw/metric threshold description/;
@@ -470,9 +474,11 @@ sub textForPass {
     my %passTotals;
     my @plates = keys(%sampleCounts);
     @plates = sort @plates;
+    my $i = 0;
     foreach my $plate (@plates) { # count of passed/failed samples by plate
-        my @fields1 = ($plate, $sampleCounts{$plate});
-        my @fields2 = ($plate, );
+        my $plateLabel = plateLabel($plate, $i);
+        my @fields1 = ($plateLabel, $sampleCounts{$plate});
+        my @fields2 = ($plateLabel, );
         $sampleTotal += $sampleCounts{$plate};
         foreach my $metric (@metricNames) {
             push(@fields1, $passCounts{$plate}{$metric});
@@ -482,6 +488,7 @@ sub textForPass {
         }
         push(@text1, \@fields1);
         push(@text2, \@fields2);
+        $i++;
     }
     my $name =  "\\textbf{".lc($allPlatesName)."}"; 
     $name =~ s/_/ /g;
