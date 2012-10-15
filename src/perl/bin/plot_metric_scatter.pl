@@ -15,7 +15,8 @@ use WTSI::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");
 
-my ($qcDir, $outDir, $title, $help, $config, $dbpath, $inipath, $resultpath);
+my ($qcDir, $outDir, $title, $help, $config, $dbpath, $inipath, $resultpath,
+    $noIntensity);
 
 GetOptions(#"metric=s"   => \$metric,
            "qcdir=s"    => \$qcDir,
@@ -25,6 +26,7 @@ GetOptions(#"metric=s"   => \$metric,
            "dbpath=s"   => \$dbpath,
            "inipath=s"  => \$inipath,
            "resultpath=s"  => \$resultpath,
+           "no-intensity"  => \$noIntensity,
            "h|help"     => \$help);
 
 
@@ -42,6 +44,7 @@ Options:
 --resultpath=PATH   Path to .json file with pipeline results
 --qcdir=PATH        Directory for QC input
 --outdir=PATH       Directory for output; defaults to qcdir
+--no-intensity      Omit intensity metric (normalized signal magnitude)
 --help              Print this help text and exit
 Unspecified options will receive default values.
 ";
@@ -61,5 +64,8 @@ foreach my $path (@paths) {
     if (!(-r $path)) { croak "Cannot read path $path"; }
 }
 
-runAllMetrics($qcDir, $outDir, $config, $dbpath, $inipath, $resultpath);
+my $maxBatch = ""; # use module default
+
+runAllMetrics($qcDir, $outDir, $config, $dbpath, $inipath, $resultpath,
+              $maxBatch, $noIntensity);
 
