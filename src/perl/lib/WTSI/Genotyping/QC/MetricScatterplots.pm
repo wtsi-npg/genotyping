@@ -7,6 +7,7 @@ use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use POSIX qw(ceil);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
  getPlateLocationsFromPath meanSd readMetricResultHash readQCMetricInputs
  readThresholds plateLabel $INI_FILE_DEFAULT);
@@ -58,7 +59,7 @@ sub getOutputPaths {
     return ($outPath, $pbPath, $pnPath);
 }
 
-sub getSortedSamplesByPlate {
+sub getSamplesByPlate {
     # return hash of (sorted) lists of sample names for each plate
     my $dbPath = shift;
     my $iniPath = shift;
@@ -96,20 +97,34 @@ sub metricMeanSd {
     else { return meanSd(@values); }
 }
 
-sub otherMetricPass {
+sub metricStatus {
     # did sample pass wrt all metrics other than the target?
+    # code to record pass/fail status wrt this and other metrics
+    # 0 = passed all; 1 = failed current only; 2 = failed current and at least one other; 3 = passed current, failed at least one other 
     my ($resultsRef, $target) = @_;
     my %results = %$resultsRef;
-    my $allPass = 1;
+    my $failedOther = 0;
+    my $failedTarget = 0;
     foreach my $metric (keys(%results)) {
-        if ($metric eq $target) { next; }
         my @fields = @{$results{$metric}};
-        if (!$fields[0]) {
-            $allPass = 0;
-            last;
+        my $pass = $fields[0];
+        if (!$pass) {
+            if ($metric eq $target) {
+                $failedTarget = 1;
+            } else {
+                $failedOther = 1;
+            }
         }
     }
-    return $allPass;
+    my $status = 0;
+    if ($failedTarget && !$failedOther) {
+        $status = 1;
+    } elsif ($failedTarget && $failedOther) {
+        $status = 2;
+    } elsif (!$failedTarget && $failedOther) {
+        $status = 3;
+    }
+    return $status;
 }
 
 sub readThresholdsForMetric {
@@ -168,7 +183,7 @@ sub writePlotInputs {
     # for large number of samples, split plates into multiple files
     my ($metric, $dbPath, $iniPath, $resultPath, $configPath, $outDir, 
         $maxBatchSize) = @_;
-    my %samplesByPlate = getSortedSamplesByPlate($dbPath, $iniPath);
+    my %samplesByPlate = getSamplesByPlate($dbPath, $iniPath);
     my %allResults = readMetricResultHash($resultPath, $configPath);
     my ($batchNum, $batchSize, $plateStart, $writeStartFinish, $i) = 
         (0,0,0,0,0);
@@ -182,7 +197,7 @@ sub writePlotInputs {
         foreach my $sample (@samples) {
             # record metric value and pass/fail status for each sample
             my @results = @{$allResults{$sample}{$metric}};
-            my $status = otherMetricPass($allResults{$sample}, $metric);
+            my $status = metricStatus($allResults{$sample}, $metric);
             push(@plateLines, $results[1]."\t".$status."\n");
         }
         if (@plateLines > $maxBatchSize) {

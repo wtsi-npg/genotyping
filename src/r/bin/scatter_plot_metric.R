@@ -110,8 +110,10 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
     }
   }
   # plot points on top of shading
-  points(index[pass==1], metric[pass==1], cex=0.6, col="black") 
-  points(index[pass==0], metric[pass==0], cex=0.6, col="darkred", pch=16)
+  points(index[pass==0], metric[pass==0], cex=0.6, col="black") 
+  points(index[pass==1], metric[pass==1], cex=0.6, col="darkred", pch=3)
+  points(index[pass==2], metric[pass==2], cex=0.6, col="darkred", pch=4)
+  points(index[pass==3], metric[pass==3], cex=0.6, col="darkred", pch=16)
   if (sdThresh) {
     sd.lines(metricMean, metricSd, metricThresh1)
   } else if (metricName=='gender') {
@@ -130,9 +132,8 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
     text(max(index), metricThresh1, label, pos=4, cex=0.6)
   }
   legend("topright",
-         c("Pass/fail threshold for this metric", "Passed all other metrics",
-           "Failed at least one other metric"), bg="white",
-         pch=c(NA,1,16), col=c("red","black","darkred"),lty=c(2,NA,NA),cex=0.7)
+         c("Pass/fail threshold for this metric", "Passed all metrics", "Failed current metric only", "Failed current metric and at least one other", "Passed current metric, failed at least one other"), bg="white",
+         pch=c(NA,1,3,4,16), col=c("red","black","darkred","darkred","darkred"),lty=c(2,NA,NA,NA,NA),cex=0.7)
   legend("topleft",
          c(paste("Mean =", signif(metricMean,4)),
            paste("SD =", signif(metricSd,4))),
