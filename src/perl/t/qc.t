@@ -34,7 +34,8 @@ my $dbfileA = $tempdir."/".$dbnameA;
 # may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
-system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/*'); # remove any previous output
+system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
+       'supplementary/*'); # remove any previous output
 
 ### test creation of QC input files ### 
 
