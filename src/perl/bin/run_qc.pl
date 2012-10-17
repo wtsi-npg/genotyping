@@ -70,12 +70,17 @@ run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $
 sub cleanup {
     # create a 'supplementary' directory in current working directory
     # move less important files (not directories) into supplementary
-    my @retain = qw(pipeline_summary.pdf pipeline_summary.csv);
+    my @retain = qw(pipeline_summary.pdf pipeline_summary.csv 
+                    plate_heatmaps.html);
     my %retain;
     my $sup = "supplementary";
     foreach my $name (@retain) { $retain{$name} = 1; }
     system("rm -f Rplots.pdf"); # empty default output from R scripts
     system("mkdir -p $sup");
+    my $heatmapIndex = "plate_heatmaps/index.html";
+    if (-e $heatmapIndex) {
+        system("ln -s $heatmapIndex plate_heatmaps.html");
+    }
     foreach my $name (glob("*")) {
         if (-d $name || $retain{$name} ) { next; }
         else { system("mv $name $sup"); }
