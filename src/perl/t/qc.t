@@ -138,9 +138,10 @@ is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
 foreach my $png (@png) {
-    ok(pngPathOK($png), "PNG output $png in valid format");
+    ok(pngPathOK("supplementary/".$png), "PNG output $png in valid format");
 }
-ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
+ok(xmlPathOK('supplementary/index.html'), 
+   "Main index.html in valid XML format");
 
 my $heatMapsOK = 1;
 foreach my $mode (@modes) {

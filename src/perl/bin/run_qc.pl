@@ -67,6 +67,24 @@ $texIntroPath = verifyAbsPath($texIntroPath);
 ### run QC
 run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype, $texIntroPath);
 
+sub cleanup {
+    # create a 'supplementary' directory in current working directory
+    # move less important files (not directories) into supplementary
+    my @retain = qw(pipeline_summary.pdf pipeline_summary.csv);
+    my %retain;
+    my $sup = "supplementary";
+    foreach my $name (@retain) { $retain{$name} = 1; }
+    system("rm -f Rplots.pdf"); # empty default output from R scripts
+    system("mkdir -p $sup");
+    foreach my $name (glob("*")) {
+        print STDERR "$name, ";
+        if (-d $name || $retain{$name} ) { next; }
+        else { system("mv $name $sup"); }
+    }
+    print STDERR "\n";
+    return 1;
+}
+
 sub getBoxBeanCommands {
     my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
     my %fileNames = %$fileNamesRef;
@@ -191,6 +209,7 @@ sub run {
     my $qcDir = ".";
     createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
                   $genderThresholdPath, $qcDir, $texIntroPath);
+    cleanup();
     chdir($startDir);
     return 1;
 }
