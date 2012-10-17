@@ -52,13 +52,12 @@ sub dbDatasetInfo {
     my @datasetInfo;
     my @runs = $db->piperun->all;
     foreach my $run (@runs) {
-	my @info;
-	my @datasets = $run->datasets->all;
-	foreach my $dataset (@datasets) {
-	    @info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
-	    push(@datasetInfo, \@info);
-	    #print join("\t", @info)."\n";
-	}
+        my @info;
+        my @datasets = $run->datasets->all;
+        foreach my $dataset (@datasets) {
+            @info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
+            push(@datasetInfo, \@info);
+        }
     }
     return @datasetInfo;
 }
@@ -405,6 +404,11 @@ sub textForDatasets {
     # text for datasets table; includes optional directory name
     my $dbPath = shift;
     my $qcDir = shift;
+    if ($qcDir && length($qcDir)>20) { # truncate long directory names
+        my @chars = split(//, $qcDir);
+        @chars = splice(@chars, 0, 20);
+        $qcDir = join('', @chars)."...";
+    }
     my @headers;
     push @headers, @dbInfoHeaders;
     if ($qcDir) { push(@headers, "directory"); }
@@ -421,8 +425,10 @@ sub textForDatasets {
 sub textForMetrics {
     # text for metric threshold/description table
     my ($jsonPath, $mMax, $fMin) = @_;
-    $mMax = sprintf("%.4f", $mMax);
-    $fMin = sprintf("%.4f", $fMin);
+    if ($mMax < 0.001) { $mMax = sprintf("%.2e", $mMax); }
+    else { $mMax = sprintf("%.3f", $mMax); }
+    if ($fMin < 0.001) { $fMin = sprintf("%.2e", $fMin); }
+    else { $fMin = sprintf("%.3f", $fMin); }
     my %doc = %{readJson($jsonPath)};
     my %thresh = %{$doc{'Metrics_thresholds'}};
     my @headers = qw/metric threshold description/;
