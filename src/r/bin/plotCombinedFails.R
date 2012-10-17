@@ -16,7 +16,7 @@ make.plot <- function(experiment, combined.counts, combined.causes, total,
                       type, outPath) {
   if (type=='pdf') { pdf(outPath, paper="a4") }
   else if (type=='png') { png(outPath, width=800,height=800,pointsize=18) }
-  cause.key <- c("C = Call_rate", "D = Duplicate", "G = Gender", "H = Heterozygosity", "I = Identity_with_Sequenom", "X = XY_intensity_difference")
+  cause.key <- c("C = Call_rate", "D = Duplicate", "G = Gender", "H = Heterozygosity", "I = Identity_with_Sequenom", "M = Magnitude_of_intensity")
   layout(matrix(c(1,2), 2, 1),  heights=c(2,1))
   par(mar=c(5.1, 4.1, 7.1, 2.1)) # increase top margin
   barplot(rev(combined.counts), names.arg=rev(combined.causes), col=2, las=1, horiz=TRUE, xlab="Total failed samples", main=paste(experiment, "\nCombined causes of sample failure\n", sep=""), cex.names=0.8)

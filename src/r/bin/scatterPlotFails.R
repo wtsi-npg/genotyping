@@ -21,17 +21,17 @@ het <- data$het
 d.fail <- abs(data$duplicate-1) # convert 'pass' flag to 'fail'
 g.fail <- abs(data$gender-1)
 i.fail <- abs(data$identity-1)
-x.fail <- abs(data$xydiff-1)
+m.fail <- abs(data$magnitude-1)
 
-fail.sum <- d.fail + g.fail + i.fail + x.fail
+fail.sum <- d.fail + g.fail + i.fail + m.fail
 
 qmax <- 40
 q = -10 * log10(1-cr) # convert to phred scale
 q[q>qmax] <- qmax # truncate CR better than Q40 (!)
 qmin <-  -10 * log10(1-minCR) # minimum CR for QC pass
-categories = c("Duplicate", "Gender", "Identity (Sequenom)", "Xydiff", "Multiple/Other") # legend categories
+categories = c("Duplicate", "Gender", "Identity (Sequenom)", "Magnitude", "Multiple/Other") # legend categories
 
-make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, type, outPath) {
+make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, type, outPath) {
   if (type=='pdf') { pdf(outPath, paper="a4") }
   else if (type=='png') { png(outPath, width=800,height=800,pointsize=18) }
 ### First plot:  Show entire CR/Het range
@@ -39,10 +39,11 @@ make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, n
   par(mar=(c(5, 4, 4, 5) + 0.1), xpd=TRUE)
   ymax = qmax
   plot(subset(het, d.fail==1 & fail.sum==1), subset(q, d.fail==1 & fail.sum==1), ylim=c(0,ymax), xlim=c(min(het), max(het)), col=2, pch=2, ylab="Call rate (Phred scale)", xlab="Autosome heterozygosity rate", main=paste(experiment, ": Failed samples", sep=" ")) # duplicates
+  cat("gender fails", length(subset(het, g.fail==1 & fail.sum==1)), "\n")
   points(subset(het, g.fail==1 & fail.sum==1), subset(q, g.fail==1 & fail.sum==1), col=3, pch=3) # gender
   points(subset(het, i.fail==1 & fail.sum==1), subset(q, i.fail==1 & fail.sum==1), col=4, pch=4) # identity
-  points(subset(het, x.fail==1 & fail.sum==1), subset(q, x.fail==1 & fail.sum==1), col=6, pch=8) # xydiff
-  points(subset(het, sum(d.fail, g.fail, i.fail, x.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, x.fail)==0 | fail.sum>1), col=1, pch=1) # other
+  points(subset(het, m.fail==1 & fail.sum==1), subset(q, m.fail==1 & fail.sum==1), col=6, pch=8) # magnitude
+  points(subset(het, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), col=1, pch=1) # other
 
   # draw boundaries of cr/het "pass region" & add labels
   abline(h=qmin, col=2, lty=2, xpd=FALSE)
@@ -59,7 +60,7 @@ make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, n
   dev.off()
 }
 
-make.plot.detail <- function(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, type, outPath) {
+make.plot.detail <- function(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, type, outPath) {
 ### Second plot: Detail of CR/Het "pass region"
   if (type=='pdf') { pdf(outPath, paper="a4") }
   else if (type=='png') { png(outPath, width=800,height=800,pointsize=18) }
@@ -69,8 +70,8 @@ make.plot.detail <- function(hetMean, hetMaxDist, minCR, experiment, categories,
   plot(subset(het, d.fail==1 & fail.sum==1), subset(q, d.fail==1 & fail.sum==1), ylim=c(qmin*0.8,ymax), xlim=c(hetMean-(hetMaxDist*1.2), hetMean+(hetMaxDist*1.2)), col=2, pch=2, ylab="Call rate (Phred scale)", xlab="Autosome heterozygosity rate", main=paste(experiment, "\nFailed samples passing CR/Het filters", sep=" "), xpd=FALSE) # duplicates
   points(subset(het, g.fail==1 & fail.sum==1), subset(q, g.fail==1 & fail.sum==1), col=3, pch=3) # gender 
   points(subset(het, i.fail==1 & fail.sum==1), subset(q, i.fail==1 & fail.sum==1), col=4, pch=4) # identity
-  points(subset(het, x.fail==1 & fail.sum==1), subset(q, x.fail==1 & fail.sum==1), col=6, pch=8) # xydiff
-  points(subset(het, sum(d.fail, g.fail, i.fail, x.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, x.fail)==0 | fail.sum>1), col=1, pch=1) # other
+  points(subset(het, m.fail==1 & fail.sum==1), subset(q, m.fail==1 & fail.sum==1), col=6, pch=8) # magnitude
+  points(subset(het, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), col=1, pch=1) # other
        
   # draw boundaries of cr/het "pass region" & add labels
   abline(h=qmin, col=2, lty=2, xpd=FALSE) 
@@ -87,11 +88,11 @@ make.plot.detail <- function(hetMean, hetMaxDist, minCR, experiment, categories,
   dev.off()
 }
 
-make.plot.full(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, 'pdf', pdfFull)
+make.plot.full(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, 'pdf', pdfFull)
 
-make.plot.full(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, 'png', pngFull)
+make.plot.full(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, 'png', pngFull)
 
-make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, 'pdf', pdfDetail)
+make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, 'pdf', pdfDetail)
 
-make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, x.fail, fail.sum, q, qmin, qmax, 'png', pngDetail)
+make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, 'png', pngDetail)
 

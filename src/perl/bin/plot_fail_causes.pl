@@ -15,7 +15,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
-use Carp qw(confess);
+use Carp;
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
 use WTSI::Genotyping::QC::QCPlotTests;
 
@@ -139,35 +139,37 @@ sub sortFailCodes {
 sub writeFailCounts {
     # write counts of (individual and combined) failure causes
     # return array of failed sample names
-    my ($qcResultsRef, $configPath, $failText, $comboText) = @_;
+    my ($qcResultsRef, $configPath, $failText, $comboText, $excludeXY) = @_;
+    $excludeXY ||= 1; # switch to exclude xydiff metric
     my %results = %$qcResultsRef;
     my (%singleFails, %combinedFails, @failedSamples);
     my %shortNames = WTSI::Genotyping::QC::QCPlotShared::readQCShortNameHash($configPath);
     foreach my $sample (keys(%results)) {
-	my %metricResults = %{$results{$sample}};
-	my @fails = ();
-	foreach my $metric (keys(%metricResults)) {
-	    my ($pass, $value) = @{$metricResults{$metric}};
-	    if ($pass) { next; }
-	    push(@fails, $shortNames{$metric} );
-	    $singleFails{$metric}++;
-	}
-	my $combo = join('', sort(@fails));
-	if ($combo ne '') { 
-	    push(@failedSamples, $sample);
-	    $combinedFails{$combo}++;
-	};
+        my %metricResults = %{$results{$sample}};
+        my @fails = ();
+        foreach my $metric (keys(%metricResults)) {
+            if ($excludeXY && $metric eq 'xydiff') { next; }
+            my ($pass, $value) = @{$metricResults{$metric}};
+            if ($pass) { next; }
+            push(@fails, $shortNames{$metric} );
+            $singleFails{$metric}++;
+        }
+        my $combo = join('', sort(@fails));
+        if ($combo ne '') { 
+            push(@failedSamples, $sample);
+            $combinedFails{$combo}++;
+        };
     }
-    open my $out, ">", $failText || die "Cannot open output file $failText: $!"; # individual failures
+    open my $out, ">", $failText || die "Cannot open output file $failText: $!";
     my @metrics = sort(keys(%singleFails));
     foreach my $metric (@metrics) {
-	print $out $metric."\t".$singleFails{$metric}."\n";
+        print $out $metric."\t".$singleFails{$metric}."\n";
     }
     close $out;
     my @failCombos = sort(keys(%combinedFails));
-    open $out, ">", $comboText || die "Cannot open output file $failText: $!"; # combined failures
+    open $out, ">", $comboText || die "Cannot open output file $failText: $!"; 
     foreach my $combo (@failCombos) {
-	print $out $combo."\t".$combinedFails{$combo}."\n";
+        print $out $combo."\t".$combinedFails{$combo}."\n";
     }
     close $out;
     return @failedSamples;
@@ -181,24 +183,24 @@ sub writeFailedCrHet {
     my %qcResults = %$qcResultsRef;
     my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     my @header = qw(sample cr het);
-    my @keys = qw(duplicate gender identity xydiff);
+    my @keys = qw(duplicate gender identity magnitude);
     push(@header, @keys);
     open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
     print $out join("\t", @header)."\n";
     foreach my $fieldsRef (@data) {
-	my @fields = splice(@$fieldsRef, 0, 3);
-	my $sample = $fields[0];
-	unless ($failedSamples{$sample}) { next; }
-	# record duplicate, gender, identity, xydiff status
-	my %qcResult = %{$qcResults{$sample}};
-	foreach my $key (@keys) {
-	    my $result = $qcResult{$key};
-	    my $pass;
-	    if ($result) { $pass = shift(@{$result}); } 
-	    else { $pass = 1; } # may not have qc results for all (metric, sample) pairs
-	    push(@fields, $pass);
-	}
-	print $out join("\t", @fields)."\n";
+        my @fields = splice(@$fieldsRef, 0, 3);
+        my $sample = $fields[0];
+        unless ($failedSamples{$sample}) { next; }
+        # record duplicate, gender, identity, magnitude status
+        my %qcResult = %{$qcResults{$sample}};
+        foreach my $key (@keys) {
+            my $result = $qcResult{$key};
+            my $pass;
+            if ($result) { $pass = shift(@{$result}); } 
+            else { $pass = 1; } 
+            push(@fields, $pass);
+        }
+        print $out join("\t", @fields)."\n";
     }
     close $out;
     return 1;
