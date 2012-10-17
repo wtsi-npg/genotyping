@@ -77,11 +77,9 @@ sub cleanup {
     system("rm -f Rplots.pdf"); # empty default output from R scripts
     system("mkdir -p $sup");
     foreach my $name (glob("*")) {
-        print STDERR "$name, ";
         if (-d $name || $retain{$name} ) { next; }
         else { system("mv $name $sup"); }
     }
-    print STDERR "\n";
     return 1;
 }
 
