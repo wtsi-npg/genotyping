@@ -119,22 +119,26 @@ sub getDefaultTitle {
 }
 
 sub getPlateHeatmapCommands {
-    my ($dbopt, $iniPath, $outDir, $title, $xydiff, $fileNamesRef) = @_;
+    my ($dbopt, $iniPath, $outDir, $title, $simPathGiven, $fileNamesRef) = @_;
     my %fileNames = %$fileNamesRef;
     my @cmds;
     my $hmOut = $outDir.'/'.$fileNames{'plate_dir'}; # heatmaps in subdirectory
     unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
     my @modes = qw/cr het/;
     my @inputs = ($fileNames{'sample_cr_het'}, $fileNames{'sample_cr_het'});
-    if ($xydiff) {
-	push(@modes, 'xydiff');
-	push(@inputs, $fileNames{'xydiff'});
+    if ($simPathGiven) {
+        push(@modes, 'magnitude');
+        push(@inputs, $fileNames{'magnitude'});
     }
     foreach my $i (0..@modes-1) {
-	push(@cmds, join(" ", ('cat', $inputs[$i], '|', "$Bin/plate_heatmap_plots.pl", "--mode=$modes[$i]", 
-			       "--out_dir=$hmOut", $dbopt, "--inipath=$iniPath")));
+        push(@cmds, join(" ", ('cat', $inputs[$i], '|', 
+                               "$Bin/plate_heatmap_plots.pl", 
+                               "--mode=$modes[$i]", 
+                               "--out_dir=$hmOut", $dbopt, 
+                               "--inipath=$iniPath")));
     }
-    push (@cmds, "$Bin/plate_heatmap_index.pl $title $hmOut ".$fileNames{'plate_index'});
+    push (@cmds, "$Bin/plate_heatmap_index.pl $title $hmOut ".
+          $fileNames{'plate_index'});
     return @cmds;
 }
 
@@ -174,14 +178,15 @@ sub run {
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix";
     if ($dbPath) { 
-	unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
-	$genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
+        unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
+        $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     }
     push(@cmds, $genderCmd);
-    my $xydiff = 0;
+    my $simPathGiven = 0;
     if ($simPath) {
-        push(@cmds, "$Bin/intensity_metrics.pl --input=$simPath --magnitude=magnitude.txt --xydiff=xydiff.txt");
-        $xydiff = 1;
+        push(@cmds, "$Bin/intensity_metrics.pl --input=$simPath ".
+             "--magnitude=magnitude.txt --xydiff=xydiff.txt");
+        $simPathGiven = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
@@ -192,8 +197,9 @@ sub run {
         if (!$simPath) { $cmd = $cmd." --no-intensity "; }
         push(@cmds, $cmd); 
     }
-    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, $xydiff, \%fileNames));
-    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, \%fileNames));
+    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
+                                        $simPathGiven, \%fileNames));
+    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $simPathGiven, $boxPlotType, \%fileNames));
     push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "$Bin/plot_cr_het_density.pl", 
 			   "--title=".$title, "--out_dir=".$outDir)));
     push(@cmds, "$Bin/plot_fail_causes.pl --title=$title");

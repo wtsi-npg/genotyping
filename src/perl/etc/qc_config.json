@@ -3,6 +3,7 @@
                  "duplicate_input":"duplicate_summary.txt",
                  "main_index":"index.html",
                  "identity_input":"identity_check_results.txt",
+                 "magnitude":"magnitude.txt",
                  "sample_cr_het":"sample_cr_het.txt",
                  "plate_index":"index.html",
                  "plate_dir":"plate_heatmaps",

@@ -81,7 +81,7 @@ foreach my $metric (@metrics) {
 }
 
 ## plate heatmap plots
-my @modes = qw/cr het xydiff/;
+my @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA --inipath=$iniPath";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
@@ -98,6 +98,7 @@ is(system($cmd), 0, "plate_heatmap_index.pl exit status");
 ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
 
 ## box/bean plots
+@modes = qw/cr het xydiff/;
 my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
 for (my $i=0;$i<@modes;$i++) {
     $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA --inipath=$iniPath";
@@ -145,6 +146,7 @@ ok(xmlPathOK('supplementary/index.html'),
    "Main index.html in valid XML format");
 
 my $heatMapsOK = 1;
+@modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     for (my $i=1;$i<=11;$i++) {
 	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
