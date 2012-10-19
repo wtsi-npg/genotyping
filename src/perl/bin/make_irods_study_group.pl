@@ -109,7 +109,7 @@ sub run {
                       my $frame = shift;
                       my $payload = $frame->{body}->payload;
                       my $tag = $frame->{deliver}->method_frame->delivery_tag;
-                      $log->debug("Recieved message $tag");
+                      $log->debug("Received message $tag");
 
                       if (find_or_create_group($payload, $log)) {
                         $log->debug("Created a new iRODS group; acking message $tag");
@@ -207,21 +207,16 @@ Options:
 
 =head1 DESCRIPTION
 
-Writes JSON to STDOUT describing the sample GTC format data for a
-pipeline run; a JSON array with one element per sample, in sample
-order. Each element of the array describes one sample as a JSON object:
+Listens to the RabbitMQ message queue npg.irods.studies for messages
+broadcast by SequenceScape when new studies are created. Creates a new
+iRODS group for each study. The scipt will ack the message only after
+the group has been created. If the named group exists already, it will
+be skipped.
 
-  {
-     "sanger_sample_id" : <WTSI sample identifier>,
-     "result" : <absolute path to the GTC format data file>,
-     "uri" : <sample URI>,
-     "gender" : <gender name string>,
-     "gender_code" : <gender code integer>
-     "gender_method" : <gender method name string>
-  }
+Once launched, the scipt will sit in an event loop, waiting for
+messages. SIGINT or SIGTERM will interrupt the event loop cleanly and
+cause the script to exit.
 
-Only records for samples marked in the pipeline database for inclusion
-(in analyses) will be printed.
 
 =head1 METHODS
 
