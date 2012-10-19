@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 92;
+use Test::More tests => 94;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -122,13 +122,6 @@ foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
 
-####### 2012-20-19 get rid of main html index? ########
-## html index for all plots
-#$cmd = "perl $bin/main_plot_index.pl . qc_results.json $titleA";
-#is(system($cmd), 0, "main_plot_index.pl exit status");
-## main index output
-#ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
-
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
@@ -158,6 +151,15 @@ ok($heatMapsOK, "Plate heatmap outputs OK");
 ok(-r 'pipeline_summary.csv', "CSV summary found");
 ok(-r 'pipeline_summary.pdf', "PDF summary found");
 
+## test standalone report script
+print "\tTesting standalone report generation script.\n";
+system('rm -f pipeline_summary.*');
+$cmd = "perl $bin/write_qc_reports.pl --database $dbfileA --input ".
+    "./supplementary";
+system($cmd);
+ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
+ok(-r 'pipeline_summary.pdf', "PDF summary found from standalone script");
+system("rm -f pipeline_summary.log pipeline_summary.tex");
 print "\tTest dataset Alpha finished.\n";
 
 my $duration = time() - $start;
