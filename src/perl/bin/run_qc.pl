@@ -168,7 +168,8 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxPlotType, $texIntroPath) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
+        $outDir, $title, $boxPlotType, $texIntroPath) = @_;
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
@@ -178,7 +179,9 @@ sub run {
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix";
     if ($dbPath) { 
-        unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
+        if (!defined($runName)) { 
+            croak "Must supply pipeline run name for database gender update"; 
+        }
         $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     }
     push(@cmds, $genderCmd);
@@ -190,7 +193,9 @@ sub run {
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
-    push(@cmds, "$Bin/write_qc_status.pl --config=$configPath $dbopt --inipath=$iniPath");
+    my $writeStatus = "$Bin/write_qc_status.pl --config=$configPath $dbopt ".
+        "--inipath=$iniPath";
+    push(@cmds, $writeStatus);
     ### plot generation ###
     if ($dbopt) { 
         my $cmd = "plot_metric_scatter.pl $dbopt";
@@ -199,16 +204,20 @@ sub run {
     }
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
                                         $simPathGiven, \%fileNames));
-    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $simPathGiven, $boxPlotType, \%fileNames));
-    push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "$Bin/plot_cr_het_density.pl", 
-			   "--title=".$title, "--out_dir=".$outDir)));
+    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, 
+                                   $simPathGiven, $boxPlotType, \%fileNames));
+    my @densityTerms = ('cat', $fileNames{'sample_cr_het'}, '|', 
+                        "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
+                        "--out_dir=".$outDir);
+    push(@cmds, join(' ', @densityTerms));
     push(@cmds, "$Bin/plot_fail_causes.pl --title=$title");
-    push(@cmds, join(' ', ("$Bin/main_plot_index.pl", $outDir, $fileNames{'qc_results'}, $title)));
     ### execute commands ###
     chdir($outDir);
     foreach my $cmd (@cmds) { 
-	my $result = system($cmd); 
-	unless ($result==0) { croak "Command finished with non-zero exit status: \"$cmd\""; } 
+        my $result = system($cmd); 
+        if ($result!=0) { 
+            croak "Command finished with non-zero exit status: \"$cmd\""; 
+        } 
     }
     ### create CSV & PDF reports
     my $resultPath = "qc_results.json";

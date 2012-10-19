@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 95;
+use Test::More tests => 92;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -122,12 +122,12 @@ foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
 
+####### 2012-20-19 get rid of main html index? ########
 ## html index for all plots
-$cmd = "perl $bin/main_plot_index.pl . qc_results.json $titleA";
-is(system($cmd), 0, "main_plot_index.pl exit status");
-
+#$cmd = "perl $bin/main_plot_index.pl . qc_results.json $titleA";
+#is(system($cmd), 0, "main_plot_index.pl exit status");
 ## main index output
-ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
+#ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
@@ -142,8 +142,6 @@ is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 foreach my $png (@png) {
     ok(pngPathOK("supplementary/".$png), "PNG output $png in valid format");
 }
-ok(xmlPathOK('supplementary/index.html'), 
-   "Main index.html in valid XML format");
 
 my $heatMapsOK = 1;
 @modes = qw/cr het magnitude/;

@@ -25,6 +25,7 @@ our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
   magnitude/;
 
+
 sub createReports {
     # 'main' method to write text and CSV files
     my ($csvPath, $texPath, $resultPath, $config, $dbPath, 

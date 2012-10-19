@@ -31,8 +31,8 @@
       "heterozygosity" : "Sample autosome heterozygosity rate",
       "magnitude" : "Mean normalised magnitude of intensity",
       "call_rate" : "Sample call rate",
-      "identity" : "Pairwise identity check of all samples",
-      "duplicate" : "Duplicate check against Sequenom database",
+      "identity" : "Identity check against Sequenom database",
+      "duplicate" : "Pairwise duplicate check for all samples",
       "gender" : "Comparison of inferred and supplied gender"
    },
    "Metrics_thresholds" : {

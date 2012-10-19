@@ -16,7 +16,7 @@ Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");
 
 my ($qcDir, $outDir, $title, $help, $config, $dbpath, $inipath, $resultpath,
-    $noIntensity);
+    $maxBatch, $noIntensity);
 
 GetOptions(#"metric=s"   => \$metric,
            "qcdir=s"    => \$qcDir,
@@ -27,6 +27,7 @@ GetOptions(#"metric=s"   => \$metric,
            "inipath=s"  => \$inipath,
            "resultpath=s"  => \$resultpath,
            "no-intensity"  => \$noIntensity,
+           "max"        => \$maxBatch,
            "h|help"     => \$help);
 
 
@@ -45,6 +46,7 @@ Options:
 --qcdir=PATH        Directory for QC input
 --outdir=PATH       Directory for output; defaults to qcdir
 --no-intensity      Omit intensity metric (normalized signal magnitude)
+--max               Maximum number of samples on any one plot
 --help              Print this help text and exit
 Unspecified options will receive default values.
 ";
@@ -63,8 +65,6 @@ my @paths = ($qcDir, $outDir, $dbpath, $inipath, $resultpath, $config);
 foreach my $path (@paths) {
     if (!(-r $path)) { croak "Cannot read path $path"; }
 }
-
-my $maxBatch = ""; # use module default
 
 runAllMetrics($qcDir, $outDir, $config, $dbpath, $inipath, $resultpath,
               $maxBatch, $noIntensity);

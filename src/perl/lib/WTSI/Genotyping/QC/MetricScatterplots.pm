@@ -165,8 +165,11 @@ sub runPlotScript {
         my $num = sprintf("%03d", $i);
         my $outPath = $plotDir.'/scatter_'.$metric.'_'.$num.'.pdf';
         my $sdThresh;
-        if ($metric eq 'heterozygosity') { $sdThresh = 'TRUE'; }
-        else  { $sdThresh = 'FALSE'; }
+        if ($metric eq 'heterozygosity' || $metric eq 'xydiff') { 
+            $sdThresh = 'TRUE'; 
+        } else  { 
+            $sdThresh = 'FALSE'; 
+        }
         my @args = ($script, $scPath, $pbPath, $pnPath, $metric, 
                     $mean, $sd, $thresh1, $thresh2, $sdThresh,
                     $i+1, $inputTotal, $outPath);
@@ -256,7 +259,7 @@ sub runMetric {
 sub runAllMetrics {
     my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
         $maxBatch, $noIntensity) = @_;
-    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
+    my @metrics = qw(call_rate duplicate heterozygosity identity gender xydiff);
     if (!$noIntensity) { push(@metrics, 'magnitude'); }
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 

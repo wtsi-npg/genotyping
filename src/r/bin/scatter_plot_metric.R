@@ -24,12 +24,15 @@ metric <- data$V2
 pass <- data$V3
 
 sdLimit <- 10
-if (metricName=='heterozygosity') { # heterozygosity
+if (metricName=='heterozygosity') { 
   ymin <- 0
   ymax <- 1.15 # allow space for legend
 } else if (metricName=='gender') {
   ymin <- 0
   ymax <- 0.54
+} else if (metricName=='xydiff') {
+  ymin <- metricMean - sdLimit*metricSd
+  ymax <- metricMean + sdLimit*metricSd
 } else if (metricName=='identity' || metricName=='duplicate') {
   ymin <- 0
   ymax <- 1.2
@@ -75,13 +78,32 @@ sd.lines <- function(metricMean, metricSd, metricThresh) {
   }
 }
 
+write.legends <- function(name, mean, sd) {
+  # write legends to plot for given metric name, mean and sd
+  legend("topright",
+         c(paste("Pass/fail threshold for", name),
+           "Passed all metrics",
+           paste("Failed", name, "only"),
+           paste("Failed", name, "and at least one other metric"),
+           paste("Passed ",name,", failed at least one other metric", sep="")),
+         bg="white",
+         pch=c(NA,16,3,4,8),
+         col=c("red","black","darkred","darkred","darkred"),
+         #col=c("red","black","red","blue","magenta"),
+         lty=c(2,NA,NA,NA,NA),cex=0.7)
+  legend("topleft",
+         c(paste("Mean =", signif(mean,4)),
+           paste("SD =", signif(sd,4))),
+         bg="white", cex=0.7)
+}
+
 ylab.name <- function(metricName) {
   if (metricName=='gender') {
     ylab.name <- "chr_X heterozygosity"
   } else if (metricName=='duplicate') {
     ylab.name <- "maximum similarity on test panel"
   } else if (metricName=='identity') {
-    ylab.name <- "identity with Sequenom results (if available)"
+    ylab.name <- "identity with Sequenom results"
   } else {
     ylab.name <- metricName
   }
@@ -110,10 +132,14 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
     }
   }
   # plot points on top of shading
-  points(index[pass==0], metric[pass==0], cex=0.6, col="black") 
+  points(index[pass==0], metric[pass==0], cex=0.5, col="black", pch=16)
   points(index[pass==1], metric[pass==1], cex=0.6, col="darkred", pch=3)
   points(index[pass==2], metric[pass==2], cex=0.6, col="darkred", pch=4)
-  points(index[pass==3], metric[pass==3], cex=0.6, col="darkred", pch=16)
+  points(index[pass==3], metric[pass==3], cex=0.6, col="darkred", pch=8)
+  #points(index[pass==1], metric[pass==1], cex=0.6, col="red", pch=3)
+  #points(index[pass==2], metric[pass==2], cex=0.6, col="blue", pch=4)
+  #points(index[pass==3], metric[pass==3], cex=0.6, col="magenta", pch=8)
+  # pass/fail lines and legends
   if (sdThresh) {
     sd.lines(metricMean, metricSd, metricThresh1)
   } else if (metricName=='gender') {
@@ -131,13 +157,7 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
     }
     text(max(index), metricThresh1, label, pos=4, cex=0.6)
   }
-  legend("topright",
-         c("Pass/fail threshold for this metric", "Passed all metrics", "Failed current metric only", "Failed current metric and at least one other", "Passed current metric, failed at least one other"), bg="white",
-         pch=c(NA,1,3,4,16), col=c("red","black","darkred","darkred","darkred"),lty=c(2,NA,NA,NA,NA),cex=0.7)
-  legend("topleft",
-         c(paste("Mean =", signif(metricMean,4)),
-           paste("SD =", signif(metricSd,4))),
-         bg="white", cex=0.7)
+  write.legends(metricName, metricMean, metricSd)
   dev.off()
 }
 
