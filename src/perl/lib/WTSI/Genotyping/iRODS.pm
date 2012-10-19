@@ -34,8 +34,12 @@ use Exporter;
 
                 get_collection_meta
                 remove_collection_meta
-                meta_exists);
+                meta_exists
 
+                group_exists
+                add_group);
+
+our $IADMIN = 'iadmin';
 our $ICHKSUM = 'ichksum';
 our $IMETA = 'imeta';
 our $IMKDIR = 'imkdir';
@@ -45,6 +49,73 @@ our $IRM = 'irm';
 our $IPWD = 'ipwd';
 
 our $log = Log::Log4perl->get_logger('genotyping');
+
+=head2 group_exists
+
+  Arg [1]    : iRODS group name
+  Example    : group_exists($name)
+  Description: Returns true if the group exists, or false otherwise
+  Returntype : boolean
+  Caller     : general
+
+=cut
+
+sub group_exists {
+  my ($name) = @_;
+
+  grep { /^$name$/ } run_command($IADMIN, 'lg');
+}
+
+
+=head2 add_group
+
+  Arg [1]    : new iRODS group name
+  Example    : add_group($name)
+  Description: Creates a new group. Raises an error if the group exists
+               already. Returns the group name. The group name is not escaped
+               in nay way.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub add_group {
+  my ($name) = @_;
+
+  if (group_exists($name)) {
+    $log->logconfess("Failed to create iRODS group '$name' because it exists already");
+  }
+
+  run_command($IADMIN, 'mkgroup', $name);
+
+  return $name;
+}
+
+
+=head2 remove_group
+
+  Arg [1]    : An existing iRODS group name
+  Example    : remove_group($name)
+  Description: Creates a new group. Raises an error if the group exists
+               already. Returns the group name. The group name is not escaped
+               in any way.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub remove_group {
+  my ($name) = @_;
+
+  if (! group_exists($name)) {
+    $log->logconfess("Unable to remove group '$name' because it doesn't exist");
+  }
+
+  run_command($IADMIN, 'rmgroup', $name);
+
+  return $name;
+}
+
 
 =head2 ipwd
 

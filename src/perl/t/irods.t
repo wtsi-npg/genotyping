@@ -8,7 +8,7 @@ use warnings;
 
 use JSON;
 
-use Test::More tests => 49;
+use Test::More tests => 54;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
@@ -30,7 +30,10 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                put_collection
                                remove_collection
                                get_collection_meta
-                               add_collection_meta);
+                               add_collection_meta
+
+                               group_exists
+                               add_group);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -145,6 +148,34 @@ is_deeply([add_object_meta($lorem_object, 'md5', $expected_checksum)],
 ok(checksum_object($lorem_object));
 
 ok(remove_object($lorem_object));
+
+
+# group exists
+ok(group_exists('rodsadmin'));
+ok(! group_exists('no_such_group_exists'));
+
+# A hack to see if there are admin rights for the following tests. I can't
+# find a clean way to list these rights in iRODS.
+
+my $no_admin = system("iadmin mkgroup foo 2>&1 | grep -E '^ERROR.*SYS_NO_API_PRIV'") == 0;
+
+if ($no_admin) {
+  dies_ok { add_group('rodsadmin') }
+    'Expected to fail due to lack of permission';
+  dies_ok { add_group('test_group') }
+    'Expected to fail due to lack of permission';
+  dies_ok { remove_group('test_group') }
+    'Expected to fail due to lack of permission';
+}
+else {
+  # add_group
+  dies_ok { add_group('rodsadmin') }
+    'Expected to fail adding a group that exists already';
+  ok(add_group('test_group'));
+  ok(remove_group('test_group'));
+}
+
+
 
 END {
   if ($dir1 && -d $dir1) {
