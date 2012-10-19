@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 94;
+use Test::More tests => 78;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -75,7 +75,7 @@ $status = system("plot_metric_scatter.pl --dbpath=$dbfileA");
 is($status, 0, "plot_metric_scatter.pl exit status");
 
 # identity plot expected to be missing!
-my @metrics = qw(call_rate duplicate heterozygosity gender magnitude);
+my @metrics = qw(call_rate duplicate heterozygosity gender magnitude xydiff);
 foreach my $metric (@metrics) {
     ok((-e 'scatter_'.$metric.'_000.pdf'), "PDF scatterplot exists: $metric");
 }
@@ -97,13 +97,7 @@ is(system($cmd), 0, "plate_heatmap_index.pl exit status");
 ## plate heatmap index output
 ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
 
-## box/bean plots
-@modes = qw/cr het xydiff/;
-my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
-for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA --inipath=$iniPath";
-    is(system($cmd), 0, "plot_box_bean.pl exit status: mode $modes[$i]");
-}
+## box/bean plots removed 2012-10-19
 
 ## cr/het density
 $cmd = "cat sample_cr_het.txt | perl $bin/plot_cr_het_density.pl --out_dir=. --title=$titleA";
@@ -114,10 +108,10 @@ $cmd = "perl $bin/plot_fail_causes.pl --title=$titleA --inipath=$iniPath";
 is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
-my @png = qw /cr_beanplot.png          crHetDensityScatter.png  failScatterPlot.png  het_beanplot.png  
-sample_xhet_gender.png  xydiff_boxplot.png      cr_boxplot.png           crHistogram.png          
-failsCombined.png    het_boxplot.png   total_samples_per_plate.png
-crHetDensityHeatmap.png  failScatterDetail.png    failsIndividual.png  hetHistogram.png  xydiff_beanplot.png/;
+my @png = qw /crHetDensityScatter.png  failScatterPlot.png  
+  sample_xhet_gender.png  crHistogram.png  failsCombined.png  
+  crHetDensityHeatmap.png  failScatterDetail.png
+  failsIndividual.png  hetHistogram.png/;
 foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }

@@ -88,26 +88,6 @@ sub cleanup {
     return 1;
 }
 
-sub getBoxBeanCommands {
-    my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
-    my %fileNames = %$fileNamesRef;
-    my $boxPlotScript = "$Bin/plot_box_bean.pl";
-    my @modes = ('cr', 'het');
-    my @inputs = ($fileNames{'sample_cr_het'}, $fileNames{'sample_cr_het'});
-    if ($xydiff) {
-	push(@modes, 'xydiff');
-	push(@inputs, $fileNames{'xydiff'});
-    }
-    my @cmds;
-    for (my $i=0; $i<@modes; $i++) {
-	my $cmd = join(' ', ('cat', $inputs[$i], '|', $boxPlotScript, '--mode='.$modes[$i], 
-			   '--out_dir='.$outDir, '--title='.$title, $dbopt, '--inipath='.$iniPath,
-			   '--type='.$boxPlotType));
-	push(@cmds, $cmd);
-    }
-    return @cmds;
-}
-
 sub getDefaultTitle {
     # default title made up of last 2 non-empty items in path
     my $outDir = shift;
@@ -204,8 +184,6 @@ sub run {
     }
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
                                         $simPathGiven, \%fileNames));
-    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, 
-                                   $simPathGiven, $boxPlotType, \%fileNames));
     my @densityTerms = ('cat', $fileNames{'sample_cr_het'}, '|', 
                         "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
                         "--out_dir=".$outDir);
