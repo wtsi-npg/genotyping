@@ -8,7 +8,7 @@ use warnings;
 
 use JSON;
 
-use Test::More tests => 54;
+use Test::More tests => 58;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
@@ -33,7 +33,8 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                add_collection_meta
 
                                group_exists
-                               add_group);
+                               add_group
+                               set_group_access);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -91,6 +92,13 @@ dies_ok { add_object($test_file, undef) }
 my $new_object = add_object($test_file, $test_object);
 ok($new_object);
 
+# set_group_access
+dies_ok { set_group_access('no_such_permission', 'public', $new_object) }
+  'Expected to fail setting access with an invalid permission argument';
+dies_ok { set_group_access('read', 'no_such_group_exists', $new_object) }
+  'Expected to fail setting access for non-existant group';
+ok(set_group_access('read', 'public', $new_object));
+ok(set_group_access(undef, 'public', $new_object));
 
 # list_object
 dies_ok { list_object() }

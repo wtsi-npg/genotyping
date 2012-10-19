@@ -37,7 +37,9 @@ use Exporter;
                 meta_exists
 
                 group_exists
-                add_group);
+                add_group
+                set_group_access
+);
 
 our $IADMIN = 'iadmin';
 our $ICHKSUM = 'ichksum';
@@ -47,8 +49,10 @@ our $IPUT = 'iput';
 our $IQUEST = 'iquest';
 our $IRM = 'irm';
 our $IPWD = 'ipwd';
+our $ICHMOD = 'ichmod';
 
 our $log = Log::Log4perl->get_logger('genotyping');
+
 
 =head2 group_exists
 
@@ -94,7 +98,7 @@ sub add_group {
 
 =head2 remove_group
 
-  Arg [1]    : An existing iRODS group name
+  Arg [1]    : An existing iRODS group name.
   Example    : remove_group($name)
   Description: Creates a new group. Raises an error if the group exists
                already. Returns the group name. The group name is not escaped
@@ -114,6 +118,36 @@ sub remove_group {
   run_command($IADMIN, 'rmgroup', $name);
 
   return $name;
+}
+
+
+=head2 set_group_access
+
+  Arg [1]    : A permission string, 'read', 'write', 'own' or undef ('null')
+  Arg [2]    : An iRODS group name.
+  Arg [3]    : One or more data objects
+  Example    : (set_group_access('read', 'public', $object1, $object2)
+  Description: Sets the access rights on one or more objects for a group,
+               returning the objects.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub set_group_access {
+  my ($permission, $group, @objects) = @_;
+
+  my $perm_str;
+  if (defined $permission) {
+    $perm_str = $permission;
+  }
+  else {
+    $perm_str = 'null';
+  }
+
+  run_command($ICHMOD, $perm_str, $group, @objects);
+
+  return @objects;
 }
 
 
