@@ -38,7 +38,6 @@ my $build = Build->new
        '../r/bin/plotIndividualFails.R' => 'bin/plotIndividualFails.R',
        '../r/bin/plotXYdiffDensity.R' => 'bin/plotXYdiffDensity.R',
        '../r/bin/plotXYdiffPlate.R' => 'bin/plotXYdiffPlate.R',
-       '../r/bin/sample_delta_xy.R' => 'bin/sample_delta_xy.R',
        '../r/bin/scatter_plot_metric.R' => 'bin/scatter_plot_metric.R',
        '../r/bin/scatterPlotFails.R' => 'bin/scatterPlotFails.R'},
    install_path => {'etc' => 'etc'}
