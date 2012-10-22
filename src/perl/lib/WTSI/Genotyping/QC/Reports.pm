@@ -133,7 +133,9 @@ sub getPlateInfo {
     # want stats for each individual metric, and for all metrics combined
     my %records = %{ shift() };
     my (%passCounts, %sampleCounts, %passRates, $key);
+    my ($sampleTotal, $passTotal) = (0,0);
     foreach my $sample (keys(%records)) {
+        $sampleTotal++;
         my %record = %{$records{$sample}};
         my $plate = $record{'plate'};
         my $samplePass = 1;
@@ -147,10 +149,11 @@ sub getPlateInfo {
             if ($pass==0) { $samplePass = 0; }
             $passCounts{$plate}{$metric} += $pass;
         }
+        if ($samplePass) { $passTotal += 1; }
         $passCounts{$plate}{$allMetricsName} += $samplePass;
         $sampleCounts{$plate}++;
     }
-    return (\%passCounts, \%sampleCounts);
+    return (\%passCounts, \%sampleCounts, $sampleTotal, $passTotal);
 }
 
 sub getSampleInfo {
@@ -228,23 +231,8 @@ sub latexSectionMetrics {
     return join("", @lines);
 }
 
-sub latexSectionResults {
-    my ($config, $qcDir, $resultPath) = @_;
-    my @lines = ();
-    push @lines, "\\section{Results}\n\n";
-    push @lines, "\\subsection{Tables}\n\n";
-    my @titles = ("Key to metric abbreviations", 
-                  "Total samples passing filters",
-                  "Sample pass rates");
-    my @refs = textForPlates($resultPath, $config);
-    for (my $i=0;$i<@refs;$i++) {
-        if ($i>0) { push @lines, "\\pagebreak\n\n"; }
-        push @lines, "\\subsubsection*{".$titles[$i]."}\n";
-        my @text = @{$refs[$i]};
-        foreach my $table (latexTables(\@text)) { push @lines, $table."\n"; }
-        push @lines, "\\clearpage\n\n"; # flush table buffer to output
-        push(@lines, "\n\n");
-    }
+sub latexResultNotes {
+    my @lines;
     push @lines, "\\subsection{Plots}\n";
     push @lines, "\\subsubsection*{Metric scatterplots}\n";
     push @lines, "Scatterplots are produced for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plots may be absent if Sequenom results are not available.\n\n";
@@ -254,23 +242,45 @@ sub latexSectionResults {
     push @lines, "\\item Causes of sample failure: Individual and combined\n";
     push @lines, "\\item Scatterplots of call rate versus heterozygosity: All samples, failed samples, and failed samples passing call rate and heterozygosity filters\n";
     push @lines, "\\end{itemize}\n";
-    push @lines, "\\clearpage\n"; # flush table buffer to output
-    my @metrics = readQCNameArray($config);
-    my @includeLines = ();
-    foreach my $metric (@metrics) {
+    push @lines, "\\clearpage\n";
+    return join("", @lines);
+}
+
+sub latexSectionResults {
+    my ($config, $qcDir, $resultPath) = @_;
+    my @lines = ();
+    push @lines, "\\section{Results}\n\n";
+    push @lines, "\\subsection{Tables}\n\n";
+    my @titles = ("Pass/fail summary",
+                  "Key to metric abbreviations", 
+                  "Total samples passing filters",
+                  "Sample pass rates");
+    my @refs = textForPlates($resultPath, $config);
+    my @headers = (0,1,1,1);
+    my @centre = (0,0,1,1);
+    for (my $i=0;$i<@refs;$i++) {
+        push @lines, "\\subsubsection*{".$titles[$i]."}\n";
+        foreach my $table (latexTables($refs[$i], $headers[$i], $centre[$i])) { 
+            push @lines, $table."\n"; 
+        }
+        if ($i>0) {
+            push @lines, "\\clearpage\n\n"; # flush table buffer to output
+            push @lines, "\\pagebreak\n\n"; 
+        }
+    }
+    push @lines, latexResultNotes();
+    foreach my $metric (@METRIC_NAMES) {
         my @plotPaths = sort(glob($qcDir."/scatter_".$metric."*.pdf"));
         foreach my $plotPath (@plotPaths) {
-            push(@includeLines, "\\includepdf[landscape=true]{".
-                 $plotPath."}\n");
+            push(@lines, "\\includepdf[landscape=true]{".$plotPath."}\n");
         }
     }
     my @morePdf =  qw(failsIndividual.pdf failsCombined.pdf 
   crHetDensityScatter.pdf failScatterPlot.pdf failScatterDetail.pdf);
     foreach my $name (@morePdf) {
         my $plotPath = $qcDir."/".$name;
-        push(@includeLines, "\\includepdf[pages={1}]{".$plotPath."}\n");
+        push(@lines, "\\includepdf[pages={1}]{".$plotPath."}\n");
     }
-    push @lines, @includeLines;
     return join("", @lines);
 }
 
@@ -279,21 +289,25 @@ sub latexTables {
 	# enforce maximum number of rows per table, before starting a new table 
     # (allows breaking across pages)
 	# assume that first row is header; repeat header at start of each table
-    my ($rowsRef, $caption, $label, $maxRows) = @_;
+    my ($rowsRef, $header, $centre, $caption, $label, $maxRows) = @_;
+    if (!defined($header)) { $header = 1; } # header=0 stays as 0
+    if (!defined($centre)) { $centre = 1; } # centre=0 stays as 0
 	$maxRows ||= 38;
 	my @rows = @$rowsRef;
 	my @tables = ();
 	if (@rows > $maxRows) {
-		my $headRef = shift(@rows);
+        my $headRef;
+		if ($header) { $headRef = shift(@rows);}
 		my @outRows;
 		my $part = 1;
 		while (@rows > $maxRows) {
-			@outRows = ($headRef,);
+			if ($header) { @outRows = ($headRef,); }
 			push(@outRows, splice(@rows, 0, $maxRows));
 			my $newCaption;
 			if ($caption) { $newCaption = $caption." (Part $part)"; }
 			else { $newCaption = ""; }
-			push(@tables, latexTableSingle(\@outRows, $newCaption, $label));
+			push(@tables, latexTableSingle(\@outRows, $header, 
+                                           $newCaption, $label));
 			$part++;
 		}
 		if (@rows>0) { # deal with remainder (if any)
@@ -301,32 +315,40 @@ sub latexTables {
 			my $newCaption;
 			if ($caption) { $newCaption = $caption." (Part $part)"; }
 			else { $newCaption = ""; }
-			push(@tables, latexTableSingle(\@rows, $newCaption, $label));
+			push(@tables, latexTableSingle(\@rows, $header, 
+                                           $newCaption, $label));
 		}
 	} else {
-		push(@tables, latexTableSingle(\@rows, $caption, $label));
+		push(@tables, latexTableSingle(\@rows, $header, $centre, 
+                                       $caption, $label));
 	}
 	return @tables;
 }
 
 sub latexTableSingle {
     # convert array of arrays into a (centred) table
-    my ($rowsRef, $caption, $label) = @_;
+    my ($rowsRef, $header, $centre, $caption, $label) = @_;
+    if (!defined($header)) { $header = 1; } # header=0 stays as 0
+    if (!defined($centre)) { $centre = 1; } # centre=0 stays as 0
     my @rows = @$rowsRef;
     my $cols = @{$rows[0]};
-    my $table = "\n\\begin{table}[!h]\n\\centering\n\\begin{tabular}{|";
+    my $table;
+    if ($centre) {
+        $table = "\n\\begin{table}[!h]\n\\centering\n\\begin{tabular}{|";
+    } else {
+        $table = "\n\\begin{table}[!h]\n\\begin{tabular}{|";
+    }
     foreach my $i (1..$cols) { $table.=" l |"; }
     $table.="} \\hline\n";
-    my $first = 1;
     foreach my $ref (@rows) {
         my @row = @$ref;
         foreach my $item (@row) {
             $item =~ s/[_]/\\_/g;
             $item =~ s/%/\\%/g;
-            if ($first) { $item = "\\textbf{".$item."}"; } # first row is header
+            if ($header) { $item = "\\textbf{".$item."}"; } # first row
         }
         $table.=join(" & ", @row)." \\\\ \\hline";
-        if ($first) { $table .= ' \hline'; $first = 0; } 
+        if ($header) { $table .= ' \hline'; $header = 0; } 
         $table.="\n";
     }
     $table.="\\end{tabular}\n";
@@ -511,19 +533,31 @@ sub textForPass {
     return (\@text1, \@text2);
 }
 
+sub textForPassSummary {
+    my ($samples, $passed) = @_;
+    my $passPercent = sprintf("%.01f", 100*($passed/$samples));
+    my @text = (
+        ["Total samples", $samples],
+        ["Samples passing QC filters", $passed],
+        ["Pass rate", $passPercent."%"],
+        );
+    return @text;
+}
+
 sub textForPlates {
     # produce text for two tables: pass counts and pass rates
     my $resultPath = shift;
     my $config = shift;
     my $resultsRef = readJson($resultPath);
-    my @refs = getPlateInfo($resultsRef, $config);
-    my %passCounts = %{$refs[0]};
-    my %sampleCounts = %{$refs[1]};
+    my ($ref1, $ref2, $samples, $passed) = getPlateInfo($resultsRef, $config);
+    my %passCounts = %{$ref1};
+    my %sampleCounts = %{$ref2};
     my %shortNames = readQCShortNameHash($config);
+    my @textSummary = textForPassSummary($samples, $passed);
     my @textKey = textForMetricKey(%shortNames);
     my ($textRef1, $textRef2) = textForPass(\%shortNames, \%passCounts, 
                                             \%sampleCounts);
-    return (\@textKey, $textRef1, $textRef2);
+    return (\@textSummary, \@textKey, $textRef1, $textRef2);
 }
 
 sub texToPdf {
