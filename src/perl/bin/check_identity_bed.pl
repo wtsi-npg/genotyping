@@ -225,9 +225,9 @@ sub getSequenomCallData {
     foreach my $sample (keys(%sampleIDs)) {
         $sth->execute($sampleIDs{$sample}); # query DB with sample ID
         foreach my $row (@{$sth->fetchall_arrayref}) {
-            print STDERR $sampleIDs{$sample}."\t".join("\t", @{$row})."\n";
+            #print STDERR $sampleIDs{$sample}."\t".join("\t", @{$row})."\n";
             my ($well, $snp, $call, $conf, $disregard) = @{$row};
-            next if $disregard == 1;           # 'disregard' flag in database
+            # $disregard==0 by construction of DB query
             $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
             next if $call =~ /[N]{2}/;              # skip 'NN' calls
             $sqnmCalls{$sample}{$snp} = $call;
