@@ -30,7 +30,6 @@ my $build = Build->new
    R_files => {
        '../r/bin/check_xhet_gender.R' => 'bin/check_xhet_gender.R',
        '../r/bin/heatmapCrHetDensity.R' => 'bin/heatmapCrHetDensity.R',
-       '../r/bin/plates.R' => 'bin/plates.R',
        '../r/bin/plotCombinedFails.R' => 'bin/plotCombinedFails.R',
        '../r/bin/plotCrHetDensity.R' => 'bin/plotCrHetDensity.R',
        '../r/bin/plotCrPlate.R' => 'bin/plotCrPlate.R',
