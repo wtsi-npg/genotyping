@@ -245,9 +245,8 @@ sub runMetric {
     my $inputTotal = $batchNum+1;
     my ($mean, $sd);
     my @results = metricMeanSd($metric, $resultPath, $config);
-    if (@results==0) { 
-        carp "No results for metric $metric; omitting scatterplot.\n";
-    } else { 
+    if (@results!=0) { 
+        # if @results is empty, omit scatterplot for this metric
         ($mean, $sd) = @results; 
         my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config);
         runPlotScript($metric, $outDir, $inputTotal, $mean, $sd, 
