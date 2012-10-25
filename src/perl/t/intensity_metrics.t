@@ -18,6 +18,7 @@ my $simPath = $testDir."qc_test_data/alpha.sim";
 my $temp = tempdir( CLEANUP => 1 );
 my $outPathMag = $temp."/mag.txt";
 my $outPathXY = $temp."/xy.txt";
+my $logPath = $temp."/intensity.log";
 
 open my $in, "<", $simPath || die "Cannot open .sim path $simPath: $!";
 my %params = headerParams($in);
@@ -26,5 +27,5 @@ my @names = readSampleNames($in, \%params);
 is(@names, 995, "Correct number of sample names");
 close $in || die "Cannot close .sim path $simPath: $!";
 
-ok(writeIntensityMetrics($simPath, $outPathMag, $outPathXY), 
+ok(writeIntensityMetrics($simPath, $outPathMag, $outPathXY, $logPath), 
    "Write intensity metrics");
