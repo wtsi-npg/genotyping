@@ -34,6 +34,7 @@ my $build = Build->new
        '../r/bin/plotCrHetDensity.R' => 'bin/plotCrHetDensity.R',
        '../r/bin/plotCrPlate.R' => 'bin/plotCrPlate.R',
        '../r/bin/plotHetPlate.R' => 'bin/plotHetPlate.R',
+       '../r/bin/plotMagnitudePlate.R' => 'bin/plotMagnitudePlate.R',
        '../r/bin/plotIndividualFails.R' => 'bin/plotIndividualFails.R',
        '../r/bin/plotXYdiffDensity.R' => 'bin/plotXYdiffDensity.R',
        '../r/bin/plotXYdiffPlate.R' => 'bin/plotXYdiffPlate.R',
