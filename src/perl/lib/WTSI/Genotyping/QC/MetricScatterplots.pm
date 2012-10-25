@@ -5,7 +5,6 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
-use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use POSIX qw(ceil);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
@@ -156,7 +155,7 @@ sub resetOutputs {
 sub runPlotScript {
     # run R script to produce plot
     my ($metric, $plotDir, $inputTotal, $mean, $sd, $thresh1, $thresh2) = @_;
-    my $script = "$Bin/../../r/bin/scatter_plot_metric.R";
+    my $script = "scatter_plot_metric.R";
     for (my $i=0;$i<$inputTotal;$i++) {
         my ($scPath, $pbPath, $pnPath) = getOutputPaths($plotDir, $metric, $i);
         foreach my $path ($scPath, $pbPath, $pnPath) {
