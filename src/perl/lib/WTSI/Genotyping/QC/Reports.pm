@@ -18,7 +18,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/createReports writeSummaryLatexNew/;
+our @EXPORT_OK = qw/createReports qcNameFromPath/;                  
 our @dbInfoHeaders = qw/run project supplier snpset/;
 our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
@@ -31,10 +31,7 @@ sub createReports {
     my ($csvPath, $texPath, $resultPath, $config, $dbPath, 
         $genderThresholdPath, $qcDir, $introPath, $qcName, $title, 
         $author) = @_;
-    if (!$qcName) { 
-        my @items = split('/', abs_path($qcDir));
-        $qcName = pop(@items);
-    }
+    $qcName ||= qcNameFromPath($qcDir);
     my $csvOK = writeCsv($resultPath, $dbPath, $config, $csvPath);
     if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
     writeSummaryLatex($texPath, $resultPath, $config, $dbPath, 
@@ -356,6 +353,21 @@ sub latexTableSingle {
     if ($label) { $table.="\\label{".$label."}\n"; }
     $table.="\\end{table}\n";
     return $table;
+}
+
+sub qcNameFromPath {
+    # try to find name of analysis program from path
+    my $dir = shift;
+    my @items = split('/', abs_path($dir));
+    if (!($items[-1])) { pop @items; }
+    my $qcName;
+    foreach my $item (@items) {
+        if ($item =~ m/illuminus|genosnp|gencall/i) {
+            $qcName = $item; last;
+        }
+    }
+    $qcName ||= pop(@items);
+    return $qcName;
 }
 
 sub readGenderThreholds {

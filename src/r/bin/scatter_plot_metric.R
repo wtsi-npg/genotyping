@@ -87,8 +87,8 @@ write.legends <- function(name, mean, sd) {
            paste("Failed", name, "and at least one other metric"),
            paste("Passed ",name,", failed at least one other metric", sep="")),
          bg="white",
-         pch=c(NA,16,3,8,4),
-         col=c("red","black","red","blue","magenta"),
+         pch=c(NA,16,3,5,4),
+         col=c("red","black","red","purple","blue"),
          lty=c(2,NA,NA,NA,NA),cex=0.7)
   legend("topleft",
          c(paste("Mean =", signif(mean,4)),
@@ -103,6 +103,8 @@ ylab.name <- function(metricName) {
     ylab.name <- "maximum similarity on test panel"
   } else if (metricName=='identity') {
     ylab.name <- "identity with Sequenom results"
+  } else if (metricName=='magnitude') {
+    ylab.name <- "normalised magnitude of intensity"
   } else {
     ylab.name <- metricName
   }
@@ -133,8 +135,8 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   # plot points on top of shading
   points(index[pass==0], metric[pass==0], cex=0.5, col="black", pch=16)
   points(index[pass==1], metric[pass==1], cex=0.6, col="red", pch=3)
-  points(index[pass==2], metric[pass==2], cex=0.6, col="blue", pch=8)
-  points(index[pass==3], metric[pass==3], cex=0.6, col="magenta", pch=4)
+  points(index[pass==2], metric[pass==2], cex=0.6, col="purple", pch=5)
+  points(index[pass==3], metric[pass==3], cex=0.6, col="blue", pch=4)
   # pass/fail lines and legends
   if (sdThresh) {
     sd.lines(metricMean, metricSd, metricThresh1)

@@ -11,14 +11,14 @@ use Getopt::Long;
 use Carp;
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
                                           defaultTexIntroPath);
-use WTSI::Genotyping::QC::Reports qw(createReports);
+use WTSI::Genotyping::QC::Reports qw(createReports qcNameFromPath);
 
 my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";
 my $defaultPrefix = "pipeline_summary";
 
 my ($help, $prefix, $csvPath, $texPath, $iniPath, $resultPath, $configPath, 
-    $dbPath, $genderThresholdPath, $qcDir, $texIntroPath);
+    $dbPath, $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
 
 GetOptions("help"        => \$help,
            "prefix=s"    => \$prefix,
@@ -50,6 +50,7 @@ $csvPath = $prefix.".csv";
 $texPath = $prefix.".tex";
 $iniPath ||= $DEFAULT_INI;
 $qcDir ||= $defaultInput;
+$qcName = qcNameFromPath($qcDir."/.."); # look at parent of supplementary dir
 foreach my $input (($qcDir, $dbPath, $iniPath)) {
     if (!(-e $input)) { croak "Input path \"$input\" does not exist!"; }
 }
@@ -60,4 +61,4 @@ $resultPath = $qcDir."/qc_results.json";
 $genderThresholdPath = $qcDir."/sample_xhet_gender_thresholds.txt";
 
 createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
-              $genderThresholdPath, $qcDir, $texIntroPath);
+              $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
