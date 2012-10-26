@@ -2,7 +2,7 @@
 # May 2012
 
 # module to read .sim intensity files
-# initially use to find xydiff stats for QC, may have other uses
+# use to find magnitude & xydiff metrics for QC
 
 package WTSI::Genotyping::QC::SimFiles;
 
@@ -10,18 +10,37 @@ use strict;
 use warnings;
 use Carp;
 use bytes;
-use POSIX;
+use POSIX qw(ceil ctime);
+use Exporter;
 
-sub blockSizeFromHeader {
-    # input an unpacked .sim header; size = name_length + (probes * channels * numeric_bytes)
-    my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @_;
-    my $numberBytes = numericBytesByFormat($numberType);
-    my $blockSize = $nameLength + ($probes * $channels * $numberBytes);
-    return $blockSize;
+our @ISA = qw/Exporter/;
+our @EXPORT_OK = qw/headerParams readSampleNames writeIntensityMetrics/;
+our $HEADER_LENGTH = 16;
+
+sub computeMetric {
+    # find (un-normalised) magnitude or xydiff, assuming 2 channels
+    # list of intensities composed of (x,y) pairs
+    my @intensities = @{ shift() };
+    my $metric = shift;
+    my $i = 0;
+    my @values;
+    while ($i < @intensities) {
+        my $val;
+        if ($metric eq 'magnitude') {
+            $val = sqrt($intensities[$i]**2 + $intensities[$i+1]**2);
+        } elsif ($metric eq 'xydiff') {
+            $val = $intensities[$i+1] - $intensities[$i];
+        } else {
+            croak("Unknown metric name: \"$metric\"");
+        }
+        push(@values, $val);
+        $i += 2;
+    }
+    return @values;
 }
 
 sub extractSampleRange {
-    # extract given range of samples from .sim file and output to given filehandle
+    # extract given range of samples from .sim file, and output
     # useful for creating small test datasets
     my ($in, $out, $startIndex, $endIndex) = @_;
     my $header = readHeader($in); 
@@ -29,43 +48,114 @@ sub extractSampleRange {
     my @header = unpackHeader($header);
     my $blockSize = blockSizeFromHeader(@header);
     for (my $i=$startIndex;$i<$endIndex;$i++) {
-	my $data = readSampleBinary($in, $i, $blockSize);
-	print $out $data;
+        my $start = $HEADER_LENGTH + $i*$blockSize;
+        my $data;
+        seek($in, $start, 0);
+        read($in, $data, $blockSize);
+        print $out $data;
     }
     return 1;
 }
 
-sub findMeanXYDiff {
-    # find mean xydiff metric for a large number of probes (assuming exactly 2 channels)
-    # data for all probes may not fit in memory, and reading one probe at a time is too slow!
-    # compromise; seek to required location and unpack data for groups of probes (intensity pairs)
-    my ($fh, $nameLength, $numberType, $sampleOffset, $sampleBlockSize, $probes, $groupNum) = @_;
-    my ($data, $xyDiffTotal, $xyDiffCount);
-    my $numericBytes = numericBytesByFormat($numberType);
-    my $start = 16 + $sampleOffset*$sampleBlockSize + $nameLength; # 16 = length of header
-    if ($groupNum > $probes) { $groupNum = $probes; } #  $groupNum = number of probes in group
-    my $groups = ceil($probes/$groupNum); # total number of groups
-    my $readProbes = $groupNum; # number of probes to read in at one time
-    my $groupSize = 2*$groupNum*$numericBytes; # generic size of groups (applies to all but last one)
-    my $remainderGroup = 0;
-    if ($probes % $groupNum != 0) { $remainderGroup = 1; }
-    for (my $i=0;$i<$groups;$i++) {
-	if ($i>0 && $i+1==$groups && $remainderGroup) { $readProbes = $probes % $groupNum; } # final group
-	my $size = 2*$readProbes*$numericBytes;
-	my $groupStart = $start + ($i*$groupSize);
-	seek($fh, $groupStart, 0); 
-	my $dataLength = read($fh, $data, $size);
-	my @signals = unpackSignals($data, $numericBytes, $numberType);
-	while (@signals) {
-	    my @pair = splice(@signals, 0, 2);
-	    $xyDiffTotal+= ($pair[1] - $pair[0]);
-	    $xyDiffCount++;
-	}
+sub findMetrics {
+    # find mean xydiff and normalised magnitude for each sample
+    # read blocks of probes; find mean magnitude for each probe to normalize
+    # update running totals by sample for each block
+    my $in = shift;
+    my $log = shift;
+    select $log; $|++; # flush log immediately for each output
+    my %params = %{ shift()};
+    my $probesInBlock = shift;
+    $probesInBlock ||= 1000;
+    my $probes = $params{'probes'};
+    my $blocks = ceil($probes / $probesInBlock);
+    my @names = readSampleNames($in, \%params);
+    my (%magTotals, %xyTotals);
+    my $i = 0; # probe offset
+    my $block = 0; # block count
+    while ($i < $probes) {
+        if ($probesInBlock > $probes - $i) {
+            $probesInBlock = $probes - $i; # reduce size for final block
+        }
+        my @args = ($in, $i, $probesInBlock, \%params);
+        my ($magRef, $xyRef) = metricTotalsForProbeBlock(@args);
+        my @mags = @{$magRef};
+        my @xy = @{$xyRef};
+        for (my $j=0;$j<@names;$j++) {
+            $magTotals{$names[$j]} += $mags[$j];
+            $xyTotals{$names[$j]} += $xy[$j];
+        }
+        $i += $probesInBlock;
+        $block++;
+        if ($block % 10 == 0 || $i == $probes) {
+            my $timeStamp = ctime(time()); # ends with \n
+            my $msg = "Metrics found for block $block of $blocks, ".
+                "probe $i of $probes: $timeStamp";
+            print $log $msg;
+        }
     }
-    my $xyDiffMean = 0;
-    if ($xyDiffCount > 0) { $xyDiffMean = $xyDiffTotal / $xyDiffCount; }
-    else { carp("WARNING: No intensities found for xydiff at sample $sampleOffset"); }
-    return $xyDiffMean;
+    foreach my $name (@names) { # find mean values across probes
+        $magTotals{$name} = $magTotals{$name} / $probes;
+        $xyTotals{$name} = $xyTotals{$name} / $probes;
+    }
+    return (\%magTotals, \%xyTotals);
+}
+
+sub headerParams {
+    # read/compute .sim file parameters form header
+    my $in = shift;
+    my @header = unpackHeader(readHeader($in));
+    my ($magic, $version, $nameLength, $samples, $probes, $channels, 
+        $numberType) = @header;
+    my %params = (
+        'magic' => $magic,
+        'version' => $version,
+        'name_bytes' => $nameLength,
+        'samples' => $samples,
+        'probes' => $probes,
+        'channels' => $channels,
+        'number_type' => $numberType,
+        );
+    my $numericBytes = numericBytesByFormat($numberType);
+    my $sampleUnitBytes = $nameLength + ($probes * $channels * $numericBytes);
+    $params{'numeric_bytes'} = $numericBytes;
+    $params{'sample_unit_bytes'} = $sampleUnitBytes;
+    return %params;
+}
+
+sub metricTotalsForProbeBlock {
+    # find total (normalised) magnitude and xydiff 
+    # for all samples, for given range of probes
+    my ($in, $probeStart, $probeTotal, $paramsRef) = @_;
+    my %params = %{$paramsRef};
+    my $samples = $params{'samples'};
+    my (@magsByProbe, @magTable, @magTotalsBySample, @xyTotals);
+    for (my $i=0;$i<$samples;$i++) { # foreach sample
+        my @intensities = readProbeRange($in, $i, $probeStart, 
+                                         $probeTotal, $paramsRef);
+        # update magnitude totals
+        my @mag = computeMetric(\@intensities, 'magnitude');
+        for (my $j=0;$j<@mag;$j++) { # foreach probe
+            $magsByProbe[$j] += $mag[$j];
+        }
+        push(@magTable, \@mag);
+        # update xydiff totals
+        my @xy = computeMetric(\@intensities, 'xydiff');
+        for (my $j=0;$j<@mag;$j++) { # foreach probe
+            $xyTotals[$i] += $xy[$j];
+        }
+    }
+    # find mean magnitude by probe
+    for (my $i=0; $i<$probeTotal; $i++) {
+        $magsByProbe[$i] = $magsByProbe[$i] / $samples;
+    }
+    # find normalized mag totals by sample
+    for (my $i=0;$i<$samples;$i++) { # foreach sample
+        for (my $j=0;$j<$probeTotal;$j++) { # foreach probe
+            $magTotalsBySample[$i] += $magTable[$i][$j] / $magsByProbe[$j];
+        }
+    }
+    return (\@magTotalsBySample, \@xyTotals);
 }
 
 sub numericBytesByFormat {
@@ -76,34 +166,21 @@ sub numericBytesByFormat {
     else { croak "Unknown .sim numeric format code: $format : $!"; }
 }
 
-sub readBlock {
-    # read given data block from .sim filehandle
-    my ($fh, $nameLength, $numberType, $blockSize, $blockOffset, $numericToRead) = @_;
-    my $name = readName($fh, $nameLength, $blockOffset, $blockSize);
-    my $start = 16 + $blockSize* $blockOffset + $nameLength; # start of numeric data
-    seek($fh, $start, 0);
-    my $binary;
-    my $numericBytes = numericBytesByFormat($numberType);
-    read($fh, $binary, $numericBytes * $numericToRead);
-    my @block = unpackSignals($binary, $numericBytes, $numberType);
-    unshift(@block, $name);
-    return @block;
-}
-
 sub readHeader {
     # read .sim format header with no unpack
-    # header fields are: ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
+    # header fields: 
+    # ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
     my $fh = shift;
     seek($fh, 0, 0);
     my $header;
-    read($fh, $header, 16); # header = first 16 bytes
+    read($fh, $header, $HEADER_LENGTH); # header = first 16 bytes
     return $header;
 }
 
 sub readName {
     # read name of sample with given $blockOffset
      my ($fh, $nameLength, $blockOffset, $blockSize) = @_;
-     my $start = 16 + $blockOffset*$blockSize;
+     my $start = $HEADER_LENGTH + $blockOffset*$blockSize;
      my $data;
      seek($fh, $start, 0);
      read($fh, $data, $nameLength);
@@ -112,56 +189,34 @@ sub readName {
      return $name;
 }
 
-sub readSampleBinary {
-    # read all binary data for sample with given $blockOffset (do not unpack)
-     my ($fh, $blockOffset, $blockSize) = @_;
-     my $start = 16 + $blockOffset*$blockSize;
-     my $data;
-     seek($fh, $start, 0);
-     read($fh, $data, $blockSize);
-     return $data;
+sub readProbeRange {
+    # read intensities for given sample and range of probes
+    my ($fh, $sampleOffset, $probeStart, $probeTotal, $paramsRef) = @_;
+    my %params = %{$paramsRef};
+    my $channels = $params{'channels'};
+    my $probeBytes = $params{'numeric_bytes'} * $channels;
+    my $start = $HEADER_LENGTH + ($sampleOffset*$params{'sample_unit_bytes'}) 
+        + $params{'name_bytes'} + ($probeBytes*$probeStart);
+    seek($fh, $start, 0);
+    my $binary;
+    read($fh, $binary, $probeBytes*$probeTotal);
+    my @block = unpackSignals($binary, $params{'numeric_bytes'}, 
+                              $params{'number_type'});
+    return @block;
 }
 
-sub readWriteXYDiffs {
-    # find xydiffs for each sample in input; write to output
-    # can correctly handle large input files (.sim files can be >> 1G)
-    my ($in, $out, $verbose, $groupNum) = @_;
-    $verbose ||= 0;
-    my @header = unpackHeader(readHeader($in));
-    if ($header[5]!=2) { croak "Must have exactly 2 intensity channels to compute xydiff: $!"; } 
-    my $nameLength = $header[2];
-    my $probes = $header[4];
-    my $channels = $header[5];
-    my $numberType = $header[6];
-    my $blockSize = blockSizeFromHeader(@header);
-    my $i = 0;
-    my @samples;
-    my @means;
-    my $maxBlocks = 50;
-    while (!eof($in)) {
-	my $name = readName($in, $nameLength, $i, $blockSize);
-	$name =~ s/\0//g; # strip off null padding
-	if ($name) {
-	    my $xydiff = findMeanXYDiff($in, $nameLength, $numberType, $i, $blockSize, $probes, $groupNum);
-	    push(@samples, $name);
-	    push(@means, $xydiff);
-	    if ($verbose && $i % 20 == 0) { print $i."\t".$name."\t".$xydiff."\n"; }
-	} else {
-	    carp "Warning: No name found for sample $i\n";
-	}
-	$i++;	
-	if (@samples==$maxBlocks || eof($in)) {
-	    # print buffers to output filehandle
-	    for (my $j=0;$j<@samples;$j++) {
-		$name = $samples[$j];
-		printf($out "%s\t%.8f\n", ($name, $means[$j])); 
-	    }
-	    if ($verbose) { print $i." samples written.\n"; }
-	    @samples = ();
-	    @means = ();
-	}
+sub readSampleNames {
+    # read names of all samples in order
+    my $in = shift;
+    my %params = %{ shift() };
+    my @names;
+    for (my $i=0;$i<$params{'samples'};$i++) {
+        my $name = readName($in, $params{'name_bytes'}, $i, 
+                            $params{'sample_unit_bytes'});
+        $name =~ s/\0//g; # strip off null padding
+        push(@names, $name);
     }
-    return $i;
+    return @names;
 }
 
 sub unpackHeader {
@@ -172,20 +227,55 @@ sub unpackHeader {
 
 sub unpackSignals {
     # unpack a chunk of binary data into signal values
+    # TODO replace this with C for better speed??
     my ($data, $numericBytes, $numberType) = @_;
     my $dataBytes = bytes::length($data);
-    if ($dataBytes % $numericBytes !=0) { croak "Incorrect number of bytes in signal data chunk: $!"; }
-    my $signals = $dataBytes/$numericBytes; # how many signal vlaues?
+    if ($dataBytes % $numericBytes !=0) { 
+        croak "Incorrect number of bytes in signal data chunk: $!"; 
+    }
+    my $signals = $dataBytes/$numericBytes; # how many signal values?
     my @signals;
     if ($numberType==0) { 
-	@signals = unpack("V$signals", $data);
-	my $repacked = pack("L$signals", @signals);
-	@signals = unpack("f$signals", $repacked);
+        # unpack/repack circumvents horrible Perl ambiguities in number format
+        @signals = unpack("V$signals", $data);
+        my $repacked = pack("L$signals", @signals);
+        @signals = unpack("f$signals", $repacked);
     } elsif ($numberType==1) {
-	@signals = unpack("v$signals", $data);
-	for (my $i=0;$i<$signals;$i++) { $signals[$i] = $signals[$i] / 1000; }
+        @signals = unpack("v$signals", $data);
+        for (my $i=0;$i<$signals;$i++) { $signals[$i] = $signals[$i] / 1000; }
     }
     return @signals;
+}
+
+sub writeIntensityMetrics {
+    # find xydiff and normalised magnitude, and write to file
+    # arguments: paths for input/output; if no input path, use STDIN
+    my ($inPath, $outPathMag, $outPathXY, $logPath, $probesInBlock) = @_;
+    my $in;
+    if ($inPath) { open $in, "<", $inPath; }
+    else { $in = \*STDIN; $inPath = "STDIN"; }
+    $logPath ||= "intensity_metrics.log";
+    open my $log, ">", $logPath;
+    print $log "Started: ".
+        ctime(time())."Input: $inPath\n";
+    my %params = headerParams($in);
+    my ($magRef, $xyRef) = findMetrics($in, $log, \%params, $probesInBlock);
+    close $in || croak("Cannot close filehandle!");
+    my %mag = %{$magRef};
+    my %xy = %{$xyRef};
+    my @samples = sort(keys(%mag));
+    print $log "Opening output files: $outPathMag $outPathXY\n";
+    open my $outMag, ">", $outPathMag;
+    open my $outXY, ">", $outPathXY;
+    foreach my $sample (@samples) {
+        printf($outMag "%s\t%.8f\n", ($sample, $mag{$sample})); 
+        printf($outXY "%s\t%.8f\n", ($sample, $xy{$sample})); 
+    }
+    print $log "Finished: ".ctime(time());
+    foreach my $fh ($log, $outMag, $outXY) {
+        close $fh || croak("Cannot close filehandle!");
+    }
+    return 1;
 }
 
 

@@ -31,7 +31,7 @@ Plots include call rate, autosome heterozygosity, and xy intensity difference.
 Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or the *XYdiff.txt file.
 
 Options:
---mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff
+--mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff, magnitude
 --dbpath=PATH       Path to SQLite pipeline database, to find plate addresses
 --inipath=PATH      Path to .ini file for SQLite pipeline database
 --out_dir=PATH      Output directory for plots
@@ -108,50 +108,49 @@ sub parseSampleName {
 }
 
 sub readData {
-    # read from a filehandle
-    # get data values by plate
+    # read from a filehandle; get data values by plate
     my ($inputRef, $index, $mode, $dbPath, $iniPath) = @_;
     my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
     my ($xMax, $yMax, $duplicates) = (0,0,0);
     my $dataOK = 1;
     my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
     while (<$inputRef>) {
-	if (/^#/) { next; } # ignore comments
-	chomp;
-	my @words = split;
-	unless ($plateLocs{$words[0]}) { 
-	    carp "Plate location not found in database for sample $words[0]";
-	    $dataOK = 0;
-	    last;
-	}
-	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};   #getPlateAddress($words[0]);
-	my ($x, $y) = parseLabel($addressLabel);
-	# clean up plate name by removing illegal characters; plate name used as filename component
-	if (not $plateNames{$plate}) {
-	    # first time plate is encountered
-	    $name = $plate;
-	    $name =~ s/[-\W]/_/g;
-	    if ($names{$name}) {  # plate name not unique after cleanup
-		$duplicates++;
-		$name .= '_'.$duplicates; # *not* guaranteed unique, but should be ok except in pathological cases
-	    }
-	    $names{$name} = 1;
-	    $plateNames{$plate} = $name;
-	} else {
-	    $name = $plateNames{$plate};
-	}
-	if ($x > $xMax) { $xMax = $x; }
-	if ($y > $yMax) { $yMax = $y; }
-	my $result = $words[$index];
-	push(@allResults, $result);
-	$results{$name}{$x}{$y} = $result;
+        if (/^#/) { next; } # ignore comments
+        chomp;
+        my @words = split;
+        unless ($plateLocs{$words[0]}) { 
+            carp "Plate location not found in database for sample $words[0]";
+            $dataOK = 0;
+            last;
+        }
+        my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};
+        my ($x, $y) = parseLabel($addressLabel);
+        # clean up plate name by removing illegal characters
+        if (not $plateNames{$plate}) {
+            $name = $plate;
+            $name =~ s/[-\W]/_/g;
+            if ($names{$name}) {  # plate name not unique after cleanup
+                # fix is *not* guaranteed unique, but should be ok 
+                $duplicates++;
+                $name .= '_'.$duplicates; 
+            }
+            $names{$name} = 1;
+            $plateNames{$plate} = $name;
+        } else {
+            $name = $plateNames{$plate};
+        }
+        if ($x > $xMax) { $xMax = $x; }
+        if ($y > $yMax) { $yMax = $y; }
+        my $result = $words[$index];
+        push(@allResults, $result);
+        $results{$name}{$x}{$y} = $result;
     }
     @allResults = sort {$a<=>$b} @allResults; # sort numerically
     if ($mode eq 'xydiff') { # special plot range for xydiff
-	($plotMin, $plotMax) = getXYdiffMinMax(\@allResults); 
+        ($plotMin, $plotMax) = getXYdiffMinMax(\@allResults); 
     } else { # default to plot range = data range
-	$plotMin = $allResults[0];
-	$plotMax = $allResults[-1];
+        $plotMin = $allResults[0];
+        $plotMax = $allResults[-1];
     }
     return ($dataOK, \%results, $xMax, $yMax, $plotMin, $plotMax);
 }
@@ -176,7 +175,7 @@ sub writeGrid {
     # write table of results to file; could be CR or het rate
     my ($resultsRef, $outDir, $outPrefix, $xMax, $yMax, $commentRef) = @_;
     my %results = %$resultsRef;
-    my %comments = %$commentRef; # supply a list of key/value comments; eg. PLATE_NAME my-name
+    my %comments = %$commentRef; # comments to put in header
     my $plate = $comments{'PLATE_NAME'};
     $plate =~ s/\s+/_/; # get rid of spaces in plate name (if any)
     my $outPath = $outDir."/".$outPrefix.$plate.".txt";
@@ -185,13 +184,13 @@ sub writeGrid {
     open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
     foreach my $key (@keyList) { print $out "# $key $comments{$key}\n"; }
     for (my $y=1; $y<=$yMax; $y++) { # x, y counts start at 1
-	my @row = ();
-	for (my $x=1; $x<=$xMax; $x++) {
-	    my $result = $results{$x}{$y};
-	    unless (defined($result)) { $result = 0; }
-	    push (@row, $result);
-	}
-	print $out join("\t", @row)."\n";
+        my @row = ();
+        for (my $x=1; $x<=$xMax; $x++) {
+            my $result = $results{$x}{$y};
+            unless (defined($result)) { $result = 0; }
+            push (@row, $result);
+        }
+        print $out join("\t", @row)."\n";
     }
     close $out;
     return 1;
@@ -222,28 +221,35 @@ sub run {
     my ($mode, $outDir, $dbPath, $iniPath) = @_;
     my $test = 1; # keep tests on by default, since they are very quick to run
     my %plotScripts = ( # R plotting scripts for each mode
-	cr     => 'plotCrPlate.R',
-	het    => 'plotHetPlate.R', 
-	xydiff => 'plotXYdiffPlate.R', );
+                        cr        => 'plotCrPlate.R',
+                        het       => 'plotHetPlate.R', 
+                        xydiff    => 'plotXYdiffPlate.R', 
+                        magnitude => 'plotMagnitudePlate.R',
+        );
     my %index = ( # index in whitespace-separated input data for each mode
-	cr     => 1,
-	het    => 2, 
-	xydiff => 1, );
+                  cr        => 1,
+                  het       => 2, 
+                  xydiff    => 1, 
+                  magnitude => 1,
+        );
     my %minMaxArgs = ( # supply min/max arguments to R script?
-	cr     => 0,
-	het    => 0, 
-	xydiff => 1, );
+                       cr        => 0,
+                       het       => 0, 
+                       xydiff    => 1, 
+                       magnitude => 0,);
     my $inputFH = \*STDIN;  
     # read data from STDIN; output data values by plate & useful stats
-    my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = readData($inputFH, $index{$mode}, $mode, $dbPath,
-	$iniPath);
+    my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = 
+        readData($inputFH, $index{$mode}, $mode, $dbPath, $iniPath);
     my $ok = 1;
     if ($dataOK) {
-	writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, $plotMin, $plotMax); 
-	$ok = makePlots($outDir, $plotScripts{$mode}, 
-			$mode."_*", "plot_${mode}_", $minMaxArgs{$mode}, $test); 
+        writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, 
+                       $plotMin, $plotMax); 
+        $ok = makePlots($outDir, $plotScripts{$mode}, $mode."_*", 
+                        "plot_${mode}_", $minMaxArgs{$mode}, $test); 
     } else {
-	print STDERR "Cannot parse plate/well locations; omitting plate heatmap plots.\n";
+        print STDERR "Cannot parse plate/well locations; omitting ".
+            "plate heatmap plots.\n";
     }
     return $ok;
 }

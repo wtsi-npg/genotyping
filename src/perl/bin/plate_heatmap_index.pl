@@ -17,8 +17,8 @@ sub getLinkThumbnail {
     # get thumbnail link HTML for given image path; optionally supply height & width in pixels
     # assumes linked file is in same directory as linking page
     my ($path, $height, $width) = @_;
-    $height ||= 200;
-    $width ||= 200;
+    $height ||= 250;
+    $width ||= 250;
     my $link;
     unless (defined($path)) { $link = "NOT_FOUND"; } # eg. xy plots not produced for gencall
     else { $link = a({href=>$path}, img({height=>$height, width=>$width, src=>$path, alt=>$path}) ); }
@@ -44,55 +44,29 @@ sub getPlateInfo {
     my $plotDir = shift;
     my $startDir = getcwd;
     chdir($plotDir);
-    my (%plates, %crPlots, %hetPlots, %xydiffPlots);
-    my ($crExpr, $hetExpr, $xydiffExpr) = qw(plot_cr_* plot_het_* plot_xydiff_*);
-    my @files = glob('{cr,het,xydiff,}*.png');
+    my (%plates, %crPlots, %hetPlots, %magPlots);
+    my ($crExpr, $hetExpr, $magExpr) = qw(plot_cr_* plot_het_* 
+  plot_magnitude_*);
+    my @files = glob('{cr,het,magnitude,}*.png');
     foreach my $file (@files) {
-	my $plate = getPlateName($file);
-	$plates{$plate} = 1;
-	if ($file =~ $crExpr) { $crPlots{$plate} = $file; }
-	elsif ($file =~ $hetExpr) { $hetPlots{$plate} = $file; }
-	elsif ($file =~ $xydiffExpr) { $xydiffPlots{$plate} = $file; }
+        my $plate = getPlateName($file);
+        $plates{$plate} = 1;
+        if ($file =~ $crExpr) { $crPlots{$plate} = $file; }
+        elsif ($file =~ $hetExpr) { $hetPlots{$plate} = $file; }
+        elsif ($file =~ $magExpr) { $magPlots{$plate} = $file; }
     }
     my @plates = sort(keys(%plates));
     chdir($startDir);
-    return (\@plates, \%crPlots, \%hetPlots, \%xydiffPlots);
+    return (\@plates, \%crPlots, \%hetPlots, \%magPlots);
 }
 
-sub getTextLinks {
-    # create unordered list of links to relevant text files, to be inserted into table
-    # assume files are in current working directory
-    my @paths = @{shift()};
-    my @links = ();
-    foreach my $path (@paths) {
-	my @terms = split(/\//, $path);
-	my $name = pop(@terms);
-	push(@links, a({href=>$name}, $name));
-    }
-    my $linkList = ul(li(\@links));
-    return $linkList;
-}
-
-sub getTextPaths {
-    # get relevant .txt files for given plate
-    my $plotDir = shift;
-    my @plates = @{shift()};
-    my %textPaths;
-    foreach my $plate (@plates) {
-	my @paths = glob($plotDir.'/{cr,het,xydiff,}_'.$plate.'*.txt'); # get .txt files containing plate name
-	@paths = sort(@paths);
-	$textPaths{$plate} = \@paths;
-    }
-    return %textPaths;
-}
 
 my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/output directory, output filename
 my @refs = getPlateInfo($plotDir);
 my @plates = @{shift(@refs)};
 my %crPlots = %{shift(@refs)};
 my %hetPlots = %{shift(@refs)};
-my %xydiffPlots = %{shift(@refs)};
-my %textPaths = getTextPaths($plotDir, \@plates);
+my %magPlots = %{shift(@refs)};
 # must write index to given plot directory -- otherwise links are broken
 my $outPath = $plotDir.'/'.$outFileName;
 open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
@@ -105,16 +79,16 @@ print $out header(-type=>''), # create the HTTP header; content-type declaration
     ;
 print $out start_table({-border=>1, -cellpadding=>4},);
 print $out Tr({-align=>'CENTER',-valign=>'TOP'}, [ 
-		 th(['Plate', 'Sample CR','Sample het rate','Sample XYdiff', 'Plot inputs',
+		 th(['Plate', 'Sample CR','Sample het rate','Sample Magnitude',
 		    ]),]);
 foreach my $plate (@plates) {
-    # for each plate -- use plate name to look up CR, Het, and XYdiff filenames & generate links
-    unless (defined($crPlots{$plate}) || defined($hetPlots{$plate}) || defined($xydiffPlots{$plate}) ) { next; }
+    # for each plate -- use plate name to look up CR, Het, and Mag filenames & generate links
+    unless (defined($crPlots{$plate}) || defined($hetPlots{$plate}) 
+            || defined($magPlots{$plate}) ) { next; }
     print $out Tr({-valign=>'TOP'}, [ td([$plate, 
 					 getLinkThumbnail($crPlots{$plate}), 
 					 getLinkThumbnail($hetPlots{$plate}), 
-					 getLinkThumbnail($xydiffPlots{$plate}),
-					 getTextLinks($textPaths{$plate}),
+					 getLinkThumbnail($magPlots{$plate}),
 					]),
 	]);
 }

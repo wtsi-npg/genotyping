@@ -11,10 +11,14 @@ PLINK dataset Alpha:
 * 5 duplicates have been deliberately inserted; the first 10 samples are actually 5 duplicate pairs.
 * Sample names are in PLATE_WELL_ID format.  An 8 row by 12 column plate configuration was used.
 * Generation script was plinkGenerator.py, in /nfs/users/nfs_i/ib5/mygit/concoct_genotype_data/python/bin/ as of 2012-07-05.
-* Dataset 'alpha' has sample names in Sanger PLATE_WELL_ID format; 'beta' has a non-Sanger format; and gamma combines the samples in alpha and beta (they share the same set of fake SNPs).  Beta was generated using the same parameters as alpha, but has different sample names and genotype calls.
 
 SIM data:
 * Same samples and genotype calls as PLINK data above.
 * Intensities generated using signal and noise distributions.
 * Written in .sim (simple intensity matrix) format, see genotype-call on github
 * Generation script was simGenerator.py, in /nfs/users/nfs_i/ib5/mygit/concoct_genotype_data/python/bin/ as of 2012-07-12.
+
+SQLite database:
+* alpha_pipeline.db is an appropriate SQLite database containing metadata for the above PLINK and .sim files.  Note that QC test write to a temporary copy of the database, so that the "master" copy in qc_test_data is unaffected.
+
+
