@@ -9,7 +9,7 @@ use warnings;
 use Cwd;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 89;
+use Test::More tests => 78;
 use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $start = time();
@@ -34,7 +34,8 @@ my $dbfileA = $tempdir."/".$dbnameA;
 # may later include datasets 'beta', 'gamma', etc.
 
 chdir($outDirA);
-system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/*'); # remove any previous output
+system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
+       'supplementary/*'); # remove any previous output
 
 ### test creation of QC input files ### 
 
@@ -58,8 +59,8 @@ $status = system("perl $bin/check_xhet_gender.pl --input=$plinkA");
 is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test xydiff computation
-$status = system("perl $bin/xydiff.pl --input=$simA --output=xydiff.txt");
-is($status, 0, "xydiff.pl exit status");
+$status = system("perl $bin/intensity_metrics.pl --input=$simA --magnitude=magnitude.txt --xydiff=xydiff.txt");
+is($status, 0, "intensity_metrics.pl exit status");
 
 ## test collation into summary
 $status = system("perl $bin/write_qc_status.pl --dbpath=$dbfileA --inipath=$iniPath");
@@ -69,8 +70,18 @@ ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 
 ### test creation of plots ###
 
+## PDF scatterplots for each metric
+$status = system("plot_metric_scatter.pl --dbpath=$dbfileA");
+is($status, 0, "plot_metric_scatter.pl exit status");
+
+# identity plot expected to be missing!
+my @metrics = qw(call_rate duplicate heterozygosity gender magnitude xydiff);
+foreach my $metric (@metrics) {
+    ok((-e 'scatter_'.$metric.'_000.pdf'), "PDF scatterplot exists: $metric");
+}
+
 ## plate heatmap plots
-my @modes = qw/cr het xydiff/;
+my @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     $cmd = "cat sample_cr_het.txt | perl $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA --inipath=$iniPath";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
@@ -86,12 +97,7 @@ is(system($cmd), 0, "plate_heatmap_index.pl exit status");
 ## plate heatmap index output
 ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
 
-## box/bean plots
-my @inputs = qw/sample_cr_het.txt sample_cr_het.txt xydiff.txt/;
-for (my $i=0;$i<@modes;$i++) {
-    $cmd = "cat $inputs[$i] | perl $bin/plot_box_bean.pl --mode=$modes[$i] --out_dir=. --title=$titleA --dbpath=$dbfileA --inipath=$iniPath";
-    is(system($cmd), 0, "plot_box_bean.pl exit status: mode $modes[$i]");
-}
+## box/bean plots removed 2012-10-19
 
 ## cr/het density
 $cmd = "cat sample_cr_het.txt | perl $bin/plot_cr_het_density.pl --out_dir=. --title=$titleA";
@@ -102,20 +108,13 @@ $cmd = "perl $bin/plot_fail_causes.pl --title=$titleA --inipath=$iniPath";
 is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
-my @png = qw /cr_beanplot.png          crHetDensityScatter.png  failScatterPlot.png  het_beanplot.png  
-sample_xhet_gender.png  xydiff_boxplot.png      cr_boxplot.png           crHistogram.png          
-failsCombined.png    het_boxplot.png   total_samples_per_plate.png
-crHetDensityHeatmap.png  failScatterDetail.png    failsIndividual.png  hetHistogram.png  xydiff_beanplot.png/;
+my @png = qw /crHetDensityScatter.png  failScatterPlot.png  
+  sample_xhet_gender.png  crHistogram.png  failsCombined.png  
+  crHetDensityHeatmap.png  failScatterDetail.png
+  failsIndividual.png  hetHistogram.png/;
 foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
-
-## html index for all plots
-$cmd = "perl $bin/main_plot_index.pl . qc_results.json $titleA";
-is(system($cmd), 0, "main_plot_index.pl exit status");
-
-## main index output
-ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
@@ -128,11 +127,11 @@ is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
 foreach my $png (@png) {
-    ok(pngPathOK($png), "PNG output $png in valid format");
+    ok(pngPathOK("supplementary/".$png), "PNG output $png in valid format");
 }
-ok(xmlPathOK('index.html'), "Main index.html in valid XML format");
 
 my $heatMapsOK = 1;
+@modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     for (my $i=1;$i<=11;$i++) {
 	my $png = "plate_heatmaps/plot_".$mode."_SS_plate".sprintf("%04d", $i).".png";
@@ -146,6 +145,15 @@ ok($heatMapsOK, "Plate heatmap outputs OK");
 ok(-r 'pipeline_summary.csv', "CSV summary found");
 ok(-r 'pipeline_summary.pdf', "PDF summary found");
 
+## test standalone report script
+print "\tTesting standalone report generation script.\n";
+system('rm -f pipeline_summary.*');
+$cmd = "perl $bin/write_qc_reports.pl --database $dbfileA --input ".
+    "./supplementary";
+system($cmd);
+ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
+ok(-r 'pipeline_summary.pdf', "PDF summary found from standalone script");
+system("rm -f pipeline_summary.log pipeline_summary.tex");
 print "\tTest dataset Alpha finished.\n";
 
 my $duration = time() - $start;

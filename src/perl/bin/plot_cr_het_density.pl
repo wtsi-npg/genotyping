@@ -101,12 +101,15 @@ sub writeTable {
 sub run {
     my $title = shift;
     my $outDir = shift;
-    my @names = ('crHetDensityHeatmap.txt', 'crHetDensityHeatmap.png', 'crHet.txt', 
-		 'crHetDensityScatter.png', 'crHistogram.png', 'hetHistogram.png');
+    my @names = ('crHetDensityHeatmap.txt', 'crHetDensityHeatmap.pdf', 
+                 'crHetDensityHeatmap.png', 
+                 'crHet.txt',  'crHetDensityScatter.pdf',
+                 'crHetDensityScatter.png', 'crHistogram.png', 
+                 'hetHistogram.png');
     my @paths = ();
     foreach my $name (@names) { push(@paths, $outDir.'/'.$name); }
     my ($cmd, $output, @args, @outputs, $result);
-    my ($heatText, $heatPng, $scatterText, $scatterPng, $crHist, $hetHist) = @paths;
+    my ($heatText, $heatPdf, $heatPng, $scatterText, $scatterPdf, $scatterPng, $crHist, $hetHist) = @paths;
     my $heatPlotScript = "heatmapCrHetDensity.R";
     ### read input and do heatmap plot ###
     my $input = \*STDIN;
@@ -116,7 +119,7 @@ sub run {
     open $output, ">", $heatText || die "Cannot open output path $heatText: $!";
     writeTable(\@counts, $output);
     close $output;
-    @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax);
+    @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax, $heatPdf);
     @outputs = ($heatPng,);
     my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     ### do scatterplot & histograms ###
@@ -125,7 +128,7 @@ sub run {
 	writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
 	close $output;
 	my $scatterPlotScript = "plotCrHetDensity.R";
-	@args = ($scatterPlotScript, $scatterText, $title);
+	@args = ($scatterPlotScript, $scatterText, $title, $scatterPdf);
 	@outputs = ($scatterPng, $crHist, $hetHist);
 	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     }

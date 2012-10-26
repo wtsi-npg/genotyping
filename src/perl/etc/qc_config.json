@@ -3,6 +3,7 @@
                  "duplicate_input":"duplicate_summary.txt",
                  "main_index":"index.html",
                  "identity_input":"identity_check_results.txt",
+                 "magnitude":"magnitude.txt",
                  "sample_cr_het":"sample_cr_het.txt",
                  "plate_index":"index.html",
                  "plate_dir":"plate_heatmaps",
@@ -13,32 +14,34 @@
                   "call_rate":"sample_cr_het.txt",
                   "xydiff":"xydiff.txt",
                   "identity":"identity_check_results.txt",
-                  "duplicate":["sample_cr_het.txt","duplicate_summary.txt"],
-                  "gender":"sample_xhet_gender.txt"},
-  "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G"},
-  "name_array":["call_rate","heterozygosity","duplicate","identity","gender","xydiff"],
+                  "duplicate":["sample_cr_het.txt","duplicate_summary.txt","duplicate_full.txt.gz"],
+                  "gender":"sample_xhet_gender.txt",
+                  "magnitude":"magnitude.txt"},
+  "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G","magnitude":"M"},
+  "name_array":["identity","duplicate","gender","call_rate","heterozygosity","magnitude","xydiff"],
   "Threshold_types" : {
       "heterozygosity" : "Standard deviations",
-      "xydiff" : "Standard deviations",
+      "magnitude" : "Minimum",
       "call_rate" : "Minimum",
-      "identity" : "Maximum",
-      "duplicate" : "NA",
+      "identity" : "Minimum",
+      "duplicate" : "Maximum",
       "gender" : "NA"
    },
    "Metric_descriptions" : {
       "heterozygosity" : "Sample autosome heterozygosity rate",
-      "xydiff" : "Sample mean XY intensity difference",
+      "magnitude" : "Mean normalised magnitude of intensity",
       "call_rate" : "Sample call rate",
-      "identity" : "Pairwise identity check of all samples",
-      "duplicate" : "Duplicate check against Sequenom database",
+      "identity" : "Identity check against Sequenom database",
+      "duplicate" : "Pairwise duplicate check for all samples",
       "gender" : "Comparison of inferred and supplied gender"
    },
    "Metrics_thresholds" : {
       "heterozygosity" : 3,
       "call_rate" : 0.95,
-      "xydiff" : 3,
+      "magnitude" : 0.90,
       "identity" : 0.90,
-      "duplicate" : "NA",
-      "gender" : "NA"
+      "duplicate" : 0.98,
+      "gender" : "NA",
+      "xydiff" : 3
    }
 }
