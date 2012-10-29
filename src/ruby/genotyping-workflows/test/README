@@ -1,0 +1,28 @@
+
+To run test workflow tests, the following steps must be performed:
+
+Installation:
+
+1) The Perl libraries in this repository must be installed and the Perl and R
+   scripts must be available on the PATH.
+
+2) The genotype callers Illuminus and GenoSNP must be available on the PATH.
+
+3) The Gftools library must be installed (required by Illuminus and GenoSNP).
+
+4) The format-shifting utility program genotype-call must be available on the
+   PATH.
+
+Test data acquisition:
+
+5) A pipeline runtime database named 'genotyping.db' must be created using the
+   Perl scripts ready_pipe.pl, ready_infinium.pl and/or ready_external.pl. This
+   file must be copied to the test directory.
+
+   This file cannot be distributed for reasons of data confidentiality.
+
+Shell environment setup:
+
+6) The environment variable BEADPOOL_MANIFEST must be set to the absolute path
+   of the Infinium BeadPool manifest (.bpm.csv) file corresponding to the data
+   described by the pipeline runtime database created in step 5.

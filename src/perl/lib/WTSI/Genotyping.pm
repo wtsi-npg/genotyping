@@ -15,12 +15,18 @@ use Exporter;
                 collect_dirs
                 make_collector
                 modified_between
+                md5sum
+                hash_path
                 run_command
 
                 make_warehouse_metadata
                 make_infinium_metadata
                 make_file_metadata
                 make_creation_metadata
+                has_consent
+
+                publish_idat_files
+                publish_gtc_files
 
                 filter_columns
                 filter_gt_columns
@@ -35,8 +41,10 @@ use Exporter;
                 read_it_column_names
                 update_it_columns
                 write_gt_calls
-                update_snp_locations
                 write_gs_snps
+
+                update_snp_locations
+                update_sample_genders
               );
 
 use WTSI::Genotyping::DelimitedFiles;
@@ -45,11 +53,12 @@ use WTSI::Genotyping::IO;
 use WTSI::Genotyping::Illuminus;
 use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
+use WTSI::Genotyping::Publication;
 use WTSI::Genotyping::Utilities;
 
 use WTSI::Genotyping::iRODS;
 
-$VERSION = '0.4.0';
+$VERSION = '0.5.0';
 
 1;
 

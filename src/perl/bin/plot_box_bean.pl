@@ -1,4 +1,4 @@
-#!/software/bin/perl
+#! /software/bin/perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012
@@ -14,17 +14,24 @@
 
 use strict;
 use warnings;
+use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
-use WTSI::Genotyping::QC::QCPlotShared; 
+use Log::Log4perl qw(:easy);
+use WTSI::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
 use WTSI::Genotyping::QC::QCPlotTests;
 
-my ($mode, $RScriptPath, $outDir, $title, $help, $test);
+Log::Log4perl->easy_init($ERROR);
+my $log = Log::Log4perl->get_logger("genotyping");
+
+my ($mode, $type, $outDir, $title, $help, $test, $dbpath, $inipath);
 
 GetOptions("mode=s"     => \$mode,
-           "R=s"        => \$RScriptPath,
+	   "type=s"     => \$type,
 	   "out_dir=s"  => \$outDir,
 	   "title=s"    => \$title,
+	   "dbpath=s"   => \$dbpath,
+	   "inipath=s"  => \$inipath,
 	   "h|help"     => \$help);
 
 
@@ -36,8 +43,10 @@ Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or th
 
 Options:
 --mode=KEY          Keyword to determine plot type. Must be one of: cr, het, xydiff
+--type=KEY          Keyword for plot type.  Must be one of: box, bean, both
+--dbpath=PATH       Path to pipeline database containing plate information
+--inipath=PATH      Path to .ini file for pipeline database
 --out_dir=PATH      Output directory for plots
---R=PATH            Path to Rscript installation to execute plots
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to: ./platePlots
 ";
@@ -48,92 +57,95 @@ Unspecified options will receive default values, with output written to: ./plate
 # mode determines some custom options (eg. xydiff scale), also used to construct filenames
 # default options
 $mode ||= "cr";
-my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-$RScriptPath ||=  $RScriptExec;
-$outDir ||= 'testBoxPlots';
+$type = 'both';
+$outDir ||= '.';
 $title ||= "UNTITLED";
-$test ||= 1; # test mode is on by default
 
-my $scriptDir = $Bin."/".$RScriptsRelative; 
-
-sub parsePlate {
-    # parse plate from sample name, assuming usual PLATE_WELL_ID format
-    # return undefined value for incorrectly formatted name
-    my $name = shift;
-    my $plate;
-    if ($name =~ /\w+_\w+/) {
-	my @terms = split(/_/, $name);
-	$plate = shift @terms;
-    }
-    return $plate;
-}
+unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") { die "Illegal mode argument: $mode: $!"; }
+unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal type argument: $type: $!"; }
+if ((!$dbpath) && (!$inipath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
+if ($dbpath && !(-r $dbpath)) { croak "Cannot read pipeline database path $dbpath"; }
+if ($inipath && !(-r $inipath)) { croak "Cannot read .ini path $inipath"; }
 
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
     # data is taken from a particular index in space-separated input (eg. sample_cr_het.txt)
-    my ($input, $output, $index) = @_;
-    my $inputOK = 1;
+    my ($input, $output, $index, $dbpath,  $inipath) = @_;
+    my $inputOK = 0;
+    my %plateLocs = getPlateLocationsFromPath($dbpath, $inipath);
     while (<$input>) {
 	if (/^#/) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	my $plate = parsePlate($words[0]);
-	unless ($plate) {
-	    my $message = "Cannot parse plate from sample name; omitting box/beanplots.\n";
-	    print $output "# ERROR: $message";
-	    print STDERR $message;
-	    $inputOK = 0;
-	    last;
+	unless ($plateLocs{$words[0]}) { croak "No plate location for sample '$words[0]'; exiting"; }
+	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};
+	if ($plate) {
+	    $inputOK = 1; # require at least one sample with a valid plate!
+	    print $output $plate."\t".$words[$index]."\n";
 	}
-	print $output $plate."\t".$words[$index]."\n";
     }
     return $inputOK;
 }
 
-sub runBeanPlot {
-    # optionally, also generate a beanplot
-    # may have to swap things around if beanplots become the default mode of operation!
-    my ($mode, $RScriptPath, $outDir, $title, $scriptDir, $textPath, $test) = @_;
-    my %plotScripts = ( # R plotting scripts for each mode
-	cr     => $scriptDir.'beanplotCR.R',
-	het    => $scriptDir.'beanplotHet.R', 
-	xydiff => $scriptDir.'beanplotXYdiff.R', );
-    my $pngOutPath = $outDir."/".$mode."_beanplot.png";
-    my @args = ($RScriptPath, $plotScripts{$mode}, $textPath, $title);
+sub runPlotScript {
+    # run R script to create box/beanplot
+    my ($mode, $bean, $outDir, $title, $textPath) = @_;
+    my %beanPlotScripts = ( # R plotting scripts for each mode
+	cr     => 'beanplotCR.R',
+	het    => 'beanplotHet.R', 
+	xydiff => 'beanplotXYdiff.R', );
+    my %boxPlotScripts = ( # R plotting scripts for each mode
+	cr     => 'boxplotCR.R',
+	het    => 'boxplotHet.R', 
+	xydiff => 'boxplotXYdiff.R', );
+    my ($plotScript, $pngOutPath);
+    if ($bean) { 
+	$plotScript = $beanPlotScripts{$mode}; 
+	$pngOutPath = $outDir."/".$mode."_beanplot.png";
+    }
+    else { 
+	$plotScript = $boxPlotScripts{$mode}; 
+	$pngOutPath = $outDir."/".$mode."_boxplot.png";
+    }
+    my @args = ($plotScript, $textPath, $title);
     my @outputs = ($pngOutPath,);
-    my $result = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
-    return $result;
+    if (!$bean && $mode eq 'cr') { push(@outputs, $outDir.'/total_samples_per_plate.png'); }
+    my ($ok, $cmd, $info) = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, 1);
+    if (not $ok) {
+	# R script error should not be fatal; beanplot may fail on 'sparse' data
+	my $msg = "Warning: R script failure: Command \"$cmd\", output \"$info\"\n";
+	$log->error($msg);
+    }
+    return 1;
 }
 
 sub run {
     # mode = cr, het or xydiff
-    my ($mode, $RScriptPath, $scriptDir, $outDir, $title, $test) = @_;
-    my %plotScripts = ( # R plotting scripts for each mode
-	cr     => $scriptDir.'boxplotCR.R',
-	het    => $scriptDir.'boxplotHet.R', 
-	xydiff => $scriptDir.'boxplotXYdiff.R', );
+    # type = box, bean, or both
+    my ($mode, $type, $outDir, $title, $dbpath, $inipath) = @_;
     my %index = ( # index in whitespace-separated input data for each mode; use to write .txt input to R scripts
 	cr     => 1,
 	het    => 2, 
 	xydiff => 1, );
     my $input = \*STDIN;
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
-    my $pngOutPath = $outDir."/".$mode."_boxplot.png";
-    open my $output, "> $textOutPath" || die "Cannot open output file: $!";
-    my $inputOK = writeBoxplotInput($input, $output, $index{$mode});
+    open my $output, ">", $textOutPath || croak "Cannot open output file: $!";
+    my $inputOK = writeBoxplotInput($input, $output, $index{$mode}, $dbpath, $inipath);
     close $output;
-    my $plotsOK = 1;
+    my $plotsOK = 0; 
     if ($inputOK) {
-	my @args = ($RScriptPath, $plotScripts{$mode}, $textOutPath, $title);
-	my @outputs = ($pngOutPath,);
-	if ($mode eq 'cr') { push(@outputs, $outDir."/platePopulationSizes.png"); }
-	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
-	my $result = runBeanPlot($mode, $RScriptPath, $outDir, $title, $scriptDir, $textOutPath, $test);
-	if ($test && $result==0) { $plotsOK = 0; }
+	if ($type eq 'both' || $type eq 'box') {
+	    $plotsOK = runPlotScript($mode, 0,  $outDir, $title, $textOutPath); # boxplot
+	}
+	if ($plotsOK && ($type eq 'both' || $type eq 'bean')) {
+	    $plotsOK = runPlotScript($mode, 1,  $outDir, $title, $textOutPath); # beanplot
+	}
+    } else {
+	croak "\tERROR: Cannot parse any plate names from standard input";
     }
     return $plotsOK;
 }
 
-my $ok = run($mode, $RScriptPath, $scriptDir, $outDir, $title, $test);
+my $ok = run($mode, $type, $outDir, $title, $dbpath, $inipath);
 if ($ok) { exit(0); }
 else { exit(1); }

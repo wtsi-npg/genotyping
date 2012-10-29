@@ -1,4 +1,4 @@
-#! /usr/bin/env Rscript
+#! /software/R-2.14.1/bin/Rscript
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012

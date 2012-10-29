@@ -19,6 +19,7 @@
 module Genotyping::Tasks
 
   PLINK = 'plink'
+  UPDATE_ANNOTATION = 'update_plink_annotation.pl'
 
   # Returns true if the Plink executable is available.
   def plink_available?()
@@ -40,13 +41,12 @@ module Genotyping::Tasks
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
-    # - An Array of 3 filenames, being the Plink BED and corresponding BIM and
-    #  FAM files.
+    # - The merged Plink BED file name
     def merge_bed(bed_files, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(bed_files, output, work_dir)
-        output = absolute_path(output, work_dir) unless absolute_path?(output)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         first_bed = bed_files.first
         rest_bed = bed_files.slice(1, bed_files.size - 1)
 
@@ -70,12 +70,65 @@ module Genotyping::Tasks
         }].flatten.join(' ')
 
         margs = [bed_files, work_dir, output]
-        task_id = task_identity(:bed_merge, *margs)
+        task_id = task_identity(:merge_bed, *margs)
         log = File.join(log_dir, task_id + '.log')
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
-                   :result => lambda { expected },
+                   :result => lambda { expected.first },
+                   :async => async)
+      end
+    end
+
+    def transpose_bed(bed_file, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(bed_file, output, work_dir)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
+        expected = plink_fileset(output)
+
+        cli_args = {:noweb => true,
+                    :make_bed => true,
+                    :bfile => File.basename(bed_file, '.bed'),
+                    :recode => true,
+                    :transpose => true,
+                    :out => File.basename(output, '.bed')}
+
+        command = [PLINK, cli_arg_map(cli_args, :prefix => '--') { |key|
+          key.gsub(/_/, '-')
+        }].flatten.join(' ')
+
+        margs = [bed_file, work_dir, output]
+        task_id = task_identity(:transpose_bed, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { expected.first },
+                   :async => async)
+      end
+    end
+
+    def update_annotation(bed_file, sample_json, snp_json, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(bed_file, sample_json, snp_json, work_dir)
+        output = absolute_path?(bed_file) ? bed_file : absolute_path(bed_file, work_dir)
+        expected = plink_fileset(output)
+
+        cli_args = {:bed => bed_file,
+                    :samples => sample_json,
+                    :snps => snp_json}
+        command = [UPDATE_ANNOTATION,
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+
+        margs = [bed_file, sample_json, snp_json, work_dir]
+        task_id = task_identity(:update_annotation, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { expected.first },
                    :async => async)
       end
     end
