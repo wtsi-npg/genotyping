@@ -18,7 +18,7 @@ QC scripts:
 
  R >= 2.11.1
  R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
- R beanplot library     http://cran.r-project.org/web/packages/beanplot/index.html
+
 
 Pipeline metadata management:
 
@@ -37,4 +37,4 @@ Pipeline components:
 Environment variables:
 
  PERL5LIB   Should include path to genotyping/src/perl/lib/
- R_LIBS     Should include path to mixtools, beanplot library installations
+ R_LIBS     Should include path to mixtools library installation

@@ -8,19 +8,14 @@ use strict;
 use warnings;
 use Cwd;
 use File::Basename;
-use File::Copy;
 use File::Temp qw(tempdir);
 use Getopt::Long;
-use JSON;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(maybe_stdin maybe_stdout
-                        read_snp_json write_gs_snps update_snp_locations);
+use WTSI::Genotyping qw(read_snp_json write_gs_snps);
 
 Log::Log4perl->easy_init($ERROR);
-
-$|=1;
 
 my $input;
 my $cutoff;
@@ -44,7 +39,7 @@ unless ($snps) {
 }
 
 if (defined $plink && !defined $output) {
-  pod2usage(-msg => "An --output argument must be given if --plink is specified",
+  pod2usage(-msg => "An --output argument must be given if --plink is specified\n",
             -exitval => 2);
 }
 
@@ -57,11 +52,11 @@ $input ||= '/dev/stdin';
 $output ||= '/dev/stdout';
 
 my $tmp_dir = tempdir(CLEANUP => 1);
-my @snps = read_snp_json($snps);
 my $snps_file = $tmp_dir . '/' . 'genosnp_snps';
-open (SNPS, ">$snps_file") or die "Failed to open '$snps_file': $!\n";
-write_gs_snps(\*SNPS, \@snps);
-close(SNPS);
+open (my $genosnp_snps, '>', "$snps_file")
+  or die "Failed to open '$snps_file': $!\n";
+write_gs_snps($genosnp_snps, [read_snp_json($snps)]);
+close($genosnp_snps) or warn "Failed to close '$snps_file'\n";
 
 my @command = ($executable, '-cutoff', $cutoff,
                '-samples', $input, '-snps', $snps_file);
@@ -79,7 +74,6 @@ if ($plink) {
   }
 
   system($command) == 0 or die "Failed to execute '$command'\n";
-  update_plink_annotation($output, \@snps, $tmp_dir);
 
   exit(0);
 }
@@ -92,28 +86,6 @@ else {
   }
 
   system($command) == 0 or die "Failed to execute '$command'\n";
-}
-
-# GenoSNP is incapable of writing complete Plink output, so we have
-# to fix it here by adding SNP chromosomes and positions
-sub update_plink_annotation {
-  my ($output, $snps, $tmp_dir) = @_;
-
-  my ($base, $path, $suffix) = fileparse($output, '.bed');
-  my $bim_file = $path . $base . '.bim';
-  my $tmp_bim = $tmp_dir . $base . '.bim';
-  my $in = maybe_stdin($bim_file);
-  my $out = maybe_stdout($tmp_bim);
-
-  my %locations;
-  foreach my $snp (@$snps) {
-    $locations{$snp->{name}} = [$snp->{chromosome}, $snp->{position}];
-  }
-  update_snp_locations($in, $out, \%locations);
-  close($in);
-  close($out);
-  move($tmp_bim, $bim_file) or die "Failed to move $tmp_bim: $!\n";
-  unlink($tmp_bim);
 }
 
 
@@ -166,19 +138,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.2.0
-
-=head1 CHANGELOG
-
-  0.2.0
-
-    Added logging.
-
-  0.1.0
-
-    Initial version 0.1.0
 
 =cut

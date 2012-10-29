@@ -5,9 +5,70 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use File::Copy;
+
+sub update_snp_locations {
+  my ($input, $output, $snps, $tmp_dir) = @_;
+
+  # SNP information
+  my @snps = read_snp_json($snps);
+
+  my ($in_base, $in_path, $in_suffix) = fileparse($input, '.bed');
+  my $in_bim = $in_path . '/' . $in_base . '.bim';
+  my $tmp_bim = $tmp_dir . $in_base . '.bim';
+  open(my $in, '<', $in_bim) or confess "Failed to open '$in_bim': $!\n";
+  open(my $out, '>', $tmp_bim)  or confess "Failed to open '$tmp_bim': $!\n";
+
+  my %locations;
+  foreach my $snp (@snps) {
+    $locations{$snp->{name}} = [$snp->{chromosome}, $snp->{position}];
+  }
+  my $num_updated = _update_snp_locations($in, $out, \%locations);
+
+  close($in) or warn "Failed to close $in\n" ;
+  close($out) or warn "Failed to close $out\n";
+
+  my ($out_base, $out_path, $out_suffix) = fileparse($output, '.bed');
+  my $out_bim = $out_path . '/' . $out_base . '.bim';
+
+  move($tmp_bim, $out_bim) or
+    confess "Failed to move $tmp_bim to $out_bim: $!\n";
+
+  return $num_updated;
+}
+
+sub update_sample_genders {
+  my ($input, $output, $samples, $tmp_dir) = @_;
+
+  my @samples = read_sample_json($samples);
+
+  my ($base, $path, $suffix) = fileparse($input, '.bed');
+  my $fam_file = $path . '/' . $base . '.fam';
+  my $tmp_fam = $tmp_dir . $base . '.fam';
+  open(my $in, '<', $fam_file) or confess "Failed to open '$fam_file': $!\n";
+  open(my $out, '>', $tmp_fam)  or confess "Failed to open '$tmp_fam': $!\n";
+
+  my %genders;
+  foreach my $sample (@samples) {
+    $genders{$sample->{uri}} = $sample->{gender_code};
+  }
+
+  my $num_updated = _update_sample_genders($in, $out, \%genders);
+
+  close($in) or warn "Failed to close $in\n";
+  close($out) or warn "Failed to close $out\n";
+
+  my ($out_base, $out_path, $out_suffix) = fileparse($output, '.bed');
+  my $out_fam = $out_path . '/' . $out_base . '.fam';
+
+  move($tmp_fam, $out_fam) or
+    confess "Failed to move $tmp_fam to $out_fam: $!\n";
+
+  return $num_updated;
+}
 
 
-=head2 update_snp_locations
+=head2 _update_snp_locations
 
   Arg [1]    : filehandle
   Arg [2]    : filehandle
@@ -24,7 +85,7 @@ use Carp;
 
 =cut
 
-sub update_snp_locations {
+sub _update_snp_locations {
   my ($in, $out, $locations) = @_;
   my $n = 0;
 
@@ -34,14 +95,14 @@ sub update_snp_locations {
       split /\s+/, $line;
 
     unless (exists $locations->{$snp_name}) {
-      croak "Failed to update the location of SNP '$snp_name'; " .
-        "no location was provided";
+      confess "Failed to update the location of SNP '$snp_name'; " .
+        "no location was provided\n";
     }
 
     my $new_loc = $locations->{$snp_name};
     unless (ref($new_loc) eq 'ARRAY' && scalar @$new_loc == 2) {
-      croak "Failed to update the location of SNP '$snp_name'; " .
-        "location was not a 2-element array";
+      confess "Failed to update the location of SNP '$snp_name'; " .
+        "location was not a 2-element array\n";
     }
 
     my $new_chr = $new_loc->[0];
@@ -49,6 +110,30 @@ sub update_snp_locations {
 
     print $out join("\t", $new_chr, $snp_name, $genetic_pos, $new_pos,
                     $allele1, $allele2), "\n";
+    ++$n;
+  }
+
+  return $n;
+}
+
+sub _update_sample_genders {
+  my ($in, $out, $genders) = @_;
+
+  my $n = 0;
+
+  while (my $line = <$in>) {
+    chomp($line);
+    my ($family_id, $paternal_id, $maternal_id, $gender, $phenotype) =
+      split /\s+/, $line;
+
+    unless (exists $genders->{$family_id}) {
+      confess "Failed to update the gender of '$family_id'; " .
+        "no gender was provided\n";
+    }
+
+    my $new_gender = $genders->{$family_id};
+    print $out join("\t", $family_id, $paternal_id, $maternal_id, $new_gender,
+                    $phenotype), "\n";
     ++$n;
   }
 

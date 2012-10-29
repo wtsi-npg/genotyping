@@ -1,4 +1,4 @@
-#! /usr/bin/perl
+#! /software/bin/perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # May 2012
@@ -10,8 +10,9 @@ use strict;
 use WTSI::Genotyping::QC::SimFiles;
 
 my $fh;
-open $fh, "< $ARGV[0]";
-my @fields = WTSI::Genotyping::QC::SimFiles::readHeader($fh);
+open $fh, "<", $ARGV[0];
+my $header = WTSI::Genotyping::QC::SimFiles::readHeader($fh);
+my @fields = WTSI::Genotyping::QC::SimFiles::unpackHeader($header);
 foreach my $field (@fields) { print $field."\n"; }
 print "#####\n";
 my $blockSize =  WTSI::Genotyping::QC::SimFiles::blockSizeFromHeader(@fields);

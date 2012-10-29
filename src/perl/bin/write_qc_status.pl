@@ -1,4 +1,4 @@
-#! /usr/bin/env perl
+#! /software/bin/perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # June 2012
@@ -16,14 +16,20 @@
 
 use strict;
 use warnings;
+use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
+use IO::Uncompress::Gunzip; # for duplicate_full.txt.gz
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared;
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames);
 
-my ($inputDir, $outputDir, $configPath, $help);
+our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
+
+my ($inputDir, $outputDir, $configPath, $dbPath, $iniPath, $help);
 
 GetOptions("input-dir=s"   => \$inputDir,
+	   "dbpath=s"      => \$dbPath,
+	   "inipath=s"     => \$iniPath,
 	   "output-dir=s"  => \$outputDir,
 	   "config=s"      => \$configPath,
 	   "help"          => \$help,
@@ -34,7 +40,9 @@ if ($help) {
 Options:
 --input-dir         Directory containing input files (defaults to current working directory)
 --output-dir        Output directory (defaults to input directory)
---config            Config path in JSON format, specifying metrics and thresholds (defaults to standard file)
+--config            Config path in JSON format (default taken from inipath)
+--dbpath            Path to pipeline.db file, to obtain plate names for each sample
+--inipath           Path to .ini file for pipeline database, and for JSON config default
 --help              Print this help text and exit
 ";
     exit(0);
@@ -42,11 +50,18 @@ Options:
 
 $inputDir ||= '.';
 $outputDir ||= $inputDir;
-$configPath ||= $Bin."/../json/qc_threshold_defaults.json";
-my %fileNames = WTSI::Genotyping::QC::QCPlotShared::readQCFileNames();
+$iniPath ||= $DEFAULT_INI;
+$configPath ||= defaultJsonConfig($iniPath); 
+
+if ((!$dbPath) && (!$iniPath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
+if ($dbPath && !(-r $dbPath)) { croak "Cannot read pipeline database path $dbPath"; }
+if ($iniPath && !(-r $iniPath)) { croak "Cannot read .ini path $iniPath"; }
+if (not -r $configPath) { croak "Cannot read config path $configPath"; }
+
+my %fileNames = readQCFileNames($configPath);
 my $outPath = $outputDir.'/'.$fileNames{'qc_results'};
 
-run($inputDir, $configPath, $outPath);
+run($inputDir, $configPath, $dbPath, $iniPath, $outPath);
 
 sub convertResults {
     # convert results from metric-major to sample-major ordering
@@ -62,61 +77,78 @@ sub convertResults {
     return %sampleResults;
 }
 
+sub findMaxSimilarity {
+    # find max pairwise similarity for each sample from duplicate_full.txt.gz
+    my $inPath = shift;
+    if (!(-e $inPath)) { croak "Input path $inPath does not exist!"; }
+    my (%max, $GunzipError);
+    my $z = new IO::Uncompress::Gunzip $inPath || 
+        croak "gunzip failed: $GunzipError\n";
+    while (<$z>) {
+        chomp;
+        my @words = split;
+        my @samples = ($words[1], $words[2]);
+        my $sim = $words[3];
+        # redudant pairwise comparisons are omitted, so check both
+        foreach my $sample (@samples) {
+            my $lastMax = $max{$sample};
+            if ((!$lastMax) || $sim > $lastMax) {
+                $max{$sample} = $sim;
+            }
+        }
+    }
+    $z->close();
+    return %max;
+}
+
 sub findMetricResults {
     # find input path(s) and QC results for given metric
     my ($inputDir, $metric, $threshold, $input) = @_;
     my %results;
     if ($metric eq 'call_rate') { 
-	%results = resultsCr($threshold, $inputDir.'/'.$input);
+        %results = resultsCr($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'heterozygosity') { 
-	%results = resultsHet($threshold, $inputDir.'/'.$input);
+        %results = resultsHet($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'duplicate') { 
-	my @input = @$input;
-	my @paths = ();
-	foreach my $name (@input) { push(@paths, $inputDir."/".$name); } 
-	%results = resultsDuplicate($threshold, \@paths);	    
+        my @input = @$input;
+        my @paths = ();
+        foreach my $name (@input) { push(@paths, $inputDir."/".$name); } 
+        %results = resultsDuplicate($threshold, \@paths);	    
     } elsif ($metric eq 'identity') { 
-	%results = resultsIdentity($threshold, $inputDir.'/'.$input);
+        %results = resultsIdentity($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'gender') { 
-	%results = resultsGender($threshold, $inputDir.'/'.$input);
+        %results = resultsGender($threshold, $inputDir.'/'.$input);
     } elsif ($metric eq 'xydiff') { 
-	%results = resultsXydiff($threshold, $inputDir.'/'.$input);
-    } else { die "Unknown QC metric $metric: $!"; }
-     return %results;
+        %results = resultsXydiff($threshold, $inputDir.'/'.$input);
+    } elsif ($metric eq 'magnitude') { 
+        %results = resultsMagnitude($threshold, $inputDir.'/'.$input);
+    } else { 
+        carp "WARNING: Unknown QC metric $metric: $!"; 
+    }
+    return %results;
 }
 
 sub readSampleNames {
     # read sample names from sample_cr_het.txt (or any other tab-delimited file with sample name as first field)
     # Now obsolete for this script! But may be useful to preserve sample order in human-readable output.
     my $inPath = shift;
-    open IN, "< $inPath" || die "Cannot open input path $inPath: $!";
+    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!";
     my $i = 0;
     my @samples = ();
-    while (<IN>) {
+    while (<$in>) {
 	if (/^#/) { next; } # comments start with a #
 	chomp;
 	my @words = split;
 	push(@samples, shift(@words));
     }
-    close IN;
+    close $in;
     return @samples;
 }
 
 
 sub resultsCr {
     # find call rate (CR) and pass/fail status of each sample
-    my ($threshold, $inPath) = @_;
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
-    my %results;
-    foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $cr) = ($fields[0], $fields[1]);
-	my $pass;
-	if ($cr >= $threshold) { $pass = 1; }
-	else { $pass = 0; }
-	$results{$sample} = [$pass, $cr];
-    }
-    return %results;
+    return resultsMinimum(@_);
 }
 
 sub resultsDuplicate {
@@ -125,41 +157,49 @@ sub resultsDuplicate {
     # read call rates from sample_cr_het.txt
     # $threshold is not used
     my ($threshold, $inPathsRef) = @_;
-    my ($crHetPath, $duplicatePath, ) = @$inPathsRef;
+    my ($crHetPath, $duplicatePath, $duplicateFull) = @$inPathsRef;
     my (%duplicates, @pairs, %results);
+    my %maxSimilarity = findMaxSimilarity($duplicateFull);
     # read duplicate sample names
-    open IN, "< $duplicatePath" || die "Cannot open input path $duplicatePath: $!";
-    while (<IN>) {
-	if (/^#/) { next; } # comments start with a #
-	my @fields = split;
-	my @pair = ($fields[1], $fields[2]);
-	foreach my $sample (@pair) { $duplicates{$sample} = 1; }
-	push(@pairs, \@pair);
+    open my $in, "<", $duplicatePath || die "Cannot open input path $duplicatePath: $!";
+    while (<$in>) {
+        if (/^#/) { next; } # comments start with a #
+        my @fields = split;
+        my @pair = ($fields[1], $fields[2]);
+        foreach my $sample (@pair) { $duplicates{$sample} = 1; }
+        push(@pairs, \@pair);
     }
-    close IN;
+    close $in;
     # read call rates for duplicated samples
     my (%duplicateCR, @samples);
     my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $cr) = ($fields[0], $fields[1]);
-	if ($duplicates{$sample}) { $duplicateCR{$sample} = $cr; }
-	push(@samples, $sample);
+        my @fields = @$ref;
+        my ($sample, $cr) = ($fields[0], $fields[1]);
+        if ($duplicates{$sample}) { $duplicateCR{$sample} = $cr; }
+        push(@samples, $sample);
     }
     # choose which duplicates to keep/discard
     my %pass;
     foreach my $pairRef (@pairs) {
-	my ($sam1, $sam2) = @$pairRef;
-	if ($duplicateCR{$sam1} > $duplicateCR{$sam2}) { $pass{$sam1} = 1; $pass{$sam2} = 0; }
-	elsif ($duplicateCR{$sam1} < $duplicateCR{$sam2}) { $pass{$sam1} = 0; $pass{$sam2} = 1; } 
-	elsif ($sam1 lt $sam2) { $pass{$sam1} = 1; $pass{$sam2} = 0; }
-	else { $pass{$sam1} = 0; $pass{$sam2} = 1; } 
+        my ($sam1, $sam2) = @$pairRef;
+        if ($duplicateCR{$sam1} > $duplicateCR{$sam2}) { 
+            $pass{$sam1} = 1; $pass{$sam2} = 0; 
+        } elsif ($duplicateCR{$sam1} < $duplicateCR{$sam2}) { 
+            $pass{$sam1} = 0; $pass{$sam2} = 1; 
+        } 
+        elsif ($sam1 lt $sam2) { 
+            $pass{$sam1} = 1; $pass{$sam2} = 0; 
+        } else { 
+            $pass{$sam1} = 0; $pass{$sam2} = 1; 
+        } 
     }
-    # fill in results for all samples; use 0/1 for not_duplicate/duplicate metric values
+    # fill in results for all samples; metric = max similarity
     foreach my $sample (@samples) {
-	if (!$duplicates{$sample}) { $results{$sample}=[1,0]; }
-	elsif ($pass{$sample}) { $results{$sample} = [1,1]; }
-	else { $results{$sample}=[0, 1]; }
+        my $metric = $maxSimilarity{$sample};
+        if (!$duplicates{$sample}) { $results{$sample}=[1,$metric]; }
+        elsif ($pass{$sample}) { $results{$sample} = [1,$metric]; }
+        else { $results{$sample}=[0,$metric]; }
     }
     return %results;
 }
@@ -169,15 +209,14 @@ sub resultsGender {
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
     my ($threshold, $inPath) = @_;
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
     my %results;
     foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $inferred, $supplied) = ($fields[0], $fields[2], $fields[3]);
+	my ($sample, $xhet, $inferred, $supplied) = @$ref;
 	my $pass;
 	if ($inferred==$supplied) { $pass = 1; }
 	else { $pass = 0; }
-	$results{$sample} = [$pass, $inferred.$supplied];
+	$results{$sample} = [$pass, $xhet, $inferred, $supplied];
     }
     return %results;
 }
@@ -212,6 +251,27 @@ sub resultsIdentity {
     return %results;
 }
 
+sub resultsMagnitude {
+    return resultsMinimum(@_);
+}
+sub resultsMinimum {
+    # read simple results file and apply minimum threshold
+    # use for cr, normalised magnitude
+    my ($threshold, $inPath) = @_;
+    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my %results;
+    foreach my $ref (@data) {
+        my @fields = @$ref;
+        my ($sample, $metric) = ($fields[0], $fields[1]);
+        my $pass;
+        if ($metric >= $threshold) { $pass = 1; }
+        else { $pass = 0; }
+        $results{$sample} = [$pass, $metric];
+    }
+    return %results;
+}
+
+
 sub resultsMetricSd {
     # find results for given field, fail samples too far from the mean; use for het rate, xydiff
     # threshold expressed in standard deviations; first need to find absolute thresholds
@@ -231,7 +291,6 @@ sub resultsMetricSd {
 	if ($values[$i] >= $min && $values[$i] <= $max) { $pass = 1; }
 	else { $pass = 0; }
 	$results{$samples[$i]} = [$pass, $values[$i]];
-	#if ($i % 100 == 0) { print join("\t", $i, $pass, $values[$i])."\n"; } ### test
     }
     return %results;
 }
@@ -239,14 +298,14 @@ sub resultsMetricSd {
 sub resultsXydiff {
     my ($threshold, $inPath) = @_;
     my $index = 1;
-    my $startLine = 1;
+    my $startLine = 0;
     return resultsMetricSd($threshold, $index, $inPath, $startLine);
 }
 
 sub writeResults {
     # find QC results and write to given filehandle in JSON format
     # assumes all results will fit in memory!  If not, will need to rethink I/O and file format.
-    my ($out, $sep, $inputDir, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
+    my ($out, $inputDir, $dbPath, $iniPath, $metricsRef, $thresholdsRef, $inputNamesRef) = @_;
     my @metrics = @$metricsRef;
     my %thresholds = %$thresholdsRef;
     my %inputNames = %$inputNamesRef;
@@ -257,26 +316,37 @@ sub writeResults {
     }
     # change from metric-major to sample-major ordering; simplifies later data processing
     my %sampleResults = convertResults(\%metricResults);
+    my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
+    foreach my $sample (keys(%sampleResults)) {
+	my %results = %{$sampleResults{$sample}};
+	my ($plate, $addressLabel) = ("Unknown_plate", "Unknown_address");
+	my $locsRef = $plateLocs{$sample};
+	if ($locsRef) { ($plate, $addressLabel) = @$locsRef; }
+	$results{'plate'} = $plate;
+	$results{'address'} = $addressLabel;
+	$sampleResults{$sample} = \%results;
+    }
     my $resultString = encode_json(\%sampleResults);
     print $out $resultString;
+    return 1;
 }
 
 sub run {
     # main method to run script
-    my ($inputDir, $configPath, $outPath, $sep) = @_;
-    $sep ||= "\t";
+    my ($inputDir, $configPath, $dbPath, $iniPath, $outPath) = @_;
     my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
-    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray();
+    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray($configPath);
     my @metrics = ();
     foreach my $metric (@metricNames) { 
 	# use metrics with defined thresholds
 	if (defined($thresholds{$metric})) { push(@metrics, $metric); }
     } 
-    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs();
+    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs($configPath);
     my $out;
-    open($out, "> $outPath") || die "Cannot open output path $outPath: $!"; 
-    writeResults($out, $sep, $inputDir, \@metrics, \%thresholds, \%inputNames);
+    open($out, ">", $outPath) || die "Cannot open output path $outPath: $!"; 
+    writeResults($out, $inputDir, $dbPath, $iniPath, \@metrics, \%thresholds, \%inputNames);
     close($out);
+    return 1;
 }
 
 

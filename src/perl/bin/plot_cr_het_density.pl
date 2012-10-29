@@ -1,4 +1,4 @@
-#! /usr/bin/env perl
+#! /software/bin/perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # March 2012
@@ -11,13 +11,11 @@ use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
-use WTSI::Genotyping::QC::QCPlotShared; # qcPlots module to define constants
 use WTSI::Genotyping::QC::QCPlotTests;
 
 my ($RScriptPath, $outDir, $title, $help);
 
-GetOptions("R=s"        => \$RScriptPath,
-	   "out_dir=s"  => \$outDir,
+GetOptions("out_dir=s"  => \$outDir,
 	   "title=s"    => \$title,
 	   "h|help"     => \$help);
 
@@ -25,7 +23,6 @@ if ($help) {
     print STDERR "Usage: $0 [ options ] 
 Options:
 --out_dir=PATH      Output directory for plots
---R=PATH            Path to Rscript installation to execute plots
 --title=TITLE       Title for experiment
 --help              Print this help text and exit
 Unspecified options will receive default values, with output written to current directory.
@@ -33,12 +30,8 @@ Unspecified options will receive default values, with output written to current 
     exit(0);
 }
 
-my ($RScriptExec, $RScriptsRelative) = WTSI::Genotyping::QC::QCPlotShared::getRPaths();
-$RScriptPath ||= $RScriptExec;
 $outDir ||= '.';
-$title ||= 'Unknown';
-
-my $scriptDir = $Bin."/".$RScriptsRelative; 
+$title ||= 'UNTITLED';
 my $test = 1;
 
 sub getBinCounts {
@@ -102,43 +95,46 @@ sub writeTable {
 	my @row = @$rowRef;
 	print $output join("\t", @row)."\n";
     }
+    return 1;
 }
 
 sub run {
-    my $RScriptPath = shift;
-    my $scriptDir = shift;
     my $title = shift;
     my $outDir = shift;
-    my $test = shift;
-    my @names = ('crHetDensityHeatmap.txt', 'crHetDensityHeatmap.png', 'crHet.txt', 
-		 'crHetDensityScatter.png', 'crHistogram.png', 'hetHistogram.png');
+    my @names = ('crHetDensityHeatmap.txt', 'crHetDensityHeatmap.pdf', 
+                 'crHetDensityHeatmap.png', 
+                 'crHet.txt',  'crHetDensityScatter.pdf',
+                 'crHetDensityScatter.png', 'crHistogram.png', 
+                 'hetHistogram.png');
     my @paths = ();
     foreach my $name (@names) { push(@paths, $outDir.'/'.$name); }
     my ($cmd, $output, @args, @outputs, $result);
-    my ($heatText, $heatPng, $scatterText, $scatterPng, $crHist, $hetHist) = @paths;
-    my $heatPlotScript = $scriptDir."heatmapCrHetDensity.R";
+    my ($heatText, $heatPdf, $heatPng, $scatterText, $scatterPdf, $scatterPng, $crHist, $hetHist) = @paths;
+    my $heatPlotScript = "heatmapCrHetDensity.R";
     ### read input and do heatmap plot ###
     my $input = \*STDIN;
     my ($coordsRef, $hetMin, $hetMax) = readCrHet($input);
     my ($xmin, $xmax, $xsteps, $ysteps) = (0, 41, 40, 40);
     my @counts = getBinCounts($coordsRef, $xmin, $xmax, $xsteps, $hetMin, $hetMax, $ysteps);
-    open $output, "> $heatText" || die "Cannot open output path $heatText: $!";
+    open $output, ">", $heatText || die "Cannot open output path $heatText: $!";
     writeTable(\@counts, $output);
     close $output;
-    @args = ($RScriptPath, $heatPlotScript, $heatText, $title, $hetMin, $hetMax);
+    @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax, $heatPdf);
     @outputs = ($heatPng,);
-    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     ### do scatterplot & histograms ###
-    open $output, "> $scatterText" || die "Cannot open output path $scatterText: $!";
-    writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
-    close $output;
-    my $scatterPlotScript = $scriptDir."plotCrHetDensity.R";
-    @args = join(' ', $RScriptPath, $scatterPlotScript, $scatterText, $title);
-    @outputs = ($scatterPng, $crHist, $hetHist);
-    $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs, $test);
+    if ($plotsOK) {
+	open $output, ">", $scatterText || die "Cannot open output path $scatterText: $!";
+	writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
+	close $output;
+	my $scatterPlotScript = "plotCrHetDensity.R";
+	@args = ($scatterPlotScript, $scatterText, $title, $scatterPdf);
+	@outputs = ($scatterPng, $crHist, $hetHist);
+	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    }
     return $plotsOK;    
 }
 
-my $ok = run($RScriptPath, $scriptDir, $title, $outDir, $test);
+my $ok = run($title, $outDir, $test);
 if ($ok) { exit(0); }
 else { exit(1); }

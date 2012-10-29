@@ -16,7 +16,7 @@ use WTSI::Genotyping qw(maybe_stdout);
 
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/msx;
 
 Log::Log4perl->easy_init($ERROR);
 
@@ -84,12 +84,15 @@ sub run {
                     uri => $sample->uri->as_string,
                     result => $sample->gtc,
                     gender =>  $gender_name,
-                    gender_code => $gender_code};
+                    gender_code => $gender_code,
+                    gender_method => $gender_method};
   }
 
   my $fh = maybe_stdout($output);
   print $fh to_json(\@samples, {utf8 => 1, pretty => 1});
   close($fh);
+
+  return;
 }
 
 
@@ -102,22 +105,25 @@ sample_intensities
 =head1 SYNOPSIS
 
 sample_intensities [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--output <JSON file>] --run <analysis run name> [--verbose]
+   [--output <JSON file>] --run <analysis run name> --gender <method> \
+   [--verbose]
 
 Options:
 
-  --all       Include all samples in output, even those marked as not for
-              analysis.
-  --config    Load database configuration from a user-defined .ini file.
-              Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file. If not supplied, defaults to the
-              value given in the configuration .ini file.
-  --help      Display help.
-  --output    The file to which output will be written. Optional, defaults
-              to STDOUT.
-  --run       The name of a pipe run defined previously using the
-              ready_infinium script.
-  --verbose   Print messages while processing. Optional.
+  --all            Include all samples in output, even those marked as not
+                   for analysis.
+  --config         Load database configuration from a user-defined .ini file.
+                   Optional, defaults to $HOME/.npg/genotyping.ini
+  --dbfile         The SQLite database file. If not supplied, defaults to
+                   the value given in the configuration .ini file.
+  --gender-method  The gender determination method as described in
+                   methods.ini. Optional, defaults to 'Supplied'.
+  --help           Display help.
+  --output         The file to which output will be written. Optional,
+                   defaults to STDOUT.
+  --run            The name of a pipe run defined previously using the
+                   ready_infinium script.
+  --verbose        Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
@@ -131,6 +137,7 @@ order. Each element of the array describes one sample as a JSON object:
      "uri" : <sample URI>,
      "gender" : <gender name string>,
      "gender_code" : <gender code integer>
+     "gender_method" : <gender method name string>
   }
 
 Only records for samples marked in the pipeline database for inclusion
@@ -157,19 +164,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.1.1
-
-=head1 CHANGELOG
-
-0.1.1
-
-  Added --output command line option.
-
-0.1.0
-
-  Initial version 0.1.0
 
 =cut

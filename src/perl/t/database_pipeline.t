@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Log::Log4perl;
 
-use Test::More tests => 34;
+use Test::More tests => 40;
 use Test::Exception;
 
 use Data::Dumper;
@@ -55,10 +55,11 @@ dies_ok { $db->should_not_autoload_this_method->all }
   'Expected AUTOLOAD to fail on invalid method';
 
 $db->populate;
-is(18, $db->snpset->count, 'The snpset dictionary');
-is(4, $db->method->count, 'The method dictionary');
-is(2, $db->relation->count, 'The relation dictionary');
-is(10, $db->state->count, 'The state dictionary');
+
+is($db->snpset->count, 20, 'The snpset dictionary');
+is($db->method->count, 5, 'The method dictionary');
+is($db->relation->count, 2, 'The relation dictionary');
+is($db->state->count, 11, 'The state dictionary',);
 
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
                                                   namespace => 'wtsi'});
@@ -71,6 +72,7 @@ ok($run, 'A run inserted');
 my $project_base = 'test_project';
 my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
 ok($snpset, 'A snpset found');
+ok($run->validate_snpset($snpset), 'A snpset validated in an empty piperun');
 
 my @datasets;
 foreach my $i (1..3) {
@@ -82,12 +84,18 @@ foreach my $i (1..3) {
   push @datasets, $dataset;
 }
 
+ok($run->validate_datasets, 'A piperun validated');
+ok($run->validate_snpset($snpset), 'A snpset validated in a full piperun');
+ok(! $run->validate_snpset($db->snpset->find({name => 'HumanOmni25-4v1'})),
+   'A snpset validated in a mismatched piperun');
+
 my $sample_base = 'test_sample';
 my $pass = $db->state->find({name => 'autocall_pass'});
 ok($pass, 'A state found');
 
 my $fail = $db->state->find({name => 'autocall_fail'});
 my $pi_approved = $db->state->find({name => 'pi_approved'});
+my $consent_withdrawn = $db->state->find({name => 'consent_withdrawn'});
 
 $db->in_transaction(sub {
                       foreach my $i (1..1000) {
@@ -100,10 +108,10 @@ $db->in_transaction(sub {
                     });
 
 my @samples = $datasets[0]->samples;
-is(1000, scalar @samples, 'Expected samples found');
+is(scalar @samples, 1000, 'Expected samples found');
 my @states = $samples[0]->states;
-is(1, scalar @states);
-is('autocall_pass', $states[0]->name);
+is(scalar @states, 1);
+is($states[0]->name, 'autocall_pass');
 
 dies_ok {
   $db->in_transaction(sub {
@@ -121,16 +129,16 @@ dies_ok {
                       });
 } 'Expected transaction to fail';
 
-is(1000, scalar $datasets[0]->samples, 'Successful rollback');
+is(scalar $datasets[0]->samples, 1000, 'Successful rollback');
 
 # Test removing and adding states
 my $passed_sample = ($datasets[0]->samples)[0];
 my $sample_id = $passed_sample->id_sample;
 
 $passed_sample->remove_from_states($pass);
-is(0, scalar $passed_sample->states, "autocall_pass state removed");
+is(scalar $passed_sample->states, 0, "autocall_pass state removed");
 $passed_sample->add_to_states($fail);
-is(1, scalar $passed_sample->states, "autocall_fail state added 1");
+is(scalar $passed_sample->states, 1, "autocall_fail state added 1");
 ok((grep { $_->name eq 'autocall_fail' } $passed_sample->states),
    "autocall_fail state added 2");
 
@@ -152,3 +160,13 @@ $failed_sample->update;
 
 $failed_sample = $db->sample->find({id_sample => $sample_id});
 ok($failed_sample->include, "Sample included after pi_approved");
+
+# Test that consent_withdrawn overrides everything
+$failed_sample->add_to_states($consent_withdrawn);
+ok((grep { $_->name eq 'consent_withdrawn' } $failed_sample->states),
+    "consent_withdrawn state added");
+$failed_sample->include_from_state;
+$failed_sample->update;
+
+$failed_sample = $db->sample->find({id_sample => $sample_id});
+ok(!$failed_sample->include, "Sample excluded after consent_withdrawn");

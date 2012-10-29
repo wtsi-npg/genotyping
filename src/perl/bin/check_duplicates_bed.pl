@@ -9,6 +9,8 @@
 # - Set concordance threshold for duplicate pairs (requires correct arguments to pairwise_concordance_bed)
 # - Supply arbitrary lists of samples/SNPs to exclude from QC
 
+use warnings;
+
 use strict;
 use Getopt::Long;
 use File::Temp;
@@ -60,7 +62,7 @@ $maf_max ||= $defaults{'maf_max'};
 $max_snps ||= $defaults{'max_snps'};
 $min_dist ||= $defaults{'min_dist'};
 $min_snp_cr ||= $defaults{'min_snp_cr'};
-my $bfile = $ARGV[0]; # prefix for PLINK data files
+$bfile = $ARGV[0]; # prefix for PLINK data files
 
 $help_text = "Generate a test set of SNPs; use concordance on test set to identify duplicate samples.
 Input files (including PLINK .bed and .bim) must be in current working directory.
@@ -82,25 +84,25 @@ if ($help) {
 }
 
 # generate hashes of chromosome and position for each SNP in .bim file
-open BIM, "< $bfile.bim" or die qq(Unable to open $bfile.bim);
-while (<BIM>) {
+open my $bim, "<", $bfile.".bim" or die qq(Unable to open $bfile.bim);
+while (<$bim>) {
     my ($chr, $snp, $pos) = (split)[0, 1, 3];
     $chr{$snp} = $chr;
     $pos{$snp} = $pos;
 }
-close BIM;
+close $bim;
 
 # open genotyping SNP results file (defaults to snp_cr_af.txt) and filter on MAF and CR
 # populate a hash %snps: Keys=chromosomes, values = lists of (snp_name, snp_position) pairs
-open SNP, "< $af" or die $!;
-while (<SNP>) {
+open my $snpfile, "<", $af or die $!;
+while (<$snpfile>) {
     my ($snp, $cr, $maf) = (split)[0, 1, 5];
     next unless $chr{$snp};
     next unless $cr >= $min_snp_cr;
     next if $maf < $maf_min || $maf > $maf_max;
     push @{$snps{$chr{$snp}}}, [ $snp, $pos{$snp} ];
 }
-close SNP;
+close $snpfile or die $!;
 
 # filter to ensure minimum distance between SNPs; generates @use_snps array
 foreach my $chr (keys %snps) {
@@ -115,13 +117,13 @@ foreach my $chr (keys %snps) {
 	}
     }
 }
-open LOG, "> $log" or die $!;
-print LOG scalar(@use_snps), " available SNPs found for duplicate check\n";
+open my $logfile, ">", $log or die $!;
+print $logfile scalar(@use_snps), " available SNPs found for duplicate check\n";
 if (@use_snps > $max_snps) {
     @use_snps = @use_snps[0 .. $max_snps - 1]; # truncate @use_snps if too large
 }
-print LOG "Using ", scalar(@use_snps), " SNPs\n";
-close LOG;
+print $logfile "Using ", scalar(@use_snps), " SNPs\n";
+close $logfile;
 
 # write @use_snps to temp file
 my $snp_file = new File::Temp; 
@@ -132,3 +134,6 @@ print $snp_file map { $_ . "\n" } @use_snps;
 my $cmd = "/software/varinf/bin/genotype_qc/pairwise_concordance_bed -n $snp_file $bfile";
 system($cmd) && die qq(Error running command "$cmd": $!);
 
+# gzip pairwise output file; can be quite large, >> 1 GB
+$cmd = "gzip -f duplicate_full.txt";
+system($cmd) && die qq(Error running command "$cmd": $!);;
