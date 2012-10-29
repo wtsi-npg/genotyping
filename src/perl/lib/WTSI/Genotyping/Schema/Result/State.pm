@@ -10,20 +10,17 @@ use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('state');
 __PACKAGE__->add_columns
-  ('id_state',  { data_type => 'integer',
-                  is_auto_increment => 1,
-                  is_nullable => 0 },
-   'name',      { data_type => 'text',
-                  is_nullable => 0 },
-  'definition', { data_type => 'text',
-                  is_nullable => 0 });
+  ('id_state',   { data_type => 'integer',
+                   is_auto_increment => 1,
+                   is_nullable => 0 },
+   'name',       { data_type => 'text',
+                   is_nullable => 0 },
+   'definition', { data_type => 'text',
+                   is_nullable => 0 });
 
 __PACKAGE__->set_primary_key('id_state');
 __PACKAGE__->add_unique_constraint(['name']);
 
-__PACKAGE__->has_many('samples',
-                      'WTSI::Genotyping::Schema::Result::Sample',
-                      { 'foreign.id_state' => 'self.id_state' });
 
 1;
 

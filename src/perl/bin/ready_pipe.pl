@@ -6,13 +6,15 @@ package main;
 
 use warnings;
 use strict;
-
 use Getopt::Long;
+use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
 use WTSI::Genotyping::Database::Pipeline;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
+
+Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
@@ -39,8 +41,12 @@ sub run {
         on_connect_do => 'PRAGMA foreign_keys = ON')->populate->disconnect;
 
   if ($verbose) {
-    print STDERR "Created $dbfile using config from $config\n";
+    my $db = $dbfile;
+    $db ||= 'configured database';
+    print STDERR "Created $db using config from $config\n";
   }
+
+  return;
 }
 
 
@@ -52,15 +58,15 @@ ready_pipe
 
 =head1 SYNOPSIS
 
-ready_pipe [--config <database .ini file>] --dbfile <SQLite file> \
-   [--namespace <sample namespace>] --project <project name> \
-   --run_name <pipeline run name> --supplier <supplier name> [--verbose]
+ready_pipe [--config <database .ini file>] [--dbfile <SQLite file>] \
+   [--overwrite] [--verbose]
 
 Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile    The SQLite database file.
+  --dbfile    The SQLite database file. If not supplied, defaults to the
+              value given in the configuration .ini file.
   --help      Display help.
   --overwrite Overwrite any existing file, otherwise data dictionaries will
               be updated with new entries only.
@@ -92,13 +98,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.1.0
-
-=head1 CHANGELOG
-
-Thu Apr  5 12:58:30 BST 2012 -- Initial version 0.1.0
 
 =cut

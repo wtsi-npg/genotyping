@@ -1,4 +1,4 @@
-#--
+#-- encoding: UTF-8
 #
 # Copyright (c) 2012 Genome Research Ltd. All rights reserved.
 #
@@ -20,14 +20,50 @@ require 'fileutils'
 require 'timeout'
 
 module TestHelper
-  def return_available?(value)
-    case value
-      when Array ; value.all?
-      when NilClass ; nil
-      else
-        true
+  include Genotyping
+
+  def test_workflow(name, klass, timeout, path, log, args)
+    ['in', 'pass', 'fail'].each do |dir|
+      root = File.join(path, dir)
+      FileUtils.mkdir(root) unless File.exists?(root)
     end
+
+    yml = File.join(path, 'in', "#{name}.yml")
+    File.open(yml, 'w') do |out|
+      config = {'workflow' => klass.to_s,
+                'arguments' => args}
+      out.puts(YAML.dump(config))
+    end
+
+    percolator = Percolator.new({'root_dir' => path,
+                                 'log_file' => log,
+                                 'log_level' => 'DEBUG',
+                                 'msg_host' => @msg_host,
+                                 'msg_port' => @msg_port,
+                                 'async' => 'lsf',
+                                 'max_processes' => 250})
+
+    # The Percolator returns all its workflows after each iteration
+    workflow = nil
+    Timeout.timeout(timeout) do
+      until workflow && workflow.finished? do
+        sleep(15)
+        print('#')
+        workflow = percolator.percolate.first
+      end
+    end
+
+    workflow && workflow.passed?
   end
+
+  def return_available?(value)
+     case value
+       when Array ; value.all?
+       when NilClass ; nil
+       else
+         true
+     end
+   end
 
   def wait_for(name, timeout, interval, &test)
     result = nil
@@ -39,20 +75,20 @@ module TestHelper
     asynchronizer.message_queue = name + '.' + $$.to_s
 
     Timeout.timeout(timeout) do
-      until return_available?(result) do
-        result = test.call
+
+      begin
+        until return_available?(result) do
+          result = test.call
+          memoizer.update_async_memos!
+          sleep(interval)
+          print('#')
+        end
+      ensure
         memoizer.update_async_memos!
-        sleep(interval)
-        print('#')
       end
     end
 
     result
-  end
-
-  def complement(predicate = nil, &block)
-    predicate ||= block
-    lambda { |*args| !predicate.call(*args) }
   end
 
   def run_test_if(predicate, msg, &test)

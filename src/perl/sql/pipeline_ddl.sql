@@ -41,7 +41,8 @@ namespace TEXT NOT NULL UNIQUE
 DROP TABLE IF EXISTS gender;
 CREATE TABLE gender (
 id_gender INTEGER PRIMARY KEY AUTOINCREMENT,
-name TEXT NOT NULL UNIQUE
+name TEXT NOT NULL UNIQUE,
+code INTEGER NOT NULL UNIQUE
 );
 
 
@@ -117,7 +118,6 @@ name TEXT NOT NULL UNIQUE,
 sanger_sample_id TEXT,
 beadchip TEXT NOT NULL,
 id_dataset INTEGER NOT NULL REFERENCES dataset(id_dataset),
-id_state INTEGER NOT NULL REFERENCES state(id_state),
 include INTEGER NOT NULL
 );
 
@@ -163,6 +163,15 @@ CREATE TABLE state (
 id_state INTEGER PRIMARY KEY AUTOINCREMENT,
 name TEXT NOT NULL UNIQUE,
 definition TEXT NOT NULL
+);
+
+
+--- A sample-state relationship
+DROP TABLE IF EXISTS sample_state;
+CREATE TABLE sample_state (
+id_sample INTEGER NOT NULL REFERENCES sample(id_sample),
+id_state INTEGER NOT NULL REFERENCES state(id_state),
+PRIMARY KEY (id_sample, id_state)
 );
 
 

@@ -26,6 +26,79 @@ __PACKAGE__->has_many('datasets',
                       'WTSI::Genotyping::Schema::Result::Dataset',
                       { 'foreign.id_piperun' => 'self.id_piperun' });
 
+=head2 validate_snpset
+
+  Arg [1]    : string Snpset name
+  Example    : $piperun->validate_snpset('HumanOmni25-8v1')
+  Description: Returns true if data for the requested Snpset may be analysed
+               in this Piperun. It is not possible to mix Snpsets in a single
+               Piperun. Validity in this context means that this Snpset
+               is the same as any which may be present in the Piperun already.
+  Returntype : boolean
+  Caller     : general
+
+=cut
+
+sub validate_snpset {
+  my ($self, $snpset) = @_;
+
+  my @snpsets = map { $_->snpset } $self->datasets;
+  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+
+  my $valid = 1;
+  if (@infinium_snpsets) {
+    my $name = $snpset->name;
+    unless (grep { $_->name eq $name } @infinium_snpsets) {
+      $valid = 0;
+    }
+  }
+
+  return $valid;
+}
+
+=head2 validate_datasets
+
+  Arg [1]    : None
+  Example    : $piperun->validate_datasets
+  Description: Returns true if the datasets in this Piperun all use the same
+               Snpset.
+  Returntype : boolean
+  Caller     : general
+
+=cut
+
+sub validate_datasets {
+  my ($self) = @_;
+
+  my @snpsets = map { $_->snpset } $self->datasets;
+
+  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+  my @snpset_names = map { $_->name } @infinium_snpsets;
+
+  my $valid = 1;
+  if (scalar @snpset_names > 1) {
+    my ($first, @rest) = @snpset_names;
+
+    my @mismatched;
+    foreach my $elt (@rest) {
+      if ($elt eq $first) {
+        next;
+      }
+      else {
+        push(@mismatched, $elt);
+      }
+    }
+
+    if (@mismatched) {
+      $valid = 0;
+      $self->log->logwarn("Invalid piperun; datasets have mixed SNP sets: [",
+                          join(", ", @mismatched), "]");
+    }
+  }
+
+  return $valid;
+}
+
 1;
 
 __END__

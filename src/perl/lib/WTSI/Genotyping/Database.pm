@@ -4,11 +4,10 @@ package WTSI::Genotyping::Database;
 
 use strict;
 use warnings;
-
 use Carp;
 use Config::IniFiles;
 use DBI;
-
+use Log::Log4perl;
 
 =head2 new
 
@@ -24,14 +23,13 @@ use DBI;
 =cut
 
 sub new {
-   my $class = shift;
+   my ($class, @args) = @_;
 
    my $self = {};
    bless($self, $class);
-   $self->configure(@_);
+   $self->configure(@args);
    return $self;
 }
-
 
 =head2 configure
 
@@ -47,20 +45,20 @@ sub new {
 =cut
 
 sub configure {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   $self->name($args{name});
   $self->inifile($args{inifile});
   my $ini = Config::IniFiles->new(-file => $self->inifile);
 
   unless ($self->name) {
-    croak("No data source name was defined.")
+    $self->log->logconfess('No data source name was defined.')
   }
 
   $self->data_source($ini->val($self->name, 'data_source'));
   $self->username($ini->val($self->name, 'username'));
   $self->password($ini->val($self->name, 'password'));
+  $self->log(Log::Log4perl->get_logger('genotyping'));
 
   return $self;
 }
@@ -77,9 +75,9 @@ sub configure {
 =cut
 
 sub inifile {
-  my $self = shift;
-  if (@_) {
-    $self->{_inifile} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_inifile} = $args[0];
   }
 
   return $self->{_inifile};
@@ -98,11 +96,13 @@ sub inifile {
 
 =cut
 
+## no critic
+
 sub connect {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   unless ($self->{_dbh}) {
+    $self->log->info('Connecting to ', $self->data_source);
     $self->{_dbh} = DBI->connect($self->data_source,
                                  $self->username,
                                  $self->password,
@@ -112,6 +112,7 @@ sub connect {
   return $self;
 }
 
+## use critic
 
 =head2 disconnect
 
@@ -124,8 +125,11 @@ sub connect {
 =cut
 
 sub disconnect {
-  my $self = shift;
+  my ($self) = @_;
+  $self->log->info('Disconnecting from ', $self->data_source);
   $self->dbh->disconnect;
+
+  return $self;
 }
 
 
@@ -140,7 +144,7 @@ sub disconnect {
 =cut
 
 sub is_connected {
-  my $self = shift;
+  my ($self) = @_;
   return defined $self->dbh && $self->dbh->ping;
 }
 
@@ -156,7 +160,7 @@ sub is_connected {
 =cut
 
 sub dbh {
-  my $self = shift;
+  my ($self) = @_;
   return $self->{_dbh};
 }
 
@@ -172,9 +176,9 @@ sub dbh {
 =cut
 
 sub name {
-  my $self = shift;
-  if (@_) {
-    $self->{_name} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_name} = $args[0];
   }
 
   return $self->{_name};
@@ -192,9 +196,9 @@ sub name {
 =cut
 
 sub data_source {
-  my $self = shift;
-  if (@_) {
-    $self->{_data_source} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_data_source} = $args[0];
   }
 
   return $self->{_data_source};
@@ -212,9 +216,9 @@ sub data_source {
 =cut
 
 sub username {
-  my $self = shift;
-  if (@_) {
-    $self->{_username} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_username} = $args[0];
   }
 
   return $self->{_username};
@@ -231,13 +235,33 @@ sub username {
 =cut
 
 sub password {
-  my $self = shift;
-  if (@_) {
-    $self->{_password} = shift;
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_password} = $args[0];
   }
 
   return $self->{_password};
 }
+
+=head2 log
+
+  Arg [1]    : None
+  Example    : $db->log
+  Description: Returns the current logger.
+  Returntype : Logger object
+  Caller     : general
+
+=cut
+
+sub log {
+  my ($self, @args) = @_;
+  if (@args) {
+    $self->{_log} = $args[0];
+  }
+
+  return $self->{_log};
+}
+
 
 1;
 

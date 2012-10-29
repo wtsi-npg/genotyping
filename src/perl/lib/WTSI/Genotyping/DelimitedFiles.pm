@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Carp;
 
+
 =head2 read_fon
 
   Arg [1]    : filehandle
@@ -18,7 +19,7 @@ use Carp;
 =cut
 
 sub read_fon {
-  my $fh = shift;
+  my ($fh) = @_;
 
   my @names;
   while (my $line = <$fh>) {

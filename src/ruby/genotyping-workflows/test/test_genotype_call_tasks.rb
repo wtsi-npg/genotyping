@@ -1,4 +1,4 @@
-#--
+#-- encoding: UTF-8
 #
 # Copyright (c) 2012 Genome Research Ltd. All rights reserved.
 #
@@ -25,6 +25,7 @@ $:.unshift(libpath) unless $:.include?(libpath)
 require 'rubygems'
 require 'test/unit'
 require 'fileutils'
+require 'json'
 
 require 'genotyping'
 require File.join(testpath, 'test_helper')
@@ -53,13 +54,14 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     run_test_if(method(:genotype_call_available?), "Skipping test_mock_study") do
       work_dir = make_work_dir('test_mock_study', data_path)
 
-      manifest_file, sample_file, gtc_files = wait_for('test_mock_study', 60, 5) do
-        mock_study('a_mock_study', 5, 100, {:work_dir =>  work_dir,
+      sample_json, manifest, gtc_files = wait_for('test_mock_study', 60, 5) do
+        mock_study('a_mock_study', 5, 100, {:work_dir => work_dir,
                                             :log_dir => work_dir})
       end
 
-      assert(File.exist?(manifest_file))
-      assert(File.exist?(sample_file))
+      assert(File.exist?(manifest))
+      assert(File.exist?(sample_json))
+      assert_equal(5, JSON.parse(File.read(sample_json)).size);
       assert_equal(5, gtc_files.size)
 
       gtc_files.each { |file| assert(File.exist?(file)) }
@@ -73,22 +75,23 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     run_test_if(method(:genotype_call_available?), "Skipping test_gtc_to_sim") do
       work_dir = make_work_dir('test_gtc_to_sim', data_path)
 
-      manifest_file, sample_file, gtc_files = wait_for('mock_study', 60, 5) do
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
         mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
                                           :log_dir => work_dir})
       end
 
-      sim_file = wait_for('test_gtc_to_sim', 60, 5) do
-        gtc_to_sim(gtc_files, manifest_file, 'mock_study.sim',
+      sim_file, metadata = wait_for('test_gtc_to_sim', 60, 5) do
+        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
-                    :log_dir => work_dir})
+                    :log_dir => work_dir,
+                    :metadata => 'chr.json'})
       end
 
       sim = SIM.new(sim_file)
       assert_equal(sim_file, sim.sim_file)
       assert_equal(1, sim.version)
       assert_equal(255, sim.sample_name_size)
-      assert_equal(0, sim.number_format)
+      assert_equal(1, sim.number_format) # unnormalized, uint16
       assert_equal(100, sim.num_probes)
       assert_equal(2, sim.num_channels)
       assert_equal(5, sim.num_samples)

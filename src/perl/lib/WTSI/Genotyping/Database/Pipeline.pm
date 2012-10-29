@@ -18,6 +18,7 @@ our $relations_ini = 'relations.ini';
 our $snpsets_ini = 'snpsets.ini';
 our $states_ini = 'states.ini';
 
+
 =head2 new
 
   Arg [1]    : name => string
@@ -35,52 +36,26 @@ our $states_ini = 'states.ini';
 =cut
 
 sub new {
-   my $class = shift;
-   my %args = @_;
+   my ($class, %args) = @_;
 
    my $self = $class->SUPER::new(%args);
    $self->{_dbfile} = $args{dbfile};
    $self->{_overwrite} = $args{overwrite};
    bless($self, $class);
-   $self->create;
-   return $self;
+
+   return $self->initialize;
 }
 
-=head2 create
-
-  Arg [1]    : None
-  Example    : $db->create
-  Description: Writes the SQLite database file. This is called automatically
-               by the constructor, but may be called at any time to re-write
-               the database file.
-  Returntype : WTSI::Genotyping::Database::Pipeline
-  Caller     : constructor, general
-
-=cut
-
-sub create {
-  my $self = shift;
+sub initialize {
+  my ($self) = @_;
 
   my $ini = Config::IniFiles->new(-file => $self->inifile);
-  my $sql_path = $ini->val($self->name, 'sqlpath');
-  my $sqlite = $ini->val($self->name, 'sqlite');
-
-  unless ($sql_path) {
-    croak "Failed to create database: sql_path declaration is missing from " .
-      $self->inifile, "\n";
-  }
-  unless (-e $sql_path) {
-    croak "Failed to create database: DDL file '$sql_path' is missing\n";
-  }
-  unless ($sqlite) {
-    croak "Failed to create database: sqlite declaration is missing from " .
-      $self->inifile, "\n";
-  }
 
   my $ds = $self->data_source;
   my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
   unless ($base && $file) {
-    croak "Failed to parse datasource string '$ds' in " . $self->inifile, "\n";
+    $self->log->logconfess("Failed to parse datasource string '$ds' in ",
+                           $self->inifile);
   }
 
   # Override the default data source if a database file was given in
@@ -93,12 +68,55 @@ sub create {
   if (-e $file) {
     if ($self->{_overwrite}) {
       unlink($file);
+      $self->create($file, $ini);
     }
   }
+  else {
+    $self->create($file, $ini);
+  }
 
-  if (! -e $file) {
+  return $self;
+}
+
+
+=head2 create
+
+  Arg [1]    : Database file
+  Arg [2]    : Config::IniFiles ini file
+  Example    : $db->create($file, $ini)
+  Description: Writes the SQLite database file. This is called automatically
+               by the constructor, but may be called at any time to re-write
+               the database file.
+  Returntype : WTSI::Genotyping::Database::Pipeline
+  Caller     : constructor, general
+
+=cut
+
+sub create {
+  my ($self, $file, $ini) = @_;
+
+  my $sql_path = $ini->val($self->name, 'sqlpath');
+  my $sqlite = $ini->val($self->name, 'sqlite');
+  my $log = $self->log;
+
+  unless ($sql_path) {
+    $log->logconfess("Failed to create database: sql_path declaration is missing from ",
+                     $self->inifile);
+  }
+  unless (-e $sql_path) {
+    $log->logconfess("Failed to create database: DDL file '$sql_path' is missing");
+  }
+  unless ($sqlite) {
+    $log->logconfess("Failed to create database: sqlite declaration is missing from ",
+                     $self->inifile);
+  }
+
+  if (-e $file) {
+    $log->logconfess("Failed to create database: database '$file' already exists");
+  }
+  else {
     system("$sqlite $file < $sql_path") == 0
-      or croak "Failed to create SQLite database '$file': $?";
+      or $log->logconfess("Failed to create SQLite database '$file': $?");
   }
 
   return $self;
@@ -125,7 +143,7 @@ sub populate {
   my $ini_path = $ini->val($self->name, 'inipath');
 
   unless ($self->is_connected) {
-    croak "Failed to populate database: not connected\n";
+    $self->log->logconfess('Failed to populate database: not connected');
   }
 
   $self->_populate_addresses;
@@ -145,11 +163,13 @@ sub populate {
 
 =cut
 
+## no critic
+
 sub connect {
-  my $self = shift;
-  my %args = @_;
+  my ($self, %args) = @_;
 
   unless ($self->is_connected) {
+    $self->log->info('Connecting to ', $self->data_source);
     $self->{_schema} = WTSI::Genotyping::Schema->connect($self->data_source,
                                                          $self->username,
                                                          $self->password,
@@ -159,6 +179,7 @@ sub connect {
   return $self;
 }
 
+## use critic
 
 =head2 is_connected
 
@@ -167,7 +188,7 @@ sub connect {
 =cut
 
 sub is_connected {
-  my $self = shift;
+  my ($self) = @_;
   return defined $self->dbh && $self->dbh->ping;
 }
 
@@ -179,8 +200,9 @@ sub is_connected {
 =cut
 
 sub disconnect {
-  my $self = shift;
+  my ($self) = @_;
   if ($self->is_connected) {
+    $self->log->info('Disconnecting from ', $self->data_source);
     $self->schema->storage->disconnect;
   }
 
@@ -195,7 +217,7 @@ sub disconnect {
 =cut
 
 sub dbh {
-  my $self = shift;
+  my ($self) = @_;
   if ($self->schema) {
     return $self->schema->storage->dbh;
   }
@@ -213,7 +235,7 @@ sub dbh {
 =cut
 
 sub dbfile {
-  my $self = shift;
+  my ($self) = @_;
   return $self->{_dbfile};
 }
 
@@ -245,16 +267,17 @@ sub in_transaction {
 
   if ($@) {
     my $error = $@;
+    my $log = $self->log;
+
     if ($error =~ /Rollback failed/) {
-      croak "$error.\nRollback failed!\nWARNING: data may be inconsistent.\n";
+      $log->logconfess("$error.\nRollback failed!\nWARNING: data may be inconsistent.");
     } else {
-      croak "$error.\nRollback successful\n";
+      $log->logconfess("$error.\nRollback successful");
     }
   };
 
   return wantarray ? @result : $result[0];
 }
-
 
 =head2 schema
 
@@ -267,7 +290,7 @@ sub in_transaction {
 =cut
 
 sub schema {
- my $self = shift;
+ my ($self) = @_;
  return $self->{_schema};
 }
 
@@ -368,6 +391,8 @@ sub _populate_addresses {
                                       label2 => $label2});
     }
   }
+
+  return $self;
 }
 
 # Populates snpsets dictionary (Infinium and Sequenom SNP sets).
@@ -449,13 +474,13 @@ sub _insert_from_ini {
 # my @samples = $db->sample->all;
 #
 sub AUTOLOAD {
-  my $self = shift;
-  my $type = ref($self) or croak "$self is not an object\n";
+  my ($self) = @_;
+  my $type = ref($self) or confess "$self is not an object\n";
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
   unless ($self->is_connected) {
-    croak "$self is not connected\n";
+    $self->log->logconfess("$self is not connected");
   }
 
   my $schema = $self->schema;
@@ -468,18 +493,23 @@ sub AUTOLOAD {
   my $method_name = $AUTOLOAD;
   $method_name =~ s/.*://;
   unless (exists $lookup{$method_name} ) {
-    croak "An invalid method `$method_name' was called " .
-      "on an object of $type. Permitted methods are [" .
-        join(", ", sort keys %lookup) . "]\n";
+    $self->log->logconfess("An invalid method `$method_name' was called ",
+                           "on an object of $type. Permitted methods are [",
+                           join(", ", sort keys %lookup), "]");
   }
 
+
  SYMBOL_TABLE: {
+    ## no critic
+
     no strict qw(refs);
 
     *$AUTOLOAD = sub {
       my $self = shift;
       return $self->schema->resultset($lookup{$method_name});
     };
+
+    ## use critic
   }
 
   unshift @_, $self;

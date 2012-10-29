@@ -5,6 +5,8 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use JSON;
+
 
 =head2 maybe_stdin
 
@@ -19,7 +21,7 @@ use Carp;
 =cut
 
 sub maybe_stdin {
-  my $file = shift;
+  my ($file) = @_;
 
   my $fh;
   if (defined $file) {
@@ -35,7 +37,7 @@ sub maybe_stdin {
       croak "'$file' is a directory\n";
     }
 
-    open($fh, "<$file") or croak "Failed to open file '$file': $!\n";
+    open($fh, '<', "$file") or confess "Failed to open file '$file': $!\n";
   } else {
     $fh = \*STDIN;
   }
@@ -56,11 +58,11 @@ sub maybe_stdin {
 =cut
 
 sub maybe_stdout {
-  my $file = shift;
+  my ($file) = @_;
 
   my $fh;
   if (defined $file) {
-    open($fh, ">$file") or croak "Failed to open $file: $!\n";
+    open($fh, '>', "$file") or confess "Failed to open '$file': $!\n";
   } else {
     $fh = \*STDOUT;
   }
@@ -68,7 +70,52 @@ sub maybe_stdout {
   return $fh;
 }
 
+=head2 read_sample_json
+
+  Arg [1]    : filename
+  Example    : @samples = read_sample_json($file)
+  Description: Returns sample metadata hashes, one per sample, from a JSON file.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub read_sample_json {
+  my ($file) = @_;
+
+  open(my $fh, '<', "$file")
+    or confess "Failed to open JSON file '$file' for reading: $!\n";
+  my $str = do { local $/ = undef; <$fh> };
+  close($fh) or warn "Failed to close JSON file '$file'\n";
+
+  return @{from_json($str, {utf8 => 1})};
+}
+
 1;
+
+=head2 read_snp_json
+
+  Arg [1]    : filename
+  Example    : @snps = read_snp_json($file)
+  Description: Returns SNP metadata hashes, one per SNP, from a JSON file.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub read_snp_json {
+  my ($file) = @_;
+
+  open(my $fh, '<', "$file")
+    or confess "Failed to open JSON file '$file' for reading: $!\n";
+  my $str = do { local $/ = undef; <$fh> };
+  close($fh) or warn "Failed to close JSON file '$file'\n";
+
+  return @{from_json($str, {utf8 => 1})};
+}
+
+1;
+
 
 __END__
 

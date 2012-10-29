@@ -43,24 +43,25 @@ sub insert_sequenom_calls {
   my $dbh = $self->dbh;
 
   my $query =
-    "SELECT DISTINCT
-       snp_name.snp_name,
-       snp_sequence.chromosome,
-       mapped_snp.position,
-       genotype.genotype
-     FROM
-       well_assay, snpassay_snp, snp_name, mapped_snp, snp_sequence, genotype, individual
-     WHERE
-       well_assay.id_assay = snpassay_snp.id_assay
-       AND snpassay_snp.id_snp = snp_name.id_snp
-       AND mapped_snp.id_snp = snp_name.id_snp
-       AND snp_sequence.id_sequence = mapped_snp.id_sequence
-       AND (snp_name.snp_name_type = 1 OR snp_name.snp_name_type = 6)
-       AND genotype.id_assay = snpassay_snp.id_assay
-       AND genotype.id_ind = individual.id_ind
-       AND disregard = 0
-       AND confidence <> 'A'
-       AND individual.clonename = ?";
+    qq(SELECT DISTINCT
+         snp_name.snp_name,
+         snp_sequence.chromosome,
+         mapped_snp.position,
+         genotype.genotype
+       FROM
+         well_assay, snpassay_snp, snp_name, mapped_snp, snp_sequence,
+         genotype, individual
+       WHERE
+         well_assay.id_assay = snpassay_snp.id_assay
+         AND snpassay_snp.id_snp = snp_name.id_snp
+         AND mapped_snp.id_snp = snp_name.id_snp
+         AND snp_sequence.id_sequence = mapped_snp.id_sequence
+         AND (snp_name.snp_name_type = 1 OR snp_name.snp_name_type = 6)
+         AND genotype.id_assay = snpassay_snp.id_assay
+         AND genotype.id_ind = individual.id_ind
+         AND disregard = 0
+         AND confidence <> 'A'
+         AND individual.clonename = ?);
 
   my $sth = $dbh->prepare($query);
 
@@ -69,8 +70,12 @@ sub insert_sequenom_calls {
 
   my $count = 0;
   foreach my $sample (@$samples) {
-    if (defined $sample->sanger_sample_id) {
-      $sth->execute($sample->sanger_sample_id);
+
+    if ($sample->include && defined $sample->sanger_sample_id) {
+      my $id = $sample->sanger_sample_id;
+
+      $self->log->trace("Executing: '$query' with args [$id]");
+      $sth->execute($id);
 
       my $result = $sample->add_to_results({method => $method});
 

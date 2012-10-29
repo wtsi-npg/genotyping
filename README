@@ -14,6 +14,12 @@ Pipeline:
  Percolate              https://github.com/wtsi-npg/Percolate
 
 
+QC scripts:
+
+ R >= 2.11.1
+ R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
+
+
 Pipeline metadata management:
 
  Perl >= v5.8.8 
@@ -26,3 +32,9 @@ Pipeline components:
  Illuminus              https://github.com/wtsi-npg/Illuminus
  Gftools                https://github.com/wtsi-npg/Gftools
  genotype-call          https://github.com/wtsi-npg/genotype-call
+
+
+Environment variables:
+
+ PERL5LIB   Should include path to genotyping/src/perl/lib/
+ R_LIBS     Should include path to mixtools library installation

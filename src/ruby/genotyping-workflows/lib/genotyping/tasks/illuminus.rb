@@ -36,29 +36,36 @@ module Genotyping::Tasks
     #
     # Arguments:
     # - sim_file (String): The SIM file name.
+    # - sample_json (String): The sample JSON file name.
     # - manifest (String): The BeadPool manifest file name.
-    # - names (String): The sample names file name.
     # - output (String): The output files base name.
     # - args (Hash): Arguments for the operation.
     #
+    #   :chromosome (String): The chromosome being worked on. Optional,
+    #   used to indicate X, Y or mitochondrial chromosomes.
+    #   :wga (boolean): Assume that the sample is whole-genome amplified.
     #   :start (Fixnum): The 0-based, half-open SNP index at which to start.
     #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
     #   :size (Fixnum): The number of SNPs in the range to process in on job.
+    #   :plink (Boolean): Enable Plink BED format output.
+    #   :debug (Boolean): tee the Illuminus text input to a file while running.
     #
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
-    # - An array of Illuminus output file paths.
-    def call_from_sim_p(sim_file, manifest, names, output, args = {}, async = {})
-      work_dir, log_dir = process_task_args(args)
+    # - An array of Illuminus or Plink output file paths.
+    def call_from_sim_p(sim_file, sample_json, manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+      chromosome = args[:chromosome]
 
-      if args_available?(sim_file, manifest, names, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
-        end
-
+      if args_available?(sim_file, sample_json, manifest, chromosome , output, work_dir)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         start_snp = args[:start] || 0
         end_snp = args[:end]
+        wga = args[:wga]
+        plink = args[:plink]
+        debug = args.delete(:debug)
+
         unless start_snp.is_a?(Fixnum)
           raise TaskArgumentError.new(":start must be an integer",
                                       :argument => :start, :value => start_snp)
@@ -77,6 +84,8 @@ module Genotyping::Tasks
                                       :argument => :size, :value => chunk_size)
         end
 
+        group_size = args[:group_size] || DEFAULT_GROUP_SIZE
+
         snp_ranges = make_ranges(start_snp, end_snp, chunk_size)
         genotype_call_args = snp_ranges.collect do |range|
           {:input => sim_file,
@@ -86,22 +95,26 @@ module Genotyping::Tasks
            :end => range.end}
         end
 
-        group_size = args[:group_size] || DEFAULT_GROUP_SIZE
-
         illuminus_wrap_args = partitions(output, snp_ranges.size).collect do |part|
           grouped_part = partition_group_path(part, group_size)
           grouped_dir = File.dirname(grouped_part)
           Dir.mkdir(grouped_dir) unless File.exist?(grouped_dir)
 
-          {:columns => names,
-           :output => grouped_part}
+          {:chr => chromosome,
+           :samples => sample_json,
+           :wga => wga,
+           :output => grouped_part,
+           :plink => plink,
+           :verbose => false}
         end
 
         commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
-          [GENOTYPE_CALL, 'sim-to-illuminus',
-                   cli_arg_map(gca, :prefix => '--'),
-                   '|', ILLUMINUS_WRAPPER,
-                   cli_arg_map(iwa, :prefix => '--')].flatten.join(' ')
+          cmd = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.5),
+                 'sim-to-illuminus',
+                 cli_arg_map(gca, :prefix => '--')]
+          cmd += ['|', 'tee', iwa[:output] + '.iln'] if debug
+          cmd += ['|', ILLUMINUS_WRAPPER, cli_arg_map(iwa, :prefix => '--')]
+          cmd.flatten.join(' ')
         end
 
         # Job memoization keys, i corresponds to the partition index
@@ -110,9 +123,10 @@ module Genotyping::Tasks
         }.each_with_index.collect { |elt, i| [i] + elt }
 
         # Expected call files
-        call_partitions = illuminus_wrap_args.collect { |args| args[:output] }
+        suffix = plink ? '.bed' : ''
+        call_partitions = illuminus_wrap_args.collect { |iwa| iwa[:output] + suffix }
 
-        task_id = task_identity(:call_from_sim_p, *margs_arrays)
+        task_id = task_identity(:illuminus_from_sim_p, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
 
         async_task_array(margs_arrays, commands, work_dir, log,
@@ -123,72 +137,5 @@ module Genotyping::Tasks
       end
     end
 
-    # Runs an Illuminus analysis on intensity data for a range of SNPs in a SIM
-    # file.
-    #
-    # Arguments:
-    # - sim_file (String): The SIM file name.
-    # - manifest (String): The BeadPool manifest file name.
-    # - names (String): The sample names file name.
-    # - output (String): The output file name.
-    # - args (Hash): Arguments for the operation.
-    #
-    #   :start (Fixnum): The 0-based, half-open SNP index at which to start.
-    #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
-    #
-    # - async (Hash): Arguments for asynchronous management.
-    #
-    # Returns:
-    # - An Illuminus output file path.
-    def call_from_sim(sim_file, manifest, names, output, args = {}, async = {})
-      work_dir, log_dir = process_task_args(args)
-
-      if args_available?(sim_file, manifest, names, output, work_dir)
-        unless absolute_path?(output)
-          output = absolute_path(output, work_dir)
-        end
-
-        start_snp = args[:start] || 0
-        end_snp = args[:end]
-
-        unless start_snp.is_a?(Fixnum)
-          raise TaskArgumentError.new(":start must be an integer",
-                                      :argument => :start, :value => start_snp)
-        end
-        unless end_snp.is_a?(Fixnum)
-          raise TaskArgumentError.new(":end must be an integer",
-                                      :argument => :end, :value => end_snp)
-        end
-        unless (0 <= start_snp) && (start_snp <= end_snp)
-          raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
-        end
-
-        genotype_call_args = {:input => sim_file,
-                              :output => 'stdout',
-                              :manifest => manifest,
-                              :start => start_snp,
-                              :end => end_snp}
-
-        illuminus_wrap_args = {:columns => names,
-                               :output => output}
-
-        command = [GENOTYPE_CALL, 'sim-to-illuminus',
-                   cli_arg_map(genotype_call_args,
-                               :prefix => '--'), '|', ILLUMINUS_WRAPPER,
-                   cli_arg_map(illuminus_wrap_args,
-                               :prefix => '--')].flatten.join(' ')
-
-        margs = [work_dir, genotype_call_args, illuminus_wrap_args]
-        task_id = task_identity(:illuminus_sim_to_gcf, *margs)
-        log = File.join(log_dir, task_id + '.log')
-
-        async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files([output], :error => false) },
-                   :result => lambda { output },
-                   :async => async)
-      end
-    end
-
-  end
-
-end
+  end # module Illuminus
+end # module Genotyping::Tasks

@@ -1,0 +1,9 @@
+
+Components of the WTSI genotype analysis pipeline.
+
+This is the Ruby Genotyping module, a component of the WTSI genotype
+analysis pipeline which provides the pipeline definitions. It defines
+which external analytical programs are run, with what arguments and in
+what order. The Percolate pipeline management application is required
+to run the pipelines.
+
