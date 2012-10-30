@@ -43,7 +43,7 @@ make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, n
   points(subset(het, g.fail==1 & fail.sum==1), subset(q, g.fail==1 & fail.sum==1), col=3, pch=3) # gender
   points(subset(het, i.fail==1 & fail.sum==1), subset(q, i.fail==1 & fail.sum==1), col=4, pch=4) # identity
   points(subset(het, m.fail==1 & fail.sum==1), subset(q, m.fail==1 & fail.sum==1), col=6, pch=8) # magnitude
-  points(subset(het, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), col=1, pch=1) # other
+  points(subset(het, fail.sum==0 | fail.sum>1), subset(q, fail.sum==0 | fail.sum>1), col=1, pch=1) # other
 
   # draw boundaries of cr/het "pass region" & add labels
   abline(h=qmin, col=2, lty=2, xpd=FALSE)
@@ -71,7 +71,7 @@ make.plot.detail <- function(hetMean, hetMaxDist, minCR, experiment, categories,
   points(subset(het, g.fail==1 & fail.sum==1), subset(q, g.fail==1 & fail.sum==1), col=3, pch=3) # gender 
   points(subset(het, i.fail==1 & fail.sum==1), subset(q, i.fail==1 & fail.sum==1), col=4, pch=4) # identity
   points(subset(het, m.fail==1 & fail.sum==1), subset(q, m.fail==1 & fail.sum==1), col=6, pch=8) # magnitude
-  points(subset(het, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), subset(q, sum(d.fail, g.fail, i.fail, m.fail)==0 | fail.sum>1), col=1, pch=1) # other
+  points(subset(het, fail.sum==0 | fail.sum>1), subset(q, fail.sum==0 | fail.sum>1), col=1, pch=1) # other
        
   # draw boundaries of cr/het "pass region" & add labels
   abline(h=qmin, col=2, lty=2, xpd=FALSE) 
