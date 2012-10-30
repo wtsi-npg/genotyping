@@ -152,7 +152,9 @@ sub metricTotalsForProbeBlock {
     # find normalized mag totals by sample
     for (my $i=0;$i<$samples;$i++) { # foreach sample
         for (my $j=0;$j<$probeTotal;$j++) { # foreach probe
-            $magTotalsBySample[$i] += $magTable[$i][$j] / $magsByProbe[$j];
+            if ($magsByProbe[$j] != 0) { 
+                $magTotalsBySample[$i] += $magTable[$i][$j] / $magsByProbe[$j];
+            }
         }
     }
     return (\@magTotalsBySample, \@xyTotals);
