@@ -257,8 +257,8 @@ sub runMetric {
 sub runAllMetrics {
     my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
         $maxBatch, $noIntensity) = @_;
-    my @metrics = qw(call_rate duplicate heterozygosity identity gender xydiff);
-    if (!$noIntensity) { push(@metrics, 'magnitude'); }
+    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
+    if (!$noIntensity) { push(@metrics, qw/magnitude xydiff/); }
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 
                   $resultPath, $maxBatch);
