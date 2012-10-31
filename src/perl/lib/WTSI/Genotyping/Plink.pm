@@ -123,8 +123,9 @@ sub _update_sample_genders {
 
   while (my $line = <$in>) {
     chomp($line);
-    my ($family_id, $paternal_id, $maternal_id, $gender, $phenotype) =
-      split /\s+/, $line;
+
+    my ($family_id, $individual_id, $paternal_id,
+		$maternal_id, $gender, $phenotype) = split /\s+/, $line;
 
     unless (exists $genders->{$family_id}) {
       confess "Failed to update the gender of '$family_id'; " .
@@ -132,8 +133,8 @@ sub _update_sample_genders {
     }
 
     my $new_gender = $genders->{$family_id};
-    print $out join("\t", $family_id, $paternal_id, $maternal_id, $new_gender,
-                    $phenotype), "\n";
+    print $out join("\t", $family_id, $individual_id, $paternal_id,
+					$maternal_id, $new_gender, $phenotype), "\n";
     ++$n;
   }
 

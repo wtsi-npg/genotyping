@@ -39,25 +39,28 @@ module Genotyping::Tasks
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(dbfile, input, output, work_dir)
-        bedfile = input.first
-        base = File.basename(bedfile, File.extname(bedfile))
+        unless (args.has_key?(:sim) && args[:sim].nil?)
+          bedfile = input.first
+          base = File.basename(bedfile, File.extname(bedfile))
 
-        Dir.mkdir(output) unless File.exist?(output)
+          Dir.mkdir(output) unless File.exist?(output)
 
-        cli_args = args.merge({:dbpath => dbfile,
-                               :output_dir => output})
-        margs = [cli_args, base]
+          cli_args = args.merge({:dbpath => dbfile,
+                                 :output_dir => output})
 
-        command = [RUN_QC,
-                   cli_arg_map(cli_args, :prefix => '--') { |key|
-                     key.gsub(/_/, '-') }, base].flatten.join(' ')
+          margs = [dbfile, input, output]
 
-        task_id = task_identity(:quality_control, *margs)
-        log = File.join(log_dir, task_id + '.log')
+          command = [RUN_QC,
+                     cli_arg_map(cli_args, :prefix => '--') { |key|
+                       key.gsub(/_/, '-') }, base].flatten.join(' ')
 
-        async_task(margs, command, work_dir, log,
-                   :result => lambda { true },
-                   :async => async)
+          task_id = task_identity(:quality_control, *margs)
+          log = File.join(log_dir, task_id + '.log')
+
+          async_task(margs, command, work_dir, log,
+                     :result => lambda { true },
+                     :async => async)
+        end
       end
     end
 
