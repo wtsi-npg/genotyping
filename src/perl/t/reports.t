@@ -5,19 +5,24 @@ use strict;
 use warnings;
 use Carp;
 use FindBin qw($Bin);
-use Test::More tests => 9;
+use Test::More tests => 10;
 use JSON;
 use WTSI::Genotyping::QC::Reports qw(createReports);
 use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
 
-my $resultPath = "$Bin/qc/alpha/qc_results.json";
+my $sup = "qc/alpha/supplementary";
+
+my $resultPath = "$Bin/$sup/qc_results.json";
 my $dbPath = "$Bin/qc_test_data/alpha_pipeline.db";
-my $texPath = "$Bin/qc/alpha/pipeline_summary.tex";
-my $pdfPath = "$Bin/qc/alpha/pipeline_summary.pdf";
-my $csvPath = "$Bin/qc/alpha/pipeline_summary.csv";
-#my $metricPath = "$Bin/../json/qc_threshold_defaults.json";
-my $qcDir = "$Bin/qc/alpha/";
-my $title = "Alpha";
+my $gtPath = "$Bin/$sup/sample_xhet_gender_thresholds.txt";
+my $texPath = "$Bin/$sup/report_test_pipeline_summary.tex";
+my $pdfPath = "$Bin/$sup/report_test_pipeline_summary.pdf";
+my $csvPath = "$Bin/$sup/report_test_pipeline_summary.csv";
+my $qcDir = "$Bin/$sup/";
+my $qcName = "alpha";
+my $title = "";
+my $author = "";
+my $introPath = "$Bin/../etc/reportIntro.tex";
 my $config = defaultJsonConfig();
 
 my @text = WTSI::Genotyping::QC::Reports::textForDatasets($dbPath);
@@ -26,23 +31,30 @@ ok(@text, "Read database dataset info");
 my $result = WTSI::Genotyping::QC::Reports::dbSampleInfo($dbPath);
 ok($result, "Read database sample info");
 
-my @plateText = WTSI::Genotyping::QC::Reports::textForPlates($resultPath, $config);
-is(@plateText, 13, "Find plate table text"); # expect exactly 13 lines, including header
+my ($sumRef, $keyRef, $countRef, $rateRef) = 
+    WTSI::Genotyping::QC::Reports::textForPlates($resultPath, $config);
+# expect exactly 13 lines, including header
+is(@{$countRef}, 13, "Find pass/fail count table text"); 
+is(@{$rateRef}, 13, "Find pass/fail rate table text"); 
 
-my @csvText = WTSI::Genotyping::QC::Reports::textForCsv($resultPath, $dbPath, $config);
+my @csvText = WTSI::Genotyping::QC::Reports::textForCsv($resultPath, $dbPath, 
+                                                        $config);
 is(@csvText, 996, "Find CSV text"); # expect 996 lines, including header
 
-ok(WTSI::Genotyping::QC::Reports::writeCsv($resultPath, $dbPath, $config, $csvPath), "Write CSV text"); 
+ok(WTSI::Genotyping::QC::Reports::writeCsv($resultPath, $dbPath, $config, 
+                                           $csvPath), "Write CSV text"); 
 
-ok(WTSI::Genotyping::QC::Reports::writeSummaryLatex($texPath, $resultPath, $config, $dbPath, $qcDir, $title), 
-   "Write summary .tex");
+ok(WTSI::Genotyping::QC::Reports::writeSummaryLatex
+   ($texPath, $resultPath, $config, $dbPath, $gtPath, $qcDir, $introPath, 
+    $qcName, $title, $author), "Write summary .tex");
 
-system("rm -f $pdfPath");
+if (-e $pdfPath) { system("rm -f $pdfPath"); }
 
 ok(WTSI::Genotyping::QC::Reports::texToPdf($texPath), "Convert .tex to .pdf");
 
 ok((-e $pdfPath), "PDF file exists");
 
-ok(createReports($resultPath, $dbPath, $csvPath, $texPath, $config, $qcDir, $title), 
+ok(createReports($csvPath, $texPath, $resultPath, $config, $dbPath, $gtPath, 
+                 $qcDir, $introPath, $qcName, $title, $author), 
    "Main method to create CSV and PDF reports");
 

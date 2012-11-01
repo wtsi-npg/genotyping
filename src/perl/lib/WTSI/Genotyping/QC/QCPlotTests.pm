@@ -19,7 +19,7 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames $ini_path/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames wrapCommand wrapPlotCommand $ini_path/;
 
 sub createTestDatabase {
     # create temporary test database with given sample names
@@ -214,6 +214,26 @@ sub timeNow {
     return strftime($tf, localtime());
 }
 
+sub wrapCommand {
+    # as for wrapPlotCommand, but without check on PNG output
+    my @args = @_;
+    my $temp = mktemp("r_script_output_XXXXXX"); # creates temporary filename
+    my $cmd = join(" ", @args)." >& $temp"; # assumes csh for redirect
+    my $result = system($cmd);
+    my $info;
+    my $ok = 1;
+    if ($result != 0) {
+        open my $in, "<", $temp || croak "Could not open temporary file $temp";
+        $info = join("", <$in>);
+        close $in || croak "Could not close temporary file $temp";
+        carp "Warning: Non-zero return code from command \"$cmd\".".
+            "Command output: \"$info\"";
+        $ok = 0;
+    }
+    if ($ok) { system("rm -f $temp"); }
+    return $ok;
+}
+
 sub wrapPlotCommand {
     # wrapper to execute R script and check PNG output
     # @args = all other arguments (including paths to R executable and script)
@@ -243,7 +263,7 @@ sub wrapPlotCommand {
 	    }
 	}
     }
-    system("rm -f $temp");
+    if ($plotsOK) { system("rm -f $temp"); }
     if ($returnOutput) { return ($plotsOK, $cmd, $info); }
     else { return $plotsOK; }
 }

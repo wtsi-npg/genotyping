@@ -12,7 +12,7 @@ use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig readQCFileNames);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -61,28 +61,31 @@ elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
 $title ||= getDefaultTitle($outDir); 
 $boxtype ||= "both";
+my $texIntroPath = defaultTexIntroPath($iniPath);
+$texIntroPath = verifyAbsPath($texIntroPath);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype, $texIntroPath);
 
-sub getBoxBeanCommands {
-    my ($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, $fileNamesRef) = @_;
-    my %fileNames = %$fileNamesRef;
-    my $boxPlotScript = "$Bin/plot_box_bean.pl";
-    my @modes = ('cr', 'het');
-    my @inputs = ($fileNames{'sample_cr_het'}, $fileNames{'sample_cr_het'});
-    if ($xydiff) {
-	push(@modes, 'xydiff');
-	push(@inputs, $fileNames{'xydiff'});
+sub cleanup {
+    # create a 'supplementary' directory in current working directory
+    # move less important files (not directories) into supplementary
+    my @retain = qw(pipeline_summary.pdf pipeline_summary.csv 
+                    plate_heatmaps.html);
+    my %retain;
+    my $sup = "supplementary";
+    foreach my $name (@retain) { $retain{$name} = 1; }
+    system("rm -f Rplots.pdf"); # empty default output from R scripts
+    system("mkdir -p $sup");
+    my $heatmapIndex = "plate_heatmaps/index.html";
+    if (-e $heatmapIndex) {
+        system("ln -s $heatmapIndex plate_heatmaps.html");
     }
-    my @cmds;
-    for (my $i=0; $i<@modes; $i++) {
-	my $cmd = join(' ', ('cat', $inputs[$i], '|', $boxPlotScript, '--mode='.$modes[$i], 
-			   '--out_dir='.$outDir, '--title='.$title, $dbopt, '--inipath='.$iniPath,
-			   '--type='.$boxPlotType));
-	push(@cmds, $cmd);
+    foreach my $name (glob("*")) {
+        if (-d $name || $retain{$name} ) { next; }
+        else { system("mv $name $sup"); }
     }
-    return @cmds;
+    return 1;
 }
 
 sub getDefaultTitle {
@@ -96,22 +99,26 @@ sub getDefaultTitle {
 }
 
 sub getPlateHeatmapCommands {
-    my ($dbopt, $iniPath, $outDir, $title, $xydiff, $fileNamesRef) = @_;
+    my ($dbopt, $iniPath, $outDir, $title, $simPathGiven, $fileNamesRef) = @_;
     my %fileNames = %$fileNamesRef;
     my @cmds;
     my $hmOut = $outDir.'/'.$fileNames{'plate_dir'}; # heatmaps in subdirectory
     unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
     my @modes = qw/cr het/;
     my @inputs = ($fileNames{'sample_cr_het'}, $fileNames{'sample_cr_het'});
-    if ($xydiff) {
-	push(@modes, 'xydiff');
-	push(@inputs, $fileNames{'xydiff'});
+    if ($simPathGiven) {
+        push(@modes, 'magnitude');
+        push(@inputs, $fileNames{'magnitude'});
     }
     foreach my $i (0..@modes-1) {
-	push(@cmds, join(" ", ('cat', $inputs[$i], '|', "$Bin/plate_heatmap_plots.pl", "--mode=$modes[$i]", 
-			       "--out_dir=$hmOut", $dbopt, "--inipath=$iniPath")));
+        push(@cmds, join(" ", ('cat', $inputs[$i], '|', 
+                               "$Bin/plate_heatmap_plots.pl", 
+                               "--mode=$modes[$i]", 
+                               "--out_dir=$hmOut", $dbopt, 
+                               "--inipath=$iniPath")));
     }
-    push (@cmds, "$Bin/plate_heatmap_index.pl $title $hmOut ".$fileNames{'plate_index'});
+    push (@cmds, "$Bin/plate_heatmap_index.pl $title $hmOut ".
+          $fileNames{'plate_index'});
     return @cmds;
 }
 
@@ -141,7 +148,8 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxPlotType) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
+        $outDir, $title, $boxPlotType, $texIntroPath) = @_;
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
@@ -151,36 +159,53 @@ sub run {
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix";
     if ($dbPath) { 
-	unless (defined($runName)) { croak "Must supply pipeline run name for database gender update"; }
-	$genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
+        if (!defined($runName)) { 
+            croak "Must supply pipeline run name for database gender update"; 
+        }
+        $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     }
     push(@cmds, $genderCmd);
-    my $xydiff = 0;
+    my $simPathGiven = 0;
     if ($simPath) {
-        push(@cmds, "$Bin/xydiff.pl --input=$simPath --output=xydiff.txt");
-        $xydiff = 1;
+        push(@cmds, "$Bin/intensity_metrics.pl --input=$simPath ".
+             "--magnitude=magnitude.txt --xydiff=xydiff.txt");
+        $simPathGiven = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
-    push(@cmds, "$Bin/write_qc_status.pl --config=$configPath $dbopt --inipath=$iniPath");
+    my $writeStatus = "$Bin/write_qc_status.pl --config=$configPath $dbopt ".
+        "--inipath=$iniPath";
+    push(@cmds, $writeStatus);
     ### plot generation ###
-    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, $xydiff, \%fileNames));
-    push(@cmds, getBoxBeanCommands($dbopt, $iniPath, $outDir, $title, $xydiff, $boxPlotType, \%fileNames));
-    push(@cmds, join(' ', ('cat', $fileNames{'sample_cr_het'}, '|', "$Bin/plot_cr_het_density.pl", 
-			   "--title=".$title, "--out_dir=".$outDir)));
+    if ($dbopt) { 
+        my $cmd = "plot_metric_scatter.pl $dbopt";
+        if (!$simPath) { $cmd = $cmd." --no-intensity "; }
+        push(@cmds, $cmd); 
+    }
+    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
+                                        $simPathGiven, \%fileNames));
+    my @densityTerms = ('cat', $fileNames{'sample_cr_het'}, '|', 
+                        "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
+                        "--out_dir=".$outDir);
+    push(@cmds, join(' ', @densityTerms));
     push(@cmds, "$Bin/plot_fail_causes.pl --title=$title");
-    push(@cmds, join(' ', ("$Bin/main_plot_index.pl", $outDir, $fileNames{'qc_results'}, $title)));
     ### execute commands ###
     chdir($outDir);
     foreach my $cmd (@cmds) { 
-	my $result = system($cmd); 
-	unless ($result==0) { croak "Command finished with non-zero exit status: \"$cmd\""; } 
+        my $result = system($cmd); 
+        if ($result!=0) { 
+            croak "Command finished with non-zero exit status: \"$cmd\""; 
+        } 
     }
     ### create CSV & PDF reports
     my $resultPath = "qc_results.json";
     my $csvPath = "pipeline_summary.csv";
     my $texPath = "pipeline_summary.tex";
-    createReports($resultPath, $dbPath, $csvPath, $texPath, $configPath, ".", $title);
+    my $genderThresholdPath = "sample_xhet_gender_thresholds.txt";
+    my $qcDir = ".";
+    createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
+                  $genderThresholdPath, $qcDir, $texIntroPath);
+    cleanup();
     chdir($startDir);
     return 1;
 }

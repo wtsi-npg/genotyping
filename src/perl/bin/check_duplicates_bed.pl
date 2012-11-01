@@ -134,3 +134,6 @@ print $snp_file map { $_ . "\n" } @use_snps;
 my $cmd = "/software/varinf/bin/genotype_qc/pairwise_concordance_bed -n $snp_file $bfile";
 system($cmd) && die qq(Error running command "$cmd": $!);
 
+# gzip pairwise output file; can be quite large, >> 1 GB
+$cmd = "gzip -f duplicate_full.txt";
+system($cmd) && die qq(Error running command "$cmd": $!);;

@@ -56,7 +56,7 @@ dies_ok { $db->should_not_autoload_this_method->all }
 
 $db->populate;
 
-is($db->snpset->count, 18, 'The snpset dictionary');
+is($db->snpset->count, 20, 'The snpset dictionary');
 is($db->method->count, 5, 'The method dictionary');
 is($db->relation->count, 2, 'The relation dictionary');
 is($db->state->count, 11, 'The state dictionary',);
