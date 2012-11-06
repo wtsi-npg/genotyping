@@ -215,9 +215,7 @@ sub updateDatabase {
             if ($inferredGenders) { next; }
             my $sample_uri = $sample->uri;
             my $genderCode = $genders{$sample_uri};
-            unless (defined($genderCode)) { 
-                croak "Error: Cannot find gender for sample \"$sample_uri\""; 
-            }
+            if (!defined($genderCode)) { $genderCode = 3; } # not available
             my $gender;
             if ($genderCode==1) { 
                 $gender = $db->gender->find({name => 'Male'}); 
