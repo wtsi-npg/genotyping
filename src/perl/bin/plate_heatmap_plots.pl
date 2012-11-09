@@ -109,6 +109,7 @@ sub parseSampleName {
 
 sub readData {
     # read from a filehandle; get data values by plate
+    # silently omit samples with no known plate location (eg. excluded sample)
     my ($inputRef, $index, $mode, $dbPath, $iniPath) = @_;
     my (%results, @allResults, $plotMin, $plotMax, %names, %plateNames, $name);
     my ($xMax, $yMax, $duplicates) = (0,0,0);
@@ -118,13 +119,10 @@ sub readData {
         if (/^#/) { next; } # ignore comments
         chomp;
         my @words = split;
-        unless ($plateLocs{$words[0]}) { 
-            carp "Plate location not found in database for sample $words[0]";
-            $dataOK = 0;
-            last;
-        }
+        if (!defined($plateLocs{$words[0]})) { next; }
         my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};
         my ($x, $y) = parseLabel($addressLabel);
+        if (!(defined($x) && defined($y))) { next; }
         # clean up plate name by removing illegal characters
         if (not $plateNames{$plate}) {
             $name = $plate;
@@ -152,6 +150,7 @@ sub readData {
         $plotMin = $allResults[0];
         $plotMax = $allResults[-1];
     }
+    if (keys(%results)==0) { $dataOK = 0; }
     return ($dataOK, \%results, $xMax, $yMax, $plotMin, $plotMax);
 }
 
