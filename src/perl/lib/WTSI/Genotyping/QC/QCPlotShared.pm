@@ -20,11 +20,13 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT/;
+our @EXPORT_OK = qw/defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
-use vars qw/$ini_path $INI_FILE_DEFAULT/;
+use vars qw/$ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
 $ini_path = defaultConfigDir($INI_FILE_DEFAULT);
+$UNKNOWN_PLATE = "Unknown_plate";
+$UNKNOWN_ADDRESS = "Unknown_address";  
 
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
 
@@ -63,22 +65,32 @@ sub getDatabaseObject {
 }
 
 sub getPlateLocations {
-    # get plate and (x,y) location form database
+    # get plate and (x,y) location from database
     my $db = shift;
     my @samples = $db->sample->all;
     my %plateLocs;
     $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    my ($plate, $x, $y) = (0,0,0);
-	    my $uri = $sample->uri;
-	    my $well = ($sample->wells->all)[0]; # assume only one well per sample
-	    my $address = $well->address;
-	    my $label = $address->label1;
-	    $plate = $well->plate;
-	    my $plateName = $plate->ss_barcode;
-	    $plateLocs{$uri} = [$plateName, $label];  
-	}
-			});
+        foreach my $sample (@samples) {
+            my ($plate, $x, $y) = (0,0,0);
+            my $uri = $sample->uri;
+            if (!defined($uri)) {
+                carp "Sample $sample has no uri!";
+                next;
+            } elsif ($sample->include == 0) {
+                next; # excluded sample
+            }
+            my $well = ($sample->wells->all)[0]; # assume one well per sample
+            if (defined($well)) { 
+                my $address = $well->address;
+                my $label = $address->label1;
+                $plate = $well->plate;
+                my $plateName = $plate->ss_barcode;
+                $plateLocs{$uri} = [$plateName, $label];  
+            } else {
+                $plateLocs{$uri} = [$UNKNOWN_PLATE, $UNKNOWN_ADDRESS];  
+            }
+        }
+                        });
     return %plateLocs;
 }
 	
@@ -175,10 +187,10 @@ sub parseLabel {
     my $label = shift;
     my ($x, $y);
     if ($label =~ m/^[A-Z][0-9]+$/) { # check name format, eg H10
-	my @chars = split //, $label;
-	$x = ord(uc(shift(@chars))) - 64; # convert letter to position in alphabet 
-	$y = join('', @chars);
-	$y =~ s/^0+//; # remove leading zeroes from $y
+        my @chars = split //, $label;
+        $x = ord(uc(shift(@chars))) - 64; # letter -> position in alphabet 
+        $y = join('', @chars);
+        $y =~ s/^0+//; # remove leading zeroes from $y
     }
     return ($x, $y);
 }
@@ -224,13 +236,13 @@ sub readMetricResultHash {
     my %metricResults;
     my %metricNames = readQCNameHash($configPath);
     foreach my $sample (keys(%allResults)) {
-	my %results = %{$allResults{$sample}};
-	foreach my $key (keys(%results)) {
-	    unless ($metricNames{$key}) {
-		delete $results{$key};
-	    }
-	}
-	$metricResults{$sample} = \%results;
+        my %results = %{$allResults{$sample}};
+        foreach my $key (keys(%results)) {
+            unless ($metricNames{$key}) {
+                delete $results{$key};
+            }
+        }
+        $metricResults{$sample} = \%results;
     }
     return %metricResults;
 }
