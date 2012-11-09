@@ -18,8 +18,7 @@ my $log = Log::Log4perl->get_logger("genotyping");
 my ($qcDir, $outDir, $title, $help, $config, $dbpath, $inipath, $resultpath,
     $maxBatch, $noIntensity);
 
-GetOptions(#"metric=s"   => \$metric,
-           "qcdir=s"    => \$qcDir,
+GetOptions("qcdir=s"    => \$qcDir,
            "outdir=s"   => \$outDir,
            "title=s"    => \$title,
            "config=s"   => \$config,
