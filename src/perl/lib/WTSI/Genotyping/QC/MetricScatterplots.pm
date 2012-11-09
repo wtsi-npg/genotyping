@@ -87,6 +87,7 @@ sub metricMeanSd {
     my @values = ();
     foreach my $sample (keys(%allResults)) {
         my %results = %{$allResults{$sample}};
+        if (!defined($results{$metric})) { next; } # excluded sample
         my @metricResults = @{$results{$metric}};
         my $value = $metricResults[1];
         if ($value eq "NA") { next; }
@@ -187,8 +188,8 @@ sub writePlotInputs {
         $maxBatchSize) = @_;
     my %samplesByPlate = getSamplesByPlate($dbPath, $iniPath);
     my %allResults = readMetricResultHash($resultPath, $configPath);
-    my ($batchNum, $batchSize, $plateStart, $writeStartFinish, $i) = 
-        (0,0,0,0,0);
+    my ($batchNum, $batchSize, $plateStart, $writeStartFinish, $i, $tooBig) = 
+        (0,0,0,0,0,0);
     my ($out, $pb, $pn) = getOutputFiles($outDir, $metric, $batchNum);
     my @plateLines = ();
     my @plates = sort(keys(%samplesByPlate));
@@ -198,17 +199,26 @@ sub writePlotInputs {
         my @samples = @{$samplesByPlate{$plate}};
         foreach my $sample (@samples) {
             # record metric value and pass/fail status for each sample
-            my @results = @{$allResults{$sample}{$metric}};
+            my $resultsRef = $allResults{$sample}{$metric};
+            if (!defined($resultsRef)) { next; } # excluded sample
+            my @results = @{$resultsRef};
             my $status = metricStatus($allResults{$sample}, $metric);
             push(@plateLines, $results[1]."\t".$status."\n");
         }
         if (@plateLines > $maxBatchSize) {
-            carp "WARNING: Plate exceeds maximum output batch size; ".\
-                "omitting batch division; plots may not render correctly.";
-        } elsif ($batchSize + @plateLines > $maxBatchSize) {
+            print STDERR "Warning: Plate \"$plate\" exceeds maximum output ".
+                "batch size $maxBatchSize; plots may not render correctly.\n";
+            if ($i>0) { # start new plot if plate is oversized
+                $batchNum++;
+                ($batchSize, $plateStart, $writeStartFinish) = (0,0,0);
+                $tooBig = 1;
+                ($out, $pb, $pn) = resetOutputs($outDir, $metric, $batchNum,
+                                                $out, $pb, $pn);
+            }
+        } elsif (($batchSize + @plateLines > $maxBatchSize) || $tooBig) {
             # close current files, open next ones, reset counters/flags
             $batchNum++;
-            ($batchSize, $plateStart, $writeStartFinish) = (0,0,0);
+            ($batchSize, $plateStart, $writeStartFinish, $tooBig) = (0,0,0,0);
             ($out, $pb, $pn) = resetOutputs($outDir, $metric, $batchNum,
                                             $out, $pb, $pn);
         }
@@ -218,7 +228,7 @@ sub writePlotInputs {
         $batchSize += @plateLines;
         my $plateFinish = $plateStart + @plateLines;
         my $midPoint = $plateStart + (@plateLines/2);
-        print $pn plateLabel($plate, $i+1)."\t".$midPoint."\n"; 
+        print $pn plateLabel($plate, $i)."\t".$midPoint."\n"; 
         @plateLines = ();
         if ($writeStartFinish) { # write for even-numbered plates only
             print $pb $plateStart."\t".$plateFinish."\n";
