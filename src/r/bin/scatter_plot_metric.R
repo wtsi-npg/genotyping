@@ -52,6 +52,24 @@ if (sdThresh) {
   xmax = 1.15*max(index)
 }
 
+process.pn <- function(pn) {
+  # remove plate names if they are too close together
+  # plate must be at least 4% of total width to include name
+  names <- pn$V1
+  positions <- pn$V2
+  total <- length(positions)
+  minDist <- total*0.04
+  if (total>=2) {
+    for (i in 1:(total-1)) {
+      if ((positions[i+1] - positions[i])  < minDist) {
+        names[i] <- ""
+      }
+    }
+  }
+  newPlateNames <- data.frame("V1"=names, "V2"=positions)
+  return(newPlateNames)
+}
+
 sd.lines <- function(metricMean, metricSd, metricThresh) {
   # draw horizontal lines to show standard deviations
   metricMax <- metricMean+metricThresh*metricSd
@@ -158,6 +176,8 @@ plot.pdf <- function(index, metric, pass, pn, pb, metricName, metricMean,
   write.legends(metricName, metricMean, metricSd)
   dev.off()
 }
+
+pn <- process.pn(pn)
 
 plot.pdf(index, metric, pass, pn, pb, metricName, metricMean,
          metricSd, metricThresh1, metricThresh2, sdThresh,
