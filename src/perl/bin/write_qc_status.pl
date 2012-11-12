@@ -21,7 +21,7 @@ use FindBin qw($Bin);
 use Getopt::Long;
 use IO::Uncompress::Gunzip; # for duplicate_full.txt.gz
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames $UNKNOWN_PLATE $UNKNOWN_ADDRESS);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -311,20 +311,22 @@ sub writeResults {
     my %inputNames = %$inputNamesRef;
     my %metricResults;
     foreach my $metric (@metrics) {
-	my %results = findMetricResults($inputDir, $metric, $thresholds{$metric}, $inputNames{$metric});
-	$metricResults{$metric} = \%results;
+        my %results = findMetricResults($inputDir, $metric, 
+                                        $thresholds{$metric}, 
+                                        $inputNames{$metric});
+        $metricResults{$metric} = \%results;
     }
     # change from metric-major to sample-major ordering; simplifies later data processing
     my %sampleResults = convertResults(\%metricResults);
     my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
     foreach my $sample (keys(%sampleResults)) {
-	my %results = %{$sampleResults{$sample}};
-	my ($plate, $addressLabel) = ("Unknown_plate", "Unknown_address");
-	my $locsRef = $plateLocs{$sample};
-	if ($locsRef) { ($plate, $addressLabel) = @$locsRef; }
-	$results{'plate'} = $plate;
-	$results{'address'} = $addressLabel;
-	$sampleResults{$sample} = \%results;
+        my %results = %{$sampleResults{$sample}};
+        my ($plate, $addressLabel) = ($UNKNOWN_PLATE, $UNKNOWN_ADDRESS);
+        my $locsRef = $plateLocs{$sample};
+        if ($locsRef) { ($plate, $addressLabel) = @$locsRef; }
+        $results{'plate'} = $plate;
+        $results{'address'} = $addressLabel;
+        $sampleResults{$sample} = \%results;
     }
     my $resultString = encode_json(\%sampleResults);
     print $out $resultString;
