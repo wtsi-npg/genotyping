@@ -16,27 +16,43 @@ use Net::LDAP;
 use Pod::Usage;
 use URI;
 
-use WTSI::Genotyping qw(collect_dirs
-                        collect_files
-                        modified_between
-                        make_warehouse_metadata
+use WTSI::Genotyping qw(make_warehouse_metadata
                         make_infinium_metadata
                         make_file_metadata
                         make_creation_metadata
                         publish_idat_files
                         publish_gtc_files);
-use WTSI::Genotyping::iRODS qw(list_object
-                               add_object
-                               get_object_meta
-                               add_object_meta
-                               meta_exists
-                               checksum_object);
+
+use WTSI::Genotyping::iRODS qw(collect_files
+                               collect_dirs
+                               modified_between);
+
 
 use WTSI::Genotyping::Database::Infinium;
 use WTSI::Genotyping::Database::Warehouse;
 
-# Log::Log4perl::init('etc/log4perl.conf');
-Log::Log4perl->easy_init($ERROR);
+
+my $embedded_conf = q(
+   log4perl.logger.verbose        = DEBUG, A1
+   log4perl.logger.quiet          = DEBUG, A2
+
+   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.stderr   = 0
+   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
+
+   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A2.stderr   = 0
+   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
+   log4perl.appender.A2.Filter   = F2
+
+   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
+   log4perl.filter.F2.LevelMin      = WARN
+   log4perl.filter.F2.LevelMax      = FATAL
+   log4perl.filter.F2.AcceptOnMatch = true
+);
+
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
@@ -46,16 +62,20 @@ run() unless caller();
 sub run {
   my $config;
   my $days;
+  my $log4perl_config;
   my $publish_dest;
   my $source;
   my $type;
+  my $verbose;
 
-  GetOptions('config=s' => \$config,
-             'days=s' => \$days,
-             'dest=s' => \$publish_dest,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'source=s' => \$source,
-             'type=s' => \$type);
+  GetOptions('config=s'  => \$config,
+             'days=s'    => \$days,
+             'dest=s'    => \$publish_dest,
+             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s' => \$log4perl_config,
+             'source=s'  => \$source,
+             'type=s'    => \$type,
+             'verbose'   => \$verbose,);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
@@ -78,7 +98,21 @@ sub run {
   $days ||= $DEFAULT_DAYS;
   $type = lc($type);
 
-  my $log = Log::Log4perl->get_logger('genotyping');
+  my $log;
+
+  if ($log4perl_config) {
+    Log::Log4perl::init($log4perl_config);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+  }
+  else {
+    Log::Log4perl::init(\$embedded_conf);
+    if ($verbose) {
+      $log = Log::Log4perl->get_logger('verbose');
+    }
+    else {
+      $log = Log::Log4perl->get_logger('quiet');
+    }
+  }
 
   my $now = DateTime->now();
   my $then = DateTime->from_epoch
@@ -91,7 +125,7 @@ sub run {
   my $file_test = modified_between($then->epoch(), $now->epoch());
   my $file_regex = qr{.($type)$}msxi;
   my $source_dir = abs_path($source);
-  my $relative_depth = 1;
+  my $relative_depth = 2;
 
   my $ifdb = WTSI::Genotyping::Database::Infinium->new
     (name   => 'infinium',
@@ -121,7 +155,9 @@ sub run {
   my @files;
   foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
     $log->debug("Checking directory '$dir'");
-    push(@files, collect_files($dir, $file_test, $relative_depth, $file_regex));
+    my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
+    $log->debug("Found " . scalar @found . " matching items\n");
+    push(@files, @found);
   }
 
   if ($type eq 'idat') {
@@ -177,10 +213,12 @@ Options:
               and counting backwards. Any sample data modified during this
               period will be considered for publication. Optional,
               defaults to 7 days.
-  --help      Display help.
   --dest      The data destination root collection in iRODS.
+  --help      Display help.
+  --logconf   A log4perl configuration file. Optional.
   --source    The root directory to search for sample data.
   --type      The data type to publish. One of [idat, gtc].
+  --verbose   Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
