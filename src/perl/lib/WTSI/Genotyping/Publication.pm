@@ -6,6 +6,15 @@ use strict;
 use warnings;
 use Carp;
 
+use WTSI::Genotyping::iRODS qw(list_object
+                               add_object
+                               checksum_object
+                               get_object_meta
+                               add_object_meta
+                               list_collection
+                               add_collection
+                               meta_exists
+                               hash_path);
 
 =head2 publish_idat_files
 
@@ -138,7 +147,15 @@ sub publish_file {
   my ($file, $sample_meta, $publish_dest, $publisher, $time, $log) = @_;
 
   my $basename = fileparse($file);
-  my $target = $publish_dest . '/' . $basename;
+  my $hash_path = hash_path($file);
+
+  my $dest_collection = $publish_dest . '/' . $hash_path;
+
+  unless (list_collection($dest_collection)) {
+    add_collection($dest_collection);
+  }
+
+  my $target = $dest_collection. '/' . $basename;
 
   my @meta = @$sample_meta;
 
@@ -165,7 +182,11 @@ sub publish_file {
 
     foreach my $elt (@meta) {
       my ($key, $value, $units) = @$elt;
+
+      $log->debug("Testing before adding key $key value $value");
+
       unless (meta_exists($key, $value, %current_meta)) {
+        $log->debug("Now adding key $key value $value");
         add_object_meta($target, $key, $value, $units);
       }
     }
