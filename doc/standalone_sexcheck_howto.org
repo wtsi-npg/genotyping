@@ -1,12 +1,7 @@
-* Header
-** Title
-   How to run a standalone sex check with wtsi-npg/genotyping
-** Author
-   Iain Bancarz, ib5@sanger.ac.uk
-** Created
-   2012-06-20
-** Updated
-   2012-06-20
+* How to run a standalone sex check with wtsi-npg/genotyping
+  * Author:: Iain Bancarz, ib5@sanger.ac.uk
+  * Created:: 2012-06-20
+  * Updated:: 2012-06-20    
 
 * Introduction
   The wtsi-npg/genotyping project (https://github.com/wtsi-npg/genotyping) is a comprehensive software package to automatically analyse large quantities of genotyping data.  As a QC step, it includes robust inference of sample gender from heterozygosity on the X chromosome using a mixture model.  The inference method is described in detail in the document "Adaptive gender thresholds for genotyping data".
