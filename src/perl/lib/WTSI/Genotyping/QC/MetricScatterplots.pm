@@ -132,10 +132,17 @@ sub readThresholdsForMetric {
     # heterozygosity: number of standard deviations
     # call_rate, identity, magnitude: single fixed value
     # gender: M_max and F_min from adaptive check (need to record these; in R script?)
-    my ($metric, $config) = @_;
+    my ($metric, $config, $gender) = @_;
     my ($thresh1, $thresh2) = ("NA", "NA");
     if ($metric eq 'gender') {
-        ($thresh1, $thresh2) = (0.02, 0.03); # placeholders
+        open my $in, "<", $gender || croak "Cannot open gender file $gender";
+        while (<$in>) {
+            chomp;
+            my @words = split;
+            if ($words[0] eq 'M_max') { $thresh1 = $words[1]; }
+            elsif ($words[0] eq 'F_min') { $thresh2 = $words[1]; }
+        }
+        close $in || croak "Cannot close gender file $gender";        
     } else {
         my %thresh = readThresholds($config);
         $thresh1 = $thresh{$metric};
@@ -246,8 +253,8 @@ sub writePlotInputs {
 }
 
 sub runMetric {
-    my ($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
-        $maxBatch) = @_;
+    my ($metric, $qcDir, $outDir, $config, $gender, $dbPath, $iniPath, 
+        $resultPath, $maxBatch) = @_;
     $maxBatch ||= 2000; # was 480;
     my $batchNum = writePlotInputs($metric, $dbPath, $iniPath, $resultPath, 
                                    $config, $outDir, $maxBatch);
@@ -257,7 +264,8 @@ sub runMetric {
     if (@results!=0) { 
         # if @results is empty, omit scatterplot for this metric
         ($mean, $sd) = @results; 
-        my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config);
+        my ($thresh1, $thresh2) = readThresholdsForMetric($metric, $config, 
+                                                          $gender);
         runPlotScript($metric, $outDir, $inputTotal, $mean, $sd, 
                       $thresh1, $thresh2);
     }
@@ -265,12 +273,12 @@ sub runMetric {
 
 
 sub runAllMetrics {
-    my ($qcDir, $outDir, $config, $dbPath, $iniPath, $resultPath,
+    my ($qcDir, $outDir, $config, $gender, $dbPath, $iniPath, $resultPath,
         $maxBatch, $noIntensity) = @_;
     my @metrics = qw(call_rate duplicate heterozygosity identity gender);
     if (!$noIntensity) { push(@metrics, qw/magnitude xydiff/); }
     foreach my $metric (@metrics) {
-        runMetric($metric, $qcDir, $outDir, $config, $dbPath, $iniPath, 
-                  $resultPath, $maxBatch);
+        runMetric($metric, $qcDir, $outDir, $config, $gender, $dbPath, 
+                  $iniPath, $resultPath, $maxBatch);
     }
 }
