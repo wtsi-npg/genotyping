@@ -213,8 +213,7 @@ sub writePlotInputs {
             push(@plateLines, $results[1]."\t".$status."\n");
         }
         if (@plateLines > $maxBatchSize) {
-            print STDERR "Warning: Plate \"$plate\" exceeds maximum output ".
-                "batch size $maxBatchSize; plots may not render correctly.\n";
+            # plate is too large; plots may not render correctly
             if ($i>0) { # start new plot if plate is oversized
                 $batchNum++;
                 ($batchSize, $plateStart, $writeStartFinish) = (0,0,0);
