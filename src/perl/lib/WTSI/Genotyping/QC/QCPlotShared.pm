@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -167,9 +167,9 @@ sub openDatabase {
     my $inifile = shift;
     $inifile ||= $INI_FILE_DEFAULT;
     my $start = getcwd;
-    # very hacky, but ensures correct loading of database using pipeline.ini
-    # assumes script is run from a subdirectory of src/perl (eg. perl/t or perl/bin)
-    chdir("$Bin/.."); 
+    # very hacky, but ensures paths in .ini file interpreted correctly
+    my $etc_dir = defaultConfigDir($inifile);
+    chdir($etc_dir."/.."); # parent of "etc" directory
     my $db = WTSI::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
 	 inifile => $inifile,

@@ -168,19 +168,17 @@ sub runGenderModel {
     # run R script to infer gender
     # return list of inferred genders, in same order as input names
     my ($namesRef, $xhetRef, $paramsRef) = @_;
-    my ($sanityCancel, $clip, $trials, $title, $modelOutputDir) = @$paramsRef;
+    my ($modelOutputDir, $title, $m_max_default, $m_max_minimum, $boundary_sd) 
+        = @$paramsRef;
     my $tempFile = writeSampleXhetTemp($namesRef, $xhetRef);
     my $scratchDir = tempdir(CLEANUP => 1);
     my $textPath = $scratchDir."/sample_xhet_gender_model_output.txt";
     my $pngPath = $modelOutputDir."/sample_xhet_gender.png";
     my $threshPath = $modelOutputDir."/sample_xhet_gender_thresholds.txt";
     my $logPath = $modelOutputDir."/sample_xhet_gender.log";
-    my $sanityOpt;
-    if ($sanityCancel) { $sanityOpt='FALSE'; }
-    else { $sanityOpt='TRUE'; }
     my $cmd = join(' ', ("check_xhet_gender.R", $tempFile, $textPath, $pngPath, 
-                         $threshPath, $title, $sanityOpt, $clip, $trials, 
-                         ">& ".$logPath) ); # $cmd uses csh redirect
+                         $threshPath, $logPath, $title, $m_max_default, 
+                         $m_max_minimum, $boundary_sd) ); 
     system($cmd);
     my @inferred = readModelGenders($textPath);
     return @inferred;

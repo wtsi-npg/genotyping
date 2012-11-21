@@ -32,25 +32,23 @@ use Getopt::Long;
 use WTSI::Genotyping::QC::GenderCheck;
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
-my ($help, $input, $inputFormat, $outputDir, $dbFile, $json, $title, $includePar, $sanityCancel, 
-    $clip, $trials, $runName);
+my ($help, $input, $inputFormat, $outputDir, $dbFile, $json, $title, 
+    $includePar, $runName, $m_max_default, $m_max_minimum, $boundary_sd);
 
 GetOptions("h|help"              => \$help,
-	   "input=s"             => \$input,
-	   "input-format=s"      => \$inputFormat,
-	   "output-dir=s"        => \$outputDir,
-	   "dbfile=s"            => \$dbFile,
-	   "json"                => \$json,
-	   "title=s"             => \$title,
-	   "include-par"         => \$includePar,
-	   "cancel-sanity-check" => \$sanityCancel,
-	   "clip=f"              => \$clip,
-	   "trials=i"            => \$trials,
-	   "run=s"               => \$runName
+           "input=s"             => \$input,
+           "input-format=s"      => \$inputFormat,
+           "output-dir=s"        => \$outputDir,
+           "dbfile=s"            => \$dbFile,
+           "json"                => \$json,
+           "title=s"             => \$title,
+           "include-par"         => \$includePar,
+           "run=s"               => \$runName,
+           "default=f"           => \$m_max_default,
+           "minimum=f"           => \$m_max_minimum,
+           "boundary=f"          => \$boundary_sd,
     );
 
-
-my ($clipDefault, $trialsDefault) = (0.01, 20);
 
 if ($help) {
     print STDERR "Usage: $0 [ options ] 
@@ -65,9 +63,9 @@ Input/output options:
 
 Gender model options:
 --title=STRING         Title for plots and other output
---cancel-sanity-check  Omit sanity checks in mixture model
---clip=FLOAT           Proportion of high x heterozygosity outliers to clip; defaults to $clipDefault
---trials=INTEGER       Number of independent trials to form consensus mixture model; defaults to $trialsDefault
+--default=FLOAT        Default value for M_max, the maximum male heterozygosity
+--minimum=FLOAT        Minimum value for M_max
+--boundary=FLOAT       Number of standard deviations from population means, for boundary of ambiguous region
 
 Other:
 --help                 Print this help text and exit
@@ -87,27 +85,33 @@ if ($inputFormat) {
     $inputFormat = $plinkFormat; 
 }
 if ($inputFormat eq $plinkFormat) { 
-    if (not checkPlinkBinaryInputs($input)) { croak "ERROR: Plink binary input files not available"; }
+    if (not checkPlinkBinaryInputs($input)) { 
+        croak "ERROR: Plink binary input files not available"; 
+    }
 } elsif (not -r $input) {
     croak "ERROR: Cannot read input path $input";
 }
 
-$outputDir ||= '.'; # TODO default output to tempdir, to push results to database only?
+$outputDir ||= '.';
 $json ||= 0; 
 $dbFile ||= 0;
 $title ||= "Untitled";
 $includePar ||= 0;
-$sanityCancel ||= 0;
-$clip ||= $clipDefault;
-$trials ||= $trialsDefault;
+$m_max_default ||= 0.02;
+$m_max_minimum ||= 0.005;
+$boundary_sd ||= 3;
 
 my $outputFormat;
 if ($json) { $outputFormat = $jsonFormat; }
 else { $outputFormat = $textFormat; }
-my @modelParams = ($sanityCancel, $clip, $trials, $title, $outputDir);
 
-my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($input, $inputFormat, $includePar);
+my @modelParams = 
+    ($outputDir, $title, $m_max_default, $m_max_minimum, $boundary_sd);
+
+my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($input, $inputFormat, 
+                                                         $includePar);
 my @inferred = runGenderModel($namesRef, $xhetsRef, \@modelParams);
-writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, $outputFormat, $outputDir); 
+writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, 
+            $outputFormat, $outputDir); 
 if ($dbFile) { updateDatabase($namesRef, \@inferred, $dbFile, $runName); }
 
