@@ -15,14 +15,15 @@ use WTSI::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");
 
-my ($qcDir, $outDir, $title, $help, $config, $dbpath, $inipath, $resultpath,
-    $maxBatch, $noIntensity);
+my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath, 
+    $resultpath, $maxBatch, $noIntensity);
 
 GetOptions("qcdir=s"    => \$qcDir,
            "outdir=s"   => \$outDir,
            "title=s"    => \$title,
            "config=s"   => \$config,
            "dbpath=s"   => \$dbpath,
+           "gender=s"   => \$gender,
            "inipath=s"  => \$inipath,
            "resultpath=s"  => \$resultpath,
            "no-intensity"  => \$noIntensity,
@@ -42,6 +43,7 @@ Options:
 --dbpath=PATH       Path to pipeline database containing plate information
 --inipath=PATH      Path to .ini file for pipeline database
 --resultpath=PATH   Path to .json file with pipeline results
+--gender=PATH       Path to .txt file with gender thresholds
 --qcdir=PATH        Directory for QC input
 --outdir=PATH       Directory for output; defaults to qcdir
 --no-intensity      Omit intensity metric (normalized signal magnitude)
@@ -57,14 +59,14 @@ $outDir ||= $qcDir;
 $dbpath ||= $qcDir."/genotyping.db";
 $inipath ||= $INI_FILE_DEFAULT;
 $resultpath ||=  $qcDir."/qc_results.json";
+$gender ||=  $qcDir."/sample_xhet_gender_thresholds.txt";
 $config ||= defaultJsonConfig($inipath);
-#if (!$metric) { croak "Must supply a --metric argument!"; }
 
 my @paths = ($qcDir, $outDir, $dbpath, $inipath, $resultpath, $config);
 foreach my $path (@paths) {
     if (!(-r $path)) { croak "Cannot read path $path"; }
 }
 
-runAllMetrics($qcDir, $outDir, $config, $dbpath, $inipath, $resultpath,
-              $maxBatch, $noIntensity);
+runAllMetrics($qcDir, $outDir, $config, $gender, $dbpath, $inipath, 
+              $resultpath, $maxBatch, $noIntensity);
 
