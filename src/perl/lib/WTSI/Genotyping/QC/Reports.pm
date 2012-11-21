@@ -24,7 +24,7 @@ our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
   magnitude/;
-
+our $NON_EMPTY_FIELDS = @dbInfoHeaders + 2; # add name, inclusion status
 
 sub createReports {
     # 'main' method to write text and CSV files
@@ -43,6 +43,7 @@ sub createReports {
     return $ok;
 }
 
+
 sub dbDatasetInfo {
     # get general information on analysis run(s) from pipeline database
     my $dbfile = shift;
@@ -57,7 +58,24 @@ sub dbDatasetInfo {
             push(@datasetInfo, \@info);
         }
     }
+    $db->disconnect();
     return @datasetInfo;
+}
+
+sub dbExcludedSamples {
+    # find list of excluded sample URIs from database
+    # use to fill in empty lines for CSV file
+    my $dbfile = shift;
+    my $db = getDatabaseObject($dbfile);
+    my @excluded;
+    my @samples = $db->sample->all;
+    foreach my $sample (@samples) {
+        if (!($sample->include)) {
+            push @excluded, $sample->uri;
+        }
+    }
+    $db->disconnect();
+    return @excluded;
 }
 
 sub dbSampleInfo {
@@ -68,16 +86,18 @@ sub dbSampleInfo {
     my %sampleInfo;
     my @runs = $db->piperun->all;
     foreach my $run (@runs) {
-	my @info;
-	my @datasets = $run->datasets->all;
-	foreach my $dataset (@datasets) {
-	    my @samples = $dataset->samples->all;
-	    foreach my $sample (@samples) {
-		@info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
-		$sampleInfo{$sample->uri} = \@info;
-	    }
-	}
+        my @info;
+        my @datasets = $run->datasets->all;
+        foreach my $dataset (@datasets) {
+            my @samples = $dataset->samples->all;
+            @info = ($run->name, $dataset->if_project, 
+                     $dataset->datasupplier->name, $dataset->snpset->name);
+            foreach my $sample (@samples) {
+                $sampleInfo{$sample->uri} = \@info;
+            }
+        }
     }
+    $db->disconnect();
     return %sampleInfo;
 }
 
@@ -96,17 +116,17 @@ sub findPlateFields {
 sub getCsvHeaders {
     my $config = shift;
     my @headers = @dbInfoHeaders;
-    push @headers, qw/sample plate well pass/;
+    push @headers, qw/sample include plate well pass/;
     foreach my $metric (@METRIC_NAMES) {
-	my @suffixes;
-	if ($metric eq 'gender') {
-	    @suffixes = qw/pass xhet inferred supplied/;
-	} else {
-	    @suffixes = qw/pass value/;
-	}
-	foreach my $suffix (@suffixes) {
-	    push(@headers, $metric."_".$suffix);
-	}
+        my @suffixes;
+        if ($metric eq 'gender') {
+            @suffixes = qw/pass xhet inferred supplied/;
+        } else {
+            @suffixes = qw/pass value/;
+        }
+        foreach my $suffix (@suffixes) {
+            push(@headers, $metric."_".$suffix);
+        }
     }
     return @headers;
 }
@@ -160,22 +180,26 @@ sub getSampleInfo {
     my @sampleFields;
     my @samples = keys(%records);
     @samples = sort @samples;
+    my $include = 1; # all samples with QC results were included in genotyping
     foreach my $sample (@samples) {
-	if (not $records{$sample}) { croak "No QC results found for sample $sample!"; }
-	my %record = %{$records{$sample}};
-	my $samplePass = 1; # $samplePass is placeholder
-	my @fields = ($sample, $record{'plate'}, $record{'address'}, $samplePass); 
-	foreach my $metric (@METRIC_NAMES) {
-	    if (not $record{$metric}) { 
-		push(@fields, (1, "NA")); # no results found; use placeholders
-	    } else {
-		my @status =  @{$record{$metric}}; # pass/fail and metric value(s)
-		if ($status[0]==0) { $samplePass = 0; }
-		push(@fields, @status); 
-	    }
-	}
-	$fields[3] = $samplePass;
-	push @sampleFields, \@fields;
+        if (not $records{$sample}) { 
+            croak "No QC results found for sample $sample!"; 
+        }
+        my %record = %{$records{$sample}};
+        my $samplePass = 1; # $samplePass is placeholder
+        my @fields = ($sample, $include, $record{'plate'}, 
+                      $record{'address'}, $samplePass); 
+        foreach my $metric (@METRIC_NAMES) {
+            if (not $record{$metric}) { 
+                push(@fields, (1, "NA")); # no results found; use placeholders
+            } else {
+                my @status =  @{$record{$metric}}; # pass/fail and metric
+                if ($status[0]==0) { $samplePass = 0; }
+                push(@fields, @status); 
+            }
+        }
+        $fields[3] = $samplePass;
+        push @sampleFields, \@fields;
     }
     return @sampleFields;
 }
@@ -422,15 +446,31 @@ sub textForCsv {
     my ($resultPath, $dbPath, $config) = @_;
     my $resultsRef = readJson($resultPath);
     my @headers = getCsvHeaders($config);
+    my $blankForExcluded = @headers - $NON_EMPTY_FIELDS; 
     my @text = (\@headers,);
-    my @sampleFields = getSampleInfo($resultsRef, $config);
-    my %dbInfo = dbSampleInfo($dbPath);
+    my @sampleFields = getSampleInfo($resultsRef, $config); # genotyped samples
+    my %dbInfo = dbSampleInfo($dbPath); # all samples
     foreach my $ref (@sampleFields) {
-	my @out = sampleFieldsToText($ref);
-	my $sample = $out[0];
-	unshift(@out, @{$dbInfo{$sample}});
-	if ($#headers != $#out) { croak "Numbers of output headers and fields differ: $#headers != $#out"; }
-	push(@text, \@out);
+        my @out = sampleFieldsToText($ref);
+        my $sample = $out[0];
+        unshift(@out, @{$dbInfo{$sample}});
+        if ($#headers != $#out) { 
+            croak "Numbers of output headers and fields differ:".
+                " $#headers != $#out"; 
+        }
+        push(@text, \@out);
+    }
+    # append empty lines for excluded samples
+    my @excluded = dbExcludedSamples($dbPath);
+    foreach my $sample (@excluded) {
+        my @out = ($sample, 0);
+        my $i = 0;
+        while ($i < $blankForExcluded) {
+            push @out, "NA";
+            $i++;
+        }
+        unshift(@out, @{$dbInfo{$sample}});
+        push(@text, \@out);
     }
     return @text;
 }

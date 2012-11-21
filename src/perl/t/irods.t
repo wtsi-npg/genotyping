@@ -6,9 +6,11 @@ use utf8;
 use strict;
 use warnings;
 
+use DateTime;
+use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 49;
+use Test::More tests => 83;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
@@ -30,7 +32,19 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                put_collection
                                remove_collection
                                get_collection_meta
-                               add_collection_meta);
+                               add_collection_meta
+
+                               group_exists
+                               add_group
+                               set_group_access
+
+                               common_stem
+                               collect_files
+                               collect_dirs
+                               modified_between
+                               md5sum
+                               hash_path
+                               meta_exists);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -76,6 +90,16 @@ foreach my $attr (keys %meta) {
   ok(scalar @x);
 }
 
+# meta_exists
+my %m = ("a" => ["1", "2"],
+         "b" => ["1"],
+         "c" => ["2"]);
+
+ok(meta_exists("a", "1", %m));
+ok(meta_exists("a", "2", %m));
+is(meta_exists("a", "12", %m), 0);
+is(meta_exists("a", "11", %m), 0);
+
 # get_collection_meta
 my %collmeta = get_collection_meta($test_collection);
 is_deeply(\%collmeta, \%expected);
@@ -88,6 +112,13 @@ dies_ok { add_object($test_file, undef) }
 my $new_object = add_object($test_file, $test_object);
 ok($new_object);
 
+# set_group_access
+dies_ok { set_group_access('no_such_permission', 'public', $new_object) }
+  'Expected to fail setting access with an invalid permission argument';
+dies_ok { set_group_access('read', 'no_such_group_exists', $new_object) }
+  'Expected to fail setting access for non-existant group';
+ok(set_group_access('read', 'public', $new_object));
+ok(set_group_access(undef, 'public', $new_object));
 
 # list_object
 dies_ok { list_object() }
@@ -105,9 +136,11 @@ foreach my $attr (keys %meta) {
 
 # get_object_meta
 my %objmeta = get_object_meta($test_object);
+is_deeply(\%objmeta, \%expected);
+
 dies_ok { get_object_meta() }
   'Expected to fail getting metdata for an undefined object';
-is_deeply(\%objmeta, \%expected);
+
 
 # remove_object
 dies_ok { remove_object() }
@@ -145,6 +178,108 @@ is_deeply([add_object_meta($lorem_object, 'md5', $expected_checksum)],
 ok(checksum_object($lorem_object));
 
 ok(remove_object($lorem_object));
+
+
+# group exists
+ok(group_exists('rodsadmin'));
+ok(! group_exists('no_such_group_exists'));
+
+# A hack to see if there are admin rights for the following tests. I can't
+# find a clean way to list these rights in iRODS.
+
+my $no_admin = system("iadmin mkgroup foo 2>&1 | grep -E '^ERROR.*SYS_NO_API_PRIV'") == 0;
+
+if ($no_admin) {
+  dies_ok { add_group('rodsadmin') }
+    'Expected to fail due to lack of permission';
+  dies_ok { add_group('test_group') }
+    'Expected to fail due to lack of permission';
+  dies_ok { remove_group('test_group') }
+    'Expected to fail due to lack of permission';
+}
+else {
+  # add_group
+  dies_ok { add_group('rodsadmin') }
+    'Expected to fail adding a group that exists already';
+  ok(add_group('test_group'));
+  ok(remove_group('test_group'));
+}
+
+
+# common_stem
+is(common_stem('', ''), '');
+is(common_stem('a', ''), '');
+is(common_stem('', 'a'), '');
+is(common_stem('a', 'a'), 'a');
+
+is(common_stem('aa', 'a'), 'a');
+is(common_stem('a', 'aa'), 'a');
+is(common_stem('ab', 'a'), 'a');
+is(common_stem('a', 'ab'), 'a');
+
+is(common_stem('aa', 'aa'), 'aa');
+is(common_stem('aa', 'bb'), '');
+
+is(common_stem('abc123', 'abc456'), 'abc');
+
+# collect_files
+my $test = sub {
+  my ($file) = @_;
+  return 1;
+};
+
+my $collect_path = "$data_path/collect_files";
+
+is_deeply([collect_files($collect_path, $test, 1)],
+          []);
+
+is_deeply([collect_files($collect_path, $test, 2)],
+          ["$collect_path/a/10.txt",
+           "$collect_path/b/20.txt",
+           "$collect_path/c/30.txt"]);
+
+is_deeply([collect_files($collect_path, $test, 3)],
+          ["$collect_path/a/10.txt",
+           "$collect_path/a/x/1.txt",
+           "$collect_path/b/20.txt",
+           "$collect_path/b/y/2.txt",
+           "$collect_path/c/30.txt",
+           "$collect_path/c/z/3.txt"]);
+
+# collect_dirs
+is_deeply([collect_dirs($collect_path, $test, 1)],
+          ["$collect_path"]);
+
+is_deeply([collect_dirs($collect_path, $test, 2)],
+          ["$collect_path",
+           "$collect_path/a",
+           "$collect_path/b",
+           "$collect_path/c"]);
+
+is_deeply([collect_dirs($collect_path, $test, 3)],
+          ["$collect_path",
+           "$collect_path/a",
+           "$collect_path/a/x",
+           "$collect_path/b",
+           "$collect_path/b/y",
+           "$collect_path/c",
+           "$collect_path/c/z"]);
+
+# modified_between
+my $then = DateTime->now;
+my ($fh, $file) = tempfile();
+my $now = DateTime->now;
+
+my $fn = modified_between($then->epoch, $now->epoch);
+ok($fn->($file));
+
+# md5sum
+is(md5sum("$data_path/md5sum/lorem.txt"), '39a4aa291ca849d601e4e5b8ed627a04');
+
+# hash_path
+is(hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
+
+is(hash_path("$data_path/md5sum/lorem.txt", 'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
 
 END {
   if ($dir1 && -d $dir1) {
