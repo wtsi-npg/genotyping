@@ -10,7 +10,7 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 83;
+use Test::More tests => 72;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
@@ -38,7 +38,6 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                add_group
                                set_group_access
 
-                               common_stem
                                collect_files
                                collect_dirs
                                modified_between
@@ -204,23 +203,6 @@ else {
   ok(add_group('test_group'));
   ok(remove_group('test_group'));
 }
-
-
-# common_stem
-is(common_stem('', ''), '');
-is(common_stem('a', ''), '');
-is(common_stem('', 'a'), '');
-is(common_stem('a', 'a'), 'a');
-
-is(common_stem('aa', 'a'), 'a');
-is(common_stem('a', 'aa'), 'a');
-is(common_stem('ab', 'a'), 'a');
-is(common_stem('a', 'ab'), 'a');
-
-is(common_stem('aa', 'aa'), 'aa');
-is(common_stem('aa', 'bb'), '');
-
-is(common_stem('abc123', 'abc456'), 'abc');
 
 # collect_files
 my $test = sub {
