@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<doc>
+	<snps>
+		<chromosome name="1">
+			100
+		</chromosome>
+		<chromosome name="-1">
+			10
+		</chromosome>
+		<chromosome name="23">
+			100
+		</chromosome>
+	</snps>
+	<probs>
+		<AUTO_HET>
+			0.25
+		</AUTO_HET>
+		<MALE>
+			0.5
+		</MALE>
+		<MALE_XHET>
+			0.02
+		</MALE_XHET>
+		<NO_CALL>
+			0.05
+		</NO_CALL>
+	</probs>
+</doc>
