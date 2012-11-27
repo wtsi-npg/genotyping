@@ -40,7 +40,6 @@ use Exporter;
                 add_group
                 set_group_access
 
-                common_stem
                 collect_files
                 collect_dirs
                 make_collector
@@ -58,8 +57,7 @@ our $IRM = 'irm';
 our $IPWD = 'ipwd';
 our $ICHMOD = 'ichmod';
 
-my $log = Log::Log4perl->get_logger('npg.irods');
-
+our $log = Log::Log4perl->get_logger('npg.irods');
 
 =head2 group_exists
 
@@ -661,45 +659,6 @@ sub meta_exists {
   }
 
   return $exists;
-}
-
-=head2 common_stem
-
-  Arg [1]    : string
-  Arg [2]    : string
-  Example    : $stem = common_stem("foo13240a", "foo199")
-  Description: Returns the common part of the two arguments, starting
-               from the left (index 0). If one or more of the arguments
-               are empty strings, or the arguments differ at the first
-               character, an empty string is returned.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub common_stem {
-  my ($str1, $str2) = @_;
-  my $stem = '';
-
-  my $len1 = length($str1);
-  my $len2 = length($str2);
-  my $end;
-  if ($len1 < $len2) {
-    $end = $len1;
-  } else {
-    $end = $len2;
-  }
-
-  for (my $i = 0; $i < $end; ++$i) {
-    my $c1 = substr($str1, $i, 1);
-    my $c2 = substr($str2, $i, 1);
-
-    last if $c1 ne $c2;
-
-    $stem .= $c1;
-  }
-
-  return $stem;
 }
 
 =head2 collect_files
