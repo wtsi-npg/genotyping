@@ -36,6 +36,8 @@ use Exporter;
 
                 update_snp_locations
                 update_sample_genders
+
+                common_stem
               );
 
 use WTSI::Genotyping::DelimitedFiles;
@@ -45,6 +47,7 @@ use WTSI::Genotyping::Illuminus;
 use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Publication;
+use WTSI::Genotyping::Utilities;
 
 $VERSION = '0.5.0';
 
