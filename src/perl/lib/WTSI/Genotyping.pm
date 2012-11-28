@@ -10,15 +10,6 @@ use vars qw($VERSION @ISA @EXPORT_OK);
 use Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(
-                common_stem
-                collect_files
-                collect_dirs
-                make_collector
-                modified_between
-                md5sum
-                hash_path
-                run_command
-
                 make_warehouse_metadata
                 make_infinium_metadata
                 make_file_metadata
@@ -45,6 +36,8 @@ use Exporter;
 
                 update_snp_locations
                 update_sample_genders
+
+                common_stem
               );
 
 use WTSI::Genotyping::DelimitedFiles;
@@ -55,8 +48,6 @@ use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Publication;
 use WTSI::Genotyping::Utilities;
-
-use WTSI::Genotyping::iRODS;
 
 $VERSION = '0.5.0';
 

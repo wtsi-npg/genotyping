@@ -7,6 +7,8 @@ use warnings;
 use Carp;
 use File::Basename;
 
+use WTSI::Genotyping::iRODS qw(md5sum);
+
 our $SAMPLE_NAME_META_KEY             = 'sample';
 our $SAMPLE_ID_META_KEY               = 'sample_id';
 our $SAMPLE_COMMON_NAME_META_KEY      = 'sample_common_name';
