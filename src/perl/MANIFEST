@@ -53,6 +53,7 @@ lib/WTSI/Genotyping/Metadata.pm
 lib/WTSI/Genotyping/Plink.pm
 lib/WTSI/Genotyping/Publication.pm
 lib/WTSI/Genotyping/QC/GenderCheck.pm
+lib/WTSI/Genotyping/QC/MetricExclusion.pm
 lib/WTSI/Genotyping/QC/MetricScatterplots.pm
 lib/WTSI/Genotyping/QC/PlinkIO.pm
 lib/WTSI/Genotyping/QC/QCPlotShared.pm
@@ -125,7 +126,8 @@ t/irods/test/file1.txt
 t/irods/test/file2.txt
 t/perlcriticrc
 t/pipeline.db
-t/qc.t
+t/qc_alpha.t
+t/qc_beta.t
 t/qc/.gitattributes
 t/qc/.pversion
 t/qc/alpha/.pversion
@@ -137,6 +139,13 @@ t/qc_test_data/alpha.map
 t/qc_test_data/alpha.ped
 t/qc_test_data/alpha.sim
 t/qc_test_data/alpha_pipeline.db
+t/qc_test_data/beta.bed
+t/qc_test_data/beta.bim
+t/qc_test_data/beta.fam
+t/qc_test_data/beta.map
+t/qc_test_data/beta.ped
+t/qc_test_data/beta.sim
+t/qc_test_data/beta_pipeline.db
 t/qc_test_data/README.txt
 t/reports.t
 t/update_illuminus_input.t
