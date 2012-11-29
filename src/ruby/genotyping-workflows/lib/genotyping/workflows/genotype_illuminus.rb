@@ -86,6 +86,7 @@ Returns:
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
+      min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
       args.delete(:memory)
       args.delete(:queue)
 
@@ -95,13 +96,23 @@ Returns:
       args = {:work_dir => work_dir,
               :log_dir => log_dir}.merge(args)
 
-      sjname = run_name + '.sample.json'
+      gcsjname = run_name + '.gencall.sample.json'
+      sjname = run_name + '.illuminus.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       smname = run_name + '.illuminus.sim'
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'
       ilname = run_name + '.illuminus.bed'
+
+      gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      gcsfile = transpose_bed(gcifile, gcsname, args, async)
+
+      ## run gencall QC to apply gencall CR filter and find genders
+      gcqcargs = {:run => run_name,
+                  :post_filter_cr => min_cr}.merge(args)
+      gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', gcqcargs)
 
       ## Insert gender_method here
       siargs = {:gender_method => gender_method}.merge(args)
@@ -112,12 +123,6 @@ Returns:
                 :snp_meta => njname}.merge(args)
       smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
 
-      gcifile, * = gtc_to_bed(sjson, manifest, gciname, args, async)
-      gcsfile = transpose_bed(gcifile, gcsname, args, async)
-
-      qcargs = {:run => run_name,
-                :sim => smfile}.merge(args)
-      gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', qcargs)
 
       ilargs = {:size => chunk_size,
                 :group_size => 50,
@@ -145,7 +150,8 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      
+      qcargs = {:run => run_name,
+                :sim => smfile}.merge(args) # add smfile to qcargs
       ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?

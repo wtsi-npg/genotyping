@@ -11,38 +11,40 @@ use Getopt::Long;
 use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
+use WTSI::Genotyping::QC::MetricExclusion qw(filterCR);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath readQCFileNames);
+use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
+    readQCFileNames);
 use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
 
-my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $boxtype, $runName);
+my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $runName, $postCR);
 
-GetOptions("help"           => \$help,
-	   "output-dir=s"   => \$outDir,
-	   "config=s"       => \$configPath,
-	   "sim=s"          => \$simPath,
-	   "dbpath=s"       => \$dbPath,
-	   "inipath=s"      => \$iniPath,
-	   "title=s"        => \$title,
-	   "boxmode=s"      => \$boxtype,
-	   "run=s"          => \$runName,
+GetOptions("help"              => \$help,
+           "output-dir=s"      => \$outDir,
+           "config=s"          => \$configPath,
+           "sim=s"             => \$simPath,
+           "dbpath=s"          => \$dbPath,
+           "inipath=s"         => \$iniPath,
+           "title=s"           => \$title,
+           "run=s"             => \$runName,
+           "post-filter-cr=f"  => \$postCR,
     );
 
 if ($help) {
     print STDERR "Usage: $0 [ options ] PLINK_GTFILE
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension). May include directory names, eg. /home/foo/project where plink files are /home/foo/project.bed, etc.
 Options:
---output-dir=PATH   Directory for QC output
---sim=PATH          Path to SIM intensity file for xydiff calculation
---dbpath=PATH       Path to pipeline database .db file
---inipath=PATH      Path to .ini file containing general pipeline and database configuration; local default is $DEFAULT_INI
---run=NAME          Name of run in pipeline database (needed for database update from gender check)
---config=PATH       Path to .json file with QC thresholds; default is taken from inipath
---title             Title for this analysis; will appear in plots
---boxtype           Keyword for boxplot type; must be one of 'box', 'bean', or 'both'; defaults to 'both'
+--output-dir=PATH Directory for QC output
+--sim=PATH        Path to SIM intensity file for xydiff calculation
+--dbpath=PATH     Path to pipeline database .db file
+--inipath=PATH    Path to .ini file containing general pipeline and database configuration; local default is $DEFAULT_INI
+--run=NAME        Name of run in pipeline database (needed for database update from gender check)
+--config=PATH     Path to .json file with QC thresholds; default is taken from inipath
+--title           Title for this analysis; will appear in plots
+--post-filter-cr  Minimum call rate (CR) for post-filtering. Optional; requires dbpath. Samples with low call rate are marked for exclusion in pipline database. Does not affect current QC, but excludes samples from subsequent analysis. Eg. samples may be excluded from Illuminus input based on Gencall CR.
 ";
     exit(0);
 }
@@ -60,12 +62,12 @@ if (not -e $outDir) { mkdir($outDir); }
 elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
 $title ||= getDefaultTitle($outDir); 
-$boxtype ||= "both";
+if ($postCR && !$dbPath) { croak "Must supply --dbpath for --post-filter-cr argument"; }
 my $texIntroPath = defaultTexIntroPath($iniPath);
 $texIntroPath = verifyAbsPath($texIntroPath);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $boxtype, $texIntroPath);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $postCR, $texIntroPath);
 
 sub cleanup {
     # create a 'supplementary' directory in current working directory
@@ -149,7 +151,7 @@ sub verifyAbsPath {
 
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
-        $outDir, $title, $boxPlotType, $texIntroPath) = @_;
+        $outDir, $title, $postCR, $texIntroPath) = @_;
     my $startDir = getcwd;
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
@@ -205,6 +207,8 @@ sub run {
     my $qcDir = ".";
     createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
                   $genderThresholdPath, $qcDir, $texIntroPath);
+    ### apply call rate filter to database (if any) ###
+    if ($postCR) { filterCR($dbPath, $configPath, $resultPath, $postCR); }
     cleanup();
     chdir($startDir);
     return 1;
