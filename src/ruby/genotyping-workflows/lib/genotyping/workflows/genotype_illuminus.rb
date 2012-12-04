@@ -112,32 +112,35 @@ Returns:
       ## run gencall QC to apply gencall CR filter and find genders
       gcqcargs = {:run => run_name,
                   :post_filter_cr => min_cr}.merge(args)
-      gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', gcqcargs)
+      gcqcdir = 'gencall_qc'
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, {}, true)
 
-      ## Insert gender_method here
-      siargs = {:gender_method => gender_method}.merge(args)
-      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-
-      smargs = {:normalize => true,
-                :chromosome_meta => cjname,
-                :snp_meta => njname}.merge(args)
-      smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-
+      smfile = nil
+      if gcquality
+        siargs = {:gender_method => gender_method}.merge(args)
+        sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+        
+        smargs = {:normalize => true,
+          :chromosome_meta => cjname,
+          :snp_meta => njname}.merge(args)
+        smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, 
+                                          smargs, async)
+      end
 
       ilargs = {:size => chunk_size,
-                :group_size => 50,
-                :plink => true,
-                :snps => njson}.merge(args)
-
+        :group_size => 50,
+        :plink => true,
+        :snps => njson}.merge(args)
+      
       ilchunks = nil
 
-      if gcquality
+      if smfile
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec["chromosome"]
           pargs = {:chromosome => chr,
-                   :start => cspec["start"],
-                   :end => cspec["end"]}
-
+            :start => cspec["start"],
+            :end => cspec["end"]}
+          
           call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
                           ilargs.merge(pargs), async)
         }.flatten
