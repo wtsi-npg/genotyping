@@ -87,6 +87,7 @@ sub cleanup {
         if (-d $name || $retain{$name} ) { next; }
         else { system("mv $name $sup"); }
     }
+    system("touch ".$sup."/finished.txt");
     return 1;
 }
 
