@@ -54,6 +54,8 @@ Arguments:
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
+    min_cr: <float> Minimum Gencall CR (call rate) for Illuminus input samples.
+    Optional, defaults to 0.9.
 
 e.g.
 
