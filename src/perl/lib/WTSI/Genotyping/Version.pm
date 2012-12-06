@@ -15,7 +15,8 @@ $YEAR = '2012'; # year of last update
 
 sub version_text {
     my $text = "WTSI Genotyping Pipeline version $VERSION\n".
-        "Copyright (c) $YEAR Genome Research Ltd. All rights reserved.\n";
+        "Pipeline software copyright (c) $YEAR Genome Research Ltd.\n".
+        "All rights reserved.\n";
     return $text;
 }
 
