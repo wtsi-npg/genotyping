@@ -17,6 +17,27 @@
 #
 
 module Genotyping
-  VERSION = '0.5.0'
+  VERSION = '0.7.0'
+  YEAR = '2012'
+  VERSION_LOG_NAME = 'version.log'
+
+  def maybe_version_log(log_dir)
+    unless File.exist?(File.join(log_dir, VERSION_LOG_NAME))
+      write_version_log(log_dir)
+    end
+  end
+
+  def version_text()
+    text = "WTSI Genotyping Pipeline version "+VERSION+"\n"+
+      "Pipeline software copyright (c) "+YEAR+" Genome Research Ltd.\n"+
+      "All rights reserved.\n"
+  end
+
+  def write_version_log(log_dir)
+    log = File.open(File.join(log_dir, VERSION_LOG_NAME), 'w')
+    log.write(version_text())
+    log.close
+  end
+
 end
 
