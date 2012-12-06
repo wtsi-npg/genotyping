@@ -54,6 +54,8 @@ Arguments:
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
+    min_cr: <float> Minimum Gencall CR (call rate) for Illuminus input samples.
+    Optional, defaults to 0.9.
 
 e.g.
 
@@ -72,7 +74,7 @@ Returns:
 - boolean.
     USAGE
 
-    version '0.1.0'
+    #version '0.1.0'
 
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
@@ -95,6 +97,7 @@ Returns:
       Dir.mkdir(log_dir) unless File.exist?(log_dir)
       args = {:work_dir => work_dir,
               :log_dir => log_dir}.merge(args)
+      maybe_version_log(log_dir)
 
       gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.illuminus.sample.json'
