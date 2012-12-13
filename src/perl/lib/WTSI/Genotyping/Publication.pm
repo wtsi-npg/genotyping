@@ -16,6 +16,8 @@ use WTSI::Genotyping::iRODS qw(list_object
                                meta_exists
                                hash_path);
 
+our $log = Log::Log4perl->get_logger('npg.irods.publish');
+
 =head2 publish_idat_files
 
   Arg [1]    : arrayref of IDAT file names
@@ -39,7 +41,6 @@ use WTSI::Genotyping::iRODS qw(list_object
 sub publish_idat_files {
   my ($files, $publish_dest, $publisher_uri, $ifdb, $ssdb, $time) = @_;
 
-  my $log = Log::Log4perl->get_logger('genotyping');
   my $paired = paired_idat_files($files, $log);
   my $pairs = scalar @$paired;
   my $total = $pairs * 2;
@@ -57,20 +58,23 @@ sub publish_idat_files {
     my $if_sample = $ifdb->find_scanned_sample($basename);
 
     if ($if_sample) {
-      my @meta;
-      push(@meta, make_warehouse_metadata($if_sample, $ssdb));
-      push(@meta, make_infinium_metadata($if_sample));
+      eval {
+        my @meta;
+        push(@meta, make_warehouse_metadata($if_sample, $ssdb));
+        push(@meta, make_infinium_metadata($if_sample));
 
-      foreach my $file ($red, $grn) {
-        eval {
-          publish_file($file, \@meta, $publish_dest, $publisher_uri->as_string,
-                       $time, $log);
+        foreach my $file ($red, $grn) {
+          publish_file($file, \@meta, $publish_dest,
+                       $publisher_uri->as_string, $time, $log);
           ++$published;
-        };
-
-        if ($@) {
-          $log->error("Failed to publish '$red' to '$publish_dest': ", $@);
         }
+      };
+
+      if ($@) {
+        $log->error("Failed to publish '$red / $grn': ", $@);
+      }
+      else {
+        $log->debug("Published '$red / $grn': $published of $pairs pairs");
       }
     }
     else {
@@ -106,11 +110,10 @@ sub publish_idat_files {
 sub publish_gtc_files {
   my ($files, $publish_dest, $publisher_uri, $ifdb, $ssdb, $time) = @_;
 
-  my $log = Log::Log4perl->get_logger('genotyping');
   my $total = scalar @$files;
   my $published = 0;
 
-  $log->debug("Publishing $total of GTC files");
+  $log->debug("Publishing $total GTC files");
 
   foreach my $file (@$files) {
     my ($basename, $dir, $suffix) = fileparse($file);
@@ -119,18 +122,24 @@ sub publish_gtc_files {
     my $if_sample = $ifdb->find_called_sample($basename);
 
     if ($if_sample) {
-      my @meta;
-      push(@meta, make_warehouse_metadata($if_sample, $ssdb));
-      push(@meta, make_infinium_metadata($if_sample));
-
       eval {
+        my @meta;
+
+        push(@meta, make_warehouse_metadata($if_sample, $ssdb));
+        push(@meta, make_infinium_metadata($if_sample));
+
         publish_file($file, \@meta, $publish_dest, $publisher_uri->as_string,
                      $time, $log);
         ++$published;
       };
 
+
+
       if ($@) {
         $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
+      }
+      else {
+        $log->debug("Published '$file': $published of $total");
       }
     }
     else {
@@ -162,7 +171,7 @@ sub publish_file {
   if (has_consent(@meta)) {
     if (list_object($target)) {
       if (checksum_object($target)) {
-        $log->info("Skipping publishing $target because checksum is unchanged");
+        $log->info("Skipping publication of $target because checksum is unchanged");
       }
       else {
         $log->info("Republishing $target because checksum is changed");
@@ -183,16 +192,17 @@ sub publish_file {
     foreach my $elt (@meta) {
       my ($key, $value, $units) = @$elt;
 
-      $log->debug("Testing before adding key $key value $value");
-
-      unless (meta_exists($key, $value, %current_meta)) {
-        $log->debug("Now adding key $key value $value");
+      if (meta_exists($key, $value, %current_meta)) {
+        $log->debug("Skipping addition of key $key value $value to $target (exists)");
+      }
+      else {
+        $log->debug("Adding key $key value $value to $target");
         add_object_meta($target, $key, $value, $units);
       }
     }
   }
   else {
-    $log->info("Skipping publishing $target because no consent was given");
+    $log->info("Skipping publication of $target because no consent was given");
   }
 
   return $target;

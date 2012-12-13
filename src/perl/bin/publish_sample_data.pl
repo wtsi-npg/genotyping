@@ -156,16 +156,26 @@ sub run {
   foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
     $log->debug("Checking directory '$dir'");
     my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
-    $log->debug("Found " . scalar @found . " matching items\n");
+    $log->debug("Found " . scalar @found . " matching items in '$dir'");
     push(@files, @found);
   }
 
+  # The above contains dupes due to the 2-level processing. Remove them.
+  my @unique;
+  my %seen;
+  foreach my $file (@files) {
+    if (! $seen{$file}) {
+      push(@unique, $file);
+      $seen{$file}++;
+    }
+  }
+
   if ($type eq 'idat') {
-    publish_idat_files(\@files, $publish_dest, $publisher_uri,
+    publish_idat_files(\@unique, $publish_dest, $publisher_uri,
                        $ifdb, $ssdb, $now);
   }
   elsif ($type eq 'gtc') {
-    publish_gtc_files(\@files, $publish_dest, $publisher_uri,
+    publish_gtc_files(\@unique, $publish_dest, $publisher_uri,
                       $ifdb, $ssdb, $now);
   }
   else {
