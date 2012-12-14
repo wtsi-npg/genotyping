@@ -71,10 +71,10 @@ sub publish_idat_files {
       };
 
       if ($@) {
-        $log->error("Failed to publish '$red / $grn': ", $@);
+        $log->error("Failed to publish '$red' + '$grn': ", $@);
       }
       else {
-        $log->debug("Published '$red / $grn': $published of $pairs pairs");
+        $log->debug("Published '$red' + '$grn': $published of $total");
       }
     }
     else {
