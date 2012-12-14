@@ -217,15 +217,16 @@ sub paired_idat_files {
   foreach my $file (@$files) {
     my ($stem, $colour, $suffix) = $file =~ m{^(\S+)_(Red|Grn)(.idat)$}msxi;
 
-    unless ($stem && $colour && $suffix) {
-      $log->warn("Found a non-idat file while sorting idat files: '$file'");
-    }
-
-    if (exists $names{$stem}) {
-      push(@{$names{$stem}}, $file);
+    if ($stem && $colour && $suffix) {
+      if (exists $names{$stem}) {
+        push(@{$names{$stem}}, $file);
+      }
+      else {
+        $names{$stem} = [$file];
+      }
     }
     else {
-      $names{$stem} = [$file];
+      $log->warn("Found a non-idat file while sorting idat files: '$file'");
     }
   }
 
