@@ -46,7 +46,7 @@ $status = system("perl $bin/check_identity_bed.pl --config $config $plinkA");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
-my $crHetFinder = "/nfs/users/nfs_i/ib5/mygit/github/Gftools/snp_af_sample_cr_bed"; # TODO make more portable
+my $crHetFinder = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
 $status = system("$crHetFinder $plinkA");
 is($status, 0, "snp_af_sample_cr_bed exit status");
 
