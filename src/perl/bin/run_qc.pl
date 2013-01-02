@@ -11,6 +11,7 @@ use Getopt::Long;
 use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
+use WTSI::Genotyping::Version qw(write_version_log);
 use WTSI::Genotyping::QC::MetricExclusion qw(filterCR);
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
@@ -154,6 +155,7 @@ sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
         $outDir, $title, $postCR, $texIntroPath) = @_;
     my $startDir = getcwd;
+    write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
     my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix",
