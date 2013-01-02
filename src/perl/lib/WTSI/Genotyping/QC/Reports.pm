@@ -204,7 +204,7 @@ sub getSampleInfo {
                 push(@fields, @status); 
             }
         }
-        $fields[3] = $samplePass;
+        $fields[4] = $samplePass;
         push @sampleFields, \@fields;
     }
     return @sampleFields;

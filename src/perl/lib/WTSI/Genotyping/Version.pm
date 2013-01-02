@@ -11,7 +11,7 @@ use Exporter;
 @EXPORT_OK = qw/version_text write_version_log/;
 
 $VERSION = '0.7.0';
-$YEAR = '2012'; # year of last update
+$YEAR = '2013'; # year of last update
 
 sub version_text {
     my $text = "WTSI Genotyping Pipeline version $VERSION\n".
