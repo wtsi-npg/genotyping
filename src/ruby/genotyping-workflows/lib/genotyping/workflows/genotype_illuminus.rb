@@ -54,6 +54,8 @@ Arguments:
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
+    min_cr: <float> Minimum Gencall CR (call rate) for Illuminus input samples.
+    Optional, defaults to 0.9.
 
 e.g.
 
@@ -72,7 +74,7 @@ Returns:
 - boolean.
     USAGE
 
-    version '0.1.0'
+    #version '0.1.0'
 
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
@@ -86,6 +88,7 @@ Returns:
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
+      min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
       args.delete(:memory)
       args.delete(:queue)
 
@@ -94,8 +97,10 @@ Returns:
       Dir.mkdir(log_dir) unless File.exist?(log_dir)
       args = {:work_dir => work_dir,
               :log_dir => log_dir}.merge(args)
+      maybe_version_log(log_dir)
 
-      sjname = run_name + '.sample.json'
+      gcsjname = run_name + '.gencall.sample.json'
+      sjname = run_name + '.illuminus.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       smname = run_name + '.illuminus.sim'
@@ -103,36 +108,42 @@ Returns:
       gcsname = run_name + '.gencall.smajor.bed'
       ilname = run_name + '.illuminus.bed'
 
-      ## Insert gender_method here
-      siargs = {:gender_method => gender_method}.merge(args)
-      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-
-      smargs = {:normalize => true,
-                :chromosome_meta => cjname,
-                :snp_meta => njname}.merge(args)
-      smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
-
-      gcifile, * = gtc_to_bed(sjson, manifest, gciname, args, async)
+      gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
-      qcargs = {:run => run_name,
-                :sim => smfile}.merge(args)
-      gcquality = quality_control(dbfile, gcsfile, 'gencall_qc', qcargs)
+      ## run gencall QC to apply gencall CR filter and find genders
+      gcqcargs = {:run => run_name,
+                  :post_filter_cr => min_cr}.merge(args)
+      gcqcdir = 'gencall_qc'
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, {}, true)
+
+      smfile = nil
+      if gcquality
+        siargs = {:gender_method => gender_method}.merge(args)
+        sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+        
+        smargs = {:normalize => true,
+          :chromosome_meta => cjname,
+          :snp_meta => njname}.merge(args)
+        smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, 
+                                          smargs, async)
+      end
 
       ilargs = {:size => chunk_size,
-                :group_size => 50,
-                :plink => true,
-                :snps => njson}.merge(args)
-
+        :group_size => 50,
+        :plink => true,
+        :snps => njson}.merge(args)
+      
       ilchunks = nil
 
-      if gcquality
+      if smfile
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec["chromosome"]
           pargs = {:chromosome => chr,
-                   :start => cspec["start"],
-                   :end => cspec["end"]}
-
+            :start => cspec["start"],
+            :end => cspec["end"]}
+          
           call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
                           ilargs.merge(pargs), async)
         }.flatten
@@ -145,7 +156,8 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      
+      qcargs = {:run => run_name,
+                :sim => smfile}.merge(args) # add smfile to qcargs
       ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?

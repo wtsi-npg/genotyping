@@ -191,14 +191,20 @@ sub getSampleInfo {
                       $record{'address'}, $samplePass); 
         foreach my $metric (@METRIC_NAMES) {
             if (not $record{$metric}) { 
-                push(@fields, (1, "NA")); # no results found; use placeholders
+                my @null;
+                if ($metric eq 'gender') {
+                    @null = (1, "NA", "NA", "NA");
+                } else {
+                    @null = (1, "NA");
+                }
+                push(@fields, @null); # no results found; use placeholders
             } else {
                 my @status =  @{$record{$metric}}; # pass/fail and metric
                 if ($status[0]==0) { $samplePass = 0; }
                 push(@fields, @status); 
             }
         }
-        $fields[3] = $samplePass;
+        $fields[4] = $samplePass;
         push @sampleFields, \@fields;
     }
     return @sampleFields;

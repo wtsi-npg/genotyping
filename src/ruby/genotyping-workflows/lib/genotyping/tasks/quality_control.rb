@@ -35,7 +35,8 @@ module Genotyping::Tasks
     #
     # Returns:
     # - boolean
-    def quality_control(dbfile, input, output, args = {}, async = {})
+    def quality_control(dbfile, input, output, args = {}, async = {},
+                        wait=false)
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(dbfile, input, output, work_dir)
@@ -57,9 +58,18 @@ module Genotyping::Tasks
           task_id = task_identity(:quality_control, *margs)
           log = File.join(log_dir, task_id + '.log')
 
-          async_task(margs, command, work_dir, log,
-                     :result => lambda { true },
-                     :async => async)
+          if wait # postcondition to check for completion of QC
+            f =  File.join(work_dir, output, 'supplementary', 'finished.txt')
+            finish = [ f, ]
+            async_task(margs, command, work_dir, log,
+                       :post => lambda {ensure_files(finish, :error => false)},
+                       :result => lambda { true },
+                       :async => async)
+          else
+            async_task(margs, command, work_dir, log,
+                       :result => lambda { true },
+                       :async => async)
+          end
         end
       end
     end

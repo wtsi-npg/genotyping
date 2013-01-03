@@ -201,7 +201,7 @@ default.thresholds <- function(xhet, m.max.default, boundary.sd )  {
   } else {
     f.min <- m.max.default
   }
-  return(c(m.max, f.min))
+  return(c(m.max.default, f.min))
 }
 
 find.thresholds <- function(xhet, m.max.default, m.max.minimum, boundary.sd,
