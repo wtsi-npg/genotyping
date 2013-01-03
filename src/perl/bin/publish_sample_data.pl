@@ -62,20 +62,22 @@ run() unless caller();
 sub run {
   my $config;
   my $days;
+  my $days_ago;
   my $log4perl_config;
   my $publish_dest;
   my $source;
   my $type;
   my $verbose;
 
-  GetOptions('config=s'  => \$config,
-             'days=s'    => \$days,
-             'dest=s'    => \$publish_dest,
-             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s' => \$log4perl_config,
-             'source=s'  => \$source,
-             'type=s'    => \$type,
-             'verbose'   => \$verbose,);
+  GetOptions('config=s'   => \$config,
+             'days=i'     => \$days,
+             'days-ago=i' => \$days_ago,
+             'dest=s'     => \$publish_dest,
+             'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'  => \$log4perl_config,
+             'source=s'   => \$source,
+             'type=s'     => \$type,
+             'verbose'    => \$verbose,);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
@@ -96,6 +98,7 @@ sub run {
 
   $config ||= $DEFAULT_INI;
   $days ||= $DEFAULT_DAYS;
+  $days_ago ||= 0;
   $type = lc($type);
 
   my $log;
@@ -115,14 +118,24 @@ sub run {
   }
 
   my $now = DateTime->now();
-  my $then = DateTime->from_epoch
-    (epoch => $now->epoch())->subtract(days => $days);
+
+  my $end;
+  if ($days_ago > 0) {
+    $end = DateTime->from_epoch
+      (epoch => $now->epoch())->subtract(days => $days_ago);
+  }
+  else {
+    $end = $now;
+  }
+
+  my $begin = DateTime->from_epoch
+    (epoch => $end->epoch())->subtract(days => $days);
 
   $log->info("Publishing '$type' from '$source' to '$publish_dest'",
-             " last modified between ", $then->iso8601,
-             " and ", $now->iso8601);
+             " last modified between ", $begin->iso8601,
+             " and ", $end->iso8601);
 
-  my $file_test = modified_between($then->epoch(), $now->epoch());
+  my $file_test = modified_between($begin->epoch(), $end->epoch());
   my $file_regex = qr{.($type)$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
@@ -156,16 +169,26 @@ sub run {
   foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
     $log->debug("Checking directory '$dir'");
     my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
-    $log->debug("Found " . scalar @found . " matching items\n");
+    $log->debug("Found " . scalar @found . " matching items in '$dir'");
     push(@files, @found);
   }
 
+  # The above contains dupes due to the 2-level processing. Remove them.
+  my @unique;
+  my %seen;
+  foreach my $file (@files) {
+    if (! $seen{$file}) {
+      push(@unique, $file);
+      $seen{$file}++;
+    }
+  }
+
   if ($type eq 'idat') {
-    publish_idat_files(\@files, $publish_dest, $publisher_uri,
+    publish_idat_files(\@unique, $publish_dest, $publisher_uri,
                        $ifdb, $ssdb, $now);
   }
   elsif ($type eq 'gtc') {
-    publish_gtc_files(\@files, $publish_dest, $publisher_uri,
+    publish_gtc_files(\@unique, $publish_dest, $publisher_uri,
                       $ifdb, $ssdb, $now);
   }
   else {
@@ -202,17 +225,20 @@ publish_sample_data
 =head1 SYNOPSIS
 
 publish_sample_data [--config <database .ini file>] \
-   [--days <n>] --source <directory> --dest <irods collection>
+   [--days-ago <n>] [--days <n>] \
+   --source <directory> --dest <irods collection> \
    --type <data type>
 
 Options:
 
   --config    Load database configuration from a user-defined .ini file.
               Optional, defaults to $HOME/.npg/genotyping.ini
-  --days      The number of days in the publication window, starting now
-              and counting backwards. Any sample data modified during this
-              period will be considered for publication. Optional,
-              defaults to 7 days.
+  --days-ago  The number of days ago that the publication window ends.
+              Optional, defaults to zero (the current day).
+  --days      The number of days in the publication window, ending at
+              the day given by the --days-ago argument. Any sample data
+              modified during this period will be considered
+              for publication. Optional, defaults to 7 days.
   --dest      The data destination root collection in iRODS.
   --help      Display help.
   --logconf   A log4perl configuration file. Optional.
@@ -223,9 +249,9 @@ Options:
 =head1 DESCRIPTION
 
 Searches a directory recursively for idat or GTC sample data files
-that have been modified within the n days prior to the time of
-invocation. Any files identified are published to iRODS with metadata
-obtained from LIMS.
+that have been modified within the n days prior to a specific time.
+Any files identified are published to iRODS with metadata obtained from
+LIMS.
 
 =head1 METHODS
 

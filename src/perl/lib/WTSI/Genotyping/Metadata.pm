@@ -19,6 +19,8 @@ our $STUDY_ID_META_MEY                = 'study_id';
 our $STUDY_TITLE_META_KEY             = 'study_title';
 
 
+our $log = Log::Log4perl->get_logger('npg.irods.publish');
+
 =head2 make_creation_metadata
 
   Arg [1]    : DateTime creation time
@@ -74,9 +76,27 @@ sub make_warehouse_metadata {
 
   my $if_barcode = $if_sample->{'plate'};
   my $if_well = $if_sample->{'well'};
+  my $if_sample_name = $if_sample->{sample};
+  my $if_chip = $if_sample->{beadchip};
 
   my $ss_sample = $ssdb->find_infinium_sample($if_barcode, $if_well);
   my @ss_studies = @{$ssdb->find_infinium_studies($if_barcode, $if_well)};
+
+  # These defensive checks are here because the SS data are sometimes missing
+  unless (defined $ss_sample->{name}) {
+    $log->logconfess("The name value for $if_sample_name (chip $if_chip) ",
+                     "is missing from the Sequencescape Warehouse");
+  }
+  unless (defined $ss_sample->{consent_withdrawn}) {
+    $log->logconfess("The consent_withdrawn value for $if_sample_name ",
+                     "(chip $if_chip)is missing from the Sequencescape ",
+                     "Warehouse");
+  }
+  unless (defined $ss_sample->{sanger_sample_id}) {
+     $log->logconfess("The sanger_sample_id value for $if_sample_name ",
+                      "(chip $if_chip) is missing from the Sequencescape ",
+                      "Warehouse");
+  }
 
   my @meta = ([$SAMPLE_NAME_META_KEY    => $ss_sample->{name}],
               [$SAMPLE_ID_META_KEY      => $ss_sample->{internal_id}],
