@@ -7,9 +7,9 @@ R scripts are invoked by system calls within Perl wrapper scripts.  The
 Perl wrappers assume that the R scripts are available on the PATH 
 environment variable.
 
-As part of the Perl installation process executed by `./Build install', 
-the R scripts are copied to the bin subdirectory of the Perl installation 
-directory.  The Perl tests executed by `./Build test' also test 
-functionality of the R scripts, for example by confirming that the correct 
-plots are output.
+R scripts are installed as part of the Perl installation process, using 
+`./Build install_R --install_base $INSTALL_DIRECTORY'.  This copies the 
+scripts to the bin subdirectory of $INSTALL_DIRECTORY.  The Perl tests 
+executed by `./Build test' also test functionality of the R scripts, for 
+example by confirming that the correct plots are output.
 
