@@ -4,6 +4,7 @@ package Build;
 
 use strict;
 use warnings;
+use Carp;
 use File::Basename;
 use File::Copy;
 use File::Path qw(make_path);
@@ -12,7 +13,7 @@ use File::Spec;
 use base 'Module::Build';
 
 #
-# Add 'install_config' and 'install_R' targets to the build file.
+# Add targets to the build file.
 #
 sub ACTION_install_config {
   my ($self) = @_;
@@ -22,6 +23,14 @@ sub ACTION_install_config {
   $self->process_sql_files;
 
   return $self;
+}
+
+sub ACTION_install_gendermix {
+    my $self = shift;
+    my $gendermix_manifest = './etc/gendermix_manifest.txt';
+    $self->process_alternate_manifest($gendermix_manifest);
+    $self->process_R_files_gendermix;
+    return $self;
 }
 
 sub ACTION_install_R {
@@ -50,10 +59,45 @@ sub process_R_files {
   return $self->process_files_by_category('R_files');
 }
 
+sub process_R_files_gendermix {
+  my ($self) = @_;
+  return $self->process_files_by_category('R_files_gendermix');
+}
+
+sub process_alternate_manifest {
+    # reads an alternate manifest, listing one file per line
+    # installs each item in manifest, under the install_base directory
+    # does not do any translation (contrast with process_files_by_category)
+    # use to install standalone gendermix check
+    my ($self, $manifest_path) = @_;
+    open my $in, "<", $manifest_path || 
+        croak "Cannot open manifest $manifest_path: $!";
+    my @manifest;
+    while (<$in>) {
+        chomp;
+        push @manifest, $_;
+    }
+    close $in || croak "Cannot close manifest $manifest_path: $!";
+    
+    my $dest_base = $self->install_base;
+    my @installed;
+    foreach my $src_file (@manifest) {
+        my $dest_file = File::Spec->catfile($dest_base, $src_file);
+        my $file = $self->copy_if_modified(from => $src_file, to => $dest_file);
+        if ($file) {
+            push(@installed, $file);
+            print STDERR "Installing $file\n";
+        }
+    }
+    return @installed;
+}
+
 sub process_files_by_category {
   my ($self, $category) = @_;
 
-  if ($self->current_action eq 'install_config' || $self->current_action eq 'install_R') {
+  if ($self->current_action eq 'install_config' || 
+      $self->current_action eq 'install_R' || 
+      $self->current_action eq 'install_gendermix') {
     my $translations = $self->{properties}->{$category};
     my $dest_base = $self->install_base;
 
@@ -72,5 +116,7 @@ sub process_files_by_category {
     return @installed;
   }
 }
+
+
 
 1;

@@ -17,3 +17,16 @@ To install:
   ./Build install --install_base <target directory>
   ./Build install_config --install_base <target directory>
   ./Build install_R --install_base <target directory>
+
+
+### Gendermix: standalone gender check ###
+
+The 'gendermix' gender check method can be installed as a standalone 
+application.  The install_gendermix target will install all required Perl, R, 
+and config files.
+
+To install:
+
+ perl Build.PL
+ ./Build test --test_files t/gender.t
+ ./Build install_gendermix --install_base <target directory>      

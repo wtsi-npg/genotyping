@@ -41,6 +41,9 @@ my $build = Build->new
        '../r/bin/plotXYdiffPlate.R' => 'bin/plotXYdiffPlate.R',
        '../r/bin/scatter_plot_metric.R' => 'bin/scatter_plot_metric.R',
        '../r/bin/scatterPlotFails.R' => 'bin/scatterPlotFails.R'},
+   R_files_gendermix => {
+       '../r/bin/check_xhet_gender.R' => 'bin/check_xhet_gender.R',
+   },
    install_path => {'etc' => 'etc'}
   );
 

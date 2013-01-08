@@ -20,7 +20,7 @@ Pipeline:
 QC scripts:
 
  R >= 2.11.1
- R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
+ R mixtools library	 http://cran.r-project.org/web/packages/mixtools/index.html
 
 
 Pipeline metadata management:
@@ -39,18 +39,20 @@ Pipeline components:
 
 Environment variables:
 
- PERL5LIB   Should include path to genotyping/src/perl/lib/
+ PATH       Should include path to <install_dir>/bin
+ PERL5LIB   Should include path to <install_dir>/src/perl/lib/
  R_LIBS     Should include path to mixtools library installation
 
 
 
 ### Gendermix: standalone gender check ###
 
-The 'gendermix' branch on github makes the gender check method 
-available as a standalone application.  Gendermix trains a Gaussian 
+The 'gendermix' gender check method can be installed as a standalone 
+application.  This is done using the appropriate target for the Perl build 
+script; see src/perl/README for details.  Gendermix trains a Gaussian 
 mixture model in order to find adaptive thresholds for X chromosome 
 heterozygosity, used to infer whether a sample is male or female.
 
-The standalone check omits much of the pipeline source code.  Requirements
+The standalone check omits much of the pipeline code.  Requirements
 which do not apply to the standalone check include Ruby, Percolate, Illuminus, 
 and Gftools; all other requirements are still in effect.
