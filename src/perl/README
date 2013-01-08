@@ -23,7 +23,9 @@ To install:
 
 The 'gendermix' gender check method can be installed as a standalone 
 application.  The install_gendermix target will install all required Perl, R, 
-and config files.
+and config files.  Note that install_gendermix has its own version of the 
+Genotyping.pm Perl module, which is stored as lib/WTSI/GenotypingReduced and 
+replaces the standard Genotyping.pm in the installation.
 
 To install:
 

@@ -1,4 +1,5 @@
 .pversion
+../r/bin/check_xhet_gender.R bin/check_xhet_gender.R
 bin/check_xhet_gender.pl
 Build.PL
 Build.pm
@@ -14,8 +15,9 @@ etc/relations.ini
 etc/reportIntro.tex
 etc/snpsets.ini
 etc/states.ini
-lib/WTSI/Genotyping.pm
+lib/WTSI/GenotypingReduced lib/WTSI/Genotyping.pm
 lib/WTSI/Genotyping/Database.pm
+lib/WTSI/Genotyping/Database/Pipeline.pm
 lib/WTSI/Genotyping/IO.pm
 lib/WTSI/Genotyping/Plink.pm
 lib/WTSI/Genotyping/QC/GenderCheck.pm
@@ -47,13 +49,10 @@ sql/pipeline_ddl.sql
 t/gender.t
 t/gender/.pversion
 t/gender/benchmark_gender.json
+t/gender/benchmark_gender_large.json
 t/gender/input_xhet.json
 t/gender/input_xhet.txt
-t/gender/sample_xhet_gender.json
-t/gender/sample_xhet_gender.log
-t/gender/sample_xhet_gender.png
-t/gender/sample_xhet_gender.txt
-t/gender/sample_xhet_gender_thresholds.txt
+t/gender/input_xhet_large.txt
 t/qc_test_data/alpha.bed
 t/qc_test_data/alpha.bim
 t/qc_test_data/alpha.fam

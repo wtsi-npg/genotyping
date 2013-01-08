@@ -77,7 +77,7 @@ foreach my $format qw(plink json text) {
 # run test on larger input set, with smoothing
 %refGenders = readBenchmark($largeInputRef);
 @names = keys(%refGenders);
-my $input = $inputDir."/sample_xhet_gender_large.txt";
+my $input = $inputDir."/input_xhet_large.txt";
 my $tempDir = tempdir( CLEANUP => 1 );
 my $cmd = "perl $script --input=$input --output-dir=$tempDir";
 my $status = system($cmd);
@@ -98,9 +98,9 @@ sub diffGenders {
     # check gender codes
     foreach my $sample (keys(%genders)) {
         if ($benchmark{$sample} != $genders{$sample}) { 
-            print STDERR "\t### $sample $benchmark{$sample} $genders{$sample}\n";
+            #print STDERR "\t### $sample $benchmark{$sample} $genders{$sample}\n";
             $diff = 1; 
-            #last; 
+            last; 
         }
     }
     # if codes OK, check that sample sets match
@@ -108,8 +108,8 @@ sub diffGenders {
         foreach my $sample (keys(%benchmark)) {
             if (!defined($genders{$sample})) { 
                 $diff = 1; 
-                print STDERR "\t### \"$sample\" gender not defined.\n";
-               #last; 
+                #print STDERR "\t### \"$sample\" gender not defined.\n";
+                last; 
             }
         }
     }

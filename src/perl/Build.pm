@@ -29,7 +29,7 @@ sub ACTION_install_gendermix {
     my $self = shift;
     my $gendermix_manifest = './etc/gendermix_manifest.txt';
     $self->process_alternate_manifest($gendermix_manifest);
-    $self->process_R_files_gendermix;
+    #$self->process_R_files_gendermix;
     return $self;
 }
 
@@ -65,24 +65,28 @@ sub process_R_files_gendermix {
 }
 
 sub process_alternate_manifest {
-    # reads an alternate manifest, listing one file per line
+    # reads an alternate manifest
+    # manifest lists one file per line, followed by (optional) translation
     # installs each item in manifest, under the install_base directory
-    # does not do any translation (contrast with process_files_by_category)
     # use to install standalone gendermix check
     my ($self, $manifest_path) = @_;
     open my $in, "<", $manifest_path || 
         croak "Cannot open manifest $manifest_path: $!";
-    my @manifest;
+    my %manifest;
     while (<$in>) {
         chomp;
-        push @manifest, $_;
+        my @words = split;
+        my $src = shift @words;
+        my $dest = shift @words;
+        if ($dest) { $manifest{$src} = $dest; }
+        else { $manifest{$src} = $src; }
     }
     close $in || croak "Cannot close manifest $manifest_path: $!";
-    
     my $dest_base = $self->install_base;
     my @installed;
-    foreach my $src_file (@manifest) {
-        my $dest_file = File::Spec->catfile($dest_base, $src_file);
+    foreach my $src_file (keys %manifest) {
+        my $dest_file = File::Spec->catfile($dest_base, 
+                                            $manifest{$src_file});
         my $file = $self->copy_if_modified(from => $src_file, to => $dest_file);
         if ($file) {
             push(@installed, $file);
