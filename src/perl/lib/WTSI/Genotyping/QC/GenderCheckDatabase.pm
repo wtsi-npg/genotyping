@@ -19,28 +19,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Module to do gender inference from x chromosome heterozygosity
-# Does input/output processing and acts as front-end for R script implementing mixture model
-# See GenderCheckDatabase.pm for internal pipeline database functions
+# Module containing database functions for gender check
+# Accesses internal pipeline DB; not needed for standalone gender cehck
 
 use warnings;
 use strict;
 use Carp;
-use File::Temp qw/tempfile tempdir/;
-use FindBin qw /$Bin/;
-use JSON;
-use plink_binary; # from gftools package
 use Exporter;
-use WTSI::Genotyping qw/read_sample_json/;
 use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping::QC::PlinkIO;
 use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject/;
-use WTSI::Genotyping::QC::QCPlotTests;
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/readDatabaseGenders updateDatabase/;
-
-
 
 sub readDatabaseGenders {
     # read inferred genders from database -- use for testing database update
@@ -65,7 +55,6 @@ sub readDatabaseGenders {
     $db->disconnect();
     return %genders;
 }
-
 
 sub updateDatabase {
     # update pipeline database with inferred genders
