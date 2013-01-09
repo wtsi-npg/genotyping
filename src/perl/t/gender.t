@@ -16,6 +16,7 @@ use JSON;
 use Test::More tests => 26;
 use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::Genotyping::QC::GenderCheckDatabase;
 use WTSI::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');

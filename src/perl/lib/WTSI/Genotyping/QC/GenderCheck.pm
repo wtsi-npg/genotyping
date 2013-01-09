@@ -1,4 +1,3 @@
-#! /usr/bin/env perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # July 2012
@@ -22,6 +21,7 @@
 
 # Module to do gender inference from x chromosome heterozygosity
 # Does input/output processing and acts as front-end for R script implementing mixture model
+# See GenderCheckDatabase.pm for internal pipeline database functions
 
 use warnings;
 use strict;
@@ -32,15 +32,12 @@ use JSON;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
-use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::PlinkIO;
-use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject/;
-use WTSI::Genotyping::QC::QCPlotTests;
 
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
-readDatabaseGenders updateDatabase/;
+our @EXPORT_OK = qw/$textFormat $jsonFormat $plinkFormat $ini_path 
+readSampleXhet runGenderModel writeOutput/;
 
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey $ini_path/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
@@ -68,30 +65,6 @@ sub readModelGenders {
     }
     close $in;
     return @inferred;
-}
-
-sub readDatabaseGenders {
-    # read inferred genders from database -- use for testing database update
-    # return hash of genders indexed by sample URI (not sample name)
-    my $dbfile = shift;
-    my $method = shift;
-    $method ||= 'Inferred';
-    my $db = getDatabaseObject($dbfile);
-    my @samples = $db->sample->all;
-    my %genders;
-    $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    my $sample_uri = $sample->uri;
-	    my $gender = $db->gender->find
-		({'sample.id_sample' => $sample->id_sample,
-		  'method.name' => $method},
-		 {join => {'sample_genders' => ['method', 'sample']}},
-		 {prefetch =>  {'sample_genders' => ['method', 'sample']} });
-	    $genders{$sample_uri} = $gender->code;
-	}
-			});
-    $db->disconnect();
-    return %genders;
 }
 
 sub readNamesXhetJson {
@@ -182,54 +155,6 @@ sub runGenderModel {
     system($cmd);
     my @inferred = readModelGenders($textPath);
     return @inferred;
-}
-
-sub updateDatabase {
-    # update pipeline database with inferred genders
-    # assume that sample names are given in URI format
-    my ($uriRef, $gendersRef, $dbfile, $runName) = @_;
-    my @uris = @$uriRef;
-    my @genders = @$gendersRef;
-    my %genders;
-    for (my $i=0;$i<@uris;$i++) {
-        $genders{$uris[$i]} = $genders[$i];
-    }
-    my $db = getDatabaseObject($dbfile);
-    my $inferred = $db->method->find({name => 'Inferred'});
-    my $run = $db->piperun->find({name => $runName});
-    unless ($run) {
-        croak "Run '$runName' does not exist. Valid runs are: [" .
-            join(", ", map { $_->name } $db->piperun->all) . "]\n";
-    }
-    # transaction to update sample genders
-    my @datasets = $run->datasets->all;
-    foreach my $ds (@datasets) {
-	my @samples = $ds->samples->all;
-	$db->in_transaction(sub {
-	    foreach my $sample (@samples) {
-            # if sample already has an inferred gender, do not update!
-            my $inferredGenders = 
-                $sample->sample_genders->find({method => $inferred});
-            if ($inferredGenders) { next; }
-            my $sample_uri = $sample->uri;
-            my $genderCode = $genders{$sample_uri};
-            if (!defined($genderCode)) { $genderCode = 3; } # not available
-            my $gender;
-            if ($genderCode==1) { 
-                $gender = $db->gender->find({name => 'Male'}); 
-            } elsif ($genderCode==2) { 
-                $gender = $db->gender->find({name => 'Female'}); 
-            } elsif ($genderCode==0) { 
-                $gender = $db->gender->find({name => 'Unknown'}); 
-            } else { 
-                $gender = $db->gender->find({name => 'Not Available'}); 
-            }
-            $sample->add_to_genders($gender, {method => $inferred});
-	    }
-                        });
-    }
-    $db->disconnect();
-    return 1;
 }
 
 sub writeOutput {

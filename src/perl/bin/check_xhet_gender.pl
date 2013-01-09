@@ -30,6 +30,7 @@ use Carp;
 use File::Temp qw/tempdir/;
 use Getopt::Long;
 use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::Genotyping::QC::GenderCheckDatabase;
 use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
 my ($help, $input, $inputFormat, $outputDir, $dbFile, $json, $title, 
@@ -49,28 +50,38 @@ GetOptions("h|help"              => \$help,
            "boundary=f"          => \$boundary_sd,
     );
 
+my %default_params = ('m_max_default' => 0.02,
+                      'm_max_minimum' => 0.005,
+                      'boundary_sd' => 3,
+    );
 
 if ($help) {
-    print STDERR "Usage: $0 [ options ] 
+    print STDERR "Script used internally by the WTSI Genotyping Pipeline.  For standalone gender check, use gendermix_standalone.pl.
+Usage: $0 [ options ] 
+
 Input/output options:
---input=PATH           Path to text/json input file, OR prefix for binary plink files (without .bed, .bim, .fam extension).  Required.
+--input=PATH           Path to text/json input file, OR prefix for binary Plink files (without .bed, .bim, .fam extension).  Required.
 --input-format=FORMAT  One of: $textFormat, $jsonFormat, $plinkFormat.  Optional; if not supplied, will be deduced from input filename.
 --output-dir=PATH      Path to output directory.  Defaults to current working directory.
---include-par          Read SNPs from pseudoautosomal regions.  Plink input only; may increase apparent x heterozygosity of male samples.
---json                 Output in .json format
---dbfile=PATH          Push results to given pipeline database file (in addition to writing text/json output)
---run=NAME             Name of pipeline run to update in pipeline database
+--include-par          Include SNPs from pseudoautosomal regions.  Plink input only; may increase apparent x heterozygosity of male samples.
+--json                 Output in .json format, instead of tab-delimited text
+--dbfile=PATH          Push results to given pipeline database file (in addition to writing text/json output). Optional; updates internal SQLite database of the WTSI genotyping pipeline.
+--run=NAME             Name of pipeline run to update in pipeline database.
 
 Gender model options:
 --title=STRING         Title for plots and other output
---default=FLOAT        Default value for M_max, the maximum male heterozygosity
---minimum=FLOAT        Minimum value for M_max
---boundary=FLOAT       Number of standard deviations from population means, for boundary of ambiguous region
+--default=FLOAT        'Fallback' value for M_max, the maximum male heterozygosity, in the event of model error.  Default: ".$default_params{'m_max_default'}."
+--minimum=FLOAT        Minimum permitted value for M_max.  Default: ".$default_params{'m_max_minimum'}."
+--boundary=FLOAT       Number of standard deviations from population means, for boundary of ambiguous region.  Default: ".$default_params{'boundary_sd'}."
 
 Other:
 --help                 Print this help text and exit
 ";
     exit(0);
+} elsif (!($input)) {
+    print STDERR "Input data must be specified!\n".
+        "Run with --help for additional usage information.\n";
+    exit(1);
 }
 
 if ($inputFormat) {
@@ -97,9 +108,9 @@ $json ||= 0;
 $dbFile ||= 0;
 $title ||= "Untitled";
 $includePar ||= 0;
-$m_max_default ||= 0.02;
-$m_max_minimum ||= 0.005;
-$boundary_sd ||= 3;
+$m_max_default ||= $default_params{'m_max_default'};
+$m_max_minimum ||= $default_params{'m_max_minimum'};
+$boundary_sd ||= $default_params{'boundary_sd'};
 
 my $outputFormat;
 if ($json) { $outputFormat = $jsonFormat; }
