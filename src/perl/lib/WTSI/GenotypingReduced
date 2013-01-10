@@ -38,13 +38,9 @@ use Exporter;
                 write_gt_calls
                 write_gs_snps
 
-                update_snp_locations
-                update_sample_genders
-
               );
 
 use WTSI::Genotyping::IO;
-use WTSI::Genotyping::Plink;
 
 $VERSION = '0.5.0';
 
