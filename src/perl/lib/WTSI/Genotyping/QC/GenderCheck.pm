@@ -339,6 +339,8 @@ sub diffGenders {
     foreach my $sample (keys(%genders)) {
         if ($benchmark{$sample} != $genders{$sample}) {
             $diff = 1; 
+            print STDERR "Genders differ for sample $sample: benchmark ".
+                $benchmark{$sample}.", model ". $genders{$sample}."\n";
             last; 
         }
     }
@@ -347,6 +349,7 @@ sub diffGenders {
         foreach my $sample (keys(%benchmark)) {
             if (!defined($genders{$sample})) { 
                 $diff = 1; 
+                print STDERR "Gender not defined for sample $sample\n";
                 last; 
             }
         }
