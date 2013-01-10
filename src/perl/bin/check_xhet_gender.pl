@@ -33,12 +33,9 @@
 
 use strict;
 use warnings;
-use Carp;
-use File::Temp qw/tempdir/;
 use Getopt::Long;
 use WTSI::Genotyping::QC::GenderCheck;
 use WTSI::Genotyping::QC::GenderCheckDatabase;
-use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 
 my %opts = ();
 
