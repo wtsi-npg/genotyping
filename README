@@ -53,6 +53,8 @@ script; see src/perl/README for details.  Gendermix trains a Gaussian
 mixture model in order to find adaptive thresholds for X chromosome 
 heterozygosity, used to infer whether a sample is male or female.
 
-The standalone check omits much of the pipeline code.  Requirements
-which do not apply to the standalone check include Ruby, Percolate, Illuminus, 
-and Gftools; all other requirements are still in effect.
+The standalone check omits much of the pipeline code; it does not require 
+Ruby, Percolate, DBIx::Class, SQLIte, Illuminus, or genotype-call.  
+Other requirements are still in effect.  Gendermix needs the Gftools package 
+for I/O of Plink data, as well as R and the mixtools library.
+
