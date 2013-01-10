@@ -169,6 +169,7 @@ sub readXPAR {
         if (/^#/) { next; } # comments start with a #
         chomp;
         my @words = split;
+        if (@words!=2) { next; }
         my @coords = ($words[0], $words[1]);
         if ($words[0] =~ /\D/ || $words[1] =~ /\D/) { next; }
         push @xpar, \@coords;
