@@ -220,14 +220,14 @@ sub readNamesXhetText {
 sub readSampleXhet {
     # read parallel list of names and xhet values (preserves name order)
     # also read supplied gender, for PLINK input only
-    my ($input, $inputFormat) = @_;
+    my ($input, $inputFormat, $includePar) = @_;
     my ($nameRef, $xhetRef, $suppliedRef);
     if ($inputFormat eq $textFormat) {
         ($nameRef, $xhetRef) = readNamesXhetText($input);
     } elsif ($inputFormat eq $jsonFormat) {
         ($nameRef, $xhetRef) = readNamesXhetJson($input);
     } elsif ($inputFormat eq $plinkFormat) {
-        ($nameRef, $xhetRef, $suppliedRef) = readPlink($input); 
+        ($nameRef, $xhetRef, $suppliedRef) = readPlink($input, $includePar); 
     } else {
         croak "Illegal input format $inputFormat";
     }
@@ -238,9 +238,10 @@ sub run {
     # 'main' method to run gender check
     # return sample names and inferred genders for possible database update
     my %opts = @_;
-    my ($namesRef, $xhetsRef, $suppliedRef) = readSampleXhet($opts{'input'},
-                                                         $opts{'input-format'},
-                                                         $opts{'include-par'});
+    my ($namesRef, $xhetsRef, $suppliedRef) 
+        = readSampleXhet($opts{'input'}, 
+                         $opts{'input-format'},
+                         $opts{'include-par'});
     my @modelParams = ();
     my @keys = qw/output-dir title m-max-default m-max-minimum boundary/;
     foreach my $key (@keys) { push(@modelParams, $opts{$key}); }
