@@ -29,7 +29,6 @@ sub ACTION_install_gendermix {
     my $self = shift;
     my $gendermix_manifest = './etc/gendermix_manifest.txt';
     $self->process_alternate_manifest($gendermix_manifest);
-    #$self->process_R_files_gendermix;
     return $self;
 }
 
@@ -57,11 +56,6 @@ sub process_sql_files {
 sub process_R_files {
   my ($self) = @_;
   return $self->process_files_by_category('R_files');
-}
-
-sub process_R_files_gendermix {
-  my ($self) = @_;
-  return $self->process_files_by_category('R_files_gendermix');
 }
 
 sub process_alternate_manifest {
@@ -100,8 +94,7 @@ sub process_files_by_category {
   my ($self, $category) = @_;
 
   if ($self->current_action eq 'install_config' || 
-      $self->current_action eq 'install_R' || 
-      $self->current_action eq 'install_gendermix') {
+      $self->current_action eq 'install_R') {
     my $translations = $self->{properties}->{$category};
     my $dest_base = $self->install_base;
 
