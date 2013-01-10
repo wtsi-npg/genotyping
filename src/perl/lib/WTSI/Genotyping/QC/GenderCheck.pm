@@ -354,6 +354,10 @@ sub diffGenders {
             }
         }
     }
+    if ($diff==1) {
+        print STDERR "Reference and model genders differ; check ".
+            "t/gender/sample_xhet_gender.log for possible error messages.\n";
+    }
     return $diff;
 }
 
