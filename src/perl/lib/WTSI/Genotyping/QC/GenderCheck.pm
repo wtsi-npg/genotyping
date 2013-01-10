@@ -35,7 +35,8 @@ use WTSI::Genotyping qw/read_sample_json/;
 use WTSI::Genotyping::QC::PlinkIO;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/$ini_path $helpText $helpTextDB processOptions run/;
+our @EXPORT_OK = qw/$ini_path $helpText $helpTextDB processOptions run
+  diffGenders readBenchmark readGenderOutput/;
 
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey 
   $supplyKey $ini_path $helpText $helpTextDB/;
@@ -324,3 +325,78 @@ sub writeSampleXhetTemp {
     close $fh;
     return $filename;
 }
+
+#################################################################
+# methods for testing
+
+sub diffGenders {
+    # compare gender results to benchmark
+    my ($benchmarkRef, $inPath) = @_;
+    my %benchmark = %$benchmarkRef;
+    my $diff = 0;
+    my %genders = readGenderOutput($inPath);
+    # check gender codes
+    foreach my $sample (keys(%genders)) {
+        if ($benchmark{$sample} != $genders{$sample}) {
+            $diff = 1; 
+            last; 
+        }
+    }
+    # if codes OK, check that sample sets match
+    unless ($diff) {
+        foreach my $sample (keys(%benchmark)) {
+            if (!defined($genders{$sample})) { 
+                $diff = 1; 
+                last; 
+            }
+        }
+    }
+    return $diff;
+}
+
+sub readBenchmark {
+    my $inPath = shift;
+    open my $in, "< $inPath";
+    my @lines = ();
+    while (<$in>) {
+        chomp;
+        push(@lines, $_);
+    }
+    close $in;
+    my $ref = decode_json(join('', @lines));
+    my %refGenders = %$ref;
+    return %refGenders;
+}
+
+sub readGenderOutput {
+    # read gender codes from .txt or .json output of check_xhet_gender.pl
+    my $inPath = shift;
+    open my $in, "<", $inPath;
+    my %genders;
+    if ($inPath =~ /\.txt$/) {
+	my $first = 1;
+	while (<$in>) {
+	    if ($first) { $first = 0; next; } # skip headers
+	    my @words = split;
+	    my ($sample, $gender) = ($words[0], $words[2]); # fields are: name, xhet, inferred, supplied
+	    $genders{$sample} = $gender;
+	}
+    } elsif ($inPath =~ /\.json$/) {
+	my @lines = ();
+	while (<$in>) {
+	    chomp;
+	    push(@lines, $_);
+	}
+	my $ref = decode_json(join('', @lines));
+	my @records = @$ref;
+	foreach my $recRef (@records) {
+	    my %record = %$recRef;
+	    $genders{$record{'sample'}} = $record{'inferred'};
+	}
+    } else {
+	croak "Illegal filename extension: $inPath";
+    }
+    close $in;
+    return %genders;
+}
+
