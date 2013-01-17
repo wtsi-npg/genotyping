@@ -10,7 +10,7 @@ This software uses Module::Build to build, test and install its Perl
 packages.  In addition, the install_R target will install the
 required R scripts.
 
-To install:
+To install Perl and R components of the pipeline:
 
   perl Build.PL
   ./Build test
@@ -21,15 +21,12 @@ To install:
 
 ### Gendermix: standalone gender check ###
 
-The 'gendermix' gender check method can be installed as a standalone 
-application.  The install_gendermix target will install all required Perl, R, 
-and config files.  Note that install_gendermix has its own version of the 
-Genotyping.pm Perl module, which appears in the source as 
-lib/WTSI/GenotypingReduced and replaces the standard Genotyping.pm in the 
-install_gendermix build.
+The 'Gendermix' gender check method can be installed as a standalone 
+application.  See doc/standalone_sexcheck_howto.org for more information.
 
-To install:
+To install Gendermix:
 
- perl Build.PL
- ./Build test --test_files t/gender_standalone.t
- ./Build install_gendermix --install_base <target directory> 
+  perl Build.PL
+  ./Build test --test_files t/gender_standalone.t
+  ./Build install_gendermix --install_base <target directory> 
+

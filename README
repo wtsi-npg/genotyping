@@ -47,14 +47,13 @@ Environment variables:
 
 ### Gendermix: standalone gender check ###
 
-The 'gendermix' gender check method can be installed as a standalone 
-application.  This is done using the appropriate target for the Perl build 
-script; see src/perl/README for details.  Gendermix trains a Gaussian 
-mixture model in order to find adaptive thresholds for X chromosome 
-heterozygosity, used to infer whether a sample is male or female.
+The 'Gendermix' gender check method can be installed as a standalone 
+application.  See doc/standalone_sexcheck_howto.org for more information.
 
 The standalone check omits much of the pipeline code; it does not require 
-Ruby, Percolate, DBIx::Class, SQLIte, Illuminus, or genotype-call.  
+Ruby, Percolate, DBIx::Class, SQLite, Illuminus, or genotype-call.  
 Other requirements are still in effect.  Gendermix needs the Gftools package 
-for I/O of Plink data, as well as R and the mixtools library.
+for I/O of Plink data, as well as R and the mixtools library.  Environment 
+variables should be set as described above.
+
 

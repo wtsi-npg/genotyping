@@ -20,16 +20,12 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # July 2012
 
-# Invoke R script to do improved gender check.  
-# Input may be in text, json or plink binary format.
-# Plink/json input will be converted to text format for R script.
-# For plink input, extract x chromosome data to temporary files.
+# Invoke R script to do improved gender check.
 
-# Output: 
-## Gender information in text or JSON format
-## Log file
-## png plot of mixture model (if any)
-## (Can also update internal pipeline database)
+# IMPORTANT:  This script is intended as a component of the automated 
+# genotyping pipeline. It includes an update of the internal pipeline SQLite 
+# database. For a manual gender check outside of the pipeline workflows, use 
+# bin/gendermix_standalone.pl.
 
 use strict;
 use warnings;
