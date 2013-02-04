@@ -28,6 +28,7 @@ run() unless caller();
 sub run {
   my $config;
   my $dbfile;
+  my $force;
   my $project_name;
   my $run_name;
   my $maximum;
@@ -37,6 +38,7 @@ sub run {
 
   GetOptions('config=s' => \$config,
              'dbfile=s'=> \$dbfile,
+             'force' => \$force,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'run=s' => \$run_name,
              'maximum=i' => \$maximum,
@@ -88,10 +90,17 @@ sub run {
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  my $chip_design = $ifdb->find_project_chip_design($project_name);
-  unless ($chip_design) {
+  my @chip_designs = $ifdb->find_project_chip_design($project_name);
+  unless (@chip_designs) {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
+  }
+
+  if (scalar @chip_designs > 1) {
+    unless ($force) {
+      die ">1 chip design found for project '$project_title': [" .
+        join(", ", @chip_designs) . "]";
+    }
   }
 
   my $snpset = $pipedb->snpset->find({name => $chip_design});
@@ -178,7 +187,7 @@ sub run {
                                                 include => 0});
 
          # If consent has been withdrawn, do not analyse and do not
-         # look in SNP for Sequenom genotypes 
+         # look in SNP for Sequenom genotypes
          if ($ss_consent_withdrawn) {
            ++$num_consent_withdrawn_samples;
            $sample->add_to_genders($gender_na, {method => $supplied});
@@ -302,8 +311,9 @@ ready_infinium
 =head1 SYNOPSIS
 
 ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--namespace <sample namespace>] [--maximum <n>] --project <project name> \
-   --run <pipeline run name> --supplier <supplier name> [--verbose]
+   [--force] [--namespace <sample namespace>] [--maximum <n>] \
+   --project <project name> --run <pipeline run name> \
+   --supplier <supplier name> [--verbose]
 
 Options:
 
@@ -311,6 +321,8 @@ Options:
               Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile    The SQLite database file. If not supplied, defaults to the
               value given in the configuration .ini file.
+  --force     Force the analysis when there are multiple chip designs in
+              the project.
   --help      Display help.
   --maximum   Import samples up to a maximum number. Optional.
   --namespace The namespace for the imported sample names. Optional,
@@ -334,8 +346,8 @@ Samples from different suppliers may have the same sample name by
 chance. The use of a namespace enables these samples to be
 distinguished while preserving their original names.
 
-Projects using different Infinium chip designs may not be mixed within
-the same run.
+Projects using different Infinium chip designs may be mixed within
+the same run only if the --force argument is used.
 
 The --run and --namespace arguments must be at least 4 characters in
 length and may contains only letters, numbers, hypens, underscores and
