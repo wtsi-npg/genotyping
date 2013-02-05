@@ -10,10 +10,23 @@ This software uses Module::Build to build, test and install its Perl
 packages.  In addition, the install_R target will install the
 required R scripts.
 
-To install:
+To install Perl and R components of the pipeline:
 
   perl Build.PL
   ./Build test
   ./Build install --install_base <target directory>
   ./Build install_config --install_base <target directory>
   ./Build install_R --install_base <target directory>
+
+
+### Gendermix: standalone gender check ###
+
+The 'Gendermix' gender check method can be installed as a standalone 
+application.  See doc/standalone_sexcheck_howto.org for more information.
+
+To install Gendermix:
+
+  perl Build.PL
+  ./Build test --test_files t/gender_standalone.t
+  ./Build install_gendermix --install_base <target directory> 
+

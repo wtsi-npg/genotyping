@@ -1,4 +1,3 @@
-#! /usr/bin/env perl
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # July 2012
@@ -22,6 +21,7 @@
 
 # Module to do gender inference from x chromosome heterozygosity
 # Does input/output processing and acts as front-end for R script implementing mixture model
+# See GenderCheckDatabase.pm for internal pipeline database functions
 
 use warnings;
 use strict;
@@ -32,20 +32,62 @@ use JSON;
 use plink_binary; # from gftools package
 use Exporter;
 use WTSI::Genotyping qw/read_sample_json/;
-use WTSI::Genotyping::Database::Pipeline;
 use WTSI::Genotyping::QC::PlinkIO;
-use WTSI::Genotyping::QC::QCPlotShared qw/getDatabaseObject/;
-use WTSI::Genotyping::QC::QCPlotTests;
-
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/$textFormat $jsonFormat $plinkFormat $ini_path readSampleXhet runGenderModel writeOutput 
-readDatabaseGenders updateDatabase/;
+our @EXPORT_OK = qw/$ini_path $helpText $helpTextDB processOptions run
+  diffGenders readBenchmark readGenderOutput/;
 
-use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey $supplyKey $ini_path/;
+use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey 
+  $supplyKey $ini_path $helpText $helpTextDB/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
 ($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
 $ini_path = "$Bin/../etc/";
+
+my %defaultParams = ('m-max-default' => 0.02,
+                     'm-max-minimum' => 0.005,
+                     'boundary' => 3,
+                     'output-dir' => '.',
+                     'json' => 0,
+                     'dbfile' => 0,
+                     'title' => 'Untitled',
+                     'include-par' => 0,
+    );
+
+$helpText =  "Usage: $0 [ options ] 
+
+--help                 Print this help text and exit
+
+Input/output options:
+--input=PATH           Path to text/json input file, OR prefix for binary Plink 
+                       files (without .bed, .bim, .fam extension).  Required.
+--input-format=FORMAT  One of: $textFormat, $jsonFormat, $plinkFormat.  
+                       Optional; if absent, will be deduced from input filename.
+--output-dir=PATH      Path to output directory.  Defaults to current directory.
+--include-par          Include SNPs from pseudoautosomal regions.  Plink input 
+                       only; may increase apparent x heterozygosity of male 
+                       samples.
+--json                 Output in .json format, instead of tab-delimited text
+
+Gender model options:
+--title=STRING         Title for plots and other output
+--m-max-default=FLOAT  Default value for M_max, the maximum male 
+                       heterozygosity, in the event of model error.  
+                       Default: ".$defaultParams{'m-max-default'}."
+--m-max-minimum=FLOAT  Minimum permitted value for M_max.  
+                       Default: ".$defaultParams{'m-max-minimum'}."
+--boundary=FLOAT       Number of standard deviations from population means, 
+                       for boundary of ambiguous region.  
+                       Default: ".$defaultParams{'boundary'}."
+";
+
+$helpTextDB = $helpText."
+Options for WTSI genotyping pipeline internal database:
+--dbfile=PATH          Push results to given pipeline database file (in 
+                       addition to writing text/json output). Optional.
+--run=NAME             Name of pipeline run to update in pipeline database.
+
+";
 
 sub getSuppliedGenderOutput {
     my $suppliedRef = shift;
@@ -53,6 +95,56 @@ sub getSuppliedGenderOutput {
     my $out = 'NA';
     if ($suppliedRef) { $out = @$suppliedRef[$i]; }
     return $out;
+}
+
+sub processOptions {
+    # validate command-line options for either database or non-database script
+    my ($optRef, $dbopts) = @_;
+    my %opts = %$optRef;
+    my $input = $opts{'input'};
+    if ($opts{'help'}) {
+        if ($dbopts) { print STDERR $helpTextDB; }
+        else { print STDERR $helpText; }
+        exit(0);
+    } elsif (!$input) {
+        print STDERR "Input data must be specified!\n".
+            "Run with --help for additional usage information.\n";
+        exit(1);
+    } elsif ($opts{'dbfile'} && !(-r $opts{'dbfile'})) {
+        croak "ERROR: Cannot read database path: ".$opts{'dbfile'};
+    }
+    my $inputFormat;
+    if ($opts{'input-format'}) {
+        $inputFormat = $opts{'input-format'};
+        if ($inputFormat ne $textFormat && 
+            $inputFormat ne $jsonFormat && 
+            $inputFormat ne $plinkFormat) {
+            croak "ERROR: Input format must be one of: ".
+                "$textFormat, $jsonFormat, $plinkFormat";
+        }
+    } elsif ($input =~ /\.txt$/) { 
+        $inputFormat = $textFormat; 
+    } elsif ($input =~ /\.json$/) {
+        $inputFormat = $jsonFormat;
+    } else {
+        $inputFormat = $plinkFormat; 
+    }
+    $opts{'input-format'} = $inputFormat;
+    if ($inputFormat eq $plinkFormat) { 
+        if (not checkPlinkBinaryInputs($input)) { 
+            croak "ERROR: Plink binary input files not available"; 
+        }
+    } elsif (not -r $input) {
+        croak "ERROR: Cannot read input path $input";
+    }
+    if ($opts{'json'}) { $opts{'output-format'} = $jsonFormat; }
+    else { $opts{'output-format'} = $textFormat; }
+    foreach my $key (keys(%defaultParams)) {
+        if (!defined($opts{$key})) {
+            $opts{$key} = $defaultParams{$key};
+        }
+    }
+    return %opts;
 }
 
 sub readModelGenders {
@@ -68,30 +160,6 @@ sub readModelGenders {
     }
     close $in;
     return @inferred;
-}
-
-sub readDatabaseGenders {
-    # read inferred genders from database -- use for testing database update
-    # return hash of genders indexed by sample URI (not sample name)
-    my $dbfile = shift;
-    my $method = shift;
-    $method ||= 'Inferred';
-    my $db = getDatabaseObject($dbfile);
-    my @samples = $db->sample->all;
-    my %genders;
-    $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    my $sample_uri = $sample->uri;
-	    my $gender = $db->gender->find
-		({'sample.id_sample' => $sample->id_sample,
-		  'method.name' => $method},
-		 {join => {'sample_genders' => ['method', 'sample']}},
-		 {prefetch =>  {'sample_genders' => ['method', 'sample']} });
-	    $genders{$sample_uri} = $gender->code;
-	}
-			});
-    $db->disconnect();
-    return %genders;
 }
 
 sub readNamesXhetJson {
@@ -112,14 +180,16 @@ sub readNamesXhetJson {
 }
 
 sub readPlink {
-    # extract X chromosome data from plink files and write to temporary directory
+    # extract X chromosome data from plink files, write to temporary directory
     # then read sample name/xhet data
     my ($plinkPrefix, $includePar) = @_;
     my $tempDir = tempdir(CLEANUP => 1);
-    my $pb = extractChromData($plinkPrefix, $tempDir); # extract X data and get plink_binary reading object
+    # extract X data and get plink_binary reading object
+    my $pb = extractChromData($plinkPrefix, $tempDir); 
     my ($nameRef, $suppliedRef) = getSampleNamesGenders($pb);
     my $snpLogPath ||=  $tempDir."/snps_gender_check.txt";
-    open(my $log, ">", $snpLogPath) || croak "Cannot open log path $snpLogPath: $!";
+    open(my $log, ">", $snpLogPath) || 
+        croak "Cannot open log path $snpLogPath: $!";
     my %hetRates = findHetRates($pb, $nameRef, $log, $includePar);
     close $log;
     my @xhets;
@@ -148,23 +218,40 @@ sub readNamesXhetText {
 }
 
 sub readSampleXhet {
-    # read parallel list of names and xhet values (instead of a hash) to preserve name order
-    # also read supplied gender, for PLINK input only (otherwise return an undefined value)
-    my ($input, $inputFormat) = @_;
+    # read parallel list of names and xhet values (preserves name order)
+    # also read supplied gender, for PLINK input only
+    my ($input, $inputFormat, $includePar) = @_;
     my ($nameRef, $xhetRef, $suppliedRef);
     if ($inputFormat eq $textFormat) {
-	($nameRef, $xhetRef) = readNamesXhetText($input);
+        ($nameRef, $xhetRef) = readNamesXhetText($input);
     } elsif ($inputFormat eq $jsonFormat) {
-	($nameRef, $xhetRef) = readNamesXhetJson($input);
+        ($nameRef, $xhetRef) = readNamesXhetJson($input);
     } elsif ($inputFormat eq $plinkFormat) {
-	($nameRef, $xhetRef, $suppliedRef) = readPlink($input); 
+        ($nameRef, $xhetRef, $suppliedRef) = readPlink($input, $includePar); 
     } else {
-	croak "Illegal input format $inputFormat";
+        croak "Illegal input format $inputFormat";
     }
     return ($nameRef, $xhetRef, $suppliedRef);
 }
 
-sub runGenderModel {
+sub run {
+    # 'main' method to run gender check
+    # return sample names and inferred genders for possible database update
+    my %opts = @_;
+    my ($namesRef, $xhetsRef, $suppliedRef) 
+        = readSampleXhet($opts{'input'}, 
+                         $opts{'input-format'},
+                         $opts{'include-par'});
+    my @modelParams = ();
+    my @keys = qw/output-dir title m-max-default m-max-minimum boundary/;
+    foreach my $key (@keys) { push(@modelParams, $opts{$key}); }
+    my @inferred = runGenderCheckR($namesRef, $xhetsRef, \@modelParams);
+    writeOutput($namesRef, $xhetsRef, \@inferred, $suppliedRef, 
+            $opts{'output-format'}, $opts{'output-dir'});
+    return ($namesRef, \@inferred);
+}
+
+sub runGenderCheckR {
     # run R script to infer gender
     # return list of inferred genders, in same order as input names
     my ($namesRef, $xhetRef, $paramsRef) = @_;
@@ -184,82 +271,38 @@ sub runGenderModel {
     return @inferred;
 }
 
-sub updateDatabase {
-    # update pipeline database with inferred genders
-    # assume that sample names are given in URI format
-    my ($uriRef, $gendersRef, $dbfile, $runName) = @_;
-    my @uris = @$uriRef;
-    my @genders = @$gendersRef;
-    my %genders;
-    for (my $i=0;$i<@uris;$i++) {
-        $genders{$uris[$i]} = $genders[$i];
-    }
-    my $db = getDatabaseObject($dbfile);
-    my $inferred = $db->method->find({name => 'Inferred'});
-    my $run = $db->piperun->find({name => $runName});
-    unless ($run) {
-        croak "Run '$runName' does not exist. Valid runs are: [" .
-            join(", ", map { $_->name } $db->piperun->all) . "]\n";
-    }
-    # transaction to update sample genders
-    my @datasets = $run->datasets->all;
-    foreach my $ds (@datasets) {
-	my @samples = $ds->samples->all;
-	$db->in_transaction(sub {
-	    foreach my $sample (@samples) {
-            # if sample already has an inferred gender, do not update!
-            my $inferredGenders = 
-                $sample->sample_genders->find({method => $inferred});
-            if ($inferredGenders) { next; }
-            my $sample_uri = $sample->uri;
-            my $genderCode = $genders{$sample_uri};
-            if (!defined($genderCode)) { $genderCode = 3; } # not available
-            my $gender;
-            if ($genderCode==1) { 
-                $gender = $db->gender->find({name => 'Male'}); 
-            } elsif ($genderCode==2) { 
-                $gender = $db->gender->find({name => 'Female'}); 
-            } elsif ($genderCode==0) { 
-                $gender = $db->gender->find({name => 'Unknown'}); 
-            } else { 
-                $gender = $db->gender->find({name => 'Not Available'}); 
-            }
-            $sample->add_to_genders($gender, {method => $inferred});
-	    }
-                        });
-    }
-    $db->disconnect();
-    return 1;
-}
-
 sub writeOutput {
     # write output in .txt or .json format
     my ($namesRef, $xhetRef, $inferredRef, $suppliedRef, $format, $outputDir, $outputName) = @_;
     my @names = @$namesRef;
     my @xhet = @$xhetRef;
     my @inferred = @$inferredRef;
-    if ($format eq $textFormat) { $outputName ||= "sample_xhet_gender.txt"; }
-    elsif ($format eq $jsonFormat) {  $outputName ||= "sample_xhet_gender.json"; }
-    else { croak "Illegal format argument: $format"; }
+    if ($format eq $textFormat) { 
+        $outputName ||= "sample_xhet_gender.txt"; 
+    } elsif ($format eq $jsonFormat) {  
+        $outputName ||= "sample_xhet_gender.json"; 
+    } else { 
+        croak "Illegal format argument: $format"; 
+    }
     my $outPath = $outputDir."/".$outputName;
     open (my $out, ">", $outPath) || croak "Cannot open output file $outPath!";
     if ($format eq $textFormat) {
-	 print $out join("\t", qw(sample xhet inferred supplied))."\n";
-	 for (my $i=0;$i<@names;$i++) {
-	     my $supplied = getSuppliedGenderOutput($suppliedRef, $i);
-	     printf $out "%s\t%6f\t%d\t%s\n", ($names[$i], $xhet[$i], $inferred[$i], $supplied);
-	 }
+        print $out join("\t", qw(sample xhet inferred supplied))."\n";
+        for (my $i=0;$i<@names;$i++) {
+            my $supplied = getSuppliedGenderOutput($suppliedRef, $i);
+            printf $out "%s\t%6f\t%d\t%s\n", ($names[$i], $xhet[$i], $inferred[$i], $supplied);
+        }
     } elsif ($format eq $jsonFormat) {
-	my @records = ();
-	for (my $i=0;$i<@names;$i++) {
-	    my %record;
-	    $record{$nameKey} = $names[$i];
-	    $record{$xhetKey} = $names[$i];
-	    $record{$inferKey} = $inferred[$i];
-	    $record{$supplyKey} = getSuppliedGenderOutput($suppliedRef, $i);
-	    push(@records, \%record);
-	}
-	print $out encode_json(\@records);
+        my @records = ();
+        for (my $i=0;$i<@names;$i++) {
+            my %record;
+            $record{$nameKey} = $names[$i];
+            $record{$xhetKey} = $names[$i];
+            $record{$inferKey} = $inferred[$i];
+            $record{$supplyKey} = getSuppliedGenderOutput($suppliedRef, $i);
+            push(@records, \%record);
+        }
+        print $out encode_json(\@records);
     }
     close $out || croak "Cannot close output file $outPath!";
     return 1;
@@ -274,10 +317,94 @@ sub writeSampleXhetTemp {
     my $total = @names;
     my @header = qw/sample xhet/;
     print $fh join("\t", @header)."\n";
-    if ($total != @xhets) { die "Name and xhet list arguments of different length: $!";  }
+    if ($total != @xhets) { 
+        die "Name and xhet list arguments of different length: $!";  
+    }
     for (my $i=0;$i<$total;$i++) {
-	print $fh "$names[$i]\t$xhets[$i]\n";
+        print $fh "$names[$i]\t$xhets[$i]\n";
     }
     close $fh;
     return $filename;
 }
+
+#################################################################
+# methods for testing
+
+sub diffGenders {
+    # compare gender results to benchmark
+    my ($benchmarkRef, $inPath) = @_;
+    my %benchmark = %$benchmarkRef;
+    my $diff = 0;
+    my %genders = readGenderOutput($inPath);
+    # check gender codes
+    foreach my $sample (keys(%genders)) {
+        if ($benchmark{$sample} != $genders{$sample}) {
+            $diff = 1; 
+            print STDERR "Genders differ for sample $sample: benchmark ".
+                $benchmark{$sample}.", model ". $genders{$sample}."\n";
+            last; 
+        }
+    }
+    # if codes OK, check that sample sets match
+    unless ($diff) {
+        foreach my $sample (keys(%benchmark)) {
+            if (!defined($genders{$sample})) { 
+                $diff = 1; 
+                print STDERR "Gender not defined for sample $sample\n";
+                last; 
+            }
+        }
+    }
+    if ($diff==1) {
+        print STDERR "Reference and model genders differ; check ".
+            "t/gender/sample_xhet_gender.log for possible error messages.\n";
+    }
+    return $diff;
+}
+
+sub readBenchmark {
+    my $inPath = shift;
+    open my $in, "< $inPath";
+    my @lines = ();
+    while (<$in>) {
+        chomp;
+        push(@lines, $_);
+    }
+    close $in;
+    my $ref = decode_json(join('', @lines));
+    my %refGenders = %$ref;
+    return %refGenders;
+}
+
+sub readGenderOutput {
+    # read gender codes from .txt or .json output of check_xhet_gender.pl
+    my $inPath = shift;
+    open my $in, "<", $inPath;
+    my %genders;
+    if ($inPath =~ /\.txt$/) {
+	my $first = 1;
+	while (<$in>) {
+	    if ($first) { $first = 0; next; } # skip headers
+	    my @words = split;
+	    my ($sample, $gender) = ($words[0], $words[2]); # fields are: name, xhet, inferred, supplied
+	    $genders{$sample} = $gender;
+	}
+    } elsif ($inPath =~ /\.json$/) {
+	my @lines = ();
+	while (<$in>) {
+	    chomp;
+	    push(@lines, $_);
+	}
+	my $ref = decode_json(join('', @lines));
+	my @records = @$ref;
+	foreach my $recRef (@records) {
+	    my %record = %$recRef;
+	    $genders{$record{'sample'}} = $record{'inferred'};
+	}
+    } else {
+	croak "Illegal filename extension: $inPath";
+    }
+    close $in;
+    return %genders;
+}
+
