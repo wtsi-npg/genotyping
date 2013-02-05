@@ -17,13 +17,13 @@ our @ISA = qw(WTSI::Genotyping::Database);
   Example    : $db->find_project_chip_design('my project name')
   Description: Returns Infinium chip design (product name) for a project
                name
-  Returntype : string
+  Returntype : list of strings
   Caller     : general
 
 =cut
 
 sub find_project_chip_design {
-  my ($self, $project_name) = @_;
+  my ($self, $project_title) = @_;
 
   my $dbh = $self->dbh;
 
@@ -44,9 +44,9 @@ sub find_project_chip_design {
          AND project.project_id = pp.project_id
          AND pp.product_definition_id = pd.product_definition_id);
 
-  $self->log->trace("Executing: '$query' with args [$project_name]");
+  $self->log->trace("Executing: '$query' with args [$project_title]");
   my $sth = $dbh->prepare($query);
-  my $rc = $sth->execute($project_name);
+  my $rc = $sth->execute($project_title);
 
   my @chip_designs;
   while (my ($design) = $sth->fetchrow_array) {
@@ -54,15 +54,10 @@ sub find_project_chip_design {
   }
 
   unless (@chip_designs) {
-    $self->log->logconfess("No chip design was found for project '$project_name'");
+    $self->log->logconfess("No chip design was found for project '$project_title'");
   }
 
-  if (scalar @chip_designs > 1) {
-    $self->log->logconfess(">1 chip design found for project '$project_name': [" .
-                           join(", ", @chip_designs) . "]");
-  }
-
-  return $chip_designs[0];
+  return @chip_designs;
 }
 
 
@@ -86,12 +81,13 @@ sub find_project_chip_design {
 =cut
 
 sub find_project_samples {
-  my ($self, $project_name) = @_;
+  my ($self, $project_title) = @_;
 
   my $dbh = $self->dbh;
 
   my $query =
     qq(SELECT
+         projecti.item AS [project],
          platei.item AS [plate],
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],
@@ -189,9 +185,9 @@ sub find_project_samples {
           right(well.alpha_coordinate,2),
           well.alpha_coordinate);
 
-  $self->log->trace("Executing: '$query' with args [$project_name]");
+  $self->log->trace("Executing: '$query' with args [$project_title]");
   my $sth = $dbh->prepare($query);
-  $sth->execute($project_name);
+  $sth->execute($project_title);
 
   my @samples;
   while (my $row = $sth->fetchrow_hashref) {
@@ -199,7 +195,7 @@ sub find_project_samples {
   }
 
   unless (@samples) {
-    $self->log->logconfess("No samples were found for project '$project_name'");
+    $self->log->logconfess("No samples were found for project '$project_title'");
   }
 
   return \@samples;
@@ -212,7 +208,8 @@ sub find_project_samples {
   Description: Returns sample details for a specific intensity file (red
                channel, arbitrarily). The sample is returned as a
                hashref with the following keys and values:
-               { plate    => <Infinium LIMS plate barcode string>,
+               { project  => <Infinium LIMS genotyping project title>,
+                 plate    => <Infinium LIMS plate barcode string>,
                  well     => <well address string with 0-pad e.g A01>,
                  sample   => <sample name string>,
                  beadchip => <chip name string>,
@@ -232,6 +229,7 @@ sub find_scanned_sample {
 
   my $query =
     qq(SELECT
+         projecti.item AS [project],
          platei.item AS [plate],
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],
@@ -349,7 +347,8 @@ sub find_scanned_sample {
   Example    : $db->find_called_sample('<GTC filename>')
   Description: Returns sample details for a specific GTC file. The sample
                is returned as a hashref with the following keys and values:
-               { plate    => <Infinium LIMS plate barcode string>,
+               { project  => <Infinium LIMS genotyping project title>,
+                 plate    => <Infinium LIMS plate barcode string>,
                  well     => <well address string with 0-pad e.g A01>,
                  sample   => <sample name string>,
                  beadchip => <chip name string>,
@@ -369,6 +368,7 @@ sub find_called_sample {
 
   my $query =
     qq(SELECT
+         projecti.item AS [project],
          platei.item AS [plate],
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],

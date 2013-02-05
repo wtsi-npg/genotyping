@@ -9,14 +9,27 @@ use File::Basename;
 
 use WTSI::Genotyping::iRODS qw(md5sum);
 
-our $SAMPLE_NAME_META_KEY             = 'sample';
-our $SAMPLE_ID_META_KEY               = 'sample_id';
-our $SAMPLE_COMMON_NAME_META_KEY      = 'sample_common_name';
-our $SAMPLE_ACCESSION_NUMBER_META_KEY = 'sample_accession_number';
-our $SAMPLE_CONSENT_META_KEY          = 'sample_consent';
+use vars qw($SAMPLE_NAME_META_KEY
+            $SAMPLE_ID_META_KEY
+            $SAMPLE_COMMON_NAME_META_KEY
+            $SAMPLE_ACCESSION_NUMBER_META_KEY
+            $SAMPLE_CONSENT_META_KEY
+            $STUDY_ID_META_KEY
+            $STUDY_TITLE_META_KEY
+            $GENOTYPING_PROJECT_TITLE_META_KEY
+            $GENOTYPING_ANALYSIS_UUID_META_KEY);
 
-our $STUDY_ID_META_MEY                = 'study_id';
-our $STUDY_TITLE_META_KEY             = 'study_title';
+$SAMPLE_NAME_META_KEY             = 'sample';
+$SAMPLE_ID_META_KEY               = 'sample_id';
+$SAMPLE_COMMON_NAME_META_KEY      = 'sample_common_name';
+$SAMPLE_ACCESSION_NUMBER_META_KEY = 'sample_accession_number';
+$SAMPLE_CONSENT_META_KEY          = 'sample_consent';
+
+$STUDY_ID_META_KEY                = 'study_id';
+$STUDY_TITLE_META_KEY             = 'study_title';
+
+$GENOTYPING_PROJECT_TITLE_META_KEY = 'dcterms:title';
+$GENOTYPING_ANALYSIS_UUID_META_KEY = 'analysis_uuid';
 
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
@@ -34,9 +47,10 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 =cut
 
 sub make_creation_metadata {
-  my ($creation_time, $publisher) = @_;
+  my ($creator, $creation_time, $publisher) = @_;
 
-  return (['dcterms:created' => $creation_time->iso8601],
+  return (['dcterms:creator'   => $creator],
+          ['dcterms:created'   => $creation_time->iso8601],
           ['dcterms:publisher' => $publisher]);
 }
 
@@ -112,7 +126,7 @@ sub make_warehouse_metadata {
   }
 
   foreach my $ss_study (@ss_studies) {
-    push(@meta, [$STUDY_ID_META_MEY => $ss_study->{internal_id}]);
+    push(@meta, [$STUDY_ID_META_KEY => $ss_study->{internal_id}]);
 
     if (defined $ss_study->{study_title}) {
       push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
@@ -136,15 +150,16 @@ sub make_warehouse_metadata {
 sub make_infinium_metadata {
   my ($if_sample) = @_;
 
-  return (['dcterms:identifier' => $if_sample->{sample}],
-          [beadchip => $if_sample->{beadchip}]);
+  return ([$GENOTYPING_PROJECT_TITLE_META_KEY => $if_sample->{project}],
+          ['dcterms:identifier'               => $if_sample->{sample}],
+          [beadchip                           => $if_sample->{beadchip}]);
 }
 
 
 =head2 make_file_metadata
 
   Arg [1]    : string filename
-  Arg [2]    : array of valid fie suffix strings
+  Arg [2]    : array of valid file suffix strings
   Example    : my @meta = make_infinium_metadata($sample)
   Description: Returns a list of metadata key/value pairs describing a file,
                including the file 'type' (suffix) and MD5 checksum.
@@ -161,12 +176,53 @@ sub make_file_metadata {
   my $md5 = md5sum($file);
   $suffix =~ s{^\.?}{}msx;
 
-  my @meta = ([md5 => $md5],
+  my @meta = ([md5    => $md5],
               ['type' => $suffix]);
 
   return @meta;
 }
 
+=head2 make_analysis_metadata
+
+  Arg [1]    : string directory name
+  Example    : my @meta = make_analysis_metadata($uuid, \@titles)
+  Description: Returns a list of metadata key/value pairs describing an analysis
+               including the genotyping project names involved.
+  Returntype : array of arrayrefs
+  Caller     : general
+
+=cut
+
+sub make_analysis_metadata {
+  my ($uuid, $genotyping_project_titles) = @_;
+
+  my @meta = ([$GENOTYPING_ANALYSIS_UUID_META_KEY => $uuid]);
+
+  foreach my $title (@$genotyping_project_titles) {
+    push(@meta, [$GENOTYPING_PROJECT_TITLE_META_KEY => $title]);
+  }
+
+  return @meta;
+}
+
+sub metadata_for_key {
+  my ($meta, $key) = @_;
+  unless (defined $key) {
+    $log->logconfess("Cannot find metadata for an undefined key");
+  }
+
+  my @values;
+
+  foreach my $pair (@$meta) {
+    my ($k, $value) = @$pair;
+
+    if ($k eq $key) {
+      push(@values, $value);
+    }
+  }
+
+  return @values;
+}
 
 =head2 has_consent
 

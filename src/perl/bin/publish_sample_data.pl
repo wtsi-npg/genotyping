@@ -12,17 +12,17 @@ use File::Basename;
 use File::Find;
 use Getopt::Long;
 use Log::Log4perl qw(:easy);;
-use Net::LDAP;
 use Pod::Usage;
-use URI;
 
 use WTSI::Genotyping qw(make_warehouse_metadata
                         make_infinium_metadata
                         make_file_metadata
                         make_creation_metadata
+                        get_wtsi_uri
+                        get_publisher_uri
+                        get_publisher_name
                         publish_idat_files
                         publish_gtc_files);
-
 use WTSI::Genotyping::iRODS qw(collect_files
                                collect_dirs
                                modified_between);
@@ -33,8 +33,8 @@ use WTSI::Genotyping::Database::Warehouse;
 
 
 my $embedded_conf = q(
-   log4perl.logger.verbose        = DEBUG, A1
-   log4perl.logger.quiet          = DEBUG, A2
+   log4perl.logger.npg.irods.publish = DEBUG, A1
+   log4perl.logger.quiet             = DEBUG, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
@@ -64,20 +64,22 @@ sub run {
   my $days;
   my $days_ago;
   my $log4perl_config;
+  my $make_groups;
   my $publish_dest;
   my $source;
   my $type;
   my $verbose;
 
-  GetOptions('config=s'   => \$config,
-             'days=i'     => \$days,
-             'days-ago=i' => \$days_ago,
-             'dest=s'     => \$publish_dest,
-             'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'  => \$log4perl_config,
-             'source=s'   => \$source,
-             'type=s'     => \$type,
-             'verbose'    => \$verbose,);
+  GetOptions('config=s'    => \$config,
+             'days=i'      => \$days,
+             'days-ago=i'  => \$days_ago,
+             'dest=s'      => \$publish_dest,
+             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'   => \$log4perl_config,
+             'make-groups' => \$make_groups,
+             'source=s'    => \$source,
+             'type=s'      => \$type,
+             'verbose'     => \$verbose,);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
@@ -110,7 +112,7 @@ sub run {
   else {
     Log::Log4perl::init(\$embedded_conf);
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('verbose');
+      $log = Log::Log4perl->get_logger('npg.irods.publish');
     }
     else {
       $log = Log::Log4perl->get_logger('quiet');
@@ -151,18 +153,10 @@ sub run {
   my $uid = `whoami`;
   chomp($uid);
 
-  my $publisher_uri = URI->new("ldap:");
-  $publisher_uri->host('ldap.internal.sanger.ac.uk');
-  $publisher_uri->dn('ou=people,dc=sanger,dc=ac,dc=uk');
-  $publisher_uri->attributes('title');
-  $publisher_uri->scope('sub');
-  $publisher_uri->filter("(uid=$uid)");
+  my $creator_uri = get_wtsi_uri();
+  my $publisher_uri = get_publisher_uri($uid);
+  my $name = get_publisher_name($publisher_uri);
 
-  my $ldap = Net::LDAP->new($publisher_uri->host) or
-    $log->logcroak("LDAP connection failed: ", $@);
-  my $name = authorize($publisher_uri, $ldap, $log);
-
-  $log->logcroak("Failed to find $uid in LDAP") unless $name;
   $log->info("Publishing from '$source' to '$publish_dest' as ", $name);
 
   my @files;
@@ -184,35 +178,18 @@ sub run {
   }
 
   if ($type eq 'idat') {
-    publish_idat_files(\@unique, $publish_dest, $publisher_uri,
-                       $ifdb, $ssdb, $now);
+    publish_idat_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
+                       $ifdb, $ssdb, $now, $make_groups);
   }
   elsif ($type eq 'gtc') {
-    publish_gtc_files(\@unique, $publish_dest, $publisher_uri,
-                      $ifdb, $ssdb, $now);
+    publish_gtc_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
+                      $ifdb, $ssdb, $now, $make_groups);
   }
   else {
     $log->logcroak("Unable to publish unknown data type '$type'");
   }
 
   return 0;
-}
-
-sub authorize {
-  my ($uri, $ldap, $log) = @_;
-
-  my $msg = $ldap->bind;
-  $msg->code && $log->logcroak($msg->error);
-
-  $msg = $ldap->search(base   => "ou=people,dc=sanger,dc=ac,dc=uk",
-                       filter => $uri->filter);
-  $msg->code && $log->logcroak($msg->error);
-
-  my ($name) = ($msg->entries)[0]->get('cn');
-
-  $ldap->unbind;
-
-  return $name;
 }
 
 
@@ -227,24 +204,26 @@ publish_sample_data
 publish_sample_data [--config <database .ini file>] \
    [--days-ago <n>] [--days <n>] \
    --source <directory> --dest <irods collection> \
-   --type <data type>
+   --type <data type> [--make-groups]
 
 Options:
 
-  --config    Load database configuration from a user-defined .ini file.
-              Optional, defaults to $HOME/.npg/genotyping.ini
-  --days-ago  The number of days ago that the publication window ends.
-              Optional, defaults to zero (the current day).
-  --days      The number of days in the publication window, ending at
-              the day given by the --days-ago argument. Any sample data
-              modified during this period will be considered
-              for publication. Optional, defaults to 7 days.
-  --dest      The data destination root collection in iRODS.
-  --help      Display help.
-  --logconf   A log4perl configuration file. Optional.
-  --source    The root directory to search for sample data.
-  --type      The data type to publish. One of [idat, gtc].
-  --verbose   Print messages while processing. Optional.
+  --config      Load database configuration from a user-defined .ini file.
+                Optional, defaults to $HOME/.npg/genotyping.ini
+  --days-ago    The number of days ago that the publication window ends.
+                Optional, defaults to zero (the current day).
+  --days        The number of days in the publication window, ending at
+                the day given by the --days-ago argument. Any sample data
+                modified during this period will be considered
+                for publication. Optional, defaults to 7 days.
+  --dest        The data destination root collection in iRODS.
+  --help        Display help.
+  --logconf     A log4perl configuration file. Optional.
+  --make-groups Make an iRODS group for each study, as required. Optional,
+                defaults to false.
+  --source      The root directory to search for sample data.
+  --type        The data type to publish. One of [idat, gtc].
+  --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
