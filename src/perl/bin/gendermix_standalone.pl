@@ -18,33 +18,19 @@
 #
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
-# July 2012
+# January 2013
 
-# Invoke R script to do improved gender check.
-
-# IMPORTANT:  This script is intended as a component of the automated 
-# genotyping pipeline. It includes an update of the internal pipeline SQLite 
-# database. For a manual gender check outside of the pipeline workflows, use 
-# bin/gendermix_standalone.pl.
+# Script to run gender check independently of WTSI genotyping pipeline
+# Excludes all references to internal pipeline database
 
 use strict;
 use warnings;
 use Getopt::Long;
 use WTSI::Genotyping::QC::GenderCheck;
-use WTSI::Genotyping::QC::GenderCheckDatabase;
 
 my %opts = ();
-
 GetOptions(\%opts, "help", "input=s", "input-format=s", "output-dir=s", 
-           "dbfile=s", "json", "title=s", "include-par", "run=s", "default=f", 
+           "json", "title=s", "include-par", "default=f", 
            "minimum=f", "boundary=f");
-
-my $dbopts = 1;
-%opts = processOptions(\%opts, $dbopts);
-
-my ($namesRef, $inferredRef) = run(%opts);
-
-my $dbFile = $opts{'dbfile'};
-my $runName = $opts{'run'};
-if ($dbFile) { updateDatabase($namesRef, $inferredRef, $dbFile, $runName); }
-
+%opts = processOptions(\%opts);
+run(%opts);

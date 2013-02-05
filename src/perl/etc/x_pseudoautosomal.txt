@@ -1,0 +1,6 @@
+# coordinates of pseudoautosomal regions (PAR) in X chromosome
+# each line lists start and end points of one PAR
+# used by PlinkIO.pm to exclude PAR from gender check
+# correct for NCBI GRCh37 Patch Release 11 (GRCh37.p11), 2013-01-10
+60001   2699520
+154931044       155260560
