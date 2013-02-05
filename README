@@ -5,6 +5,9 @@ This pipeline is designed to process large volumes of raw genotyping
 data into genotype calls. The platform supported is Illumina Infinium
 genotyping microarrays, supplemented with Sequenom genotyping.
 
+The gender check used as a QC metric is also available as a standalone
+application; see below.
+
 Requirements:
 
 
@@ -17,7 +20,7 @@ Pipeline:
 QC scripts:
 
  R >= 2.11.1
- R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
+ R mixtools library	 http://cran.r-project.org/web/packages/mixtools/index.html
 
 
 Pipeline metadata management:
@@ -36,5 +39,21 @@ Pipeline components:
 
 Environment variables:
 
- PERL5LIB   Should include path to genotyping/src/perl/lib/
+ PATH       Should include path to <install_dir>/bin
+ PERL5LIB   Should include path to <install_dir>/src/perl/lib/
  R_LIBS     Should include path to mixtools library installation
+
+
+
+### Gendermix: standalone gender check ###
+
+The 'Gendermix' gender check method can be installed as a standalone 
+application.  See doc/standalone_sexcheck_howto.org for more information.
+
+The standalone check omits much of the pipeline code; it does not require 
+Ruby, Percolate, DBIx::Class, SQLite, Illuminus, or genotype-call.  
+Other requirements are still in effect.  Gendermix needs the Gftools package 
+for I/O of Plink data, as well as R and the mixtools library.  Environment 
+variables should be set as described above.
+
+

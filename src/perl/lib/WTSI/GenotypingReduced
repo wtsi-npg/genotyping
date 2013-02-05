@@ -1,5 +1,17 @@
 use utf8;
 
+#########################################################
+#
+# Stripped-down version of the Genotyping.pm module
+# Contains only functions and modules required for the gendermix check
+# Replaces Genotyping.pm when './Build install_gendermix' is run
+# *NOT* intended for any other use!
+#
+# Iain Bancarz, ib5@sanger.ac.uk
+# January 2013
+#
+#########################################################
+
 package WTSI::Genotyping;
 
 use warnings;
@@ -10,18 +22,6 @@ use vars qw($VERSION @ISA @EXPORT_OK);
 use Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(
-                make_warehouse_metadata
-                make_infinium_metadata
-                make_file_metadata
-                make_creation_metadata
-                make_analysis_metadata
-                has_consent
-
-                get_wtsi_uri
-                get_publisher_uri
-                get_publisher_name
-                publish_idat_files
-                publish_gtc_files
 
                 filter_columns
                 filter_gt_columns
@@ -38,20 +38,9 @@ use Exporter;
                 write_gt_calls
                 write_gs_snps
 
-                update_snp_locations
-                update_sample_genders
-
-                common_stem
               );
 
-use WTSI::Genotyping::DelimitedFiles;
-use WTSI::Genotyping::GenoSNP;
 use WTSI::Genotyping::IO;
-use WTSI::Genotyping::Illuminus;
-use WTSI::Genotyping::Metadata;
-use WTSI::Genotyping::Plink;
-use WTSI::Genotyping::Publication;
-use WTSI::Genotyping::Utilities;
 
 $VERSION = '0.5.0';
 

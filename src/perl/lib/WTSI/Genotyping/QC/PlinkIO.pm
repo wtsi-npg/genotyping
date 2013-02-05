@@ -28,6 +28,7 @@ use strict;
 use Carp;
 use plink_binary; # from gftools package
 use Exporter;
+use WTSI::Genotyping::QC::QCPlotShared qw/$ini_path/;
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/checkPlinkBinaryInputs/;
@@ -45,10 +46,14 @@ sub checkPlinkBinaryInputs {
 }
 
 sub countCallsHets {
-    # filter SNPs on call rate and PAR location; count successful calls, and het calls, for SNPs passing filters
-    my ($pb, $sampleNamesRef, $minCR, $log, $verbose, $includePar) = @_;
+    # filter SNPs on call rate and PAR location
+    # count successful calls, and het calls, for SNPs passing filters
+    my ($pb, $sampleNamesRef, $minCR, $log, $verbose, $includePar, 
+        $parPath) = @_;
     my ($snpTotal, $snpFail, $snpPar) = (0,0,0);
     $includePar ||= 0; # remove SNPs from pseudoautosomal regions
+    $parPath ||= $ini_path."/x_pseudoautosomal.txt";
+    my @xpar = readXPAR($parPath);
     $log ||= 0;
     if ($log) { writeSnpLogHeader($log); }
     my (%allHets, %allCalls);
@@ -57,11 +62,12 @@ sub countCallsHets {
     my $snp = new plink_binary::snp;
     my $genotypes = new plink_binary::vectorstr;
     while ($pb->next_snp($snp, $genotypes)) {
-	my ($callsRef, $hetsRef, $cr) = snpCallsHets($snp, $genotypes, $sampleNamesRef);
+	my ($callsRef, $hetsRef, $cr) = 
+        snpCallsHets($snp, $genotypes, $sampleNamesRef);
 	my $crPass;
 	if ($cr >= $minCR) { $crPass = 1; }
 	else { $crPass = 0; }
-	my $par = isXPAR($snp);
+	my $par = isXPAR($snp, \@xpar);
 	if ($log) { updateLog($log, $snp, $cr, $crPass, $par); }
 	if (!$crPass) { $snpFail++; next; }
 	elsif (!$includePar && $par) { $snpPar++; next; }
@@ -102,18 +108,22 @@ sub findHetRates {
     $verbose ||= 0;
     my @sampleNames = @$sampleNamesRef;
     if ($verbose) { print STDERR "Finding SNP evaluation set.\n"; }
-    my ($allCallsRef, $allHetsRef, $snps) = countCallsHets($pb, $sampleNamesRef,$minCR,$log,$verbose,$includePar);
-    if ($verbose) { print STDERR $snps." SNPs found for het rate computation.\n"; }
+    my ($allCallsRef, $allHetsRef, $snps) = 
+        countCallsHets($pb, $sampleNamesRef,$minCR,$log,$verbose,$includePar);
+    if ($verbose) { 
+        print STDERR $snps." SNPs found for het rate computation.\n"; 
+    }
     my %allCalls = %$allCallsRef;
     my %allHets = %$allHetsRef;
     my %hetRates = ();
     for my $i (0..$#sampleNames) {
-	my $name = $sampleNames[$i];
-	my $hetRate;
-	if ($allCalls{$name} > 0) { $hetRate = $allHets{$name} / $allCalls{$name}; }
-	else { $hetRate = 0; }
-	$hetRates{$name} = $hetRate;
-	if ($verbose && $i % 100 == 0) {print $i." ".$name." ".$hetRate."\n"; }
+        my $name = $sampleNames[$i];
+        my $hetRate = 0;
+        if ($allCalls{$name} > 0) { 
+            $hetRate = $allHets{$name} / $allCalls{$name}; 
+        } 
+        $hetRates{$name} = $hetRate;
+        if ($verbose && $i % 100 == 0) {print $i." ".$name." ".$hetRate."\n"; }
     }
     return %hetRates;
 }
@@ -133,23 +143,39 @@ sub getSampleNamesGenders {
 }
 
 sub isXPAR {
-    # does given SNP (plink_binary object) on x chromosome fall into pseudoautosomal region?
+    # is SNP (plink_binary object) on pseudoautosomal region of x chromosome?
     my $snp = shift;
+    my @xPars = @{ shift() };
     my $chrom = $snp->{"chromosome"};
     if ($chrom ne 'X' && $chrom!=23) { 
-	croak "Non-X SNP supplied to X chromosome PAR check: Chromosome $snp->{\"chromosome\"}: $!"; 
+        croak "Non-X SNP supplied to X chromosome PAR check: ".
+            "Chromosome $snp->{\"chromosome\"}: $!"; 
     }
-    my @xPars = ( # X chrom pseudoautosomal regions; from NCBI GRCh37 Patch Release 8 (GRCh37.p8), 2012-04-12
-	[60001,	2699520],
-	[154931044, 155260560],
-	);
     my $snp_pos = $snp->{"physical_position"};
     my $par = 0;
     foreach my $pairRef (@xPars) {
-	my ($start, $end) = @$pairRef;
-	if ($snp_pos>=$start && $snp_pos <= $end) { $par = 1; last; }
+        my ($start, $end) = @$pairRef;
+        if ($snp_pos>=$start && $snp_pos <= $end) { $par = 1; last; }
     }
     return $par;
+}
+
+sub readXPAR {
+    # read x chromosome PAR coordinates from text file
+    my $inPath = shift;
+    my @xpar;
+    open my $in, "<", $inPath || croak "Cannot open input $inPath";
+    while (<$in>) {
+        if (/^#/) { next; } # comments start with a #
+        chomp;
+        my @words = split;
+        if (@words!=2) { next; }
+        my @coords = ($words[0], $words[1]);
+        if ($words[0] =~ /\D/ || $words[1] =~ /\D/) { next; }
+        push @xpar, \@coords;
+    }
+    close $in || croak "Cannot close input $inPath";
+    return @xpar;
 }
 
 sub snpCallsHets {
@@ -161,13 +187,15 @@ sub snpCallsHets {
     my $total = $genotypes->size();
     my @sampleNames = @$samplesRef;
     for (my $i=0;$i<$total;$i++) { # calls for each sample on current snp
-	my $call = $genotypes->get($i);
-	if ($call =~ /[N]{2}/) { 
-	    $noCalls++;
-	} else {
-	    $calls{$sampleNames[$i]} = 1;
-	    if (substr($call, 0, 1) ne substr($call, 1, 1)) { $hets{$sampleNames[$i]} = 1; }
-	}
+        my $call = $genotypes->get($i);
+        if ($call =~ /[N]{2}/) { 
+            $noCalls++;
+        } else {
+            $calls{$sampleNames[$i]} = 1;
+            if (substr($call, 0, 1) ne substr($call, 1, 1)) { 
+                $hets{$sampleNames[$i]} = 1; 
+            }
+        }
     }
     my $cr;
     if ($total>0) { $cr = 1 - ($noCalls/$total); }
