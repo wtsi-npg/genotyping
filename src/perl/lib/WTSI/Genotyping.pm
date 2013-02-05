@@ -14,8 +14,12 @@ use Exporter;
                 make_infinium_metadata
                 make_file_metadata
                 make_creation_metadata
+                make_analysis_metadata
                 has_consent
 
+                get_wtsi_uri
+                get_publisher_uri
+                get_publisher_name
                 publish_idat_files
                 publish_gtc_files
 
