@@ -25,17 +25,21 @@ use Exporter;
                 batch_object_meta
                 get_object_meta
                 remove_object_meta
+                find_objects_by_meta
 
                 list_collection
                 add_collection
                 put_collection
                 remove_collection
                 add_collection_meta
-
                 get_collection_meta
                 remove_collection_meta
+                find_collections_by_meta
+
                 meta_exists
 
+                make_group_name
+                find_or_make_group
                 group_exists
                 add_group
                 set_group_access
@@ -58,6 +62,54 @@ our $IPWD = 'ipwd';
 our $ICHMOD = 'ichmod';
 
 our $log = Log::Log4perl->get_logger('npg.irods');
+
+
+=head2 make_group_name
+
+  Arg [1]    : A SequenceScape study ID.
+  Example    : make_group_name(1234))
+  Description: Returns an iRODS group name given a SequenceScape study ID.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub make_group_name {
+  my ($study_id) = @_;
+
+  return "ss_" . $study_id;
+}
+
+=head2 find_or_make_group
+
+  Arg [1]    : iRODS group name
+  Example    : find_or_create_group($name)
+  Description: Creates a new iRODS group if it does not exist. Returns
+               the group name.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub find_or_make_group {
+  my ($group_name) = @_;
+
+  my $group;
+
+  $log->debug("Checking for iRODS group '$group_name'");
+
+  if (group_exists($group_name)) {
+    $group = $group_name;
+    $log->debug("An iRODS group '$group' exists; a new group will not be added");
+  }
+  else {
+    $group = add_group($group_name);
+    $log->info("Added a new iRODS group '$group'");
+  }
+
+  return $group;
+}
+
 
 =head2 group_exists
 
@@ -267,8 +319,8 @@ sub list_object {
   }
 
   my $command = join(' ', $IQUEST, '"%s"',
-                     qq("SELECT DATA_NAME \
-                         WHERE DATA_NAME = '$data_name' \
+                     qq("SELECT DATA_NAME
+                         WHERE DATA_NAME = '$data_name'
                          AND COLL_NAME = '$collection'"));
 
   my $name = `$command 2> /dev/null`;
@@ -406,7 +458,7 @@ sub batch_object_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : remove_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
-  Description: Removes metadata to a data object. Returns an array of
+  Description: Removes metadata from a data object. Returns an array of
                the removed key, value and units.
   Returntype : array
   Caller     : general
@@ -432,11 +484,49 @@ sub remove_object_meta {
   return ($key, $value, $units);
 }
 
+
+=head2 find_objects_by_meta
+
+  Arg [1]    : iRODS collection pattern
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units
+  Example    : find_objects_by_meta('/my/path/foo%', 'id', 'ABCD1234')
+  Description: Finds objects by their metadata, restricted to a parent collection.
+               Returns a list of collections.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub find_objects_by_meta {
+  my ($root, $key, $value, $units) = @_;
+
+  my $unit_clause;
+  if (defined $units) {
+    $unit_clause = qq(AND META_DATA_ATTR_UNITS = '$units');
+  }
+  else {
+    $unit_clause = '';
+  }
+
+  my @objs = _safe_select('"%s"', qq("SELECT COUNT(DATA_NAME)
+                                      WHERE META_DATA_ATTR_NAME = '$key'
+                                      AND META_DATA_ATTR_VALUE = '$value' $unit_clause
+                                      AND COLL_NAME LIKE '$root'"),
+                          '"%s/%s"', qq("SELECT COLL_PARENT_NAME, DATA_NAME
+                                         WHERE META_DATA_ATTR_NAME = '$key'
+                                         AND META_DATA_ATTR_VALUE = '$value' $unit_clause
+                                         AND COLL_NAME LIKE '$root'"));
+  return \@objs;
+}
+
+
 =head2 list_collection
 
   Arg [1]    : iRODS collection name
   Example    : $dir = list_collection($coll)
-  Description: Returns the contents of the collectionas two arrayrefs,
+  Description: Returns the contents of the collection as two arrayrefs,
                the first listing data objects, the second listing nested
                collections.
   Returntype : array
@@ -452,27 +542,28 @@ sub list_collection {
   $collection =~ s!/$!!;
   $collection = _ensure_absolute($collection);
 
-  my @root = _safe_select(qq("SELECT COUNT(COLL_NAME) \
+  my @root = _safe_select('"%s"',
+                          qq("SELECT COUNT(COLL_NAME)
                               WHERE COLL_NAME = '$collection'"),
-                          qq("SELECT COLL_NAME \
+                          '"%s"',
+                          qq("SELECT COLL_NAME
                               WHERE COLL_NAME = '$collection'"));
 
   $log->debug("Listing collection '$collection'");
 
   if (@root) {
     $log->debug("Collection '$collection' exists");
-    my @objs = _safe_select(qq("SELECT COUNT(DATA_NAME)
-                                WHERE COLL_NAME = '$collection'"),
-                            qq("SELECT DATA_NAME \
-                                WHERE COLL_NAME = '$collection'"));
-    my @colls = _safe_select(qq("SELECT COUNT(COLL_NAME) \
-                                 WHERE COLL_PARENT_NAME = '$collection'"),
-                             qq("SELECT COLL_NAME \
-                                 WHERE COLL_PARENT_NAME = '$collection'"));
+    my @objs = _safe_select('"%s"', qq("SELECT COUNT(DATA_NAME)
+                                        WHERE COLL_NAME = '$collection'"),
+                            '"%s"', qq("SELECT DATA_NAME
+                                        WHERE COLL_NAME = '$collection'"));
+    my @colls = _safe_select('"%s"', qq("SELECT COUNT(COLL_NAME)
+                                         WHERE COLL_PARENT_NAME = '$collection'"),
+                             '"%s"', qq("SELECT COLL_NAME
+                                         WHERE COLL_PARENT_NAME = '$collection'"));
 
     $log->debug("Collection '$collection' contains ", scalar @objs,
                 " data objects and ", scalar @colls, " collections");
-
 
     return (\@objs, \@colls);
   }
@@ -481,6 +572,8 @@ sub list_collection {
     return;
   }
 }
+
+
 
 =head2 add_collection
 
@@ -616,7 +709,7 @@ sub add_collection_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : remove_collection_meta('/my/path/foo', 'id', 'ABCD1234')
-  Description: Removes metadata to a data object. Returns an array of
+  Description: Removes metadata from a collection object. Returns an array of
                the removed key, value and units.
   Returntype : array
   Caller     : general
@@ -645,6 +738,44 @@ sub remove_collection_meta {
   return ($key, $value, $units);
 }
 
+
+=head2 find_collections_by_meta
+
+  Arg [1]    : iRODS collection pattern
+  Arg [2]    : key
+  Arg [3]    : value
+  Arg [4]    : units
+  Example    : find_collections_by_meta('/my/path/foo%', 'id', 'ABCD1234')
+  Description: Finds collections by their metadata, restricted to a parent collection.
+               Returns a list of collections.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub find_collections_by_meta {
+  my ($root, $key, $value, $units) = @_;
+
+  my $unit_clause;
+  if (defined $units) {
+    $unit_clause = qq(AND META_COLL_ATTR_UNITS = '$units');
+  }
+  else {
+    $unit_clause = '';
+  }
+
+  my @colls = _safe_select('"%s"', qq("SELECT COUNT(COLL_NAME)
+                                      WHERE META_COLL_ATTR_NAME = '$key'
+                                      AND META_COLL_ATTR_VALUE = '$value' $unit_clause
+                                      AND COLL_NAME LIKE '$root'"),
+                          '"%s"', qq("SELECT COLL_NAME
+                                      WHERE META_COLL_ATTR_NAME = '$key'
+                                      AND META_COLL_ATTR_VALUE = '$value' $unit_clause
+                                      AND COLL_NAME LIKE '$root'"));
+  return \@colls;
+}
+
+
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
@@ -660,6 +791,53 @@ sub meta_exists {
 
   return $exists;
 }
+
+
+
+=head2 md5sum
+
+  Arg [1]    : string path to a file
+  Example    : my $md5 = md5sum($filename)
+  Description: Calculates the MD5 checksum of a file.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub md5sum {
+  my ($file) = @_;
+
+  my @result = _run_command("md5sum $file");
+  my $raw = shift @result;
+  my ($md5) = $raw =~ m{^(\S+)\s+\S+$}msx;
+
+  return $md5;
+}
+
+=head2 hash_path
+
+  Arg [1]    : string path to a file
+  Arg [2]    : MD5 checksum (optional)
+  Example    : my $path = hash_path($filename)
+  Description: Returns a hashed path 3 directories deep, each level having
+               a maximum of 256 subdirectories, calculated from the file's
+               MD5. If the optional MD5 argument is supplied, the MD5
+               calculation is skipped and the provided value is used instead.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub hash_path {
+  my ($file, $md5sum) = @_;
+
+  $md5sum ||= md5sum($file);
+
+  my @levels = $md5sum =~ m{\G(..)}gmsx;
+
+  return join('/', @levels[0..2]);
+}
+
 
 =head2 collect_files
 
@@ -812,50 +990,6 @@ sub modified_between {
   }
 }
 
-=head2 md5sum
-
-  Arg [1]    : string path to a file
-  Example    : my $md5 = md5sum($filename)
-  Description: Calculates the MD5 checksum of a file.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub md5sum {
-  my ($file) = @_;
-
-  my @result = _run_command("md5sum $file");
-  my $raw = shift @result;
-  my ($md5) = $raw =~ m{^(\S+)\s+\S+$}msx;
-
-  return $md5;
-}
-
-=head2 hash_path
-
-  Arg [1]    : string path to a file
-  Arg [2]    : MD5 checksum (optional)
-  Example    : my $path = hash_path($filename)
-  Description: Returns a hashed path 3 directories deep, each level having
-               a maximum of 256 subdirectories, calculated from the file's
-               MD5. If the optional MD5 argument is supplied, the MD5
-               calculation is skipped and the provided value is used instead.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub hash_path {
-  my ($file, $md5sum) = @_;
-
-  $md5sum ||= md5sum($file);
-
-  my @levels = $md5sum =~ m{\G(..)}gmsx;
-
-  return join('/', @levels[0..2]);
-}
-
 sub _run_command {
   my @command = @_;
 
@@ -937,13 +1071,13 @@ sub _parse_raw_meta {
 }
 
 sub _safe_select {
-  my ($icount, $iquery) = @_;
+  my ($ctemplate, $icount, $qtemplate, $iquery) = @_;
 
   my @result;
 
-  my @count = _run_command($IQUEST, '"%s"', $icount);
+  my @count = _run_command($IQUEST, $ctemplate, $icount);
   if (@count && $count[0] > 0) {
-    push(@result, _run_command($IQUEST, '"%s"', $iquery));
+    push(@result, _run_command($IQUEST, $qtemplate, $iquery));
   }
 
   return @result;
