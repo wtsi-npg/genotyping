@@ -23,10 +23,10 @@ my $build = Build->new
                  'etc/pipeline.ini' => 'etc/pipeline.ini',
                  'etc/relations.ini' => 'etc/relations.ini',
                  'etc/snpsets.ini' => 'etc/snpsets.ini',
-                 'etc/states.ini' => 'etc/states.ini'},
+                 'etc/states.ini' => 'etc/states.ini' },
    conf_files => {'etc/log4perl.conf' => 'etc/log4perl.conf',
                   'etc/qc_config.json' => 'etc/qc_config.json',
-                  'etc/reportIntro.tex' => 'etc/reportIntro.tex'},
+                  'etc/x_pseudoautosomal.txt' => 'etc/x_pseudoautosomal.txt'},
    sql_files => {'sql/pipeline_ddl.sql' => 'sql/pipeline_ddl.sql'},
    R_files => {
        '../r/bin/check_xhet_gender.R' => 'bin/check_xhet_gender.R',
