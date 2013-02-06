@@ -39,6 +39,7 @@ etc/relations.ini
 etc/reportIntro.tex
 etc/snpsets.ini
 etc/states.ini
+etc/x_pseudoautosomal.txt
 lib/WTSI/Genotyping.pm
 lib/WTSI/Genotyping/Database.pm
 lib/WTSI/Genotyping/Database/Infinium.pm
