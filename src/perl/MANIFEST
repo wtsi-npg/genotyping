@@ -3,6 +3,7 @@ bin/check_duplicates_bed.pl
 bin/check_identity_bed.pl
 bin/check_xhet_gender.pl
 bin/filter_illuminus_output.pl
+bin/gendermix_standalone.pl
 bin/genosnp.pl
 bin/illuminus.pl
 bin/intensity_metrics.pl
@@ -38,6 +39,7 @@ etc/relations.ini
 etc/reportIntro.tex
 etc/snpsets.ini
 etc/states.ini
+etc/x_pseudoautosomal.txt
 lib/WTSI/Genotyping.pm
 lib/WTSI/Genotyping/Database.pm
 lib/WTSI/Genotyping/Database/Infinium.pm

@@ -10,7 +10,7 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 72;
+use Test::More tests => 92;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
@@ -23,6 +23,7 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                add_object_meta
                                get_object_meta
                                remove_object_meta
+                               find_objects_by_meta
 
                                get_object_checksum
                                checksum_object
@@ -33,6 +34,7 @@ use WTSI::Genotyping::iRODS qw(ipwd
                                remove_collection
                                get_collection_meta
                                add_collection_meta
+                               find_collections_by_meta
 
                                group_exists
                                add_group
@@ -90,18 +92,29 @@ foreach my $attr (keys %meta) {
 }
 
 # meta_exists
-my %m = ("a" => ["1", "2"],
-         "b" => ["1"],
-         "c" => ["2"]);
+my %m = ('a' => ['1', '2'],
+         'b' => ['1'],
+         'c' => ['2']);
 
-ok(meta_exists("a", "1", %m));
-ok(meta_exists("a", "2", %m));
-is(meta_exists("a", "12", %m), 0);
-is(meta_exists("a", "11", %m), 0);
+ok(meta_exists('a', '1', %m));
+ok(meta_exists('a', '2', %m));
+is(meta_exists('a', '12', %m), 0);
+is(meta_exists('a', '11', %m), 0);
+
 
 # get_collection_meta
 my %collmeta = get_collection_meta($test_collection);
 is_deeply(\%collmeta, \%expected);
+
+# find_collections_by_meta
+foreach my $attr (keys %meta) {
+  my $value = $meta{$attr};
+  my $root = $wd;
+  my @found = find_collections_by_meta("$root%", $attr, $value);
+
+  ok(scalar @found == 1);
+}
+
 
 # add_object
 dies_ok { add_object(undef, $test_object) }
@@ -139,6 +152,15 @@ is_deeply(\%objmeta, \%expected);
 
 dies_ok { get_object_meta() }
   'Expected to fail getting metdata for an undefined object';
+
+# find_objects_by_meta
+foreach my $attr (keys %meta) {
+  my $value = $meta{$attr};
+  my $root = $wd;
+  my @found = find_objects_by_meta("$root%", $attr, $value);
+
+  ok(scalar @found == 1);
+}
 
 
 # remove_object

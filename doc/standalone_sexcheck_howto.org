@@ -1,34 +1,52 @@
 * How to run a standalone sex check with wtsi-npg/genotyping
   - Author :: Iain Bancarz, ib5@sanger.ac.uk
   - Created :: 2012-06-20
-  - Updated :: 2012-06-20    
+  - Updated :: 2013-01-17    
 
 * Introduction
-  The wtsi-npg/genotyping project (https://github.com/wtsi-npg/genotyping) is a comprehensive software package to automatically analyse large quantities of genotyping data.  As a QC step, it includes robust inference of sample gender from heterozygosity on the X chromosome using a mixture model.  The inference method is described in detail in the document "Adaptive gender thresholds for genotyping data".
 
-  There has been interest in running this sex check as a standalone measure, separately from the wtsi-npg/genotyping pipeline.  This document describes how to run a standalone sex check.
+  The wtsi-npg/genotyping pipeline (https://github.com/wtsi-npg/genotyping) is a software package to automatically analyse large quantities of genotyping data.  As a QC step, it includes robust inference of sample gender from heterozygosity on the X chromosome using a Gaussian mixture model.  This sex check has been named Gendermix.
 
-** Key scripts
-   The minimal set of scripts required is check_xhet_gender.R and write_gender_files.pl.  For more convenient execution, check_xhet_gender.pl is also needed.
+  There has been interest in running Gendermix as a standalone measure, separately from the wtsi-npg/genotyping pipeline.  This document describes how to install and run the standalone sex check.
 
-* Prerequisites
-  The full set of prerequisites for the genotyping pipeline is not required in order to run the sex check.  Minimal requirements are set out below.
+* Installation
 
-** Perl modules
-   All modules must be visible in the PERL5LIB environment variable.
-*** plink_binary
-    The plink_binary module is required.  This is part of the Sanger GFtools package available from Github:  https://github.com/wtsi-npg/Gftools .  PERL5LIB must include the path to the directory containing plink_binary.pm.
-*** PlinkIO.pm
-    This module is part of wtsi-npg/genotyping, located in genotyping/src/perl/lib/WTSI/Genotyping/QC/.  PlinkIO in turn requires the plink_binary module (see above).  PERL5LIB must include the genotyping/src/perl/lib/ directory.
+** Prerequisites
 
-*** Additional modules for check_xhet_gender.pl
-** R packages
-   The mixtools package is required.  This is available from CRAN:  http://cran.r-project.org/web/packages/mixtools/index.html
-   The R_LIBS_USER environment variable (or equivalent) must include the mixtools installation.
+Prerequisites are listed in the pipeline README file.  Gendermix has fewer prerequisites than the full pipeline.
 
-** Scripts
-   Two scripts from wtsi-npg/genotyping are needed.
-*** write_gender_files.pl
-    Found in genotyping/src/perl/bin.  This extracts X chromosome data from binary PLINK files, writes a number of temporary files, and finally writes sample_xhet_input.txt, which lists samples and X heterozygosity values and serves as input to check_xhet_gender.R.
-*** check_xhet_gender.R
-    Found in genotyping/src/perl/bin. This trains and applies the mixture model, and writes 
+** Standalone installation
+
+Installation instructions are given in src/perl/README.  Briefly, the install_gendermix target for the Perl Build file will install the necessary files for a standalone gender check to the given target directory.  
+
+** Component of full pipeline installation
+
+Gendermix can also be run from a full install of the genotyping pipeline.  The gendermix_standalone.pl script is contained in a full pipeline install and will work normally.  (Note that install_gendermix should not have the same target directory as a full pipeline installation -- this would modify the Genotyping.pm module and disable the pipeline.)
+
+* Running with Perl wrapper
+
+Gendermix is run as a standalone using the wrapper script: bin/gendermix_standalone.pl
+
+** Usage and input formats
+
+Run with --help for usage information.  The wrapper will accept input in Plink binary, json, or tab-delimited text format.  For examples of appropriate json and text input, see t/gender/input_xhet.(txt|json).
+
+Text or json input should contain the rate of heterozygosity for the X chromosome only.  Ideally this should exclude pseudoautosomal regions, as discussed below.
+
+Plink is a genotyping analysis software package which defines its own binary and text data formats; see http://pngu.mgh.harvard.edu/~purcell/plink.  Gendermix accepts Plink binary files as input data.  Plink binary input may contain calls for any SNPs, not just those on the X chromosome.
+
+** Pseudoautosomal filter:  Plink input only
+
+The pseudoautosomal regions (PARs) of the X chromosome have a high degree of homology to the Y chromosome.  Therefore, genotyping a PAR is likely to detect a high rate of heterozygosity in male samples, which may confuse the Gendermix check.  Plink data records the genomic locus of each SNP.  When Gendermix is run on Plink input, it extracts the X chromosome calls for the heterozygosity computation, and omits any SNPs which are located in known PARs.
+
+The PAR coordinates used by Gendermix are specified in etc/x_pseudoautosomal.txt, using the standard definitions released by NCBI.  If desired, this file can be edited to use non-standard PAR coordinates.  The PAR filter may also be omitted altogether using the --include-par argument to gendermix_standalone.pl.
+
+** Output files
+
+Output of sample name, X heterozygosity, and inferred gender will be in either .txt or .json format.  The default output file is sample_xhet_gender.json for .json input, or sample_xhet_gender.txt otherwise.  Default output format can be overridden on the command line.  The output contains a placeholder for "supplied" gender, for use in the full pipeline.
+
+The script will also output a file sample_xhet_gender.log recording details of the adaptive gender model, including the exact thresholds used.  If training of a mixture model is successful, the script will write a file sample_xhet_gender.png containing a plot of the model distribution.
+
+** Output gender codes
+
+The gender in the output files is identified as follows: 0=Ambiguous, 1=Male, 2=Female.  This is consistent with the convention in Plink .ped files.
