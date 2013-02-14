@@ -34,6 +34,7 @@ class TestIlluminusTasks < Test::Unit::TestCase
   include Genotyping
   include Genotyping::Tasks::Illuminus
   include Genotyping::Tasks::GenotypeCall
+  include Genotyping::Tasks::Simtools
 
   def initialize(name)
     super(name)

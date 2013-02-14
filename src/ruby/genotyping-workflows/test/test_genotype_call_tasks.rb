@@ -71,34 +71,5 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     end
   end
 
-  def test_gtc_to_sim
-    run_test_if(method(:genotype_call_available?), "Skipping test_gtc_to_sim") do
-      work_dir = make_work_dir('test_gtc_to_sim', data_path)
-
-      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
-        mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
-                                          :log_dir => work_dir})
-      end
-
-      sim_file, metadata = wait_for('test_gtc_to_sim', 60, 5) do
-        gtc_to_sim(sample_json, manifest, 'mock_study.sim',
-                   {:work_dir =>  work_dir,
-                    :log_dir => work_dir,
-                    :metadata => 'chr.json'})
-      end
-
-      sim = SIM.new(sim_file)
-      assert_equal(sim_file, sim.sim_file)
-      assert_equal(1, sim.version)
-      assert_equal(255, sim.sample_name_size)
-      assert_equal(1, sim.number_format) # unnormalized, uint16
-      assert_equal(100, sim.num_probes)
-      assert_equal(2, sim.num_channels)
-      assert_equal(5, sim.num_samples)
-
-      Percolate.log.close
-      remove_work_dir(work_dir)
-    end
-  end
 
 end

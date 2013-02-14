@@ -22,6 +22,7 @@ module Genotyping::Workflows
     include Genotyping
     include Genotyping::Tasks::Database
     include Genotyping::Tasks::GenotypeCall
+    include Genotyping::Tasks::Simtools
 
     description <<-DESC
     Collates the normalized intensity values and GenCall genotype calls for the

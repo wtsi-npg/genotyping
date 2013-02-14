@@ -73,68 +73,9 @@ module Genotyping::Tasks
       end
     end
 
-    # Collates intensity data from multiple GTC format files into a single SIM
-    # format file with JSON annotation of chromosome boundaries.
-    #
-    # Arguments:
-    # - input (String): A JSON file specifying sample URIs and GTC file paths.
-    # - manifest (String): The BeadPool manifest file name.
-    # - output (String): The SIM file name.
-    # - args (Hash): Arguments for the operation.
-    #
-    #   :chromosome (String): Limit the operation to SNPs on one chromosome, as
-    #   named in the BeadPool manifest.
-    #   :normalize (Boolean): Normalize the intensities. Should be false for
-    #   the GenoSNP caller.
-    #
-    # - async (Hash): Arguments for asynchronous management.
-    #
-    # Returns:
-    # - An Array containing
-    #   - The SIM file path.
-    #   - The JSON chromosome annotation path.
-    def gtc_to_sim(input, manifest, output, args = {}, async = {})
-      args, work_dir, log_dir = process_task_args(args)
 
-      if args_available?(input, manifest, output, work_dir)
-        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
-        expected = [output]
+    # [gtc_to_sim function has been replaced by version in module Simtools]
 
-        cli_args = {:chromosome => args[:chromosome],
-                    :normalize => args[:normalize],
-                    :input => input,
-                    :manifest => manifest,
-                    :output => output}
-
-        if args.has_key?(:chromosome_meta)
-          chr_json = args[:chromosome_meta]
-          chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:chromosome_meta] = chr_json
-          expected << chr_json
-        end
-
-        if args.has_key?(:snp_meta)
-          snp_json = args[:snp_meta]
-          snp_json = absolute_path(snp_json, work_dir) unless absolute_path?(snp_json)
-          cli_args[:snp_meta] = snp_json
-          expected << snp_json
-        end
-
-        margs = [cli_args, input, work_dir]
-        task_id = task_identity(:gtc_to_sim, *margs)
-        log = File.join(log_dir, task_id + '.log')
-
-        command = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.9),
-                   'gtc-to-sim',
-                   cli_arg_map(cli_args, :prefix => '--') { |key|
-                     key.gsub(/_/, '-') }].flatten.join(' ')
-
-        async_task(margs, command, work_dir, log,
-                   :post => lambda { ensure_files(expected, :error => false) },
-                   :result => lambda { expected },
-                   :async => async)
-      end
-    end
 
     # Collates GenCall genotype call data from multiple GTC format files into a
     # single Plink BED format file.
