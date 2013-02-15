@@ -87,10 +87,10 @@ module Genotyping::Tasks
         group_size = args[:group_size] || DEFAULT_GROUP_SIZE
 
         snp_ranges = make_ranges(start_snp, end_snp, chunk_size)
-        genotype_call_args = snp_ranges.collect do |range|
-          {:input => sim_file,
-           :output => 'stdout',
-           :manifest => manifest,
+        simtools_args = snp_ranges.collect do |range|
+          {:infile => sim_file,
+           :outfile => '-',
+           :man_dir => manifest, # path to file, despite the name!
            :start => range.begin,
            :end => range.end}
         end
@@ -108,9 +108,8 @@ module Genotyping::Tasks
            :verbose => false}
         end
 
-        commands = genotype_call_args.zip(illuminus_wrap_args).collect do |gca, iwa|
-          cmd = [GENOTYPE_CALL, GenotypeCall.memory_request_arg(async, 0.5),
-                 'sim-to-illuminus',
+        commands = simtools_args.zip(illuminus_wrap_args).collect do |gca, iwa|
+          cmd = [SIMTOOLS, 'illuminus',
                  cli_arg_map(gca, :prefix => '--')]
           cmd += ['|', 'tee', iwa[:output] + '.iln'] if debug
           cmd += ['|', ILLUMINUS_WRAPPER, cli_arg_map(iwa, :prefix => '--')]
@@ -118,7 +117,7 @@ module Genotyping::Tasks
         end
 
         # Job memoization keys, i corresponds to the partition index
-        margs_arrays = genotype_call_args.zip(illuminus_wrap_args).collect { |gca, iwa|
+        margs_arrays = simtools_args.zip(illuminus_wrap_args).collect { |gca, iwa|
           [work_dir, gca, iwa]
         }.each_with_index.collect { |elt, i| [i] + elt }
 
