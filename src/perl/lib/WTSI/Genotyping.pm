@@ -5,7 +5,7 @@ package WTSI::Genotyping;
 use warnings;
 use strict;
 
-use vars qw($VERSION @ISA @EXPORT_OK);
+use vars qw(@ISA @EXPORT_OK);
 
 use Exporter;
 @ISA = qw(Exporter);
@@ -52,8 +52,6 @@ use WTSI::Genotyping::Metadata;
 use WTSI::Genotyping::Plink;
 use WTSI::Genotyping::Publication;
 use WTSI::Genotyping::Utilities;
-
-$VERSION = '0.5.0';
 
 1;
 
