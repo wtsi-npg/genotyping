@@ -120,7 +120,7 @@ sub get_publisher_name {
 
 sub publish_idat_files {
   my ($files, $creator_uri, $publish_dest, $publisher_uri,
-      $ifdb, $ssdb, $make_groups, $time) = @_;
+      $ifdb, $ssdb, $time, $make_groups) = @_;
 
   my $paired = paired_idat_files($files, $log);
   my $pairs = scalar @$paired;
@@ -193,7 +193,7 @@ sub publish_idat_files {
 
 sub publish_gtc_files {
   my ($files, $creator_uri, $publish_dest, $publisher_uri,
-      $ifdb, $ssdb, $time, $make_groups,) = @_;
+      $ifdb, $ssdb, $time, $make_groups) = @_;
 
   my $total = scalar @$files;
   my $published = 0;
