@@ -15,6 +15,7 @@ Pipeline:
 
  Ruby 1.8.7
  Percolate              https://github.com/wtsi-npg/Percolate
+ Simtools               https://github.com/wtsi-npg/simtools
 
 
 QC scripts:
@@ -39,7 +40,7 @@ Pipeline components:
 
 Environment variables:
 
- PATH       Should include path to <install_dir>/bin
+ PATH       Should include path to <install_dir>/bin and to simtools
  PERL5LIB   Should include path to <install_dir>/src/perl/lib/
  R_LIBS     Should include path to mixtools library installation
 
