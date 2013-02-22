@@ -22,6 +22,7 @@ module Genotyping::Workflows
     include Genotyping
     include Genotyping::Tasks::Database
     include Genotyping::Tasks::GenotypeCall
+    include Genotyping::Tasks::Simtools
     include Genotyping::Tasks::Illuminus
     include Genotyping::Tasks::Plink
     include Genotyping::Tasks::QualityControl

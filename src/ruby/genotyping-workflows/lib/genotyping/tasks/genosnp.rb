@@ -85,10 +85,10 @@ module Genotyping::Tasks
         group_size = args[:group_size] || DEFAULT_GROUP_SIZE
 
         sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
-        genotype_call_args = sample_ranges.collect do |range|
-          {:input => sim_file,
-           :output => 'stdout',
-           :manifest => manifest,
+        simtools_args = sample_ranges.collect do |range|
+          {:infile => sim_file,
+           :outfile => '-',
+           :man_dir => manifest, # path to file, despite the name!
            :start => range.begin,
            :end => range.end}
         end
@@ -105,16 +105,16 @@ module Genotyping::Tasks
            :plink => true}
         end
 
-        commands = genotype_call_args.zip(genosnp_wrap_args).collect do |gca, gwa|
-         cmd = [GENOTYPE_CALL, 'sim-to-genosnp', cli_arg_map(gca, :prefix => '--')]
+        commands = simtools_args.zip(genosnp_wrap_args).collect do |sta, gwa|
+         cmd = [SIMTOOLS, 'genosnp', cli_arg_map(sta, :prefix => '--')]
          cmd += ['|', 'tee', gwa[:output] + '.raw.txt'] if debug
          cmd += ['|', GENOSNP_WRAPPER, cli_arg_map(gwa, :prefix => '--')]
          cmd.flatten.join(' ')
         end
 
         # Job memoization keys, i corresponds to the partition index
-        margs_arrays = genotype_call_args.zip(genosnp_wrap_args).collect { |gca, gwa|
-          [work_dir, gca, gwa]
+        margs_arrays = simtools_args.zip(genosnp_wrap_args).collect { |sta, gwa|
+          [work_dir, sta, gwa]
         }.each_with_index.collect { |elt, i| [i] + elt }
 
         # Expected call files
