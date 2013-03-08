@@ -48,15 +48,17 @@ class TestZCallTasks < Test::Unit::TestCase
     super(name)
     @msg_host = Socket.gethostname
     @msg_port = 11300
-    @egt = '/nfs/gapi/data/genotype/zcall_test/HumanExome-12v1.egt'
-    @manifest = '/nfs/gapi/data/genotype/zcall_test/HumanExome-12v1_A.bpm.csv'
-    @sample_json = '/nfs/gapi/data/genotype/zcall_test/gtc.json'
+    data_dir = '/nfs/gapi/data/genotype/zcall_test/'
+    @egt = data_dir+'HumanExome-12v1.egt'
+    @manifest = data_dir+'HumanExome-12v1_A.bpm.csv'
+    @threshold_json = data_dir+'thresholds.json'
+    @sample_json = data_dir+'gtc.json'
   end
 
   def setup
     Percolate.log = Logger.new(File.join(data_path, 'test_zcall_tasks.log'))
-    Percolate.asynchronizer = SystemAsynchronizer.new
-      #LSFAsynchronizer.new(:job_arrays_dir => data_path)
+    #Percolate.asynchronizer = SystemAsynchronizer.new
+    Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir => data_path)
   end
 
   def data_path
@@ -64,7 +66,8 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_prepare_thresholds
-    run_test_if(method(:zcall_available?), "Skipping test_zcall") do
+    run_test_if(method(:zcall_prepare_available?), 
+                "Skipping test_zcall_prepare") do
       work_dir = make_work_dir('test_zcall', data_path)
       zstart = 6
       ztotal = 3
@@ -86,6 +89,26 @@ class TestZCallTasks < Test::Unit::TestCase
       remove_work_dir(work_dir)
     end
   end
+
+  def test_evaluate_thresholds
+    run_test_if(method(:zcall_evaluate_available?), 
+                "Skipping test_zcall_evaluate") do
+      work_dir = make_work_dir('test_zcall', data_path)
+ 
+      foo = wait_for('test_zcall_evaluate', 120, 5) do
+        evaluate_thresholds(@threshold_json, @sample_json, @manifest, @egt,
+                            {
+                              :start => 0, :end => 8, :size => 4,
+                              :work_dir => work_dir
+                            })
+      end
+
+      Percolate.log.close
+      remove_work_dir(work_dir)
+
+    end
+  end
+
 end # class TestZCallTasks
 
 
