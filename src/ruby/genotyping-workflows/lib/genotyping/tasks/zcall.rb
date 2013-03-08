@@ -32,6 +32,14 @@ module Genotyping::Tasks
     script_available?(CALL)
   end
 
+  def zcall_prepare_available?()
+    script_available?(PREPARE)
+  end
+
+def zcall_evaluate_available?()
+    script_available?(MERGE) and script_available?(EVALUATE)
+  end
+
   module ZCall
     include Genotyping
     include Genotyping::Tasks
@@ -103,10 +111,84 @@ module Genotyping::Tasks
       end
     end
 
+    private # private methods for internal housekeeping
+    # Generate path for evaluation chunk .json output
+    def get_evaluation_path(work_dir, i)
+      name = "evaluation_part_%03d.json" % i # pad with leading zeroes
+      File.join(work_dir, name)
+    end
+
+    # Validate start/end points and return sample range
+    def get_sample_ranges(start_sample, end_sample, args)
+      unless start_sample.is_a?(Fixnum)
+        raise TaskArgumentError.new(":start must be an integer",
+                                    :argument => :start, :value => start_sample)
+      end
+      unless end_sample.is_a?(Fixnum)
+        raise TaskArgumentError.new(":end must be an integer",
+                                    :argument => :end, :value => end_sample)
+      end
+      unless (0 <= start_sample) && (start_sample <= end_sample)
+        raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
+      end
+      
+      chunk_size = args[:size] || (end_sample - start_sample)
+      unless chunk_size.is_a?(Fixnum)
+        raise TaskArgumentError.new(":size must be an integer",
+                                    :argument => :size, :value => chunk_size)
+      end
+
+      sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
+      return chunk_size, sample_ranges
+    end
+    public # end of private methods
+
+    # Evaluate thresholds by batch processing, then merge evaluations
     def evaluate_thresholds(threshold_json, sample_json, manifest, egt_file,
-                             args = {}, async ={})
-      # evaluate thresholds by batch processing, then merge evaluations
+                            args = {}, async ={})
       args, work_dir, log_dir = process_task_args(args)
+      if args_available?(threshold_json, sample_json, manifest, egt_file)
+        start_sample = args[:start] || 0
+        end_sample = args[:end]
+        chunk_size, sample_ranges = 
+          get_sample_ranges(start_sample, end_sample, args)
+        ### construct arguments for job array
+        temp_dir = File.join(work_dir, 'evaluation_temp')
+        Dir.mkdir(temp_dir) unless File.exist?(temp_dir)
+        evaluation_args = sample_ranges.each_with_index.collect do |range, i|
+          {
+            :thresholds => threshold_json,
+            :bpm => manifest,
+            :egt => egt_file,
+            :gtc => sample_json,
+            :start => range.begin,
+            :end => range.end,
+            :out => get_evaluation_path(temp_dir, i)  
+          }
+        end
+        out_paths = evaluation_args.collect do |args|
+          args[:out]
+        end
+
+        commands = evaluation_args.collect do |args| 
+          cmd = [EVALUATE, cli_arg_map(args, :prefix => '--')]
+          cmd.join(' ')
+        end
+
+        margs_arrays = evaluation_args.collect { | args |
+          [work_dir, args]
+        }.each_with_index.collect { |elt, i| [i] + elt }
+
+        task_id = task_identity(:evaluate_thresholds, *margs_arrays)
+        log = File.join(log_dir, task_id + '.%I.log')
+          
+        async_task_array(margs_arrays, commands, work_dir, log,
+                         :post => lambda { |i| ensure_files([out_paths[i]],
+                                                            :error => false)},
+                         :result => lambda { |i| out_paths[i] },
+                         :async => async)
+        ### once job array finishes, want to merge results and find best z
+      end
     end
 
     def run_zcall(thresholds, sample_json, manifest, egt_file,
@@ -114,6 +196,6 @@ module Genotyping::Tasks
       # run zcall on given thresholds and samples
       args, work_dir, log_dir = process_task_args(args)
     end
-
+    
   end # module ZCall
 end # module Genotyping::Tasks
