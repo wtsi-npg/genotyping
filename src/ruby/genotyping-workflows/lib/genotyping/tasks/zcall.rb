@@ -22,6 +22,8 @@ module Genotyping::Tasks
   EVALUATE = 'evaluateThresholds.py'
   MERGE = 'mergeEvaluation.py'
   CALL = 'runZCall.py'
+  METRIC_INDEX = 'evaluation_metric_index.json'
+  MERGED_EVALUATION = 'merged_z_evaluation.json'
 
   # Returns true if the given script is available.
   def script_available?(script)
@@ -169,26 +171,58 @@ def zcall_evaluate_available?()
         out_paths = evaluation_args.collect do |args|
           args[:out]
         end
+        index_path = File.join(work_dir, METRIC_INDEX)
+        unless File.exists?(index_path)
+          JSON.dump(out_paths, File.new(index_path, mode='w'))
+        end
 
         commands = evaluation_args.collect do |args| 
           cmd = [EVALUATE, cli_arg_map(args, :prefix => '--')]
           cmd.join(' ')
         end
-
         margs_arrays = evaluation_args.collect { | args |
           [work_dir, args]
         }.each_with_index.collect { |elt, i| [i] + elt }
 
         task_id = task_identity(:evaluate_thresholds, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
-          
-        async_task_array(margs_arrays, commands, work_dir, log,
-                         :post => lambda { |i| ensure_files([out_paths[i]],
-                                                            :error => false)},
-                         :result => lambda { |i| out_paths[i] },
-                         :async => async)
-        ### once job array finishes, want to merge results and find best z
+                  
+        async = async_task_array(margs_arrays, commands, work_dir, log,
+                                 :post => lambda { 
+                                   ensure_files(out_paths, :error => false)
+                                 },
+                                 :result => lambda { index_path },
+                                 :async => async)
+        if async.include?(nil)
+          result = nil
+        else
+          result = index_path
+        end
+        return result
       end
+    end
+
+    def merge_evaluation(metrics_path, thresholds_path, args = {}, async ={})
+      args, work_dir, log_dir = process_task_args(args)
+      if args_available?(metrics_path)
+        out_path = File.join(work_dir, MERGED_EVALUATION)
+        cli_args = {
+          :metrics => metrics_path,
+          :thresholds => thresholds_path,
+          :out => out_path}
+        margs = [cli_args, work_dir]
+        task_id = task_identity(:merge_evaluation, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        command = [MERGE, 
+                   cli_arg_map(cli_args,
+                               :prefix => '--')].flatten.join(' ')
+        expected = [out_path,]
+        async_task(margs, command, work_dir, log,
+                   :post => lambda {ensure_files([out_path,])},
+                   :result => lambda { out_path },
+                   :async => async)
+      end
+
     end
 
     def run_zcall(thresholds, sample_json, manifest, egt_file,
