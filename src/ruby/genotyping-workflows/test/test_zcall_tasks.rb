@@ -90,12 +90,12 @@ class TestZCallTasks < Test::Unit::TestCase
     end
   end
 
-  def test_evaluate_thresholds
+  def test_evaluate_merge_thresholds
     run_test_if(method(:zcall_evaluate_available?), 
                 "Skipping test_zcall_evaluate") do
       work_dir = make_work_dir('test_zcall', data_path)
  
-      foo = wait_for('test_zcall_evaluate', 120, 5) do
+      metrics_path = wait_for('test_zcall_evaluate', 120, 5) do
         evaluate_thresholds(@threshold_json, @sample_json, @manifest, @egt,
                             {
                               :start => 0, :end => 8, :size => 4,
@@ -103,11 +103,21 @@ class TestZCallTasks < Test::Unit::TestCase
                             })
       end
 
+      merged_path = wait_for('test_zcall_merge', 120, 5) do
+        merge_evaluation(metrics_path,  @threshold_json,
+                         { :work_dir => work_dir })
+      end
+
+      puts merged_path
+
       Percolate.log.close
       remove_work_dir(work_dir)
 
     end
   end
+
+
+
 
 end # class TestZCallTasks
 
