@@ -22,6 +22,7 @@ use Exporter;
                 get_publisher_name
                 publish_idat_files
                 publish_gtc_files
+                publish_analysis_directory
 
                 filter_columns
                 filter_gt_columns

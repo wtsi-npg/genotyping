@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Carp;
 use File::Basename;
+use UUID;
 
 use WTSI::Genotyping::iRODS qw(md5sum);
 
@@ -184,7 +185,7 @@ sub make_file_metadata {
 
 =head2 make_analysis_metadata
 
-  Arg [1]    : string directory name
+  Arg [1]    : Arrayref of genotyping project titles
   Example    : my @meta = make_analysis_metadata($uuid, \@titles)
   Description: Returns a list of metadata key/value pairs describing an analysis
                including the genotyping project names involved.
@@ -194,9 +195,14 @@ sub make_file_metadata {
 =cut
 
 sub make_analysis_metadata {
-  my ($uuid, $genotyping_project_titles) = @_;
+  my ($genotyping_project_titles) = @_;
 
-  my @meta = ([$GENOTYPING_ANALYSIS_UUID_META_KEY => $uuid]);
+  my $uuid_bin;
+  my $uuid_str;
+  UUID::generate($uuid_bin);
+  UUID::unparse($uuid_bin, $uuid_str);
+
+  my @meta = ([$GENOTYPING_ANALYSIS_UUID_META_KEY => $uuid_str]);
 
   foreach my $title (@$genotyping_project_titles) {
     push(@meta, [$GENOTYPING_PROJECT_TITLE_META_KEY => $title]);
