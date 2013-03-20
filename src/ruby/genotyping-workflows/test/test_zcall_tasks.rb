@@ -52,7 +52,9 @@ class TestZCallTasks < Test::Unit::TestCase
     @egt = data_dir+'HumanExome-12v1.egt'
     @manifest = data_dir+'HumanExome-12v1_A.bpm.csv'
     @threshold_json = data_dir+'thresholds.json'
+    @thresholds_z6 = data_dir+'thresholds_HumanExome-12v1_z06.txt' 
     @sample_json = data_dir+'gtc.json'
+    @merged_json = data_dir+'merged_z_evaluation.json'
   end
 
   def setup
@@ -65,7 +67,7 @@ class TestZCallTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_prepare_thresholds
+  def notest_prepare_thresholds
     run_test_if(method(:zcall_prepare_available?), 
                 "Skipping test_zcall_prepare") do
       work_dir = make_work_dir('test_zcall', data_path)
@@ -93,7 +95,7 @@ class TestZCallTasks < Test::Unit::TestCase
   def test_evaluate_merge_thresholds
     run_test_if(method(:zcall_evaluate_available?), 
                 "Skipping test_zcall_evaluate") do
-      work_dir = make_work_dir('test_zcall', data_path)
+      work_dir = make_work_dir('zcall_evaluate', data_path)
  
       metrics_path = wait_for('test_zcall_evaluate', 120, 5) do
         evaluate_thresholds(@threshold_json, @sample_json, @manifest, @egt,
@@ -107,17 +109,32 @@ class TestZCallTasks < Test::Unit::TestCase
         merge_evaluation(metrics_path,  @threshold_json,
                          { :work_dir => work_dir })
       end
-
-      puts merged_path
-
+      merged_file = File.open(merged_path)
+      assert_equal(JSON.load(merged_file),
+                   JSON.load(File.open(@merged_json)))
+      merged_file.close() # ensure file close before directory removal
       Percolate.log.close
-      remove_work_dir(work_dir)
-
+      #remove_work_dir(work_dir)
     end
   end
 
+  def test_run_zcall
+    run_test_if(method(:zcall_available?), 
+                "Skipping test_run_zcall") do
+      work_dir = make_work_dir('zcall_run', data_path)
+      bed_path = File.join(work_dir, 'test_zcall.bed')
+      result = wait_for('test_zcall_run', 120, 5) do
+        run_zcall(@thresholds_z6, @sample_json, @manifest, @egt, bed_path,
+                  { :work_dir => work_dir })
+      end
+      puts result.inspect
 
 
+      Percolate.log.close
+      #remove_work_dir(work_dir)
+
+    end
+  end
 
 end # class TestZCallTasks
 
