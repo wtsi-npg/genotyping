@@ -158,13 +158,8 @@ def zcall_evaluate_available?()
         temp_dir = File.join(work_dir, 'evaluation_temp')
         Dir.mkdir(temp_dir) unless File.exist?(temp_dir)
         evaluation_args = sample_ranges.each_with_index.collect do |range, i|
-          {
-            :thresholds => threshold_json,
-            :bpm => manifest,
-            :egt => egt_file,
-            :gtc => sample_json,
-            :start => range.begin,
-            :end => range.end,
+          {:thresholds => threshold_json, :bpm => manifest, :egt => egt_file,
+            :gtc => sample_json, :start => range.begin, :end => range.end,
             :out => get_evaluation_path(temp_dir, i)  
           }
         end
@@ -175,18 +170,16 @@ def zcall_evaluate_available?()
         unless File.exists?(index_path)
           JSON.dump(out_paths, File.new(index_path, mode='w'))
         end
-
         commands = evaluation_args.collect do |args| 
           cmd = [EVALUATE, cli_arg_map(args, :prefix => '--')]
           cmd.join(' ')
         end
+
         margs_arrays = evaluation_args.collect { | args |
           [work_dir, args]
         }.each_with_index.collect { |elt, i| [i] + elt }
-
         task_id = task_identity(:evaluate_thresholds, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
-                  
         async = async_task_array(margs_arrays, commands, work_dir, log,
                                  :post => lambda { 
                                    ensure_files(out_paths, :error => false)
@@ -216,7 +209,6 @@ def zcall_evaluate_available?()
         command = [MERGE, 
                    cli_arg_map(cli_args,
                                :prefix => '--')].flatten.join(' ')
-        expected = [out_path,]
         async_task(margs, command, work_dir, log,
                    :post => lambda {ensure_files([out_path,])},
                    :result => lambda { out_path },
@@ -225,10 +217,33 @@ def zcall_evaluate_available?()
 
     end
 
-    def run_zcall(thresholds, sample_json, manifest, egt_file,
+    def run_zcall(thresholds, sample_json, manifest, egt_file, bed_path,
                   args = {}, async ={})
       # run zcall on given thresholds and samples
       args, work_dir, log_dir = process_task_args(args)
+      if args_available?(thresholds, sample_json, manifest, egt_file, bed_path)
+        
+        ## TODO modify to split samples into chunks and use job array
+
+        cli_args = {
+          :thresholds => thresholds,
+          :bpm => manifest,
+          :egt => egt_file,
+          :gtc => sample_json,
+          :out => bed_path
+        }
+        margs = [cli_args, work_dir]
+        task_id = task_identity(:merge_evaluation, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        command = [CALL, 
+                   cli_arg_map(cli_args,
+                               :prefix => '--')].flatten.join(' ')
+        async_task(margs, command, work_dir, log,
+                   :post => lambda {ensure_files([bed_path,])},
+                   :result => lambda { bed_path },
+                   :async => async)
+
+      end
     end
     
   end # module ZCall
