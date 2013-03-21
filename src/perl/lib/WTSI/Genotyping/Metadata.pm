@@ -12,6 +12,7 @@ use WTSI::Genotyping::iRODS qw(md5sum);
 
 use vars qw($SAMPLE_NAME_META_KEY
             $SAMPLE_ID_META_KEY
+            $SAMPLE_SUPPLIER_NAME_META_KEY
             $SAMPLE_COMMON_NAME_META_KEY
             $SAMPLE_ACCESSION_NUMBER_META_KEY
             $SAMPLE_CONSENT_META_KEY
@@ -22,6 +23,7 @@ use vars qw($SAMPLE_NAME_META_KEY
 
 $SAMPLE_NAME_META_KEY             = 'sample';
 $SAMPLE_ID_META_KEY               = 'sample_id';
+$SAMPLE_SUPPLIER_NAME_META_KEY    = 'sample_supplier_name';
 $SAMPLE_COMMON_NAME_META_KEY      = 'sample_common_name';
 $SAMPLE_ACCESSION_NUMBER_META_KEY = 'sample_accession_number';
 $SAMPLE_CONSENT_META_KEY          = 'sample_consent';
@@ -97,30 +99,38 @@ sub make_warehouse_metadata {
   my $ss_sample = $ssdb->find_infinium_sample($if_barcode, $if_well);
   my @ss_studies = @{$ssdb->find_infinium_studies($if_barcode, $if_well)};
 
+  my @meta = ([$SAMPLE_ID_META_KEY => $ss_sample->{internal_id}]);
+
   # These defensive checks are here because the SS data are sometimes missing
-  unless (defined $ss_sample->{name}) {
-    $log->logconfess("The name value for $if_sample_name (chip $if_chip) ",
-                     "is missing from the Sequencescape Warehouse");
-  }
-  unless (defined $ss_sample->{consent_withdrawn}) {
-    $log->logconfess("The consent_withdrawn value for $if_sample_name ",
-                     "(chip $if_chip)is missing from the Sequencescape ",
-                     "Warehouse");
-  }
-  unless (defined $ss_sample->{sanger_sample_id}) {
-     $log->logconfess("The sanger_sample_id value for $if_sample_name ",
-                      "(chip $if_chip) is missing from the Sequencescape ",
-                      "Warehouse");
+  if (defined $ss_sample->{name}) {
+    push(@meta, [$SAMPLE_NAME_META_KEY => $ss_sample->{name}]);
+  } else {
+    $log->logcluck("The name value for $if_sample_name (chip $if_chip) ",
+                   "is missing from the Sequencescape Warehouse");
   }
 
-  my @meta = ([$SAMPLE_NAME_META_KEY    => $ss_sample->{name}],
-              [$SAMPLE_ID_META_KEY      => $ss_sample->{internal_id}],
-              [$SAMPLE_CONSENT_META_KEY => !$ss_sample->{consent_withdrawn}],
-              ['dcterms:identifier'     => $ss_sample->{sanger_sample_id}]);
+  if (defined $ss_sample->{consent_withdrawn}) {
+    push(@meta, [$SAMPLE_CONSENT_META_KEY => !$ss_sample->{consent_withdrawn}]);
+  } else {
+    $log->logcluck("The consent_withdrawn value for $if_sample_name ",
+                   "(chip $if_chip)is missing from the Sequencescape ",
+                   "Warehouse");
+  }
+
+  if (defined $ss_sample->{sanger_sample_id}) {
+    push(@meta, ['dcterms:identifier' => $ss_sample->{sanger_sample_id}]);
+  } else {
+    $log->logcluck("The sanger_sample_id value for $if_sample_name ",
+                   "(chip $if_chip) is missing from the Sequencescape ",
+                   "Warehouse");
+  }
+
+  if (defined $ss_sample->{supplier_name}) {
+    push(@meta, [$SAMPLE_SUPPLIER_NAME_META_KEY => $ss_sample->{supplier_name}]);
+  }
 
   if (defined $ss_sample->{accession_number}) {
-    push(@meta, [$SAMPLE_ACCESSION_NUMBER_META_KEY =>
-                 $ss_sample->{accession_number}]);
+    push(@meta, [$SAMPLE_ACCESSION_NUMBER_META_KEY => $ss_sample->{accession_number}]);
   }
   if (defined $ss_sample->{common_name}) {
     push(@meta, [$SAMPLE_COMMON_NAME_META_KEY => $ss_sample->{common_name}]);
@@ -151,9 +161,16 @@ sub make_warehouse_metadata {
 sub make_infinium_metadata {
   my ($if_sample) = @_;
 
+  my $if_barcode = $if_sample->{'plate'};
+  my $if_well = $if_sample->{'well'};
+  my $if_sample_name = $if_sample->{sample};
+  my $if_chip = $if_sample->{beadchip};
+
   return ([$GENOTYPING_PROJECT_TITLE_META_KEY => $if_sample->{project}],
           ['dcterms:identifier'               => $if_sample->{sample}],
-          [beadchip                           => $if_sample->{beadchip}]);
+          [beadchip                           => $if_sample->{beadchip}],
+          [beadchip_section                   => $if_sample->{beadchip_section}],
+          [beadchip_design                    => $if_sample->{beadchip_design}]);
 }
 
 
