@@ -67,7 +67,7 @@ class TestZCallTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def notest_prepare_thresholds
+  def test_prepare_thresholds
     run_test_if(method(:zcall_prepare_available?), 
                 "Skipping test_zcall_prepare") do
       work_dir = make_work_dir('test_zcall', data_path)
