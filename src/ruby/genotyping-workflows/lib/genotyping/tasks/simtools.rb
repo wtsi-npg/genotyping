@@ -52,25 +52,12 @@ module Genotyping::Tasks
       if args_available?(input, manifest, output, work_dir)
         output = absolute_path?(output) ? output : absolute_path(output, work_dir)
         expected = [output]
-
+        
         cli_args = {:normalize => args[:normalize],
-                    :infile => input,
-                    :man_dir => manifest, # manifest path -- despite the name!
-                    :outfile => output}
-
-        if args.has_key?(:chromosome_meta)
-          chr_json = args[:chromosome_meta]
-          chr_json = absolute_path(chr_json, work_dir) unless absolute_path?(chr_json)
-          cli_args[:chromosome_meta] = chr_json
-          expected << chr_json
-        end
-
-        if args.has_key?(:snp_meta)
-          snp_json = args[:snp_meta]
-          snp_json = absolute_path(snp_json, work_dir) unless absolute_path?(snp_json)
-          cli_args[:snp_meta] = snp_json
-          expected << snp_json
-        end
+          :infile => input,
+          :man_dir => manifest, # manifest path -- despite the name!
+          :outfile => output,
+        }
 
         margs = [cli_args, input, work_dir]
         task_id = task_identity(:gtc_to_sim, *margs)
