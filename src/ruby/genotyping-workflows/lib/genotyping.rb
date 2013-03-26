@@ -35,7 +35,7 @@ require 'genotyping/sim'
 require 'genotyping/tasks'
 require 'genotyping/workflows'
 
-require 'genotyping/tasks/database'
+require 'genotyping/tasks/metadata'
 require 'genotyping/tasks/genotype_call'
 require 'genotyping/tasks/illuminus'
 require 'genotyping/tasks/plink'
