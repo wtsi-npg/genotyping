@@ -20,7 +20,7 @@ module Genotyping::Workflows
 
   class FetchSampleData < Percolate::Workflow
     include Genotyping
-    include Genotyping::Tasks::Database
+    include Genotyping::Tasks::Metadata
     include Genotyping::Tasks::GenotypeCall
     include Genotyping::Tasks::Simtools
 
