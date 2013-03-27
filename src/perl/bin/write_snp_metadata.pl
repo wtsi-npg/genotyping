@@ -34,12 +34,12 @@ Log::Log4perl->easy_init($ERROR);
 
 sub byChromosomePosition {
     # use to sort manifest into (chromosome, position) order
-    # assumes chromosome identifiers are numeric
+    # sort chromosomes by string order, positions by numeric order
     # $a, $b are global variables used by Perl sort
     my %snpA = %$a;
     my %snpB = %$b;
-    my $result = $snpA{'chromosome'} <=> $snpB{'chromosome'} ||
-        $snpA{'position'} <=> $snpB{'position'};
+    my $result = $snpA{'chromosome'} cmp $snpB{'chromosome'} 
+                 || $snpA{'position'} <=> $snpB{'position'};
     return $result;
 }
 
@@ -51,9 +51,8 @@ sub findChromosomeBounds {
     my $start = 0;
     my $lastChr = 'NULL';
     for (my $i=0; $i<@manifest; $i++) {
-        my %snp = %{$manifest[$i]};
-        my $chr = $snp{'chromosome'};
-        if ($lastChr ne 'NULL' && $chr!=$lastChr) { # end of previous chromosome
+        my $chr = $manifest[$i]{'chromosome'};
+        if ($lastChr ne 'NULL' && $chr ne $lastChr) { # end previous chromosome
             push (@bounds, { 'chromosome' => $lastChr,
                              'start' => $start,
                              'end' => $i });
@@ -74,17 +73,6 @@ sub findChromosomeBounds {
     return @bounds;
 }
 
-sub numericChromosome {
-    # convert chromosome identifiers to numeric values
-    # used by Plink, and needed for manifest sort
-    my $chr = shift;
-    if ($chr eq 'X') { $chr = 23; }
-    elsif ($chr eq 'Y') { $chr = 24; }
-    elsif ($chr eq 'XY') { $chr = 25; }
-    elsif ($chr eq 'MT') { $chr = 26; }
-    return $chr;
-}
-
 sub readManifest {
     # read manifest bpm.csv
     # .csv fields: Index,Name,Chromosome,Position,GenTrain Score,SNP,ILMN Strand,Customer Strand,NormID
@@ -103,14 +91,13 @@ sub readManifest {
     while (<$in>) {
         $i++;
         if ($verbose && $i % 10000 == 0) { print "$i lines read.\n"; }
-        if ($i == 1) { next; }
-        $_ =~ s/\s+$//g; # remove whitespace from end of line
+        if ($i == 1) { next; } # first line is header
+        $_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
         my %snp;
         my @fields = split /,/;
         foreach my $key (qw/name chromosome position norm_id/) {
             $snp{$key} = $fields[$indices{$key}];
         }
-        $snp{'chromosome'} = numericChromosome($snp{'chromosome'});
         my $alleles = $fields[$indices{'snp'}];
         $alleles =~ s/\W//g; # remove nonword characters
         my @alleles = split('', $alleles);
