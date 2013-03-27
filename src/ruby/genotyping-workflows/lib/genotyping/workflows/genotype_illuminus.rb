@@ -20,7 +20,7 @@ module Genotyping::Workflows
 
   class GenotypeIlluminus < Percolate::Workflow
     include Genotyping
-    include Genotyping::Tasks::Database
+    include Genotyping::Tasks::Metadata
     include Genotyping::Tasks::GenotypeCall
     include Genotyping::Tasks::Simtools
     include Genotyping::Tasks::Illuminus
@@ -116,19 +116,21 @@ Returns:
       ## run gencall QC to apply gencall CR filter and find genders
       gcqcargs = {:run => run_name,
                   :post_filter_cr => min_cr}.merge(args)
-      gcqcdir = 'gencall_qc'
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, {}, true)
+      gcqcdir = File.join(work_dir, 'gencall_qc')
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                  async, true)
 
       smfile = nil
       if gcquality
         siargs = {:gender_method => gender_method}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
         
-        smargs = {:normalize => true,
-          :chromosome_meta => cjname,
-          :snp_meta => njname}.merge(args)
-        smfile, cjson, njson = gtc_to_sim(sjson, manifest, smname, 
-                                          smargs, async)
+        smargs = {:normalize => true }.merge(args)
+        smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
+      end
+      cjson = nil
+      if smfile
+        njson, cjson = parse_manifest(manifest, njname, cjname, args)
       end
 
       ilargs = {:size => chunk_size,
@@ -138,7 +140,7 @@ Returns:
       
       ilchunks = nil
 
-      if smfile
+      if cjson
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec["chromosome"]
           pargs = {:chromosome => chr,
@@ -159,7 +161,7 @@ Returns:
 
       qcargs = {:run => run_name,
                 :sim => smfile}.merge(args) # add smfile to qcargs
-      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs)
+      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]
