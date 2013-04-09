@@ -71,6 +71,9 @@ sub find_project_chip_design {
                  well     => <well address string with 0-pad e.g A01>,
                  sample   => <sample name string>,
                  beadchip => <chip name string>,
+                 beadchip_section => <chip section name>,
+                 beadchip_design => <chip design name>,
+                 beadchip_revision => <chip revision name>,
                  status   => <status string of 'Pass' for passed samples>,
                  gtc_path => <path string of GTC format result file>,
                  idat_grn_path => <path string of IDAT format result file>,
@@ -92,8 +95,10 @@ sub find_project_samples {
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],
          chipi.item AS [beadchip],
+         samplesectd.section_label AS [beadchip_section],
+         productd.product_name AS [beadchip_design],
+         productr.product_revision AS [beadchip_revision],
          statusav.appvalue AS [status],
-
          callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
          redparentdir.path + '\\' + redappfile.file_name AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
@@ -110,6 +115,7 @@ sub find_project_samples {
            ON sampleassn.sample_container_id = samplecon.sample_container_id
          INNER JOIN item platei
            ON samplecon.itemid = platei.itemid
+
          INNER JOIN appvalue containerav
            ON platei.itemtypeid = containerav.appvalueid
          INNER JOIN samplewell well
@@ -126,16 +132,25 @@ sub find_project_samples {
          INNER JOIN projectusage projectuse
            ON project.project_id = projectuse.project_id
            AND samplebd.sample_batch_detail_id = projectuse.sample_batch_detail_id
+
          INNER JOIN samplesection samplesect
            ON samplesect.sample_section_id = projectuse.sample_section_id
+         INNER JOIN samplesectiondefinition samplesectd
+           ON samplesect.sample_section_definition_id = samplesectd.sample_section_definition_id
          INNER JOIN item sectioni
            ON sectioni.itemid = samplesect.itemid
+
          INNER JOIN appvalue sectionav
            ON sectioni.itemtypeid = sectionav.appvalueid
          INNER JOIN beadchip chip
            ON samplesect.bead_chip_id = chip.bead_chip_id
          INNER JOIN item chipi
            ON chip.itemid = chipi.itemid
+
+         INNER JOIN productrevision productr
+           ON samplesectd.product_revision_id = productr.product_revision_id
+         INNER JOIN productdefinition productd
+           ON productr.product_definition_id = productd.product_definition_id
 
          LEFT OUTER JOIN callfile callfile
            ON samplesect.sample_section_id = callfile.sample_section_id
@@ -208,15 +223,18 @@ sub find_project_samples {
   Description: Returns sample details for a specific intensity file (red
                channel, arbitrarily). The sample is returned as a
                hashref with the following keys and values:
-               { project  => <Infinium LIMS genotyping project title>,
-                 plate    => <Infinium LIMS plate barcode string>,
-                 well     => <well address string with 0-pad e.g A01>,
-                 sample   => <sample name string>,
-                 beadchip => <chip name string>,
-                 status   => <status string of 'Pass' for passed samples>,
-                 gtc_path => <path string of GTC format result file>,
-                 idat_grn_path => <path string of IDAT format result file>,
-                 idat_red_path => <path string of IDAT format result file> }
+               { project           => <Infinium LIMS genotyping project title>,
+                 plate             => <Infinium LIMS plate barcode string>,
+                 well              => <well address string with 0-pad e.g A01>,
+                 sample            => <sample name string>,
+                 beadchip          => <chip name string>,
+                 beadchip_section  => <chip section name>,
+                 beadchip_design   => <chip design name>,
+                 beadchip_revision => <chip revision name>,
+                 status            => <status string of 'Pass' for passed samples>,
+                 gtc_path          => <path string of GTC format result file>,
+                 idat_grn_path     => <path string of IDAT format result file>,
+                 idat_red_path     => <path string of IDAT format result file> }
   Returntype : hashref
   Caller     : general
 
@@ -234,8 +252,10 @@ sub find_scanned_sample {
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],
          chipi.item AS [beadchip],
+         samplesectd.section_label AS [beadchip_section],
+         productd.product_name AS [beadchip_design],
+         productr.product_revision AS [beadchip_revision],
          statusav.appvalue AS [status],
-
          callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
          redparentdir.path + '\\' + redappfile.file_name AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
@@ -268,16 +288,25 @@ sub find_scanned_sample {
          INNER JOIN projectusage projectuse
            ON project.project_id = projectuse.project_id
            AND samplebd.sample_batch_detail_id = projectuse.sample_batch_detail_id
+
          INNER JOIN samplesection samplesect
            ON samplesect.sample_section_id = projectuse.sample_section_id
+         INNER JOIN samplesectiondefinition samplesectd
+           ON samplesect.sample_section_definition_id = samplesectd.sample_section_definition_id
          INNER JOIN item sectioni
            ON sectioni.itemid = samplesect.itemid
+
          INNER JOIN appvalue sectionav
            ON sectioni.itemtypeid = sectionav.appvalueid
          INNER JOIN beadchip chip
            ON samplesect.bead_chip_id = chip.bead_chip_id
          INNER JOIN item chipi
            ON chip.itemid = chipi.itemid
+
+         INNER JOIN productrevision productr
+           ON samplesectd.product_revision_id = productr.product_revision_id
+         INNER JOIN productdefinition productd
+           ON productr.product_definition_id = productd.product_definition_id
 
          LEFT OUTER JOIN callfile callfile
            ON samplesect.sample_section_id = callfile.sample_section_id
@@ -347,15 +376,18 @@ sub find_scanned_sample {
   Example    : $db->find_called_sample('<GTC filename>')
   Description: Returns sample details for a specific GTC file. The sample
                is returned as a hashref with the following keys and values:
-               { project  => <Infinium LIMS genotyping project title>,
-                 plate    => <Infinium LIMS plate barcode string>,
-                 well     => <well address string with 0-pad e.g A01>,
-                 sample   => <sample name string>,
-                 beadchip => <chip name string>,
-                 status   => <status string of 'Pass' for passed samples>,
-                 gtc_path => <path string of GTC format result file>,
-                 idat_grn_path => <path string of IDAT format result file>,
-                 idat_red_path => <path string of IDAT format result file> }
+               { project           => <Infinium LIMS genotyping project title>,
+                 plate             => <Infinium LIMS plate barcode string>,
+                 well              => <well address string with 0-pad e.g A01>,
+                 sample            => <sample name string>,
+                 beadchip          => <chip name string>,
+                 beadchip_section  => <chip section name>,
+                 beadchip_design   => <chip design name>,
+                 beadchip_revision => <chip revision name>,
+                 status            => <status string of 'Pass' for passed samples>,
+                 gtc_path          => <path string of GTC format result file>,
+                 idat_grn_path     => <path string of IDAT format result file>,
+                 idat_red_path     => <path string of IDAT format result file> }
   Returntype : hashref
   Caller     : general
 
@@ -373,6 +405,9 @@ sub find_called_sample {
          well.alpha_coordinate AS [well],
          samplei.item AS [sample],
          chipi.item AS [beadchip],
+         samplesectd.section_label AS [beadchip_section],
+         productd.product_name AS [beadchip_design],
+         productr.product_revision AS [beadchip_revision],
          statusav.appvalue AS [status],
 
          callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
@@ -409,14 +444,22 @@ sub find_called_sample {
            AND samplebd.sample_batch_detail_id = projectuse.sample_batch_detail_id
          INNER JOIN samplesection samplesect
            ON samplesect.sample_section_id = projectuse.sample_section_id
+         INNER JOIN samplesectiondefinition samplesectd
+           ON samplesect.sample_section_definition_id = samplesectd.sample_section_definition_id
          INNER JOIN item sectioni
            ON sectioni.itemid = samplesect.itemid
+
          INNER JOIN appvalue sectionav
            ON sectioni.itemtypeid = sectionav.appvalueid
          INNER JOIN beadchip chip
            ON samplesect.bead_chip_id = chip.bead_chip_id
          INNER JOIN item chipi
            ON chip.itemid = chipi.itemid
+
+         INNER JOIN productrevision productr
+           ON samplesectd.product_revision_id = productr.product_revision_id
+         INNER JOIN productdefinition productd
+           ON productr.product_definition_id = productd.product_definition_id
 
          LEFT OUTER JOIN callfile callfile
            ON samplesect.sample_section_id = callfile.sample_section_id

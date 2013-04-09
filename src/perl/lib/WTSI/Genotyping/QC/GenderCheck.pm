@@ -266,7 +266,8 @@ sub runGenderCheckR {
     my $cmd = join(' ', ("check_xhet_gender.R", $tempFile, $textPath, $pngPath, 
                          $threshPath, $logPath, $title, $m_max_default, 
                          $m_max_minimum, $boundary_sd) ); 
-    system($cmd);
+    system($cmd) == 0 or confess("system '$cmd' failed: $?");
+
     my @inferred = readModelGenders($textPath);
     return @inferred;
 }

@@ -91,9 +91,9 @@ sub extractChromData {
     $outPrefix ||= "plink_temp_chrom$chrom";
     $verbose ||= 0;
     my $outArg = $outDir."/$outPrefix";
-    my $cmd = "/software/bin/plink --bfile $plinkPrefix --chr $chrom --out $outArg --make-bed";
+    my $cmd = "plink --bfile $plinkPrefix --chr $chrom --out $outArg --make-bed";
     unless ($verbose) { $cmd .= " > /dev/null"; } # suppress stdout from plink
-    system($cmd);
+    system($cmd) == 0 or confess("system '$cmd' failed: $?");
     my $pb = new plink_binary::plink_binary($outArg);
     return $pb;
 }
