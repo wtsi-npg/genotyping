@@ -6,7 +6,7 @@
 
 use strict;
 use warnings;
-use Cwd;
+use Cwd qw/abs_path/;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use Test::More tests => 78;
@@ -25,6 +25,9 @@ my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
 my $config = "$bin/../etc/qc_config.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
+
+# The directory contains the R scripts
+$ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);
@@ -46,7 +49,7 @@ $status = system("perl $bin/check_identity_bed.pl --config $config $plinkA");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
-my $crHetFinder = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
+my $crHetFinder = "snp_af_sample_cr_bed";
 $status = system("$crHetFinder $plinkA");
 is($status, 0, "snp_af_sample_cr_bed exit status");
 
