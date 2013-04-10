@@ -19,8 +19,9 @@
 module Genotyping::Tasks
 
   SAMPLE_INTENSITIES = 'sample_intensities.pl'
+  PARSE_MANIFEST = 'write_snp_metadata.pl'
 
-  module Database
+  module Metadata
     include Genotyping::Tasks
 
     # Extracts sample intensity file information from the pipeline database and
@@ -57,5 +58,42 @@ module Genotyping::Tasks
       end
     end
 
-  end
-end
+    # Parses the .bpm.csv SNP manifest and writes two files in JSON format:
+    # - Chromosome boundaries with respect to position in the (sorted) manifest
+    # - SNP information: name, chromosome, position, alleles, normid
+    #
+    # Arguments:
+    # - manifest (String): The manifest file name.
+    # - chromosome (String): Filename for JSON chromosome boundaries
+    # - snp (String): Filename for JSON SNP information
+    # - args (Hash): Arguments for the operation.
+    #
+    # Returns:
+    # - Array containing the (chromosome, snp) file paths
+    def parse_manifest(manifest, snp, chromosomes, args = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(manifest, snp, chromosomes, work_dir)
+
+        snp_path = absolute_path?(snp) ? snp : 
+          absolute_path(snp, work_dir)
+        chr_path = absolute_path?(chromosomes) ? chromosomes : 
+          absolute_path(chromosomes, work_dir)
+
+        cli_args = args.merge({:manifest => manifest,
+                                :snp => snp_path,
+                                :chromosomes => chr_path})
+        margs = [cli_args, work_dir]
+
+        command = [PARSE_MANIFEST,
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+
+        expected = [snp_path, chr_path]
+        task(margs, command, work_dir,
+             :post => lambda { ensure_files(expected, :error => false) },
+             :result => lambda { expected })
+      end
+    end
+
+  end #  module Metadata
+end # module Genotyping::Tasks

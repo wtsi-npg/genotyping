@@ -90,7 +90,7 @@ module Genotyping::Tasks
            :outfile => '-',
            :man_dir => manifest, # path to file, despite the name!
            :start => range.begin,
-           :end => range.end}
+           :end => range.end - 1 } # switch to simtools range convention
         end
 
         genosnp_wrap_args = partitions(output, sample_ranges.size).collect do |part|
