@@ -46,6 +46,39 @@ def zcall_evaluate_available?()
     include Genotyping
     include Genotyping::Tasks
 
+    # private methods for internal housekeeping
+    private 
+    # Generate path for evaluation chunk .json output
+    def get_evaluation_path(work_dir, i)
+      name = "evaluation_part_%03d.json" % i # pad with leading zeroes
+      File.join(work_dir, name)
+    end
+
+    # Validate start/end points and return sample range
+    def get_sample_ranges(start_sample, end_sample, args)
+      unless start_sample.is_a?(Fixnum)
+        raise TaskArgumentError.new(":start must be an integer",
+                                    :argument => :start, :value => start_sample)
+      end
+      unless end_sample.is_a?(Fixnum)
+        raise TaskArgumentError.new(":end must be an integer",
+                                    :argument => :end, :value => end_sample)
+      end
+      unless (0 <= start_sample) && (start_sample <= end_sample)
+        raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
+      end
+      
+      chunk_size = args[:size] || (end_sample - start_sample)
+      unless chunk_size.is_a?(Fixnum)
+        raise TaskArgumentError.new(":size must be an integer",
+                                    :argument => :size, :value => chunk_size)
+      end
+
+      sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
+      return chunk_size, sample_ranges
+    end
+    public # end of private methods
+
     # Runs ZCall re-calling on the GTC files output by another caller 
     # (typically Illumina's GenCall software).  The range of samples is 
     # broken into chunks of the specified size which are run in parallel 
@@ -97,7 +130,7 @@ def zcall_evaluate_available?()
         command = [PREPARE, 
                    cli_arg_map(cli_args,
                                :prefix => '--')].flatten.join(' ')
-        threshold_json = File.join(work_dir, 'threshold_index.json')
+        threshold_json = File.join(work_dir, 'thresholds.json')
         threshold_text = []
         zscores = [6,7,8]
         zscores.each do |z|
@@ -112,38 +145,6 @@ def zcall_evaluate_available?()
                    :async => async)
       end
     end
-
-    private # private methods for internal housekeeping
-    # Generate path for evaluation chunk .json output
-    def get_evaluation_path(work_dir, i)
-      name = "evaluation_part_%03d.json" % i # pad with leading zeroes
-      File.join(work_dir, name)
-    end
-
-    # Validate start/end points and return sample range
-    def get_sample_ranges(start_sample, end_sample, args)
-      unless start_sample.is_a?(Fixnum)
-        raise TaskArgumentError.new(":start must be an integer",
-                                    :argument => :start, :value => start_sample)
-      end
-      unless end_sample.is_a?(Fixnum)
-        raise TaskArgumentError.new(":end must be an integer",
-                                    :argument => :end, :value => end_sample)
-      end
-      unless (0 <= start_sample) && (start_sample <= end_sample)
-        raise TaskArgumentError.new(":start and :end must satisfy 0 <= :start <= :end")
-      end
-      
-      chunk_size = args[:size] || (end_sample - start_sample)
-      unless chunk_size.is_a?(Fixnum)
-        raise TaskArgumentError.new(":size must be an integer",
-                                    :argument => :size, :value => chunk_size)
-      end
-
-      sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
-      return chunk_size, sample_ranges
-    end
-    public # end of private methods
 
     # Evaluate thresholds by batch processing, then merge evaluations
     def evaluate_thresholds(threshold_json, sample_json, manifest, egt_file,
@@ -217,11 +218,11 @@ def zcall_evaluate_available?()
 
     end
 
-    def run_zcall(thresholds, sample_json, manifest, egt_file, bed_path,
+    def run_zcall(thresholds, sample_json, manifest, egt_file, work_dir,
                   args = {}, async ={})
       # run zcall on given thresholds and samples
       args, work_dir, log_dir = process_task_args(args)
-      if args_available?(thresholds, sample_json, manifest, egt_file, bed_path)
+      if args_available?(thresholds, sample_json, manifest, egt_file, work_dir)
         
         ## TODO modify to split samples into chunks and use job array
 
@@ -229,8 +230,9 @@ def zcall_evaluate_available?()
           :thresholds => thresholds,
           :bpm => manifest,
           :egt => egt_file,
-          :gtc => sample_json,
-          :out => bed_path
+          :samples => sample_json,
+          :out => work_dir,
+          :binary => ''
         }
         margs = [cli_args, work_dir]
         task_id = task_identity(:merge_evaluation, *margs)
@@ -238,6 +240,7 @@ def zcall_evaluate_available?()
         command = [CALL, 
                    cli_arg_map(cli_args,
                                :prefix => '--')].flatten.join(' ')
+        bed_path = File.join(work_dir, 'zcall.bed')
         async_task(margs, command, work_dir, log,
                    :post => lambda {ensure_files([bed_path,])},
                    :result => lambda { bed_path },
