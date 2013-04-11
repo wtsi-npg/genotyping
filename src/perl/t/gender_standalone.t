@@ -5,8 +5,8 @@
 
 use strict;
 use warnings;
-use Carp qw/abs_path/;
-use Cwd;
+use Carp;
+use Cwd qw/abs_path/;
 use FindBin qw($Bin);
 use File::Temp qw/tempdir/;
 use Log::Log4perl;
