@@ -9,7 +9,6 @@ use WTSI::Genotyping::Database;
 
 our @ISA = qw(WTSI::Genotyping::Database);
 
-
 =head2 insert_sequenom_calls
 
   Arg [1]    : WTSI::Genotyping::Database::Pipeline object
@@ -97,6 +96,58 @@ sub insert_sequenom_calls {
   }
 
   return $count;
+}
+
+
+=head2 data_by_sample
+
+  Arg [1]    : WTSI::Genotyping::Database::Pipeline object
+  Arg [2]    : Reference to a hash. Keys are sample names, values are
+               sample IDs in the SNP database.
+  Description: Query the SNP database by sample and return details of calls.
+               Returns a hash of hashes of calls indexed by sample and SNP; 
+               hash of SNPs found; hash of samples with no calls in SNP;
+               total number of calls read
+  Returntype : (hashref, hashref, hashref, integer)
+  Caller     : General
+
+=cut
+
+sub data_by_sample {
+    my $self = shift;
+    my %sampleIDs = %{ shift() };
+    my ($dbh, $sth, %sqnmCalls, %sqnmSnps, %missingSamples);
+    $dbh = $self->dbh;
+    $sth = $dbh->prepare(qq(
+select distinct well_assay.id_well, snp_name.snp_name,
+genotype.genotype, genotype.confidence, genotype.disregard
+from well_assay, snpassay_snp, snp_name, genotype, individual
+where well_assay.id_assay = snpassay_snp.id_assay
+and snpassay_snp.id_snp = snp_name.id_snp
+and (snp_name.snp_name_type = 1 or snp_name.snp_name_type = 6)
+and genotype.id_assay = snpassay_snp.id_assay
+and genotype.id_ind = individual.id_ind
+and disregard = 0
+and confidence <> 'A'
+and individual.clonename = ?
+));
+    my $totalCalls = 0;
+    foreach my $sample (keys(%sampleIDs)) {
+        $sth->execute($sampleIDs{$sample}); # query DB with sample ID
+        foreach my $row (@{$sth->fetchall_arrayref}) {
+            my ($well, $snp, $call, $conf, $disregard) = @{$row};
+            # $disregard==0 by construction of DB query
+            $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
+            next if $call =~ /[N]{2}/;              # skip 'NN' calls
+            $sqnmCalls{$sample}{$snp} = $call;
+            $sqnmSnps{$snp} = 1;
+            $totalCalls += 1;
+        }
+        if (!$sqnmCalls{$sample}) { $missingSamples{$sample} = 1; }
+    }
+    $sth->finish;
+    $dbh->disconnect;
+    return (\%sqnmCalls, \%sqnmSnps, \%missingSamples, $totalCalls);
 }
 
 1;
