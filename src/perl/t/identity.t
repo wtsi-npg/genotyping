@@ -8,7 +8,6 @@ use warnings;
 use Carp;
 use FindBin qw($Bin);
 use Test::More tests => 12;
-use WrapDBI;
 use WTSI::Genotyping::QC::SnpID qw/illuminaToSequenomSNP 
   sequenomToIlluminaSNP/;
 
