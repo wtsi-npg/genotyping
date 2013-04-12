@@ -27,8 +27,8 @@ use WTSI::Genotyping::Database::Pipeline;
 
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = INFO, A1
+   log4perl.logger.quiet             = ERROR, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
@@ -71,14 +71,23 @@ sub run {
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
+              -exitval => 3);
   }
   unless ($run_name) {
-    pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
+    pod2usage(-msg => "A --run argument is required\n", -exitval => 3);
   }
   unless ($source) {
     pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 2);
+              -exitval => 3);
+  }
+
+  unless (-e $source) {
+    pod2usage(-msg => "No such source as '$source'\n",
+              -exitval => 4);
+  }
+  unless (-d $source) {
+    pod2usage(-msg => "The --source argument was not a directory\n",
+              -exitval => 4);
   }
 
   $config ||= $DEFAULT_INI;
