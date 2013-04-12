@@ -10,6 +10,7 @@ use FindBin qw/$Bin/;
 use File::Temp qw/tempdir/;
 use Test::More tests => 20;
 
+my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $plinkB = "$Bin/qc_test_data/beta";
 my $simB = "$Bin/qc_test_data/beta.sim";
 my $outDirB = "$Bin/qc/beta/";
@@ -19,8 +20,6 @@ my $iniPath = abs_path("$Bin/../etc/qc_test.ini");
 my $dbnameB = "beta_pipeline.db";
 my $dbfileMasterB = "$Bin/qc_test_data/$dbnameB";
 my $config = "$Bin/../etc/qc_config.json";
-
-$ENV{PATH} = abs_path('../bin') . ':' . $ENV{PATH};
 
 my $start = time();
 print "\tTesting dataset Beta.\n";
@@ -32,7 +31,7 @@ chdir($outDirB);
 system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
        'supplementary/*'); # remove any previous output
 
-my $cmd = "run_qc.pl --output-dir=. --dbpath=$dbfileB --sim=$simB $plinkB --run=test --inipath=$iniPath"; 
+my $cmd = "$bin/run_qc.pl --output-dir=. --dbpath=$dbfileB --sim=$simB $plinkB --run=test --inipath=$iniPath"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 my @pdf = qw/crHetDensityHeatmap.pdf  failsCombined.pdf          
