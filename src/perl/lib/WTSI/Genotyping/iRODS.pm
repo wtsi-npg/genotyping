@@ -604,7 +604,7 @@ sub add_collection {
 =head2 put_collection
 
   Arg [2]    : iRODS collection name
-  Example    : put_collection('/my/path/foo', )
+  Example    : put_collection('/my/path/foo', '/archive')
   Description: Makes a new collection in iRODS. Returns the new collection.
   Returntype : string
   Caller     : general
@@ -615,6 +615,9 @@ sub put_collection {
   my ($dir, $target) = @_;
 
   $dir or $log->logconfess('A non-empty directory argument is required');
+
+  # iput does not accept trailing slashes on directories
+  $dir =~ s!/$!!;
 
   $target = _ensure_absolute($target);
   $target =~ s!/$!!;
