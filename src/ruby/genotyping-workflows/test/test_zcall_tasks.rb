@@ -34,7 +34,6 @@ class TestZCallTasks < Test::Unit::TestCase
   include TestHelper
   include Genotyping
   include Genotyping::Tasks::ZCall
-  #include Genotyping::Tasks::GenotypeCall
 
   # TODO Create mock study with compatible EGT file
   # EGT file format is undocumented
@@ -93,7 +92,7 @@ class TestZCallTasks < Test::Unit::TestCase
 
   def test_evaluate_merge_thresholds
     run_test_if(method(:zcall_evaluate_available?), 
-                "Skipping test_zcall_evaluate") do
+                "Skipping test_zcall_evaluate_merge") do
       work_dir = make_work_dir('zcall_evaluate_merge', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
  
@@ -119,8 +118,7 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_run_zcall
-    run_test_if(method(:zcall_available?), 
-                "Skipping test_run_zcall") do
+    run_test_if(method(:zcall_available?), "Skipping test_run_zcall") do
       work_dir = make_work_dir('zcall_run', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run', 120, 5) do

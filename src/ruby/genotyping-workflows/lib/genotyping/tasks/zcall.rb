@@ -46,7 +46,26 @@ def zcall_evaluate_available?()
     include Genotyping
     include Genotyping::Tasks
 
-    # private methods for internal housekeeping
+    # Runs ZCall re-calling on the GTC files output by another caller 
+    # (typically Illumina's GenCall software).  The range of samples is 
+    # broken into chunks of the specified size which are run in parallel 
+    # as batch jobs.
+    #
+    # Zcall runs in four steps:
+    # 1) Prepare thresholds: Find thresholds for each SNP, for range of z scores
+    # 2) Evaluate thresholds: Find concordance/gain metrics for each threshold, 
+    # for samples which pass QC criteria on previous caller
+    # 3) Merge evaluation: Compare metrics and find 'best' threshold
+    # 4) Call: Apply the ZCall algorithm with chosen threshold
+    # identified in step (3), to re-call any 'no-calls' in the GTC input, 
+    # writing output in Plink (.bed or .ped) format.
+    #
+    # Steps (2) and (4) use batch processing, with results merged after batch 
+    # completion.
+    #
+    ######################################################################
+
+    # private methods for internal use
     private 
     # Generate path for evaluation chunk .json output
     def get_evaluation_path(work_dir, i)
@@ -78,28 +97,6 @@ def zcall_evaluate_available?()
       return chunk_size, sample_ranges
     end
     public # end of private methods
-
-    # Runs ZCall re-calling on the GTC files output by another caller 
-    # (typically Illumina's GenCall software).  The range of samples is 
-    # broken into chunks of the specified size which are run in parallel 
-    # as batch jobs.
-    #
-    # Zcall runs in three steps:
-    # 1) Prepare thresholds: Find thresholds for each SNP, for range of z scores
-    # 2) Evaluate thresholds: Find which threshold gives best results, for
-    # samples which pass QC criteria on previous caller
-    # 3) Call: Apply the ZCall algorithm with the 'best' thresholds 
-    # identified in step (2), to re-call any 'no-calls' in the GTC input, 
-    # writing output in Plink .bed format.
-    #
-    # Steps (2) and (3) use batch processing, with results merged after batch 
-    # completion.
-    #
-    # TODO
-    # Use sample_intensities.pl to create .json file listing input GTC files
-    # Split GTC files into chunks, use batch processing for steps 2 and 3
-
-    ######################################################################
 
     # Prepares threshold.txt files for zcall
     #
@@ -146,7 +143,13 @@ def zcall_evaluate_available?()
       end
     end
 
-    # Evaluate thresholds by batch processing, then merge evaluations
+    # Evaluate thresholds by batch processing
+    #
+    # Arguments:
+    # - threshold_json (String): Path to .json file containing a hash whose
+    # keys are thresholds, values are threshold.txt paths
+    # - sample_json (String): Path to .json file with sample data, eg.
+    # constructed by f
     def evaluate_thresholds(threshold_json, sample_json, manifest, egt_file,
                             args = {}, async ={})
       args, work_dir, log_dir = process_task_args(args)
@@ -155,7 +158,7 @@ def zcall_evaluate_available?()
         end_sample = args[:end]
         chunk_size, sample_ranges = 
           get_sample_ranges(start_sample, end_sample, args)
-        ### construct arguments for job array
+        # construct arguments for job array
         temp_dir = File.join(work_dir, 'evaluation_temp')
         Dir.mkdir(temp_dir) unless File.exist?(temp_dir)
         evaluation_args = sample_ranges.each_with_index.collect do |range, i|
