@@ -20,6 +20,8 @@ my $dbnameB = "beta_pipeline.db";
 my $dbfileMasterB = "$Bin/qc_test_data/$dbnameB";
 my $config = "$Bin/../etc/qc_config.json";
 
+$ENV{PATH} = abs_path('../bin') . ':' . $ENV{PATH};
+
 my $start = time();
 print "\tTesting dataset Beta.\n";
 my $tempdir = tempdir(CLEANUP => 1);
