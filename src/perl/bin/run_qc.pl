@@ -183,7 +183,7 @@ sub run {
     push(@cmds, $writeStatus);
     ### plot generation ###
     if ($dbopt) { 
-        my $cmd = "plot_metric_scatter.pl $dbopt";
+        my $cmd = "$Bin/plot_metric_scatter.pl $dbopt";
         if (!$simPath) { $cmd = $cmd." --no-intensity "; }
         push(@cmds, $cmd); 
     }
