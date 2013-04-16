@@ -123,7 +123,7 @@ class TestZCallTasks < Test::Unit::TestCase
 
   def test_run_zcall
     run_test_if(method(:zcall_available?), "Skipping test_run_zcall") do
-      work_dir = make_work_dir('zcall_run', data_path)
+      work_dir = make_work_dir('test_zcall_run', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run', 120, 5) do
         run_zcall(@thresholds_z6, @sample_json, @manifest, @egt, work_dir,
@@ -132,6 +132,21 @@ class TestZCallTasks < Test::Unit::TestCase
       end
       cmd = 'plink --bfile '+File.join(work_dir, 'zcall')+' --out '+File.join(work_dir, 'plink')
       assert(system(cmd))
+      Percolate.log.close
+      remove_work_dir(work_dir)
+    end
+  end
+
+  def test_run_zcall_array
+    run_test_if(method(:zcall_available?), "Skipping test_run_zcall") do
+      work_dir = make_work_dir('test_zcall_run_array', data_path)
+      Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
+      result = wait_for('test_zcall_run_array', 120, 5) do
+        run_zcall_array(@thresholds_z6, @sample_json, @manifest, @egt, work_dir,
+                        { :start => 0, :end => 8, :size => 4,
+                          :work_dir => work_dir },
+                        :queue=>@queue)
+      end
       Percolate.log.close
       remove_work_dir(work_dir)
     end
