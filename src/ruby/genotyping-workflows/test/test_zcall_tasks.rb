@@ -54,6 +54,7 @@ class TestZCallTasks < Test::Unit::TestCase
     @thresholds_z6 = data_dir+'thresholds_HumanExome-12v1_z06.txt' 
     @sample_json = data_dir+'gtc.json'
     @merged_json = data_dir+'merged_z_evaluation.json'
+    @queue = :small
   end
 
   def setup
@@ -75,7 +76,8 @@ class TestZCallTasks < Test::Unit::TestCase
       t_json, t_files = wait_for('test_zcall_prepare', 180, 5) do
         prepare_thresholds(@egt, zstart, ztotal,  
                            {:work_dir => work_dir,
-                             :log_dir => work_dir})
+                             :log_dir => work_dir},
+                           :queue=>@queue)
       end
 
       assert(File.exist?(t_json))
@@ -101,12 +103,14 @@ class TestZCallTasks < Test::Unit::TestCase
                             {
                               :start => 0, :end => 8, :size => 4,
                               :work_dir => work_dir
-                            })
+                            },
+                            :queue=>@queue)
       end
 
       merged_path = wait_for('test_zcall_merge', 120, 5) do
         merge_evaluation(metrics_path,  @threshold_json,
-                         { :work_dir => work_dir })
+                         { :work_dir => work_dir },
+                         :queue=>@queue)
       end
       merged_file = File.open(merged_path)
       assert_equal(JSON.load(merged_file),
@@ -123,7 +127,8 @@ class TestZCallTasks < Test::Unit::TestCase
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run', 120, 5) do
         run_zcall(@thresholds_z6, @sample_json, @manifest, @egt, work_dir,
-                  { :work_dir => work_dir })
+                  { :work_dir => work_dir },
+                  :queue=>@queue)
       end
 
       Percolate.log.close
