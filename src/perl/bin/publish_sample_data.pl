@@ -23,6 +23,7 @@ use WTSI::Genotyping qw(make_warehouse_metadata
                         get_publisher_name
                         publish_idat_files
                         publish_gtc_files);
+
 use WTSI::Genotyping::iRODS qw(collect_files
                                collect_dirs
                                modified_between);
@@ -79,7 +80,7 @@ sub run {
              'make-groups' => \$make_groups,
              'source=s'    => \$source,
              'type=s'      => \$type,
-             'verbose'     => \$verbose,);
+             'verbose'     => \$verbose);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",

@@ -6,13 +6,16 @@
 use strict;
 use warnings;
 use Carp;
-use Cwd;
+use Cwd qw/abs_path/;
 use FindBin qw($Bin);
 use File::Temp qw/tempdir/;
 use Log::Log4perl;
 use JSON;
 use Test::More tests => 12;
 use WTSI::Genotyping::QC::GenderCheck;
+
+# The directory contains the R scripts
+$ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
