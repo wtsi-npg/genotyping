@@ -19,7 +19,7 @@ use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
 use WTSI::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $CR_STATS_EXECUTABLE = "/software/varinf/bin/genotype_qc/snp_af_sample_cr_bed";
+our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $runName, $postCR);
 
@@ -183,7 +183,7 @@ sub run {
     push(@cmds, $writeStatus);
     ### plot generation ###
     if ($dbopt) { 
-        my $cmd = "plot_metric_scatter.pl $dbopt";
+        my $cmd = "$Bin/plot_metric_scatter.pl $dbopt";
         if (!$simPath) { $cmd = $cmd." --no-intensity "; }
         push(@cmds, $cmd); 
     }

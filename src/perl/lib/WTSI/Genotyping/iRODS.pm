@@ -61,7 +61,7 @@ our $IRM = 'irm';
 our $IPWD = 'ipwd';
 our $ICHMOD = 'ichmod';
 
-our $log = Log::Log4perl->get_logger('npg.irods');
+our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
 
 =head2 make_group_name
@@ -510,11 +510,13 @@ sub find_objects_by_meta {
     $unit_clause = '';
   }
 
+  $log->debug("Finding by metadata '$key'  => '$value'");
+
   my @objs = _safe_select('"%s"', qq("SELECT COUNT(DATA_NAME)
                                       WHERE META_DATA_ATTR_NAME = '$key'
                                       AND META_DATA_ATTR_VALUE = '$value' $unit_clause
                                       AND COLL_NAME LIKE '$root'"),
-                          '"%s/%s"', qq("SELECT COLL_PARENT_NAME, DATA_NAME
+                          '"%s/%s"', qq("SELECT COLL_NAME, DATA_NAME
                                          WHERE META_DATA_ATTR_NAME = '$key'
                                          AND META_DATA_ATTR_VALUE = '$value' $unit_clause
                                          AND COLL_NAME LIKE '$root'"));
@@ -539,8 +541,9 @@ sub list_collection {
 
   $collection or
     $log->logconfess('A non-empty collection argument is required');
-  $collection =~ s!/$!!;
+
   $collection = _ensure_absolute($collection);
+  $collection =~ s!/$!!;
 
   my @root = _safe_select('"%s"',
                           qq("SELECT COUNT(COLL_NAME)
@@ -590,7 +593,6 @@ sub add_collection {
 
   $collection or
     $log->logconfess('A non-empty collection argument is required');
-  $collection =~ s!/$!!;
   $collection = _ensure_absolute($collection);
 
   $log->debug("Adding collection '$collection'");
@@ -602,7 +604,7 @@ sub add_collection {
 =head2 put_collection
 
   Arg [2]    : iRODS collection name
-  Example    : put_collection('/my/path/foo', )
+  Example    : put_collection('/my/path/foo', '/archive')
   Description: Makes a new collection in iRODS. Returns the new collection.
   Returntype : string
   Caller     : general
@@ -612,12 +614,15 @@ sub add_collection {
 sub put_collection {
   my ($dir, $target) = @_;
 
-  $dir or
-    $log->logconfess('A non-empty directory argument is required');
-  $target =~ s!/$!!;
-  $target = _ensure_absolute($target);
+  $dir or $log->logconfess('A non-empty directory argument is required');
 
-  $log->debug("Putting collection '$dir'");
+  # iput does not accept trailing slashes on directories
+  $dir =~ s!/$!!;
+
+  $target = _ensure_absolute($target);
+  $target =~ s!/$!!;
+
+  $log->debug("Putting collection '$dir' into '$target'");
   _run_command($IPUT, '-r', $dir, $target);
 
   return $target . '/' . basename($dir);
@@ -1077,7 +1082,7 @@ sub _safe_select {
 
   my @count = _run_command($IQUEST, $ctemplate, $icount);
   if (@count && $count[0] > 0) {
-    push(@result, _run_command($IQUEST, $qtemplate, $iquery));
+    push(@result, _run_command($IQUEST, '--no-page', $qtemplate, $iquery));
   }
 
   return @result;

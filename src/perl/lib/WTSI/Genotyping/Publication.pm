@@ -5,6 +5,7 @@ package WTSI::Genotyping;
 use strict;
 use warnings;
 use Carp;
+use File::Basename qw(basename);
 use Net::LDAP;
 use URI;
 
@@ -17,12 +18,20 @@ use WTSI::Genotyping::iRODS qw(make_group_name
                                checksum_object
                                get_object_meta
                                add_object_meta
+                               find_objects_by_meta
                                list_collection
                                add_collection
+                               put_collection
+                               add_collection_meta
                                meta_exists
                                hash_path);
 
+# This is the collection will be searched for sample data to cross
+# reference with an analysis
+our $SAMPLE_DATA_ARCHIVE_PATTERN = '/archive/GAPI/gen/infinium%';
+
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
+
 
 =head2 get_wtsi_uri
 
@@ -39,6 +48,7 @@ sub get_wtsi_uri {
 
   return $uri;
 }
+
 
 =head2 get_publisher_uri
 
@@ -94,6 +104,7 @@ sub get_publisher_name {
 
   return $name;
 }
+
 
 =head2 publish_idat_files
 
@@ -168,6 +179,7 @@ sub publish_idat_files {
   return $published;
 }
 
+
 =head2 publish_gtc_files
 
   Arg [1]    : arrayref of GTC file names
@@ -235,6 +247,111 @@ sub publish_gtc_files {
   return $published;
 }
 
+
+=head2 publish_analysis_directory
+
+  Arg [1]    : directory containing the analysis results
+  Arg [2]    : URI object of creator
+  Arg [3]    : string publication destination in iRODS
+  Arg [4]    : URI object of publisher (typically an LDAP URI)
+  Arg [5]    : genotyping pipeline database handle
+  Arg [6]    : pipeline run name in pipeline database
+  Arg [7]    : DateTime object of publication
+
+  Example    : my $uuid =
+                   publish_analysis_directory($dir, $creator_uri,
+                                             '/my/project', $publisher_uri,
+                                             $pipedb, 'run1', $now);
+  Description: Publishes an analysis directory to an iRODS collection. Adds
+               to the collection metadata describing the genotyping projects
+               analysed and a new UUID for the analysis. It also locates the
+               corresponding sample data in iRODS and cross-references it to
+               the analysis by adding the UUID to the sample metadata.
+  Returntype : a new UUID for the analysis
+  Caller     : general
+
+=cut
+
+sub publish_analysis_directory {
+  my ($dir, $creator_uri, $publish_dest, $publisher_uri, $pipedb, $run_name,
+      $time) = @_;
+
+  $publish_dest =~ s!/$!!;
+  my $target = $publish_dest . '/' . basename($dir);
+
+  if (list_collection($target)) {
+    $log->logcroak("An iRODS collection already exists at '$target'. " .
+                   "Please move or delete it before proceeding.");
+  }
+
+  $log->debug("Finding the project titles in the analysis database");
+
+  my @project_titles;
+  foreach my $dataset($pipedb->piperun->find({name => $run_name})->datasets) {
+    push(@project_titles, $dataset->if_project);
+  }
+
+  unless (@project_titles) {
+    $log->logcroak("The analysis database contained no data for run '$run_name'")
+  }
+
+  my $uuid;
+  my $num_projects = 0;
+  my $num_samples = 0;
+
+  eval {
+    my @meta;
+    push(@meta, make_analysis_metadata(\@project_titles));
+
+    unless (list_collection($publish_dest)) {
+      add_collection($publish_dest);
+    }
+
+    my $target = put_collection($dir, $publish_dest);
+    $log->info("Created new collection $target");
+
+    foreach my $elt (@meta) {
+      my ($key, $value, $units) = @$elt;
+      $log->debug("Adding key $key value $value to $target");
+      add_collection_meta($target, $key, $value, $units);
+    }
+
+    my @uuid_meta = grep { $_->[0] =~ /uuid/ } @meta;
+    $uuid = $uuid_meta[0]->[1];
+
+    foreach my $title (@project_titles) {
+      # Find the sample-level data for this analysis
+      my @sample_data =  @{find_objects_by_meta($SAMPLE_DATA_ARCHIVE_PATTERN,
+                                                'dcterms:title',
+                                                $title)};
+      if (@sample_data) {
+        $log->info("Adding cross-reference metadata to " . scalar @sample_data .
+                   " data objects in genotyping project '$title'");
+
+        foreach my $target (@sample_data) {
+          update_object_meta($target, \@uuid_meta);
+          ++$num_samples;
+        }
+
+        ++$num_projects;
+      }
+      else {
+        $log->warn("Found no sample data objects in iRODS for '$title'");
+      }
+    }
+  };
+
+  if ($@) {
+    $log->error("Failed to publish: ", $@);
+  }
+  else {
+    $log->info("Published '$dir' to '$publish_dest' and cross-referenced $num_samples data objects in $num_projects projects");
+  }
+
+  return $uuid;
+}
+
+
 sub publish_file {
   my ($file, $sample_meta, $creator, $publish_dest, $publisher,
       $time, $make_groups, $log) = @_;
@@ -242,6 +359,7 @@ sub publish_file {
   my $basename = fileparse($file);
   my $hash_path = hash_path($file);
 
+  $publish_dest =~ s!/$!//!;
   my $dest_collection = $publish_dest . '/' . $hash_path;
 
   unless (list_collection($dest_collection)) {
@@ -269,21 +387,9 @@ sub publish_file {
       $target = add_object($file, $target);
     }
 
-    my %current_meta = get_object_meta($target);
-
     push(@meta, make_file_metadata($file, '.idat', '.gtc'));
 
-    foreach my $elt (@meta) {
-      my ($key, $value, $units) = @$elt;
-
-      if (meta_exists($key, $value, %current_meta)) {
-        $log->debug("Skipping addition of key $key value $value to $target (exists)");
-      }
-      else {
-        $log->debug("Adding key $key value $value to $target");
-        add_object_meta($target, $key, $value, $units);
-      }
-    }
+    update_object_meta($target, \@meta);
 
     my @groups = expected_irods_groups(@meta);
     foreach my $group (@groups) {
@@ -308,6 +414,7 @@ sub publish_file {
 
   return $target;
 }
+
 
 sub paired_idat_files {
   my ($files, $log) = @_;
@@ -344,6 +451,7 @@ sub paired_idat_files {
   return \@paired;
 }
 
+
 sub expected_irods_groups {
   my @meta = @_;
 
@@ -361,6 +469,23 @@ sub expected_irods_groups {
   return @groups;
 }
 
+
+sub update_object_meta {
+  my ($target, $meta) = @_;
+
+  my %current_meta = get_object_meta($target);
+  foreach my $elt (@$meta) {
+    my ($key, $value, $units) = @$elt;
+
+    if (meta_exists($key, $value, %current_meta)) {
+      $log->debug("Skipping addition of key $key value $value to $target (exists)");
+    }
+    else {
+      $log->debug("Adding key $key value $value to $target");
+      add_object_meta($target, $key, $value, $units);
+    }
+  }
+}
 
 1;
 
