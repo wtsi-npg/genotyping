@@ -28,7 +28,7 @@ use WTSI::Genotyping::Database::Pipeline;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = INFO, A1
-   log4perl.logger.quiet             = ERROR, A2
+   log4perl.logger.quiet             = INFO, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
@@ -52,6 +52,7 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 run() unless caller();
 
 sub run {
+  my $archive_pattern;
   my $config;
   my $dbfile;
   my $log4perl_config;
@@ -60,7 +61,8 @@ sub run {
   my $source;
   my $verbose;
 
-  GetOptions('config=s'  => \$config,
+  GetOptions('archive=s' => \$archive_pattern,
+             'config=s'  => \$config,
              'dbfile=s'=> \$dbfile,
              'dest=s'    => \$publish_dest,
              'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
@@ -90,6 +92,7 @@ sub run {
               -exitval => 4);
   }
 
+  $archive_pattern ||= $WTSI::Genotyping::DEFAULT_SAMPLE_ARCHIVE_PATTERN;
   $config ||= $DEFAULT_INI;
 
   my $log;
@@ -128,11 +131,13 @@ sub run {
   my $publisher_uri = get_publisher_uri($uid);
   my $name = get_publisher_name($publisher_uri);
 
-  $log->info("Publishing from '$source' to '$publish_dest'");
+  $log->info("Publishing from '$source' to '$publish_dest' using sample archive '$archive_pattern'");
 
   print publish_analysis_directory($source, $creator_uri,
                                    $publish_dest, $publisher_uri,
-                                   $pipedb, $run_name, $now);
+                                   $pipedb, $run_name,
+                                   $archive_pattern,
+                                   $now);
   print "\n";
 }
 
@@ -151,6 +156,8 @@ publish_analysis_data [--config <database .ini file>] \
 
 Options:
 
+  --archive     Search pattern matching root of samples archive.
+                Optional, defaults to '/archive/GAPI/gen/infinium%'
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile      The SQLite database file. If not supplied, defaults to the
