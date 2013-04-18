@@ -34,8 +34,8 @@ use WTSI::Genotyping::Database::Warehouse;
 
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = INFO, A1
+   log4perl.logger.quiet             = INFO, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
