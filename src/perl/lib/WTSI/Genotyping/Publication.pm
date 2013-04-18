@@ -302,6 +302,7 @@ sub publish_analysis_directory {
   eval {
     my @meta;
     push(@meta, make_analysis_metadata(\@project_titles));
+    push(@meta, make_creation_metadata($creator_uri, $time,  $publisher_uri));
 
     unless (list_collection($publish_dest)) {
       add_collection($publish_dest);
@@ -353,7 +354,7 @@ sub publish_analysis_directory {
 
 
 sub publish_file {
-  my ($file, $sample_meta, $creator, $publish_dest, $publisher,
+  my ($file, $sample_meta, $creator_uri, $publish_dest, $publisher_uri,
       $time, $make_groups, $log) = @_;
 
   my $basename = fileparse($file);
@@ -383,7 +384,7 @@ sub publish_file {
     }
     else {
       $log->info("Publishing $target");
-      push(@meta, make_creation_metadata($creator, $time,  $publisher));
+      push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
       $target = add_object($file, $target);
     }
 

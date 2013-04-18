@@ -318,8 +318,7 @@ sub find_scanned_sample {
            ON callfile.status_id = statusav.appvalueid
 
          LEFT OUTER JOIN intensityfile redintensityfile
-           ON redintensityfile.imaging_event_id = callfile.imaging_event_id
-           AND redintensityfile.project_usage_id = projectuse.project_usage_id
+           ON redintensityfile.project_usage_id = projectuse.project_usage_id
          LEFT OUTER JOIN appvalue redchannelav
            ON redintensityfile.channel_id = redchannelav.appvalueid
 
@@ -329,7 +328,7 @@ sub find_scanned_sample {
            ON redparentdir.parent_directory_id = redappfile.parent_directory_id
 
          LEFT OUTER JOIN intensityfile greenintensityfile
-           ON greenintensityfile.imaging_event_id = callfile.imaging_event_id
+           ON greenintensityfile.imaging_event_id = redintensityfile.imaging_event_id
            AND greenintensityfile.project_usage_id = projectuse.project_usage_id
          LEFT OUTER JOIN appvalue greenchannelav
            ON greenintensityfile.channel_id = greenchannelav.appvalueid
