@@ -225,10 +225,7 @@ def zcall_evaluate_available?()
                   args = {}, async ={})
       # run zcall on given thresholds and samples
       args, work_dir, log_dir = process_task_args(args)
-      if args_available?(thresholds, sample_json, manifest, egt_file, work_dir)
-        
-        ## TODO modify to split samples into chunks and use job array
-
+      if args_available?(thresholds, sample_json, manifest, egt_file, work_dir) 
         cli_args = {
           :thresholds => thresholds,
           :bpm => manifest,
@@ -252,5 +249,46 @@ def zcall_evaluate_available?()
       end
     end
     
+    def run_zcall_array(thresholds, sample_json, manifest, egt_file, work_dir,
+                        args = {}, async ={})
+      # run zcall in parallel on subsets of samples
+      # write series of sample .json files, submit zcall commands as job array
+      # combine plink outputs after job array completion
+      #  using plink --merge-list; needs list of .bed/.bim/.fam files
+      args, work_dir, log_dir = process_task_args(args)
+      if args_available?(thresholds, sample_json, manifest, egt_file, work_dir)
+        start_sample = args[:start] || 0
+        end_sample = args[:end]
+        chunk_size, sample_ranges = 
+          get_sample_ranges(start_sample, end_sample, args)
+        #puts sample_ranges.inspect
+        sample_subsets = write_sample_subsets(sample_ranges, sample_json, 
+                                              work_dir)
+        return 1
+      end
+    end
+
+    private
+    def write_sample_subsets(sample_ranges, sample_json, work_dir)
+      # write sample .json files with subsets of main file
+      
+      #puts sample_ranges.inspect
+      puts sample_json
+      samples = JSON.load(File.read(sample_json))
+      sample_ranges.each do |x|
+        puts x.inspect
+      end
+      
+    end
+
+    #  
+      # iterate over sample ranges and write new .json file for each
+    #  sample_ranges.each |x| do
+    #    puts x.inspect
+    #  end
+    #end
+
+    
+
   end # module ZCall
 end # module Genotyping::Tasks
