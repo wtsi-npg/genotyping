@@ -22,13 +22,14 @@ use WTSI::Genotyping::iRODS qw(make_group_name
                                list_collection
                                add_collection
                                put_collection
+                               get_collection_meta
                                add_collection_meta
                                meta_exists
                                hash_path);
 
 # This is the collection will be searched for sample data to cross
 # reference with an analysis
-our $SAMPLE_DATA_ARCHIVE_PATTERN = '/archive/GAPI/gen/infinium%';
+our $DEFAULT_SAMPLE_ARCHIVE_PATTERN = '/archive/GAPI/gen/infinium%';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -256,17 +257,23 @@ sub publish_gtc_files {
   Arg [4]    : URI object of publisher (typically an LDAP URI)
   Arg [5]    : genotyping pipeline database handle
   Arg [6]    : pipeline run name in pipeline database
+  Arg [7]    : sample data archive pattern used to search for sample data
+               to cross reference
   Arg [7]    : DateTime object of publication
 
   Example    : my $uuid =
                    publish_analysis_directory($dir, $creator_uri,
                                              '/my/project', $publisher_uri,
-                                             $pipedb, 'run1', $now);
+                                             $pipedb, 'run1',
+                                             '/archive/GAPI/gen/infinium%',
+                                             $now);
   Description: Publishes an analysis directory to an iRODS collection. Adds
                to the collection metadata describing the genotyping projects
                analysed and a new UUID for the analysis. It also locates the
                corresponding sample data in iRODS and cross-references it to
-               the analysis by adding the UUID to the sample metadata.
+               the analysis by adding the UUID to the sample metadata. It also
+               adds the sample study/studies of the samples to the analysis
+               collection metadata.
   Returntype : a new UUID for the analysis
   Caller     : general
 
@@ -274,7 +281,7 @@ sub publish_gtc_files {
 
 sub publish_analysis_directory {
   my ($dir, $creator_uri, $publish_dest, $publisher_uri, $pipedb, $run_name,
-      $time) = @_;
+      $sample_archive_pattern, $time) = @_;
 
   $publish_dest =~ s!/$!!;
   my $target = $publish_dest . '/' . basename($dir);
@@ -300,37 +307,41 @@ sub publish_analysis_directory {
   my $num_samples = 0;
 
   eval {
-    my @meta;
-    push(@meta, make_analysis_metadata(\@project_titles));
-    push(@meta, make_creation_metadata($creator_uri, $time,  $publisher_uri));
+    my @analysis_meta;
+    push(@analysis_meta, make_analysis_metadata(\@project_titles));
+    push(@analysis_meta, make_creation_metadata($creator_uri, $time,
+                                                $publisher_uri));
 
     unless (list_collection($publish_dest)) {
       add_collection($publish_dest);
     }
 
-    my $target = put_collection($dir, $publish_dest);
+    my $analysis_coll = put_collection($dir, $publish_dest);
     $log->info("Created new collection $target");
 
-    foreach my $elt (@meta) {
-      my ($key, $value, $units) = @$elt;
-      $log->debug("Adding key $key value $value to $target");
-      add_collection_meta($target, $key, $value, $units);
-    }
-
-    my @uuid_meta = grep { $_->[0] =~ /uuid/ } @meta;
+    my @uuid_meta = grep { $_->[0] =~ /uuid/ } @analysis_meta;
     $uuid = $uuid_meta[0]->[1];
 
     foreach my $title (@project_titles) {
       # Find the sample-level data for this analysis
-      my @sample_data =  @{find_objects_by_meta($SAMPLE_DATA_ARCHIVE_PATTERN,
+      my @sample_data =  @{find_objects_by_meta($sample_archive_pattern,
                                                 'dcterms:title',
                                                 $title)};
+
       if (@sample_data) {
         $log->info("Adding cross-reference metadata to " . scalar @sample_data .
                    " data objects in genotyping project '$title'");
 
-        foreach my $target (@sample_data) {
-          update_object_meta($target, \@uuid_meta);
+        foreach my $sample_datum (@sample_data) {
+          # Xref analysis to sample studies
+          my %sample_meta = get_object_meta($sample_datum);
+          my @sample_studies = @{$sample_meta{$STUDY_ID_META_KEY}};
+          foreach my $sample_study (@sample_studies) {
+            push(@analysis_meta, [$STUDY_ID_META_KEY => $sample_study]);
+          }
+
+          # Xref samples to analysis UUID
+          update_object_meta($sample_datum, \@uuid_meta);
           ++$num_samples;
         }
 
@@ -340,6 +351,8 @@ sub publish_analysis_directory {
         $log->warn("Found no sample data objects in iRODS for '$title'");
       }
     }
+
+    update_collection_meta($analysis_coll, \@analysis_meta);
   };
 
   if ($@) {
@@ -456,7 +469,7 @@ sub paired_idat_files {
 sub expected_irods_groups {
   my @meta = @_;
 
-  my @ss_study_ids = metadata_for_key(\@meta, $WTSI::Genotyping::STUDY_ID_META_KEY);
+  my @ss_study_ids = metadata_for_key(\@meta, $STUDY_ID_META_KEY);
   unless (@ss_study_ids) {
     $log->logconfess("Did not find any study information in metadata");
   }
@@ -474,8 +487,10 @@ sub expected_irods_groups {
 sub update_object_meta {
   my ($target, $meta) = @_;
 
+  my $unique_meta = _remove_meta_duplicates($meta);
   my %current_meta = get_object_meta($target);
-  foreach my $elt (@$meta) {
+
+  foreach my $elt (@$unique_meta) {
     my ($key, $value, $units) = @$elt;
 
     if (meta_exists($key, $value, %current_meta)) {
@@ -486,6 +501,60 @@ sub update_object_meta {
       add_object_meta($target, $key, $value, $units);
     }
   }
+}
+
+
+sub update_collection_meta {
+  my ($target, $meta) = @_;
+
+  my $unique_meta = _remove_meta_duplicates($meta);
+  my %current_meta = get_collection_meta($target);
+
+  foreach my $elt (@$unique_meta) {
+    my ($key, $value, $units) = @$elt;
+
+    if (meta_exists($key, $value, %current_meta)) {
+      $log->debug("Skipping addition of key $key value $value to $target (exists)");
+    }
+    else {
+      $log->debug("Adding key $key value $value to $target");
+      add_collection_meta($target, $key, $value, $units);
+    }
+  }
+}
+
+sub _remove_meta_duplicates {
+  my ($meta) = @_;
+
+  my %lookup_inc_units;
+  my %lookup_exc_units;
+
+  my @unique;
+  foreach my $elt (@$meta) {
+    my ($key, $value, $units) = @$elt;
+
+    if (defined $units) {
+      if (exists $lookup_inc_units{$key} &&
+          exists $lookup_inc_units{$key}->{$value} &&
+          exists $lookup_inc_units{$key}->{$value}->{$units}) {
+        next;
+      }
+      else {
+        $lookup_inc_units{$key}->{$value}->{$units} = 1;
+        push(@unique, $elt);
+      }
+    }
+    elsif (exists $lookup_exc_units{$key} &&
+           exists $lookup_exc_units{$key}->{$value}) {
+      next;
+    }
+    else {
+      $lookup_exc_units{$key}->{$value} = 1;
+      push(@unique, $elt);
+    }
+  }
+
+  return \@unique;
 }
 
 1;
