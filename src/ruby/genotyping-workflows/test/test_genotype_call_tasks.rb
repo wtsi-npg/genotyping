@@ -71,5 +71,4 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     end
   end
 
-
 end
