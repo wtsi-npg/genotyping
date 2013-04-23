@@ -58,8 +58,7 @@ class TestWorkflows < Test::Unit::TestCase
       run_name = 'run1'
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
-      args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :queue => @queue}]
+      args = [dbfile, run_name, work_dir, {:manifest => manifest}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::FetchSampleData,
@@ -84,8 +83,7 @@ class TestWorkflows < Test::Unit::TestCase
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :gender_method => 'Supplied',
                                            :chunk_size => 4000,
-                                           :memory => 2048,
-                                           :queue => @queue}]
+                                           :memory => 2048}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
@@ -109,8 +107,7 @@ class TestWorkflows < Test::Unit::TestCase
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :chunk_size => 2,
-                                           :memory => 2048,
-                                           :queue => @queue}]
+                                           :memory => 2048}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
