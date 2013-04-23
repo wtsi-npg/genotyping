@@ -70,19 +70,22 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
 
-      args = ensure_valid_args(args, :config, :manifest, :queue)
+      args = ensure_valid_args(args, :config, :manifest, :queue, :select)
       args[:work_dir] = maybe_work_dir(work_dir)
       manifest = args.delete(:manifest) # TODO: find manifest automatically
 
       async_defaults = {:memory => 500}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       sjname = run_name + '.sample.json'
       cjname = run_name + '.chr.json'
       smname = run_name + '.sim'
       gcname = run_name + '.gencall.bed'
 
-      sjson = sample_intensities(dbfile, run_name, sjname, args)
+      # Delete async args from sync task
+
+      sjson = sample_intensities(dbfile, run_name, sjname,
+                                 args.reject { |key, val| ![:select].include?(key) })
 
       smargs = {:metadata => cjname}.merge(args)
       smfile, cjson = gtc_to_sim(sjson, manifest, smname, smargs, async)

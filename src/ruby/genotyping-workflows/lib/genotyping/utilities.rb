@@ -130,7 +130,7 @@ module Genotyping
     end
 
     # subtract 1 from endpoint -- to work with simtools index convention
-    ranges.collect { |range| Range.new(range.begin + from, range.end+from-1)  }
+    ranges.collect { |range| Range.new(range.begin + from, range.end + from -1)  }
   end
 
   # Returns the partition group to which partition belongs (based on its index),
