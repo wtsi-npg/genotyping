@@ -40,6 +40,7 @@ sub defaultConfigDir {
 
 sub defaultJsonConfig {
     my $iniPath = shift;
+    $iniPath ||= $INI_FILE_DEFAULT;
     my $json = defaultConfigDir($iniPath)."/qc_config.json";
     return $json;
 }
