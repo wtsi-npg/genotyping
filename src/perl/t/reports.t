@@ -82,15 +82,15 @@ sub checkCsv {
         my @fields = split(/,/);
         my $cols = scalar(@fields);
         if ($cols!=$expectedCols) { 
-            print STDERR "Expected $expectedCols columns, ".
+            print STDERR "Expected $expectedCols .csv columns, ".
                 "found $cols at line $rows\n"; 
             $ok = 0; 
             last;
         } 
     }
     close $in || croak "Cannot close input $inPath";
-    if ($rows!=$expectedRows) { 
-        print STDERR "Expected $expectedRows rows, found $rows\n";
+    if ($ok==1 && $rows!=$expectedRows) { 
+        print STDERR "Expected $expectedRows .csv rows, found $rows\n";
         $ok = 0; 
     }
     return $ok;
