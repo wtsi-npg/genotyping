@@ -38,7 +38,10 @@ class TestWorkflows < Test::Unit::TestCase
     super(name)
     @msg_host = Socket.gethostname
     @msg_port = 11300
-    @queue = 'normal'
+    @queue = ENV['LSB_DEFAULTQUEUE']
+    unless @queue
+      @queue = :small
+    end
   end
 
   def data_path
