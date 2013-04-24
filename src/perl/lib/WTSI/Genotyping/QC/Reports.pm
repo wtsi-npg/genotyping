@@ -19,7 +19,8 @@ use Exporter;
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/createReports qcNameFromPath/;                  
-our @dbInfoHeaders = qw/run project supplier snpset/;
+our @dbInfoHeaders = qw/run project data_supplier snpset supplier_name rowcol 
+  beadchip_number /;
 our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
@@ -86,13 +87,23 @@ sub dbSampleInfo {
     my %sampleInfo;
     my @runs = $db->piperun->all;
     foreach my $run (@runs) {
-        my @info;
+        my @root;
         my @datasets = $run->datasets->all;
         foreach my $dataset (@datasets) {
             my @samples = $dataset->samples->all;
-            @info = ($run->name, $dataset->if_project, 
-                     $dataset->datasupplier->name, $dataset->snpset->name);
+            @root = ($run->name, $dataset->if_project, 
+                     $dataset->datasupplier->name,                    
+                     $dataset->snpset->name);
+            # query for rowcol, supplier name, chip no.
             foreach my $sample (@samples) {
+                my @info = (
+                    $sample->supplier_name,
+                    $sample->rowcol,
+                    $sample->beadchip);
+                foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
+                    if ($info[$i] eq "") { $info[$i] = "NA"; } 
+                }
+                unshift(@info, @root);
                 $sampleInfo{$sample->uri} = \@info;
             }
         }
