@@ -18,7 +18,7 @@ my $introPath = "$Bin/../etc/reportIntro.tex";
 my $config = defaultJsonConfig();
 
 my $inputdir = "$Bin/reports/";
-my $dbName = "pipeline.db";
+my $dbName = "test_pipeline.db";
 my $resultName = "qc_results.json";
 my $gtName = "sample_xhet_gender_thresholds.txt";
 my $tempdir = tempdir("/tmp/qc_report_tXXXXXX", CLEANUP => 1);
