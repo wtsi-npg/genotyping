@@ -46,8 +46,8 @@ $dbPath ||= "./test_genotyping.db";
 $iniPath ||= $ENV{HOME} . "/.npg/genotyping.ini";
 $plateSize ||= 96;
 $plateTotal ||= 20;
-$flip ||= 0.02;
-$excl ||= 0.05;
+unless (defined($flip)) { $flip = 0.02; } # may have flip==0
+unless (defined($excl)) { $excl = 0.05; } # may have excl==0
 
 my $etcDir = defaultConfigDir($iniPath);
 if (! (-e $etcDir)) { 
@@ -159,11 +159,15 @@ $db->in_transaction(sub {
         my $include = 1;
         if (rand() <= $excl) { $include = 0; $exclTotal++; }
         # 'sample names' are actually URI's; strip off prefix
+        my $uri = $sampleNames[$i];
         my @terms = split(':', $sampleNames[$i]);
         my $name = pop(@terms);
         my $sample = $dataset->add_to_samples
             ({name => $name,
-              beadchip => 'ABC123456',
+              sanger_sample_id => $uri,
+              supplier_name => 'supplier_name_Z',
+              rowcol => 'rowcol_XY',
+              beadchip => 'beadchip_ABC123456',
               include => $include});
         my $genderCode = $sampleGenders[$i];
         $flipTotal += addSampleGender($db, $sample, $genderCode, $flip);
