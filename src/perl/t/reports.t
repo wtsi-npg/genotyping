@@ -54,7 +54,7 @@ is(@csvText, 996, "Find CSV text"); # expect 996 lines, including header
 ok(WTSI::Genotyping::QC::Reports::writeCsv($resultPath, $dbPath, $config, 
                                            $csvPath), "Write CSV text"); 
 
-ok(checkCsv($csvPath, 996, 23), "Correct row/column totals in .csv file");
+ok(checkCsv($csvPath, 996, 26), "Correct row/column totals in .csv file");
 
 ok(WTSI::Genotyping::QC::Reports::writeSummaryLatex
    ($texPath, $resultPath, $config, $dbPath, $gtPath, $tempdir, $introPath, 
