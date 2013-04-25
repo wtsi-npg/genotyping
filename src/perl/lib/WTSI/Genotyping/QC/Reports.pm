@@ -18,9 +18,9 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/createReports qcNameFromPath/;                  
-our @dbInfoHeaders = qw/run project data_supplier snpset supplier_name rowcol 
-  beadchip_number /;
+our @EXPORT_OK = qw/createReports qcNameFromPath/; 
+our @dbInfoHeaders = qw/run project data_supplier snpset
+                        supplier_name rowcol beadchip_number/;
 our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
@@ -501,8 +501,7 @@ sub textForDatasets {
         @chars = splice(@chars, 0, 20);
         $qcDir = join('', @chars)."...";
     }
-    my @headers;
-    push @headers, @dbInfoHeaders;
+    my @headers = @dbInfoHeaders[0..3];
     if ($qcDir) { push(@headers, "directory"); }
     my @text = (\@headers, );
     my @datasetInfo = dbDatasetInfo($dbPath);
