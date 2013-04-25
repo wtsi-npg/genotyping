@@ -22,6 +22,10 @@ __PACKAGE__->add_columns
    'id_dataset',       { data_type => 'integer',
                          is_foreign_key => 1,
                          is_nullable => 0 },
+   'supplier_name',    { data_type => 'text',
+                         is_nullable => 1 },
+   'rowcol',           { data_type => 'text',
+                         is_nullable => 1 },
    'include',          { data_type => 'integer',
                          is_nullable => 0 });
 

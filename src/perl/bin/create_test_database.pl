@@ -20,7 +20,6 @@ GetOptions("sample-gender=s"   => \$sampleGenderPath,
            "inipath=s"     => \$iniPath,
            "plate-size=i"  => \$plateSize,
            "plate-total=i" => \$plateTotal,
-           "flip=f"        => \$flip,
            "excl=f"        => \$excl,
            "help"          => \$help,
     );
@@ -29,11 +28,10 @@ if ($help) {
     print STDERR "Usage: $0 [ options ] 
 Options:
 --sample-gender     Path to sample_xhet_gender.txt file, to input sample names and inferred genders
---dbpath            Path to pipeline.db file, to obtain plate names for each sample
+--dbpath            Path to pipeline.db file output
 --inipath           Path to .ini file for pipeline database
 --plate-size        Number of samples on each plate (maximum 384)
 --plate-total       Total number of plates.  If (plate size)*(plate total) is less than number of samples, excess samples will have no plate information.
---flip              Probability of flip between inferred and supplied gender
 --excl              Probability of sample being arbitrarily excluded
 --help              Print this help text and exit
 Unspecified options will receive default values.
@@ -46,8 +44,7 @@ $dbPath ||= "./test_genotyping.db";
 $iniPath ||= $ENV{HOME} . "/.npg/genotyping.ini";
 $plateSize ||= 96;
 $plateTotal ||= 20;
-$flip ||= 0.02;
-$excl ||= 0.05;
+unless (defined($excl)) { $excl = 0.05; } # may have excl==0
 
 my $etcDir = defaultConfigDir($iniPath);
 if (! (-e $etcDir)) { 
@@ -63,24 +60,29 @@ sub getSampleNamesGenders {
     # from sample_xhet_gender.txt
     my $inPath = shift;
     open (my $in, "< $inPath");
-    my (@samples, @genders);
+    my (@samples, @inferred, @supplied);
     my $first = 1;
     while (<$in>) {
-	if ($first) { $first = 0; next; } # skip header
-	my @words = split;
-	push(@samples, $words[0]);
-	push(@genders, $words[2]);
+        if ($first) { $first = 0; next; } # skip header
+        my @words = split;
+        push(@samples, $words[0]);
+        push(@inferred, $words[2]);
+        push(@supplied, $words[3]);
     }
     close $in;
-    return (\@samples, \@genders);
+    return (\@samples, \@inferred, \@supplied);
 }
 
 sub addSampleGender {
-    my ($db, $sample, $genderCode, $flip) = @_;
-    my $inferred = $db->method->find({name => 'Inferred'});
-    my $supplied = $db->method->find({name => 'Supplied'});
+    my ($db, $sample, $genderCode, $inferred) = @_;
+    # $inferred: Gender inferred if true, supplied otherwise
+    my $method;
+    if ($inferred) {
+        $method = $db->method->find({name => 'Inferred'});
+    } else {
+        $method = $db->method->find({name => 'Supplied'});
+    }
     my $gender;
-    my $flipped = 0;
     if ($genderCode==1) { 
         $gender = $db->gender->find({name => 'Male'}); 
     } elsif ($genderCode==2) { 
@@ -90,34 +92,16 @@ sub addSampleGender {
     } else { 
         $gender = $db->gender->find({name => 'Not available'}); 
     }
-    $sample->add_to_genders($gender, {method => $inferred});
-    if ($genderCode==0) { # ambiguous gender check; assign 'supplied' randomly
-        if (rand() <= 0.5) {
-            $gender = $db->gender->find({name => 'Male'}); 
-        } else {
-            $gender = $db->gender->find({name => 'Female'}); 
-        }
-    } elsif (rand() <= $flip) { # flip from inferred gender
-        if ($genderCode==1) {
-            $gender = $db->gender->find({name => 'Female'}); 
-        } elsif ($genderCode==2) { 
-            $gender = $db->gender->find({name => 'Male'}); 
-        }
-        $flipped = 1;
-    }
-    $sample->add_to_genders($gender, {method => $supplied});
-    return $flipped;
+    $sample->add_to_genders($gender, {method => $method});
 }
 
 Log::Log4perl->init("etc/log4perl.conf");
 
-my ($namesRef, $gendersRef) = getSampleNamesGenders($sampleGenderPath);
+my ($namesRef, $gRefInferred, $gRefSupplied) 
+    = getSampleNamesGenders($sampleGenderPath);
 my @sampleNames = @$namesRef;
-my @sampleGenders = @$gendersRef;
-my %genders;
-foreach my $i (0..@sampleNames-1) { 
-    $genders{$sampleNames[$i]} = $sampleGenders[$i]; 
-}
+my @gInferred = @$gRefInferred;
+my @gSupplied = @$gRefSupplied;
 print "Read ".@sampleNames." samples from file.\n";
 
 ## create & initialize database object
@@ -130,7 +114,7 @@ my $schema;
 $schema = $db->connect(RaiseError => 1,
                        on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
 $db->populate;
-my $run = $db->piperun->find_or_create({name => 'test',
+my $run = $db->piperun->find_or_create({name => 'pipeline_run',
                                         start_time => time()});
 ## get values for (supplier, snpset, dataset) objects
 my $supplier = $db->datasupplier->find_or_create({name => $ENV{'USER'},
@@ -159,14 +143,18 @@ $db->in_transaction(sub {
         my $include = 1;
         if (rand() <= $excl) { $include = 0; $exclTotal++; }
         # 'sample names' are actually URI's; strip off prefix
+        my $uri = $sampleNames[$i];
         my @terms = split(':', $sampleNames[$i]);
         my $name = pop(@terms);
         my $sample = $dataset->add_to_samples
             ({name => $name,
-              beadchip => 'ABC123456',
+              sanger_sample_id => $uri,
+              supplier_name => 'supplier_name_Z',
+              rowcol => 'rowcol_XY',
+              beadchip => 'beadchip_ABC123456',
               include => $include});
-        my $genderCode = $sampleGenders[$i];
-        $flipTotal += addSampleGender($db, $sample, $genderCode, $flip);
+        addSampleGender($db, $sample, $gInferred[$i], 1);
+        addSampleGender($db, $sample, $gSupplied[$i], 0);
         if ($i >= $wells) { next; }
         my $plateNum = int($i / $plateSize);
         my $plate = $plates[$plateNum];
@@ -203,9 +191,6 @@ foreach my $sample (@samples) {
           'method.name' => 'Supplied'},
          {join => {'sample_genders' => ['method', 'sample']}},
          {prefetch =>  {'sample_genders' => ['method', 'sample']} });
-    if ($gender->code != $genders{$sample_name}) {
-        $mismatch++;
-    }
     my $well = ($sample->wells->all)[0]; # assume one well per sample
     my $label = 'Unknown_address';
     my $plateName = 'Unknown_plate';
@@ -217,12 +202,10 @@ foreach my $sample (@samples) {
     }
     if ($i % 100 == 0) {
         print $sample_name." ".$gender->code." ".
-            $genders{$sample_name}." ".$label." ".$plateName."\n";
+            $label." ".$plateName."\n";
     }
     $i++;
 }
-print "$mismatch supplied/inferred gender mismatches.\n";
-
 
 $db->disconnect();
 
