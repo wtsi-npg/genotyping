@@ -1,4 +1,3 @@
-.pversion
 bin/check_duplicates_bed.pl
 bin/check_identity_bed.pl
 bin/check_xhet_gender.pl
@@ -103,7 +102,6 @@ t/gender/alpha.fam
 t/gender/benchmark_gender.json
 t/gender/input_xhet.json
 t/gender/input_xhet.txt
-t/gender/sample_xhet_gender_thresholds.txt
 t/identity.t
 t/identity/identity_check_failed_pairs.txt
 t/identity/identity_check_failed_pairs_match.txt
