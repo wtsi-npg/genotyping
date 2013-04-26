@@ -15,13 +15,13 @@ use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 my $testName = 'small_test';
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plinkA = "$Bin/qc_test_data/$testName";
-my $simA = "$Bin/qc_test_data/$testName.sim";
-my $outDirA = "$Bin/qc/$testName/";
+my $plink = "$Bin/qc_test_data/$testName";
+my $sim = "$Bin/qc_test_data/$testName.sim";
+my $outDir = "$Bin/qc/$testName/";
 my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
-my $dbnameA = "small_test.db";
-my $dbfileMasterA = "$Bin/qc_test_data/$dbnameA";
+my $dbname = "small_test.db";
+my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
 my $config = "$bin/../etc/qc_config.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
@@ -32,11 +32,11 @@ $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
-my $dbfileA = $tempdir."/".$dbnameA;
+my $dbfile = $tempdir."/".$dbname;
 
 # may later include datasets 'beta', 'gamma', etc.
-
-chdir($outDirA);
+unless (-e $outDir && -d $outDir) { mkdir($outDir); }
+chdir($outDir);
 system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
        'supplementary/*'); # remove any previous output
 
@@ -45,28 +45,28 @@ system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --config $config $plinkA");
+$status = system("$bin/check_identity_bed.pl --config $config $plink");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";
-$status = system("$crHetFinder $plinkA");
+$status = system("$crHetFinder $plink");
 is($status, 0, "snp_af_sample_cr_bed exit status");
 
 ## test duplicate check
-$status = system("$bin/check_duplicates_bed.pl $plinkA");
+$status = system("$bin/check_duplicates_bed.pl $plink");
 is($status, 0, "check_duplicates_bed.pl exit status");
 
 ## test gender check
-$status = system("$bin/check_xhet_gender.pl --input=$plinkA");
+$status = system("$bin/check_xhet_gender.pl --input=$plink");
 is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test xydiff computation
-$status = system("$bin/intensity_metrics.pl --input=$simA --magnitude=magnitude.txt --xydiff=xydiff.txt");
+$status = system("$bin/intensity_metrics.pl --input=$sim --magnitude=magnitude.txt --xydiff=xydiff.txt");
 is($status, 0, "intensity_metrics.pl exit status");
 
 ## test collation into summary
-$status = system("$bin/write_qc_status.pl --dbpath=$dbfileA --inipath=$iniPath");
+$status = system("$bin/write_qc_status.pl --dbpath=$dbfile --inipath=$iniPath");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
@@ -74,7 +74,7 @@ ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 ### test creation of plots ###
 
 ## PDF scatterplots for each metric
-$status = system("$bin/plot_metric_scatter.pl --dbpath=$dbfileA");
+$status = system("$bin/plot_metric_scatter.pl --dbpath=$dbfile");
 is($status, 0, "plot_metric_scatter.pl exit status");
 
 # identity plot expected to be missing!
@@ -86,7 +86,7 @@ foreach my $metric (@metrics) {
 ## plate heatmap plots
 my @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
-    $cmd = "cat sample_cr_het.txt | $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDirA/$heatMapDir --dbpath=$dbfileA --inipath=$iniPath";
+    $cmd = "cat sample_cr_het.txt | $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDir/$heatMapDir --dbpath=$dbfile --inipath=$iniPath";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
     for (my $i=0;$i<2;$i++) { 
         my $png = "plate_heatmaps/plot_".$mode."_ssbc0000$i.png";
@@ -124,7 +124,7 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
-$cmd = "$bin/run_qc.pl --output-dir=. --dbpath=$dbfileA --sim=$simA $plinkA --run=$piperun --inipath=$iniPath"; 
+$cmd = "$bin/run_qc.pl --output-dir=. --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
@@ -150,7 +150,7 @@ ok(-r 'pipeline_summary.pdf', "PDF summary found");
 ## test standalone report script
 print "\tTesting standalone report generation script.\n";
 system('rm -f pipeline_summary.*');
-$cmd = "$bin/write_qc_reports.pl --database $dbfileA --input ".
+$cmd = "$bin/write_qc_reports.pl --database $dbfile --input ".
     "./supplementary";
 system($cmd);
 ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
