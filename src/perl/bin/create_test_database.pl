@@ -149,8 +149,8 @@ $db->in_transaction(sub {
         my $sample = $dataset->add_to_samples
             ({name => $name,
               sanger_sample_id => $uri,
-              supplier_name => 'supplier_name_Z',
-              rowcol => 'rowcol_XY',
+              supplier_name => 'supplier_WeylandYutani'.sprintf("%05d",$i),
+              rowcol => 'rowcol_number'.sprintf("%03d", $i % $plateSize),
               beadchip => 'beadchip_ABC123456',
               include => $include});
         addSampleGender($db, $sample, $gInferred[$i], 1);
