@@ -27,6 +27,19 @@ our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity
   magnitude/;
 our $NON_EMPTY_FIELDS = @dbInfoHeaders + 2; # add name, inclusion status
 
+sub bySampleName {
+    # comparison function for sorting samples in getSampleInfo
+    # if in plate_well_id format, sort by id; otherwise use standard sort
+    if ($a =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/ &&
+        $b =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/) {
+        my @termsA = split(/_/, $a);
+        my @termsB = split(/_/, $b);
+        return $termsA[-1] cmp $termsB[-1];
+    } else {
+        return $a cmp $b;
+    }   
+}
+
 sub createReports {
     # 'main' method to write text and CSV files
     my ($csvPath, $texPath, $resultPath, $config, $dbPath, 
@@ -190,7 +203,7 @@ sub getSampleInfo {
     my %records = %{ shift() };
     my @sampleFields;
     my @samples = keys(%records);
-    @samples = sort @samples;
+    @samples = sort bySampleName @samples;
     my $include = 1; # all samples with QC results were included in genotyping
     foreach my $sample (@samples) {
         if (not $records{$sample}) { 
@@ -467,9 +480,13 @@ sub textForCsv {
     my @text = (\@headers,);
     my @sampleFields = getSampleInfo($resultsRef, $config); # genotyped samples
     my %dbInfo = dbSampleInfo($dbPath); # all samples
+    my @excluded = dbExcludedSamples($dbPath);
+    my %excluded;
+    foreach my $sam (@excluded) { $excluded{$sam}=1; }
     foreach my $ref (@sampleFields) {
         my @out = sampleFieldsToText($ref);
         my $sample = $out[0];
+        if ($excluded{$sample}) { next; }
         unshift(@out, @{$dbInfo{$sample}});
         if ($#headers != $#out) { 
             croak "Numbers of output headers and fields differ:".
@@ -478,7 +495,6 @@ sub textForCsv {
         push(@text, \@out);
     }
     # append empty lines for excluded samples
-    my @excluded = dbExcludedSamples($dbPath);
     foreach my $sample (@excluded) {
         my @out = ($sample, 0);
         my $i = 0;
