@@ -6,6 +6,7 @@
 
 use strict;
 use warnings;
+use Carp;
 use Cwd qw/abs_path/;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
@@ -36,7 +37,7 @@ my $dbfile = $tempdir."/".$dbname;
 
 # may later include datasets 'beta', 'gamma', etc.
 unless (-e $outDir && -d $outDir) { mkdir($outDir); }
-chdir($outDir);
+chdir($outDir) || croak "Cannot cd to output directory \"$outDir\"";
 system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
        'supplementary/*'); # remove any previous output
 
