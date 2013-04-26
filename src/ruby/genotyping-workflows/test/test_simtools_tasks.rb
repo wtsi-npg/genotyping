@@ -81,21 +81,4 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     end
   end
 
-  def test_gtc_to_sim_fail
-    run_test_if(method(:simtools_available?), "Skipping test_gtc_to_sim") do
-      work_dir = make_work_dir('test_gtc_to_sim', data_path)
-
-      assert_raise Percolate::AsyncTaskError do
-        sim_file, metadata = wait_for('test_gtc_to_sim', 60, 5) do
-          gtc_to_sim('dummy', 'dummy', 'dummy.sim',
-                     {:work_dir =>  work_dir,
-                      :log_dir => work_dir,
-                      :metadata => 'chr.json'})
-        end
-      end
-
-      Percolate.log.close
-      remove_work_dir(work_dir)
-    end
-  end
 end
