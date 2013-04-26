@@ -83,6 +83,7 @@ Returns:
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 20
+      gtconfig = args.delete(:config)
 
       args.delete(:memory)
       args.delete(:queue)
@@ -101,7 +102,8 @@ Returns:
       smname = run_name + '.genosnp.sim'
       gsname = run_name + '.genosnp.bed'
 
-      sjson = sample_intensities(dbfile, run_name, sjname, args)
+      siargs = {:config => gtconfig}.merge(args)
+      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       num_samples = count_samples(sjson)
 
       smargs = {:normalize => false }.merge(args)

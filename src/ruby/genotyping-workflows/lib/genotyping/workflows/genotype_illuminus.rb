@@ -90,6 +90,7 @@ Returns:
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
       min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
+      gtconfig = args.delete(:config)
 
       args.delete(:memory)
       args.delete(:queue)
@@ -125,7 +126,8 @@ Returns:
 
       smfile = nil
       if gcquality
-        siargs = {:gender_method => gender_method}.merge(args)
+        siargs = {:config => gtconfig,
+                  :gender_method => gender_method}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
 
         smargs = {:normalize => true }.merge(args)
@@ -165,6 +167,7 @@ Returns:
 
       qcargs = {:run => run_name,
                 :sim => smfile}.merge(args) # add smfile to qcargs
+
       ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
