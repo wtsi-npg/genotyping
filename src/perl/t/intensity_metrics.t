@@ -13,7 +13,7 @@ use WTSI::Genotyping::QC::SimFiles qw/headerParams readSampleNames
  writeIntensityMetrics/;
 
 my $testDir = "/nfs/users/nfs_i/ib5/mygit/github/genotyping/src/perl/t/";
-my $simPath = $testDir."qc_test_data/alpha.sim";
+my $simPath = $testDir."qc_test_data/small_test.sim";
 
 my $temp = tempdir( CLEANUP => 1 );
 my $outPathMag = $temp."/mag.txt";
@@ -24,7 +24,7 @@ open my $in, "<", $simPath || die "Cannot open .sim path $simPath: $!";
 my %params = headerParams($in);
 is(keys(%params), 9, "Header params of correct length");
 my @names = readSampleNames($in, \%params);
-is(@names, 995, "Correct number of sample names");
+is(@names, 100, "Correct number of sample names");
 close $in || die "Cannot close .sim path $simPath: $!";
 
 ok(writeIntensityMetrics($simPath, $outPathMag, $outPathXY, $logPath), 

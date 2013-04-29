@@ -1,3 +1,0 @@
-*.txt -crlf -diff
-*.png -crlf -diff
-*.html -crlf -diff

@@ -168,6 +168,7 @@ sub run {
          my $if_well = $if_sample->{'well'};
          my $if_name = $if_sample->{'sample'};
          my $if_status = $if_sample->{'status'};
+         my $if_rowcol = $if_sample->{'beadchip_section'};
 
          my $ss_plate;
          if (exists $cache{$if_sample->{'plate'}}) {
@@ -176,9 +177,10 @@ sub run {
          else {
            $ss_plate = $ssdb->find_infinium_plate($if_barcode);
          }
-
          my $address = $pipedb->address->find({label1 => $if_well});
          my $ss_sample = $ss_plate->{$address->label2};
+         my $ss_supply = $ss_plate->{'supplier_name'};
+         unless (defined($ss_supply)) { $ss_supply = ""; } # field may be null
 
          # Untracked
          my $ss_id = $ss_sample->{sanger_sample_id} ||
@@ -198,7 +200,9 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                include => 0});
+                                                include => 0,
+                                                supplier_name => $ss_supply,
+                                                rowcol => $if_rowcol});
 
          # If consent has been withdrawn, do not analyse and do not
          # look in SNP for Sequenom genotypes

@@ -18,13 +18,27 @@ use WTSI::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/createReports qcNameFromPath/;                  
-our @dbInfoHeaders = qw/run project supplier snpset/;
+our @EXPORT_OK = qw/createReports qcNameFromPath/; 
+our @dbInfoHeaders = qw/run project data_supplier snpset
+                        supplier_name rowcol beadchip_number/;
 our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
   magnitude/;
 our $NON_EMPTY_FIELDS = @dbInfoHeaders + 2; # add name, inclusion status
+
+sub bySampleName {
+    # comparison function for sorting samples in getSampleInfo
+    # if in plate_well_id format, sort by id; otherwise use standard sort
+    if ($a =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/ &&
+        $b =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/) {
+        my @termsA = split(/_/, $a);
+        my @termsB = split(/_/, $b);
+        return $termsA[-1] cmp $termsB[-1];
+    } else {
+        return $a cmp $b;
+    }   
+}
 
 sub createReports {
     # 'main' method to write text and CSV files
@@ -86,13 +100,23 @@ sub dbSampleInfo {
     my %sampleInfo;
     my @runs = $db->piperun->all;
     foreach my $run (@runs) {
-        my @info;
+        my @root;
         my @datasets = $run->datasets->all;
         foreach my $dataset (@datasets) {
             my @samples = $dataset->samples->all;
-            @info = ($run->name, $dataset->if_project, 
-                     $dataset->datasupplier->name, $dataset->snpset->name);
+            @root = ($run->name, $dataset->if_project, 
+                     $dataset->datasupplier->name,                    
+                     $dataset->snpset->name);
+            # query for rowcol, supplier name, chip no.
             foreach my $sample (@samples) {
+                my @info = (
+                    $sample->supplier_name,
+                    $sample->rowcol,
+                    $sample->beadchip);
+                foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
+                    if ($info[$i] eq "") { $info[$i] = "NA"; } 
+                }
+                unshift(@info, @root);
                 $sampleInfo{$sample->uri} = \@info;
             }
         }
@@ -179,7 +203,7 @@ sub getSampleInfo {
     my %records = %{ shift() };
     my @sampleFields;
     my @samples = keys(%records);
-    @samples = sort @samples;
+    @samples = sort bySampleName @samples;
     my $include = 1; # all samples with QC results were included in genotyping
     foreach my $sample (@samples) {
         if (not $records{$sample}) { 
@@ -456,9 +480,13 @@ sub textForCsv {
     my @text = (\@headers,);
     my @sampleFields = getSampleInfo($resultsRef, $config); # genotyped samples
     my %dbInfo = dbSampleInfo($dbPath); # all samples
+    my @excluded = dbExcludedSamples($dbPath);
+    my %excluded;
+    foreach my $sam (@excluded) { $excluded{$sam}=1; }
     foreach my $ref (@sampleFields) {
         my @out = sampleFieldsToText($ref);
         my $sample = $out[0];
+        if ($excluded{$sample}) { next; }
         unshift(@out, @{$dbInfo{$sample}});
         if ($#headers != $#out) { 
             croak "Numbers of output headers and fields differ:".
@@ -467,7 +495,6 @@ sub textForCsv {
         push(@text, \@out);
     }
     # append empty lines for excluded samples
-    my @excluded = dbExcludedSamples($dbPath);
     foreach my $sample (@excluded) {
         my @out = ($sample, 0);
         my $i = 0;
@@ -490,8 +517,7 @@ sub textForDatasets {
         @chars = splice(@chars, 0, 20);
         $qcDir = join('', @chars)."...";
     }
-    my @headers;
-    push @headers, @dbInfoHeaders;
+    my @headers = @dbInfoHeaders[0..3];
     if ($qcDir) { push(@headers, "directory"); }
     my @text = (\@headers, );
     my @datasetInfo = dbDatasetInfo($dbPath);
