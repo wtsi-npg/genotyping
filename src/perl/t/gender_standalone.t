@@ -21,7 +21,7 @@ Log::Log4perl::init('etc/log4perl_tests.conf');
 
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plink = "$Bin/qc_test_data/alpha";
+my $plink = "$Bin/gender/alpha";
 my $outDir = "$Bin/gender/";
 my $inputDir = $outDir;
 my $title = "Alpha";

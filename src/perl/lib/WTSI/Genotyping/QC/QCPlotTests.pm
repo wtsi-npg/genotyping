@@ -218,7 +218,7 @@ sub wrapCommand {
     # as for wrapPlotCommand, but without check on PNG output
     my @args = @_;
     my $temp = mktemp("r_script_output_XXXXXX"); # creates temporary filename
-    my $cmd = join(" ", @args)." >& $temp"; # assumes csh for redirect
+    my $cmd = "bash -c \"".join(" ", @args)." &> $temp\""; 
     my $result = system($cmd);
     my $info;
     my $ok = 1;
@@ -244,7 +244,8 @@ sub wrapPlotCommand {
     $returnOutput ||= 0;
     my $plotsOK = 1;
     my $temp = mktemp("r_script_output_XXXXXX"); # creates temporary filename
-    my $cmd = join(' ', @args).' '.join(' ', @outputs)." >& $temp"; # assumes csh for redirect
+    my $cmd = "bash -c \"".join(' ', @args).' '.join(' ', @outputs).
+        " &> $temp\""; 
     my $startTime = time();
     my $result = system($cmd);
     my $info;

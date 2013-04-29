@@ -23,7 +23,7 @@ my $start = time();
 my $dbWorkDir = "$Bin/.."; # must change dir to genoytping/src/perl for default pipeline database config
 chdir($dbWorkDir);
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plink = "$Bin/qc_test_data/alpha";
+my $plink = "$Bin/gender/alpha";
 my $outDir = "$Bin/gender/";
 my $inputDir = $outDir;
 my $title = "Alpha";

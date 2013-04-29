@@ -43,7 +43,7 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
   end
 
   def setup
-    Percolate.log = Logger.new(File.join(data_path, 'test_genotype_call_tasks.log'))
+    Percolate.log = Logger.new(File.join(data_path, 'test_simtools_tasks.log'))
     Percolate.asynchronizer = SystemAsynchronizer.new
   end
 

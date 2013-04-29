@@ -76,15 +76,18 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :chunk_size)
+                               :select, :chunk_size)
 
       async_defaults = {:memory => 1024}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 20
+      gtconfig = args.delete(:config)
+
       args.delete(:memory)
       args.delete(:queue)
+      args.delete(:select)
 
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
@@ -99,7 +102,8 @@ Returns:
       smname = run_name + '.genosnp.sim'
       gsname = run_name + '.genosnp.bed'
 
-      sjson = sample_intensities(dbfile, run_name, sjname, args)
+      siargs = {:config => gtconfig}.merge(args)
+      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       num_samples = count_samples(sjson)
 
       smargs = {:normalize => false }.merge(args)

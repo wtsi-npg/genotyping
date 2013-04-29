@@ -111,6 +111,12 @@ sub readManifest {
         }
         $snp{'allele_a'} = $alleles[0];
         $snp{'allele_b'} = $alleles[1];
+        # change chromosome ID to satisfy plink convention
+        my $key = 'chromosome';
+        if ($snp{$key} eq 'X') { $snp{$key}=23; }
+        elsif ($snp{$key} eq 'Y') { $snp{$key}=24; }
+        elsif ($snp{$key} eq 'XY') { $snp{$key}=25; }
+        elsif ($snp{$key} eq 'MT') { $snp{$key}=26; }
         push(@manifest, \%snp);
     }
     close $in || croak "Cannot close input path $inPath";

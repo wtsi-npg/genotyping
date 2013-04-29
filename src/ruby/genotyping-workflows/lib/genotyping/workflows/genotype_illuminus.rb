@@ -81,17 +81,20 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :chunk_size, :gender_method)
+                               :select, :chunk_size, :gender_method)
 
       async_defaults = {:memory => 1024}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
       min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
+      gtconfig = args.delete(:config)
+
       args.delete(:memory)
       args.delete(:queue)
+      args.delete(:select)
 
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
@@ -116,36 +119,39 @@ Returns:
       ## run gencall QC to apply gencall CR filter and find genders
       gcqcargs = {:run => run_name,
                   :post_filter_cr => min_cr}.merge(args)
+
       gcqcdir = File.join(work_dir, 'gencall_qc')
       gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
                                   async, true)
 
       smfile = nil
       if gcquality
-        siargs = {:gender_method => gender_method}.merge(args)
+        siargs = {:config => gtconfig,
+                  :gender_method => gender_method}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-        
+
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
       end
+
       cjson = nil
       if smfile
         njson, cjson = parse_manifest(manifest, njname, cjname, args)
       end
 
       ilargs = {:size => chunk_size,
-        :group_size => 50,
-        :plink => true,
-        :snps => njson}.merge(args)
+                :group_size => 50,
+                :plink => true,
+                :snps => njson}.merge(args)
       
       ilchunks = nil
 
       if cjson
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
-          chr = cspec["chromosome"]
+          chr = cspec['chromosome']
           pargs = {:chromosome => chr,
-            :start => cspec["start"],
-            :end => cspec["end"]}
+                   :start => cspec['start'],
+                   :end => cspec['end']}
           
           call_from_sim_p(smfile, sjson, manifest, run_name + '.' + chr,
                           ilargs.merge(pargs), async)
@@ -161,6 +167,7 @@ Returns:
 
       qcargs = {:run => run_name,
                 :sim => smfile}.merge(args) # add smfile to qcargs
+
       ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?

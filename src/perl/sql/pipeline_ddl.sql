@@ -116,6 +116,8 @@ CREATE TABLE sample (
 id_sample INTEGER PRIMARY KEY AUTOINCREMENT,
 name TEXT NOT NULL UNIQUE,
 sanger_sample_id TEXT,
+supplier_name TEXT,
+rowcol TEXT,
 beadchip TEXT NOT NULL,
 id_dataset INTEGER NOT NULL REFERENCES dataset(id_dataset),
 include INTEGER NOT NULL

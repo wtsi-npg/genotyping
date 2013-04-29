@@ -38,7 +38,10 @@ class TestWorkflows < Test::Unit::TestCase
     super(name)
     @msg_host = Socket.gethostname
     @msg_port = 11300
-    @queue = 'normal'
+    @queue = ENV['LSB_DEFAULTQUEUE']
+    unless @queue
+      @queue = :small
+    end
   end
 
   def data_path
@@ -56,7 +59,7 @@ class TestWorkflows < Test::Unit::TestCase
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :queue => @queue}]
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::FetchSampleData,
@@ -76,13 +79,15 @@ class TestWorkflows < Test::Unit::TestCase
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
+      pipe_ini = File.join(data_path, 'genotyping.ini')
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
+                                           :config => pipe_ini,
                                            :gender_method => 'Supplied',
-                                           :chunk_size => 4000,
+                                           :chunk_size => 10000,
                                            :memory => 2048,
-                                           :queue => @queue}]
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
@@ -105,9 +110,9 @@ class TestWorkflows < Test::Unit::TestCase
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :chunk_size => 2,
+                                           :chunk_size => 4,
                                            :memory => 2048,
-                                           :queue => @queue}]
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
