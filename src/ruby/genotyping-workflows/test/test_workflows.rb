@@ -58,7 +58,8 @@ class TestWorkflows < Test::Unit::TestCase
       run_name = 'run1'
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
-      args = [dbfile, run_name, work_dir, {:manifest => manifest}]
+      args = [dbfile, run_name, work_dir, {:manifest => manifest,
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::FetchSampleData,
@@ -78,12 +79,15 @@ class TestWorkflows < Test::Unit::TestCase
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
+      pipe_ini = File.join(data_path, 'genotyping.ini')
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
+                                           :config => pipe_ini,
                                            :gender_method => 'Supplied',
-                                           :chunk_size => 4000,
-                                           :memory => 2048}]
+                                           :chunk_size => 10000,
+                                           :memory => 2048,
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
@@ -106,8 +110,9 @@ class TestWorkflows < Test::Unit::TestCase
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :chunk_size => 2,
-                                           :memory => 2048}]
+                                           :chunk_size => 4,
+                                           :memory => 2048,
+                                           :select => 'lenny'}]
       timeout = 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
