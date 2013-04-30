@@ -81,8 +81,8 @@ class TestZCallTasks < Test::Unit::TestCase
       end
 
       assert(File.exist?(t_json))
-      assert_equal(3, JSON.parse(File.read(t_json)).size)
-      assert_equal(3, t_files.size)
+      assert_equal(ztotal, JSON.parse(File.read(t_json)).size)
+      assert_equal(ztotal, t_files.size)
       t_files.each do |file| 
         assert(File.exist?(file))
         assert_equal(247871, File.open(file) { |f| f.readlines.size })
@@ -138,7 +138,7 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_run_zcall_array
-    run_test_if(method(:zcall_available?), "Skipping test_run_zcall") do
+    run_test_if(method(:zcall_available?), "Skipping test_run_zcall_array") do
       work_dir = make_work_dir('test_zcall_run_array', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run_array', 120, 5) do
