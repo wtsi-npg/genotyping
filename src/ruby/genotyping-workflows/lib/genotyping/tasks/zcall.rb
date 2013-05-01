@@ -172,7 +172,9 @@ def zcall_evaluate_available?()
         end
         index_path = File.join(work_dir, METRIC_INDEX)
         unless File.exists?(index_path)
-          JSON.dump(out_paths, File.new(index_path, mode='w'))
+          index_file = File.new(index_path, mode='w')
+          JSON.dump(out_paths, index_file)
+          index_file.close # need to ensure file closure!
         end
         commands = evaluation_args.collect do |args| 
           cmd = [EVALUATE, cli_arg_map(args, :prefix => '--')]
@@ -293,7 +295,7 @@ def zcall_evaluate_available?()
                                  :post => lambda { 
                                    ensure_files(bed_paths, :error => false)
                                  },
-                                 :result => lambda { bed_paths },
+                                 :result => lambda { |i| bed_paths[i] },
                                  :async => async)
       end
     end
