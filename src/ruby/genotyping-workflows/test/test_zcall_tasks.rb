@@ -130,7 +130,8 @@ class TestZCallTasks < Test::Unit::TestCase
                   { :work_dir => work_dir },
                   :queue=>@queue)
       end
-      cmd = 'plink --bfile '+File.join(work_dir, 'zcall')+' --out '+File.join(work_dir, 'plink')
+      cmd = 'plink --bfile '+File.join(work_dir, 'zcall')+
+        ' --silent --out '+File.join(work_dir, 'plink')
       assert(system(cmd))
       Percolate.log.close
       remove_work_dir(work_dir)
@@ -148,6 +149,13 @@ class TestZCallTasks < Test::Unit::TestCase
                         :queue=>@queue)
       end
       Percolate.log.close
+      assert_equal(2, result.size)
+      ['000', '001'].collect do | x |
+        cmd =  'plink --bfile '+
+          File.join(work_dir, 'zcall_temp', 'samples_part_'+x)+
+          ' --silent --out '+File.join(work_dir, 'plink_'+x)
+        assert(system(cmd))
+      end
       remove_work_dir(work_dir)
     end
   end
