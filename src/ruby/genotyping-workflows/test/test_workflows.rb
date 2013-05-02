@@ -65,7 +65,7 @@ class TestWorkflows < Test::Unit::TestCase
                                            :chunk_size => 10000,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 720
+      timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
                              timeout, work_dir, log, args)
@@ -90,7 +90,7 @@ class TestWorkflows < Test::Unit::TestCase
                                            :chunk_size => 4,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 720
+      timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
                              timeout, work_dir, log, args)
