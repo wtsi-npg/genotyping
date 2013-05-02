@@ -48,29 +48,6 @@ class TestWorkflows < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_fetch_sample_data
-    manifest = ENV['BEADPOOL_MANIFEST']
-    name = 'test_fetch_sample_data'
-
-    run_test_if(lambda { manifest }, "Skipping #{name}") do
-      work_dir = make_work_dir(name, data_path)
-      dbfile = File.join(work_dir, name + '.db')
-      run_name = 'run1'
-
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
-      args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :select => 'lenny'}]
-      timeout = 720
-      log = 'percolate.log'
-      result = test_workflow(name, Genotyping::Workflows::FetchSampleData,
-                             timeout, work_dir, log, args)
-      assert(result)
-
-      Percolate.log.close
-      remove_work_dir(work_dir) if result
-    end
-  end
-
   def test_genotype_illuminus
     manifest = ENV['BEADPOOL_MANIFEST']
     name = 'test_genotype_illuminus'
@@ -88,7 +65,7 @@ class TestWorkflows < Test::Unit::TestCase
                                            :chunk_size => 10000,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 720
+      timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
                              timeout, work_dir, log, args)
@@ -113,7 +90,7 @@ class TestWorkflows < Test::Unit::TestCase
                                            :chunk_size => 4,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 720
+      timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
                              timeout, work_dir, log, args)
