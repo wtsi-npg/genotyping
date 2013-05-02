@@ -129,13 +129,12 @@ def zcall_evaluate_available?()
                                :prefix => '--')].flatten.join(' ')
         threshold_json = File.join(work_dir, 'thresholds.json')
         threshold_text = []
-        zscores = [6,7,8]
+        zscores = Array(Range.new(zstart, zstart+ztotal, true))
         zscores.each do |z|
           t = 'thresholds_HumanExome-12v1_z0'+z.to_s()+'.txt'
           threshold_text.push(File.join(work_dir, t))
         end
         expected = [threshold_json, threshold_text].flatten
-
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
                    :result => lambda { [threshold_json, threshold_text] },
