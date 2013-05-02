@@ -67,6 +67,23 @@ def zcall_evaluate_available?()
 
     # private methods for internal use
     private 
+   
+    def default_threshold_paths(egt_path, work_dir, zstart, ztotal)
+      # generate default threshold.txt paths
+      # equivalent to method used in zcall calibration.py
+      egt_name = File.basename(egt_path)
+      items = egt_name.split(/\./)
+      items.pop()
+      base = items.join('.')
+      thresholds = []
+      zscores = Array(Range.new(zstart, zstart+ztotal, true))
+      zscores.each do |z|
+        t = 'thresholds_'+base+'_z%02d.txt' % z
+        thresholds.push(File.join(work_dir, t))
+      end
+      return thresholds
+    end
+
     # Generate path for evaluation/calling chunk .json output
     def get_sample_subset_path(work_dir, i)
       name = "samples_part_%03d.json" % i # pad with leading zeroes
@@ -96,6 +113,25 @@ def zcall_evaluate_available?()
       sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
       return chunk_size, sample_ranges
     end
+
+    def write_sample_subsets(sample_ranges, sample_json, out_dir)
+      # write sample .json files with subsets of main file
+      samples = JSON.load(File.read(sample_json))
+      out_paths = Array.new
+      sample_ranges.each_with_index.collect do |range, i|
+        gtc_output = Array.new
+        out_path = get_sample_subset_path(out_dir, i)
+        out_paths.push(out_path)
+        samples[range].collect do |sample|
+          gtc_output.push(sample)  # append hash to list
+        end
+        out_file = File.new(out_path, mode='w')
+        JSON.dump(gtc_output, out_file)
+        out_file.close # need to ensure file closure!
+      end
+      return out_paths
+    end
+
     public # end of private methods
 
     # Prepares threshold.txt files for zcall
@@ -128,12 +164,8 @@ def zcall_evaluate_available?()
                    cli_arg_map(cli_args,
                                :prefix => '--')].flatten.join(' ')
         threshold_json = File.join(work_dir, 'thresholds.json')
-        threshold_text = []
-        zscores = Array(Range.new(zstart, zstart+ztotal, true))
-        zscores.each do |z|
-          t = 'thresholds_HumanExome-12v1_z0'+z.to_s()+'.txt'
-          threshold_text.push(File.join(work_dir, t))
-        end
+        threshold_text = default_threshold_paths(egt_file, work_dir, 
+                                                 zstart, ztotal)
         expected = [threshold_json, threshold_text].flatten
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
@@ -297,25 +329,6 @@ def zcall_evaluate_available?()
                                  :result => lambda { |i| bed_paths[i] },
                                  :async => async)
       end
-    end
-
-    private
-    def write_sample_subsets(sample_ranges, sample_json, out_dir)
-      # write sample .json files with subsets of main file
-      samples = JSON.load(File.read(sample_json))
-      out_paths = Array.new
-      sample_ranges.each_with_index.collect do |range, i|
-        gtc_output = Array.new
-        out_path = get_sample_subset_path(out_dir, i)
-        out_paths.push(out_path)
-        samples[range].collect do |sample|
-          gtc_output.push(sample)  # append hash to list
-        end
-        out_file = File.new(out_path, mode='w')
-        JSON.dump(gtc_output, out_file)
-        out_file.close # need to ensure file closure!
-      end
-      return out_paths
     end
 
   end # module ZCall

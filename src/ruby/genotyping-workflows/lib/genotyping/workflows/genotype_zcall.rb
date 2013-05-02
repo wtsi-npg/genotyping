@@ -105,8 +105,21 @@ Returns:
 
       siargs = {:config => gtconfig}.merge(args)
       sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+      num_samples = count_samples(sjson)
 
       result = prepare_thresholds(egt_file, zstart, ztotal, args, async)
+      tjson = nil
+      tjson = result[0] if result
+      evargs = {:samples => sjson,
+                :start => 0,
+                :end => num_samples,
+                :size => chunk_size}.merge(args)
+      evaluate_thresholds(tjson, sjson, manifest, egt_file, evargs, async)
+    end
+
+    :private
+    def count_samples(sjson)
+      JSON.parse(File.read(sjson)).size if sjson
     end
 
   end # end of class

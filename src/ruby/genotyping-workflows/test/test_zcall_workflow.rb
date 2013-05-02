@@ -58,7 +58,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
     name = 'test_genotype_zcall'
 
     # TODO get .egt from environment or config
-    egt_file = '/nfs/gapi/data/genotype/zcall_test/HumanExome-12v1.egt' 
+    egt_file = '/nfs/gapi/data/genotype/zcall_test/Human670-QuadCustom_v1_A.egt'
 
     run_test_if(lambda { manifest }, "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
@@ -68,7 +68,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :egt => egt_file,
-                                           :chunk_size => 4,
+                                           :chunk_size => 12,
                                            :memory => 2048,
                                            :select => 'lenny'}]
       timeout = 720
