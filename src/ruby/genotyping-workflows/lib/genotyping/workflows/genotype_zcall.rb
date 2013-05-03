@@ -134,7 +134,8 @@ Returns:
       temp_dir = File.join(work_dir, 'zcall_temp') # TODO rationalize tempdir
       zchunks_s = nil
       if zchunks_i
-        transpose_args = {:work_dir => temp_dir}.merge(args)
+        transpose_args = args.clone
+        transpose_args[:work_dir] = temp_dir
         zchunks_s = zchunks_i.each_with_index.collect do |bfile, i|
           bfile_s = File.join(temp_dir, ('zcall_smajor_part_%03d' % i)+'.bed')
           transpose_bed(bfile, bfile_s, transpose_args, async)
