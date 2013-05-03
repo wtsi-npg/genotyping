@@ -328,6 +328,12 @@ def zcall_evaluate_available?()
                                  },
                                  :result => lambda { |i| bed_paths[i] },
                                  :async => async)
+        if async.include?(nil) # one or more expected outputs is missing
+          result = nil
+        else # all expected outputs present
+          result = [async, temp_dir]
+        end
+        return result
       end
     end
 

@@ -129,9 +129,8 @@ Returns:
       zargs = {:start => 0,
                :end => num_samples,
                :size => chunk_size}.merge(args)
-      zchunks_i = run_zcall_array(best_t, sjson, manifest, egt_file,
-                                  zargs, async)
-      temp_dir = File.join(work_dir, 'zcall_temp') # TODO rationalize tempdir
+      zchunks_i, temp_dir = run_zcall_array(best_t, sjson, manifest, egt_file,
+                                            zargs, async)
       zchunks_s = nil
       if zchunks_i
         transpose_args = args.clone
