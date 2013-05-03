@@ -75,6 +75,7 @@ Returns:
     USAGE
 
     def run(dbfile, run_name, work_dir, args = {})
+      # TODO run QC on GenCall output (similar to Illuminus) & exclude failures
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :egt, :queue, :memory,
@@ -102,6 +103,11 @@ Returns:
       maybe_version_log(log_dir)
 
       sjname = run_name + '.sample.json'
+      njname = run_name + '.snp.json'
+      cjname = run_name + '.chr.json'
+      zname = run_name + '.zcall.bed'
+
+      njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
       siargs = {:config => gtconfig}.merge(args)
       sjson = sample_intensities(dbfile, run_name, sjname, siargs)
@@ -114,12 +120,43 @@ Returns:
                 :start => 0,
                 :end => num_samples,
                 :size => chunk_size}.merge(args)
-      evaluate_thresholds(tjson, sjson, manifest, egt_file, evargs, async)
+      evjson = evaluate_thresholds(tjson, sjson, manifest, egt_file, 
+                                   evargs, async)
+      metric_json = merge_evaluation(evjson, tjson, args, async)
+      best_t = nil
+      best_t = read_best_thresholds(metric_json) if metric_json
+
+      zargs = {:start => 0,
+               :end => num_samples,
+               :size => chunk_size}.merge(args)
+      zchunks_i = run_zcall_array(best_t, sjson, manifest, egt_file,
+                                  zargs, async)
+      temp_dir = File.join(work_dir, 'zcall_temp') # TODO rationalize tempdir
+      zchunks_s = nil
+      if zchunks_i
+        transpose_args = {:work_dir => temp_dir}.merge(args)
+        zchunks_s = zchunks_i.each_with_index.collect do |bfile, i|
+          bfile_s = File.join(temp_dir, ('zcall_smajor_part_%03d' % i)+'.bed')
+          transpose_bed(bfile, bfile_s, transpose_args, async)
+        end
+      end
+
+      zfile = update_annotation(merge_bed(zchunks_s, zname, args, async),
+                                 sjson, njson, args, async)
+      qcargs = {:run => run_name}.merge(args)
+      zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+
+      [zfile, zquality] if [zfile, zquality].all?
     end
 
     :private
     def count_samples(sjson)
       JSON.parse(File.read(sjson)).size if sjson
+    end
+
+    def read_best_thresholds(mjson)
+      metrics = JSON.parse(File.read(mjson)) if mjson
+      return metrics['BEST_THRESHOLDS']
     end
 
   end # end of class
