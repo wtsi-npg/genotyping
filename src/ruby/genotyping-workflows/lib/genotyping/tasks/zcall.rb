@@ -283,7 +283,7 @@ def zcall_evaluate_available?()
       end
     end
     
-    def run_zcall_array(thresholds, sample_json, manifest, egt_file, work_dir,
+    def run_zcall_array(thresholds, sample_json, manifest, egt_file,
                         args = {}, async ={})
       # run zcall in parallel on subsets of samples
       # write series of sample .json files, submit zcall commands as job array
