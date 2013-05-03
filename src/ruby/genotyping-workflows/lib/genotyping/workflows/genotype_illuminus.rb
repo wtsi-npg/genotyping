@@ -81,7 +81,7 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size, :gender_method)
+                               :select, :chunk_size, :gender_method, :min_cr)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
