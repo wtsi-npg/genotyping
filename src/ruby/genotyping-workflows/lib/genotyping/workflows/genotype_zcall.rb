@@ -131,17 +131,20 @@ Returns:
                :size => chunk_size}.merge(args)
       zchunks_i, temp_dir = run_zcall_array(best_t, sjson, manifest, egt_file,
                                             zargs, async)
-      zchunks_s = nil
+      zchunks_t = nil
       if zchunks_i
         transpose_args = args.clone
         transpose_args[:work_dir] = temp_dir
         zchunks_s = zchunks_i.each_with_index.collect do |bfile, i|
           bfile_s = File.join(temp_dir, ('zcall_smajor_part_%03d' % i)+'.bed')
-          transpose_bed(bfile, bfile_s, transpose_args, async)
+          #transpose_bed(bfile, bfile_s, transpose_args, async)
         end
+        zchunks_t = transpose_bed_array(zchunks_i, zchunks_s, 
+                                        transpose_args, async)
       end
+      
 
-      zfile = update_annotation(merge_bed(zchunks_s, zname, args, async),
+      zfile = update_annotation(merge_bed(zchunks_t, zname, args, async),
                                  sjson, njson, args, async)
       qcargs = {:run => run_name}.merge(args)
       zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
