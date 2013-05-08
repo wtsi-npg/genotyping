@@ -111,7 +111,7 @@ module Genotyping::Tasks
 
     def transpose_bed_array(inputs, outputs, args = {}, async = {})
       # as for transpose_bed, but transpose multiple files in parallel
-      # inputs/outputs are Plink binary prefixes (without .bed extension)
+      # inputs/outputs are Plink .bed filenames
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(inputs, outputs, work_dir)
