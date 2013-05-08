@@ -79,7 +79,7 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :egt, :queue, :memory,
-                               :select, :chunk_size)
+                               :select, :chunk_size, :zstart, :ztotal, :min_cr)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -90,6 +90,7 @@ Returns:
       gtconfig = args.delete(:config)
       zstart = args.delete(:zstart) || 6  # wider z range for production
       ztotal = args.delete(:ztotal) || 3
+      min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
 
       args.delete(:memory)
       args.delete(:queue)
@@ -102,6 +103,9 @@ Returns:
               :log_dir => log_dir}.merge(args)
       maybe_version_log(log_dir)
 
+      gcsjname = run_name + '.gencall.sample.json'
+      gciname = run_name + '.gencall.imajor.bed'
+      gcsname = run_name + '.gencall.smajor.bed'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
@@ -109,11 +113,29 @@ Returns:
 
       njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
-      siargs = {:config => gtconfig}.merge(args)
-      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+      gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      gcsfile = transpose_bed(gcifile, gcsname, args, async)
+
+      ## run gencall QC to apply gencall CR filter and find genders
+      gcqcargs = {:run => run_name,
+                  :post_filter_cr => min_cr}.merge(args)
+
+      gcqcdir = File.join(work_dir, 'gencall_qc')
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                  async, true)
+
+      sjson = nil
+      if gcquality
+        siargs = {:config => gtconfig}.merge(args)
+        sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+      end
       num_samples = count_samples(sjson)
 
-      result = prepare_thresholds(egt_file, zstart, ztotal, args, async)
+      result = nil
+      if sjson
+        result = prepare_thresholds(egt_file, zstart, ztotal, args, async)
+      end
       tjson = nil
       tjson = result[0] if result
       evargs = {:samples => sjson,
