@@ -143,7 +143,7 @@ class TestZCallTasks < Test::Unit::TestCase
       work_dir = make_work_dir('test_zcall_run_array', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run_array', 120, 5) do
-        run_zcall_array(@thresholds_z6, @sample_json, @manifest, @egt, work_dir,
+        run_zcall_array(@thresholds_z6, @sample_json, @manifest, @egt,
                         { :start => 0, :end => 8, :size => 4,
                           :work_dir => work_dir },
                         :queue=>@queue)
