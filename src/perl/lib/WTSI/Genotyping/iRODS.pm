@@ -182,8 +182,8 @@ sub remove_group {
 
   Arg [1]    : A permission string, 'read', 'write', 'own' or undef ('null')
   Arg [2]    : An iRODS group name.
-  Arg [3]    : One or more data objects
-  Example    : (set_group_access('read', 'public', $object1, $object2)
+  Arg [3]    : One or more data objects or collections
+  Example    : set_group_access('read', 'public', $object1, $object2)
   Description: Sets the access rights on one or more objects for a group,
                returning the objects.
   Returntype : array
