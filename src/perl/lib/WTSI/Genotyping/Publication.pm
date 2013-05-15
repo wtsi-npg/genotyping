@@ -283,10 +283,15 @@ sub publish_analysis_directory {
   my ($dir, $creator_uri, $publish_dest, $publisher_uri, $pipedb, $run_name,
       $sample_archive_pattern, $time) = @_;
 
-  $publish_dest =~ s!/$!!;
-  my $target = $publish_dest . '/' . basename($dir);
+  my $basename = fileparse($pipedb->dbfile);
+  # Make a path based on the database file's MD5 to enable even distribution
+  my $hash_path = hash_path($pipedb->dbfile);
 
-  if (list_collection($target)) {
+  $publish_dest =~ s!/$!!;
+  my $target = join('/', $publish_dest, $hash_path);
+  my $leaf_collection = join('/', $target, basename($dir));
+
+  if (list_collection($leaf_collection)) {
     $log->logcroak("An iRODS collection already exists at '$target'. " .
                    "Please move or delete it before proceeding.");
   }
@@ -312,11 +317,11 @@ sub publish_analysis_directory {
     push(@analysis_meta, make_creation_metadata($creator_uri, $time,
                                                 $publisher_uri));
 
-    unless (list_collection($publish_dest)) {
-      add_collection($publish_dest);
+    unless (list_collection($target)) {
+      add_collection($target);
     }
 
-    my $analysis_coll = put_collection($dir, $publish_dest);
+    my $analysis_coll = put_collection($dir, $target);
     $log->info("Created new collection $target");
 
     my @uuid_meta = grep { $_->[0] =~ /uuid/ } @analysis_meta;
@@ -332,12 +337,18 @@ sub publish_analysis_directory {
         $log->info("Adding cross-reference metadata to " . scalar @sample_data .
                    " data objects in genotyping project '$title'");
 
+        my %studies_seen;
+
         foreach my $sample_datum (@sample_data) {
           # Xref analysis to sample studies
           my %sample_meta = get_object_meta($sample_datum);
           my @sample_studies = @{$sample_meta{$STUDY_ID_META_KEY}};
+
           foreach my $sample_study (@sample_studies) {
-            push(@analysis_meta, [$STUDY_ID_META_KEY => $sample_study]);
+            unless (exists $studies_seen{$sample_study}) {
+              push(@analysis_meta, [$STUDY_ID_META_KEY => $sample_study]);
+              $studies_seen{$sample_study}++;
+            }
           }
 
           # Xref samples to analysis UUID
@@ -353,6 +364,11 @@ sub publish_analysis_directory {
     }
 
     update_collection_meta($analysis_coll, \@analysis_meta);
+
+    my @groups = expected_irods_groups(@analysis_meta);
+    my $make_groups = 0;
+
+    grant_group_access($target, '-r read', $make_groups, @groups);
   };
 
   if ($@) {
@@ -371,6 +387,7 @@ sub publish_file {
       $time, $make_groups, $log) = @_;
 
   my $basename = fileparse($file);
+  # Make a path based on the file's MD5 to enable even distribution
   my $hash_path = hash_path($file);
 
   $publish_dest =~ s!/$!//!;
@@ -406,21 +423,7 @@ sub publish_file {
     update_object_meta($target, \@meta);
 
     my @groups = expected_irods_groups(@meta);
-    foreach my $group (@groups) {
-      $log->info("Giving group '$group' read access to $target");
-
-      if ($make_groups) {
-        set_group_access('read', find_or_make_group($group), $target);
-      }
-      else {
-        if (group_exists($group)) {
-          set_group_access('read', $group, $target);
-        }
-        else {
-          $log->warn("Cannot give group '$group' access to $target because this group does not exist (in no-create groups mode)");
-        }
-      }
-    }
+    grant_group_access($target, 'read', $make_groups, @groups);
   }
   else {
     $log->info("Skipping publication of $target because no consent was given");
@@ -522,6 +525,28 @@ sub update_collection_meta {
     }
   }
 }
+
+
+sub grant_group_access {
+  my ($target, $access, $make_groups, @groups) = @_;
+
+  foreach my $group (@groups) {
+    $log->info("Giving group '$group' '$access' access to $target");
+
+    if ($make_groups) {
+      set_group_access($access, find_or_make_group($group), $target);
+    }
+    else {
+      if (group_exists($group)) {
+        set_group_access($access, $group, $target);
+      }
+      else {
+        $log->warn("Cannot give group '$group' '$access' access to $target because this group does not exist (in no-create groups mode)");
+      }
+    }
+  }
+}
+
 
 sub _remove_meta_duplicates {
   my ($meta) = @_;
