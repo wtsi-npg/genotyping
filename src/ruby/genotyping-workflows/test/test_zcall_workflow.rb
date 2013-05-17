@@ -78,7 +78,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
       assert(result)
 
       Percolate.log.close
-      #remove_work_dir(work_dir) if result
+      remove_work_dir(work_dir) if result
     end
 
   end
