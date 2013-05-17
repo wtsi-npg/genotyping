@@ -144,7 +144,9 @@ Returns:
                 :size => chunk_size}.merge(args)
       evjson = evaluate_thresholds(tjson, sjson, manifest, egt_file, 
                                    evargs, async)
-      metric_json = merge_evaluation(evjson, tjson, args, async)
+      msfile = File.join(work_dir, 'metric_summary.txt')
+      metric_args = {:text => msfile }.merge(args)
+      metric_json = merge_evaluation(evjson, tjson, metric_args, async)
       best_t = nil
       best_t = read_best_thresholds(metric_json) if metric_json
 
