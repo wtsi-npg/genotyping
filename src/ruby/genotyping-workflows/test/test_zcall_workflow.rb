@@ -60,7 +60,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
     # TODO get .egt from environment or config
     egt_file = '/nfs/gapi/data/genotype/zcall_test/Human670-QuadCustom_v1_A.egt'
 
-    run_test_if(lambda { manifest }, "Skipping #{name}") do
+    run_test_if(lambda { manifest }, "Manifest not found, skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
