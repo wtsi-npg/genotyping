@@ -86,10 +86,10 @@ Returns:
 
       manifest = args.delete(:manifest) 
       egt_file = args.delete(:egt) 
-      chunk_size = args.delete(:chunk_size) || 4 # 20 for production
+      chunk_size = args.delete(:chunk_size) || 10
       gtconfig = args.delete(:config)
-      zstart = args.delete(:zstart) || 6  # wider z range for production
-      ztotal = args.delete(:ztotal) || 3
+      zstart = args.delete(:zstart) || 1  # wider z range for production
+      ztotal = args.delete(:ztotal) || 10
       min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
 
       args.delete(:memory)
