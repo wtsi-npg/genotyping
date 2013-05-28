@@ -5,9 +5,9 @@ use strict;
 use Carp;
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
-use WTSI::Genotyping::Database::SNP;
-use WTSI::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
-use WTSI::Genotyping::QC::QCPlotShared qw(readThresholds);
+use WTSI::NPG::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -413,7 +413,7 @@ sub run {
     if ($log) { print $logfile $total." samples read from PLINK binary.\n"; }
     # get Sequenom genotypes for all samples 
     $iniPath ||= $DEFAULT_INI;
-    my $snpdb = WTSI::Genotyping::Database::SNP->new
+    my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
         (name   => 'snp',
          inifile => $iniPath)->connect(RaiseError => 1);
     my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 

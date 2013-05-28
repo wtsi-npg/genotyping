@@ -11,7 +11,7 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(update_snp_locations update_sample_genders);
+use WTSI::NPG::Genotyping qw(update_snp_locations update_sample_genders);
 
 Log::Log4perl->easy_init($ERROR);
 

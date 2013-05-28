@@ -9,8 +9,12 @@ use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Log::Log4perl qw(:easy);
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig getPlateLocationsFromPath readMetricResultHash readQCMetricInputs $INI_FILE_DEFAULT);
-use WTSI::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig
+                                               getPlateLocationsFromPath
+                                               readMetricResultHash
+                                               readQCMetricInputs
+                                               $INI_FILE_DEFAULT);
+use WTSI::NPG::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");

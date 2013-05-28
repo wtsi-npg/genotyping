@@ -12,7 +12,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use WTSI::Genotyping::QC::SimFiles qw/writeIntensityMetrics/;
+use WTSI::NPG::Genotyping::QC::SimFiles qw/writeIntensityMetrics/;
 
 my ($help, $inPath, $outPathXY, $outPathMag, $probeNum, $probeDefault,
     $logPath, $logDefault, $outMag, $outXY);

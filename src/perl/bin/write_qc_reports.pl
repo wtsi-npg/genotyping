@@ -9,9 +9,9 @@ use strict;
 use warnings;
 use Getopt::Long;
 use Carp;
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
-                                          defaultTexIntroPath);
-use WTSI::Genotyping::QC::Reports qw(createReports qcNameFromPath);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
+                                               defaultTexIntroPath);
+use WTSI::NPG::Genotyping::QC::Reports qw(createReports qcNameFromPath);
 
 my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";

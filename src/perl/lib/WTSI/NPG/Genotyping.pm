@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping;
 
 use warnings;
 use strict;
+use Carp;
 use JSON;
 
 use base 'Exporter';

@@ -13,7 +13,7 @@ use Log::Log4perl qw(:easy);
 use Net::RabbitFoot;
 use Pod::Usage;
 
-use WTSI::Genotyping::iRODS qw(group_exists add_group);
+use WTSI::NPG::iRODS qw(group_exists add_group);
 
 $| = 1;
 
