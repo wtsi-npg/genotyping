@@ -16,8 +16,8 @@ use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Carp;
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
+use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
     $comboText, $causeText, $crHetFail,  $comboPdf, $causePdf, $comboPng, 
@@ -105,13 +105,13 @@ sub findFailedCrHet {
 sub findHetMeanSd {
     # find mean and sd of autosome heterozygosity
     my $inPath = shift;
-    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my @hets;
     foreach my $fieldsRef (@data) {
 	my @fields = @$fieldsRef;
 	push(@hets, $fields[2]);
     }
-    return WTSI::Genotyping::QC::QCPlotShared::meanSd(@hets);
+    return WTSI::NPG::Genotyping::QC::QCPlotShared::meanSd(@hets);
 }
 
 sub sortFailCodes {
@@ -143,7 +143,7 @@ sub writeFailCounts {
     $excludeXY ||= 1; # switch to exclude xydiff metric
     my %results = %$qcResultsRef;
     my (%singleFails, %combinedFails, @failedSamples);
-    my %shortNames = WTSI::Genotyping::QC::QCPlotShared::readQCShortNameHash($configPath);
+    my %shortNames = WTSI::NPG::Genotyping::QC::QCPlotShared::readQCShortNameHash($configPath);
     foreach my $sample (keys(%results)) {
         my %metricResults = %{$results{$sample}};
         my @fails = ();
@@ -181,7 +181,7 @@ sub writeFailedCrHet {
     my %failedSamples;
     foreach my $sample (@$failedSamplesRef) { $failedSamples{$sample} = 1; }
     my %qcResults = %$qcResultsRef;
-    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     my @header = qw(sample cr het);
     my @keys = qw(duplicate gender identity magnitude);
     push(@header, @keys);
@@ -209,7 +209,7 @@ sub writeFailedCrHet {
 sub run {
     # find failure causes and write input for R scripts
     my ($inputPath, $qcConfigPath, $outputsRef, $title, $crHetPath) = @_;
-    my %qcResults = WTSI::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath, $qcConfigPath);
+    my %qcResults = WTSI::NPG::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath, $qcConfigPath);
     unless (containsFailedSample(\%qcResults)) {
 	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
 	return 1;
@@ -227,19 +227,19 @@ sub run {
     my @args = ("plotIndividualFails.R", $failText, $failTotal, $title, 
                 $causePdf);
     my @outputs = ($causePng,);
-    my $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    my $ok = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for individual failure barplot: $!"; }
     # barplot combined failures
     @args = ("plotCombinedFails.R", $comboText, $title, $comboPdf);
     @outputs = ($comboPng,);
-    $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    $ok = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for combined failure barplot: $!"; }    
-    my %thresholds =  WTSI::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
+    my %thresholds =  WTSI::NPG::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
     my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
     my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
     @args = ("scatterPlotFails.R", $crHetFail, $hetMean, $hetMaxDist, $thresholds{'call_rate'}, $title, $scatterPdf, $detailPdf);
     @outputs = ($scatterPng, $detailPng);
-    $ok = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    $ok = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     unless ($ok) { confess "Error for failure scatterplot: $!"; }
     return $ok;
 }

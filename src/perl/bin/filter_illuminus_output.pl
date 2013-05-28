@@ -10,8 +10,12 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(read_fon find_column_indices filter_columns
-                        read_gt_column_names filter_gt_columns);
+use WTSI::NPG::Utilities::DelimitedFiles qw(read_fon
+                                            find_column_indices
+                                            filter_columns);
+
+use WTSI::NPG::Genotyping::Illuminus qw(read_gt_column_names
+                                        filter_gt_columns);
 
 Log::Log4perl->easy_init($ERROR);
 

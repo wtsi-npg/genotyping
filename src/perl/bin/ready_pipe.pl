@@ -10,7 +10,7 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::Database::Pipeline;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -32,7 +32,7 @@ sub run {
 
   $config ||= $DEFAULT_INI;
 
-  my $pipedb = WTSI::Genotyping::Database::Pipeline->new
+  my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => $config,
      dbfile => $dbfile,

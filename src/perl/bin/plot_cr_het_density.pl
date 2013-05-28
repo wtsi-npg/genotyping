@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 my ($RScriptPath, $outDir, $title, $help);
 
@@ -121,7 +121,7 @@ sub run {
     close $output;
     @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax, $heatPdf);
     @outputs = ($heatPng,);
-    my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+    my $plotsOK = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     ### do scatterplot & histograms ###
     if ($plotsOK) {
 	open $output, ">", $scatterText || die "Cannot open output path $scatterText: $!";
@@ -130,7 +130,7 @@ sub run {
 	my $scatterPlotScript = "plotCrHetDensity.R";
 	@args = ($scatterPlotScript, $scatterText, $title, $scatterPdf);
 	@outputs = ($scatterPng, $crHist, $hetHist);
-	$plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+	$plotsOK = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     }
     return $plotsOK;    
 }
