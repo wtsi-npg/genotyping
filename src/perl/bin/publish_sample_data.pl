@@ -14,28 +14,23 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);;
 use Pod::Usage;
 
-use WTSI::Genotyping qw(make_warehouse_metadata
-                        make_infinium_metadata
-                        make_file_metadata
-                        make_creation_metadata
-                        get_wtsi_uri
-                        get_publisher_uri
-                        get_publisher_name
-                        publish_idat_files
-                        publish_gtc_files);
-
-use WTSI::Genotyping::iRODS qw(collect_files
-                               collect_dirs
-                               modified_between);
-
-
-use WTSI::Genotyping::Database::Infinium;
-use WTSI::Genotyping::Database::Warehouse;
-
+use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Genotyping::Database::Infinium;
+use WTSI::NPG::Genotyping::Publication qw(publish_idat_files
+                                          publish_gtc_files);
+use WTSI::NPG::iRODS qw(collect_files
+                        collect_dirs
+                        modified_between);
+use WTSI::NPG::Metadata qw(make_sample_metadata
+                           make_file_metadata
+                           make_creation_metadata);
+use WTSI::NPG::Publication qw(get_wtsi_uri
+                              get_publisher_uri
+                              get_publisher_name);
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = INFO, A1
-   log4perl.logger.quiet             = INFO, A2
+   log4perl.logger.npg.irods.publish = DEBUG, A1
+   log4perl.logger.quiet             = DEBUG, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
@@ -143,13 +138,15 @@ sub run {
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
-  my $ifdb = WTSI::Genotyping::Database::Infinium->new
-    (name   => 'infinium',
-     inifile =>  $config)->connect(RaiseError => 1);
+  my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
+    (name    => 'infinium',
+     inifile => $config)->connect(RaiseError => 1);
+  # $ifdb->log($log);
 
-  my $ssdb = WTSI::Genotyping::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1);
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name    => 'sequencescape_warehouse',
+     inifile => $config)->connect(RaiseError => 1);
+  # $ssdb->log($log);
 
   my $uid = `whoami`;
   chomp($uid);
@@ -172,7 +169,7 @@ sub run {
   my @unique;
   my %seen;
   foreach my $file (@files) {
-    if (! $seen{$file}) {
+    if (!$seen{$file}) {
       push(@unique, $file);
       $seen{$file}++;
     }
@@ -192,7 +189,6 @@ sub run {
 
   return 0;
 }
-
 
 __END__
 

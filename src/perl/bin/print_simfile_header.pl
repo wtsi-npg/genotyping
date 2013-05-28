@@ -7,21 +7,21 @@
 
 use warnings;
 use strict;
-use WTSI::Genotyping::QC::SimFiles;
+use WTSI::NPG::Genotyping::QC::SimFiles;
 
 my $fh;
 open $fh, "<", $ARGV[0];
-my $header = WTSI::Genotyping::QC::SimFiles::readHeader($fh);
-my @fields = WTSI::Genotyping::QC::SimFiles::unpackHeader($header);
+my $header = WTSI::NPG::Genotyping::QC::SimFiles::readHeader($fh);
+my @fields = WTSI::NPG::Genotyping::QC::SimFiles::unpackHeader($header);
 foreach my $field (@fields) { print $field."\n"; }
 print "#####\n";
-my $blockSize =  WTSI::Genotyping::QC::SimFiles::blockSizeFromHeader(@fields);
+my $blockSize =  WTSI::NPG::Genotyping::QC::SimFiles::blockSizeFromHeader(@fields);
 my ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType) = @fields;
 my $numericToRead = $probes * $channels;
 if ($numericToRead > 20) { $numericToRead = 20; }
 foreach my $i (0..4) {
-    my @items = WTSI::Genotyping::QC::SimFiles::readBlock($fh, $nameLength, $numberType, $i, $blockSize, 
-							  $numericToRead);
+    my @items = WTSI::NPG::Genotyping::QC::SimFiles::readBlock($fh, $nameLength, $numberType,
+                                                               $i, $blockSize, $numericToRead);
     print join(',', @items)."\n";
 }
 close $fh;

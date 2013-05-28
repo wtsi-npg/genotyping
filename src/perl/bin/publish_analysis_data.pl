@@ -11,24 +11,24 @@ use DateTime;
 use File::Basename;
 use File::Find;
 use Getopt::Long;
-use Log::Log4perl qw(:easy);;
+use Log::Log4perl;
 use Net::LDAP;
 use Pod::Usage;
 use URI;
 use UUID;
 
-use WTSI::Genotyping qw(make_analysis_metadata
-                        get_wtsi_uri
-                        get_publisher_uri
-                        get_publisher_name
-                        publish_analysis_directory);
 
-use WTSI::Genotyping::Database::Pipeline;
+use WTSI::NPG::Publication qw(get_wtsi_uri
+                              get_publisher_uri
+                              get_publisher_name);
+use WTSI::NPG::Genotyping::Publication qw(publish_analysis_directory);
+
+use WTSI::NPG::Genotyping::Database::Pipeline;
 
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = INFO, A1
-   log4perl.logger.quiet             = INFO, A2
+   log4perl.logger.npg.irods.publish = DEBUG, A1
+   log4perl.logger.quiet             = DEBUG, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.stderr   = 0
@@ -63,7 +63,7 @@ sub run {
 
   GetOptions('archive=s' => \$archive_pattern,
              'config=s'  => \$config,
-             'dbfile=s'=> \$dbfile,
+             'dbfile=s'  => \$dbfile,
              'dest=s'    => \$publish_dest,
              'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s' => \$log4perl_config,
@@ -92,7 +92,7 @@ sub run {
               -exitval => 4);
   }
 
-  $archive_pattern ||= $WTSI::Genotyping::DEFAULT_SAMPLE_ARCHIVE_PATTERN;
+  $archive_pattern ||= $WTSI::NPG::Genotyping::Publication::DEFAULT_SAMPLE_ARCHIVE_PATTERN;
   $config ||= $DEFAULT_INI;
 
   my $log;
@@ -117,7 +117,7 @@ sub run {
   $db ||= 'configured database';
   $log->debug("Using $db using config from $config");
 
-  my $pipedb = WTSI::Genotyping::Database::Pipeline->new
+  my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => $config,
      dbfile => $dbfile)->connect

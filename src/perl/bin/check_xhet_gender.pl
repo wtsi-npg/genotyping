@@ -30,8 +30,8 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use WTSI::Genotyping::QC::GenderCheck;
-use WTSI::Genotyping::QC::GenderCheckDatabase;
+use WTSI::NPG::Genotyping::QC::GenderCheck;
+use WTSI::NPG::Genotyping::QC::GenderCheckDatabase;
 
 my %opts = ();
 

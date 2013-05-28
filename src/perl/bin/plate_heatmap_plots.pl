@@ -13,8 +13,8 @@ use warnings;
 use Carp;
 use FindBin qw($Bin);
 use Getopt::Long;
-use WTSI::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
+use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 my ($dbPath, $iniPath, $mode, $RScriptPath, $outDir, $help);
 
@@ -86,7 +86,7 @@ sub makePlots {
 	my @args = ($plotScript, $path, $plate);
 	if ($minMaxArgs) { push(@args, ($comments{'PLOT_MIN'}, $comments{'PLOT_MAX'})); }
 	my @outputs = ($outPath, );
-	my $plotsOK = WTSI::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
+	my $plotsOK = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
 	if ($plotsOK==0) { $allPlotsOK = 0; }
     } 
     return $allPlotsOK;
