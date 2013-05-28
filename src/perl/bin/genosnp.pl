@@ -13,6 +13,7 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
+use WTSI::NPG::Genotyping qw(read_snp_json);
 use WTSI::NPG::Genotyping::GenoSNP qw(write_gs_snps);
 
 Log::Log4perl->easy_init($ERROR);
