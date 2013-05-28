@@ -8,7 +8,10 @@ use JSON;
 use Test::More tests => 6;
 use Test::Exception;
 
-use WTSI::Genotyping qw(update_snp_locations update_sample_genders);
+use WTSI::NPG::Genotyping;
+
+use WTSI::NPG::Genotyping::Plink qw(update_snp_locations
+                                    update_sample_genders);
 
 my @samples = ({name => 'sample_0000',
                 uri => 'urn:wtsi:sample_0000',

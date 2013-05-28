@@ -8,7 +8,7 @@ use warnings;
 use Carp;
 use FindBin qw($Bin);
 use Test::More tests => 12;
-use WTSI::Genotyping::QC::SnpID qw/illuminaToSequenomSNP 
+use WTSI::NPG::Genotyping::QC::SnpID qw/illuminaToSequenomSNP 
   sequenomToIlluminaSNP/;
 
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
@@ -39,7 +39,7 @@ chdir($workdir);
 foreach my $plink (@plink) {
     my $input = $dataDir."/".$plink;
     $cmd = "$bin/check_identity_bed.pl --config $config $input";
-    is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
+    is(system($cmd), 0, "$bin/check_identity_bed.pl exit status, input $plink");
     foreach my $output (@outputs) {
         my $ref = $dataDir."/".$output;
         my $status = system("diff $ref $output >& /dev/null");
