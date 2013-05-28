@@ -21,7 +21,10 @@ Log::Log4perl::init('etc/log4perl_tests.conf');
 
 my $ini_path = './etc';
 my $dbfile = 't/pipeline.db';
-unlink($dbfile);
+
+if (-e $dbfile) {
+  unlink($dbfile);
+}
 
 my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
   (name => 'pipeline',
@@ -170,3 +173,6 @@ $failed_sample->update;
 
 $failed_sample = $db->sample->find({id_sample => $sample_id});
 ok(!$failed_sample->include, "Sample excluded after consent_withdrawn");
+
+# Clean up
+unlink($dbfile);
