@@ -8,8 +8,8 @@ use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use Test::More tests => 11;
 use JSON;
-use WTSI::Genotyping::QC::Reports qw(createReports);
-use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
+use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
 
 my $qcName = "alpha";
 my $title = "";
@@ -35,34 +35,34 @@ my $texPath = $prefix.".tex";
 my $pdfPath = $prefix.".pdf";
 my $csvPath = $prefix.".csv";
 
-my @text = WTSI::Genotyping::QC::Reports::textForDatasets($dbPath);
+my @text = WTSI::NPG::Genotyping::QC::Reports::textForDatasets($dbPath);
 ok(@text, "Read database dataset info");
 
-my $result = WTSI::Genotyping::QC::Reports::dbSampleInfo($dbPath);
+my $result = WTSI::NPG::Genotyping::QC::Reports::dbSampleInfo($dbPath);
 ok($result, "Read database sample info");
 
 my ($sumRef, $keyRef, $countRef, $rateRef) = 
-    WTSI::Genotyping::QC::Reports::textForPlates($resultPath, $config);
+    WTSI::NPG::Genotyping::QC::Reports::textForPlates($resultPath, $config);
 # expect exactly 13 lines, including header
 is(@{$countRef}, 13, "Find pass/fail count table text"); 
 is(@{$rateRef}, 13, "Find pass/fail rate table text"); 
 
-my @csvText = WTSI::Genotyping::QC::Reports::textForCsv($resultPath, $dbPath, 
+my @csvText = WTSI::NPG::Genotyping::QC::Reports::textForCsv($resultPath, $dbPath, 
                                                         $config);
 is(@csvText, 996, "Find CSV text"); # expect 996 lines, including header
 
-ok(WTSI::Genotyping::QC::Reports::writeCsv($resultPath, $dbPath, $config, 
+ok(WTSI::NPG::Genotyping::QC::Reports::writeCsv($resultPath, $dbPath, $config, 
                                            $csvPath), "Write CSV text"); 
 
 ok(checkCsv($csvPath, 996, 26), "Correct row/column totals in .csv file");
 
-ok(WTSI::Genotyping::QC::Reports::writeSummaryLatex
+ok(WTSI::NPG::Genotyping::QC::Reports::writeSummaryLatex
    ($texPath, $resultPath, $config, $dbPath, $gtPath, $tempdir, $introPath, 
     $qcName, $title, $author), "Write summary .tex");
 
 if (-e $pdfPath) { system("rm -f $pdfPath"); }
 
-ok(WTSI::Genotyping::QC::Reports::texToPdf($texPath), "Convert .tex to .pdf");
+ok(WTSI::NPG::Genotyping::QC::Reports::texToPdf($texPath), "Convert .tex to .pdf");
 
 ok((-e $pdfPath), "PDF file exists");
 

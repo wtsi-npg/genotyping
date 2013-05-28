@@ -11,7 +11,7 @@ use Cwd qw/abs_path/;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use Test::More tests => 49;
-use WTSI::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
+use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
 my $start = time();

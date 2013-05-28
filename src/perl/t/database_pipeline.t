@@ -1,5 +1,5 @@
 
-# Tests WTSI::Genotyping::Database::Pipeline
+# Tests WTSI::NPG::Genotyping::Database::Pipeline
 
 use utf8;
 
@@ -12,10 +12,10 @@ use Test::Exception;
 
 use Data::Dumper;
 
-BEGIN { use_ok('WTSI::Genotyping::Schema'); }
-require_ok('WTSI::Genotyping::Schema');
+BEGIN { use_ok('WTSI::NPG::Genotyping::Schema'); }
+require_ok('WTSI::NPG::Genotyping::Schema');
 
-use WTSI::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::Database::Pipeline;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -23,7 +23,7 @@ my $ini_path = './etc';
 my $dbfile = 't/pipeline.db';
 unlink($dbfile);
 
-my $db = WTSI::Genotyping::Database::Pipeline->new
+my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
   (name => 'pipeline',
    inifile => "$ini_path/pipeline.ini",
    dbfile => $dbfile);
@@ -32,13 +32,13 @@ ok(-e $dbfile);
 ok($db->disconnect);
 undef $db;
 
-$db = WTSI::Genotyping::Database::Pipeline->new
+$db = WTSI::NPG::Genotyping::Database::Pipeline->new
   (name => 'pipeline',
    inifile => "$ini_path/pipeline.ini",
    dbfile => $dbfile);
 ok($db, 'A database file reopened.');
 
-ok(WTSI::Genotyping::Database::Pipeline->new
+ok(WTSI::NPG::Genotyping::Database::Pipeline->new
    (name => 'pipeline',
     inifile => "$ini_path/pipeline.ini",
     dbfile => $dbfile,

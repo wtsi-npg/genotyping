@@ -12,10 +12,10 @@ use File::Temp qw/tempdir/;
 use Log::Log4perl;
 use JSON;
 use Test::More tests => 26;
-use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping::QC::GenderCheck;
-use WTSI::Genotyping::QC::GenderCheckDatabase;
-use WTSI::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::QC::GenderCheck;
+use WTSI::NPG::Genotyping::QC::GenderCheckDatabase;
+use WTSI::NPG::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
