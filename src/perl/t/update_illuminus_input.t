@@ -8,7 +8,8 @@ use warnings;
 
 use Test::More tests => 22;
 
-use WTSI::Genotyping qw(read_it_column_names update_it_columns);
+use WTSI::NPG::Genotyping::Illuminus qw(read_it_column_names
+                                        update_it_columns);
 
 my $data_path = "t/update_illuminus_input";
 

@@ -12,7 +12,7 @@ use File::Temp qw/tempdir/;
 use Log::Log4perl;
 use JSON;
 use Test::More tests => 12;
-use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::NPG::Genotyping::QC::GenderCheck;
 
 # The directory contains the R scripts
 $ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};

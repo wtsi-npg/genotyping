@@ -1,5 +1,5 @@
 
-# Tests WTSI::Genotyping::Database::Warehouse
+# Tests WTSI::NPG::Database::Warehouse
 
 use utf8;
 
@@ -8,10 +8,10 @@ use warnings;
 
 use Test::More tests => 8;
 
-BEGIN { use_ok('WTSI::Genotyping::Database::Warehouse'); }
-require_ok('WTSI::Genotyping::Database::Warehouse');
+BEGIN { use_ok('WTSI::NPG::Database::Warehouse'); }
+require_ok('WTSI::NPG::Database::Warehouse');
 
-use WTSI::Genotyping::Database::Warehouse;
+use WTSI::NPG::Database::Warehouse;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -21,7 +21,7 @@ SKIP: {
   skip "$db_credentials credentials file not present", 6
     unless -e $db_credentials;
 
-  my $db = WTSI::Genotyping::Database::Warehouse->new
+  my $db = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
      inifile =>  $db_credentials);
 
