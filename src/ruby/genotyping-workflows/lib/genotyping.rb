@@ -46,3 +46,4 @@ require 'genotyping/tasks/zcall'
 
 require 'genotyping/workflows/genotype_illuminus'
 require 'genotyping/workflows/genotype_genosnp'
+require 'genotyping/workflows/genotype_zcall'
