@@ -17,7 +17,7 @@ our @EXPORT_OK = qw(write_gs_snps);
   Arg [1]    : filehandle
   Arg [2]    : arrayref of SNP hashes (see read_snp_json)
   Example    : $fh = write_gs_snps($fh, \@snps)
-  Description: Writes SNP annotation to a filehandle in the format
+  Description: Write SNP annotation to a filehandle in the format
                expected by GenoSNP.
 
                Important: The integer in the second column is not

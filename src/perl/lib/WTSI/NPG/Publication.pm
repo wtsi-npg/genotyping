@@ -51,7 +51,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 =head2 get_wtsi_uri
 
   Example    : my $uri = get_wtsi_uri();
-  Description: Returns the URI of the WTSI.
+  Description: Return the URI of the WTSI.
   Returntype : URI
   Caller     : general
 
@@ -69,7 +69,7 @@ sub get_wtsi_uri {
 
   Arg [1]    : Login name string
   Example    : my $uri = get_publisher_uri($login);
-  Description: Returns the LDAP URI of the user publishing data.
+  Description: Return the LDAP URI of the user publishing data.
   Returntype : URI
   Caller     : general
 
@@ -92,7 +92,7 @@ sub get_publisher_uri {
 
   Arg [1]    : LDAP URI of publisher
   Example    : my $name = get_publisher_name($uri);
-  Description: Returns the LDAP name of the user publishing data.
+  Description: Return the LDAP name of the user publishing data.
   Returntype : string
   Caller     : general
 
@@ -119,6 +119,19 @@ sub get_publisher_name {
   return $name;
 }
 
+=head2 pair_rg_channel_files 
+
+  Arg [1]    : arrayref of file names of a type, paired for Reg and Grn channels
+  Example    : @paired = pair_rg_channel_files(['x_Red.idat', 'y_Red.idat',
+                                                'y_Grn.idat', 'x_Grn.idat'], 'idat')
+  Description: Return file names such that Red and Grn channels are paired. Pairing
+               is determined by the file name and channel token (Red/Grn). Files
+               not of the expected type are ignored.
+  Returntype : array of arrayrefs
+  Caller     : general
+
+=cut
+
 sub pair_rg_channel_files {
   my ($files, $type) = @_;
 
@@ -127,8 +140,6 @@ sub pair_rg_channel_files {
   # Determine unique
   foreach my $file (@$files) {
     my ($stem, $colour, $suffix) = $file =~ m{^(.+)_(Red|Grn)(.$type)$}msxi;
-
-    print "'$stem' '$colour' '$suffix'\n";
 
     if ($stem && $colour && $suffix) {
       if (exists $names{$stem}) {
@@ -156,6 +167,29 @@ sub pair_rg_channel_files {
 
   return @paired;
 }
+
+=head2 publish_file
+
+  Arg [1]    : file name
+  Arg [2]    : Sample metadata
+  Arg [3]    : URI object of creator
+  Arg [4]    : Publication path in iRODS
+  Arg [5]    : URI object of publisher (typically an LDAP URI)
+  Arg [6]    : DateTime object of publication
+  Arg [7]    : Make iRODs groups as necessary if true
+  Arg [8]    : Log4perl logger
+
+  Example    : my $data_obj = publish_file($file, \@metadata, $creator_uri,
+                                          '/my/file', $publisher_uri,
+                                          $now, $groups);
+  Description: Publish a file to iRODS with attendant metadata.
+               Skip any file where consent is absent. Republish any
+               file that is already published, but whose checksum has
+               changed.
+  Returntype : path to new iRODS data object
+  Caller     : general
+
+=cut
 
 sub publish_file {
   my ($file, $sample_meta, $creator_uri, $publish_dest, $publisher_uri,
@@ -207,6 +241,18 @@ sub publish_file {
   return $target;
 }
 
+
+=head2 expected_irods_groups
+
+  Arg [1]    : array of arrayrefs (metadata)
+  Example    : @groups = expected_irods_groups(@meta)
+  Description: Return an array of iRODS group names given metadata containing
+               >=1 study_id under the key $STUDY_ID_META_KEY
+  Returntype : array of string
+  Caller     : general
+
+=cut
+
 sub expected_irods_groups {
   my @meta = @_;
 
@@ -223,6 +269,18 @@ sub expected_irods_groups {
 
   return @groups;
 }
+
+=head2 update_object_meta
+
+  Arg [1]    : iRODS data object
+  Arg [2]    : array of arrayrefs (metadata)
+  Example    : update_object_meta('/my/object', [[$key => $value]])
+  Description: Update the iRODS metadata of an object by adding keys and values
+               given in the second argument. No iRODS metadata are removed.
+  Returntype : void
+  Caller     : general
+
+=cut
 
 sub update_object_meta {
   my ($target, $meta) = @_;
@@ -243,6 +301,18 @@ sub update_object_meta {
   }
 }
 
+=head2 update_collection_meta
+
+  Arg [1]    : iRODS collection
+  Arg [2]    : array of arrayrefs (metadata)
+  Example    : update_collection_meta('/my/collection', [[$key => $value]])
+  Description: Update the iRODS metadata of a collection by adding keys and values
+               given in the second argument. No iRODS metadata are removed.
+  Returntype : void
+  Caller     : general
+
+=cut
+
 sub update_collection_meta {
   my ($target, $meta) = @_;
 
@@ -261,6 +331,20 @@ sub update_collection_meta {
     }
   }
 }
+
+=head2 grant_group_access
+
+  Arg [1]    : iRODS collection or data object
+  Arg [2]    : iRODS access level string ('read', 'all' etc.)
+  Arg [3]    : generate any required new groups
+  Arg [4]    : array of group names
+  Example    : grant_group_access('/my/object', 'read', 0, 'ss_1234', 'ss_1235')
+  Description: Set iRODS group access on the spefied entity. If the 3rd argument
+               is true, groups that do not exist will be created.
+  Returntype : void
+  Caller     : general
+
+=cut
 
 sub grant_group_access {
   my ($target, $access, $make_groups, @groups) = @_;

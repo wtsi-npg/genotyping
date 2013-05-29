@@ -53,7 +53,7 @@ sub read_it_column_names {
   Arg [3]    : arrayref of column indices
   Arg [4]    : value to insert
   Example    : $n = update_it_columns(\*STDIN, \*STDOUT, [0, 1], 'NaN')
-  Description: Reads Illuminus intensity format data from $in and writes
+  Description: Read Illuminus intensity format data from $in and writes
                it to $out, having changed the intensity values in columns
                denoted by the indices to contain the specified value. The
                column indices count from the first sample column. i.e. the
@@ -97,7 +97,7 @@ sub update_it_columns {
 
   Arg [1]    : filehandle
   Example    : $names = read_gt_column_names($fh);
-  Description: Reads the column names from a filehandle of genotype call format
+  Description: Read the column names from a filehandle of genotype call format
                data.
   Returntype : arrayref
   Caller     : general
@@ -130,7 +130,7 @@ sub read_gt_column_names {
                or 'exclude'
   Example    : @filtered =
                  filter_columns(["a", "b", "c", "d"], [0, 3], 'include')
-  Description: Retains or removes the indicated columns from an array of columns
+  Description: Retain or removes the indicated columns from an array of columns
                of genotype call or probability format data.
   Returntype : array
   Caller     : general
@@ -184,7 +184,7 @@ sub filter_gt_columns {
   Arg [2]    : input filehandle (raw probabilities)
   Arg [3]    : output filehandle
   Example    : $num_records = write_gt_calls($cin, $pin, \*STDOUT)
-  Description: Writes genotype call format data to a filehandle, given streams
+  Description: Write genotype call format data to a filehandle, given streams
                of raw Illuminus results (calls codes and probabilities)
   Returntype : integer
   Caller     : general

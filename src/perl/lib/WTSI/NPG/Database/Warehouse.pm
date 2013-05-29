@@ -12,7 +12,7 @@ use base 'WTSI::NPG::Database';
 
   Arg [1]    : string
   Example    : $db->find_infinium_plate('Infinium LIMS plate barcode')
-  Description: Returns plate details for an Infinium LIMS plate barcode
+  Description: Return plate details for an Infinium LIMS plate barcode
                as a hashref with plate addresses as keys and values being
                a further hashref for each sample having the following keys
                and values:
