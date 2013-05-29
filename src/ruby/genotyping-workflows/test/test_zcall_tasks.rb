@@ -151,9 +151,10 @@ class TestZCallTasks < Test::Unit::TestCase
       Percolate.log.close
       assert_equal(2, result.size)
       ['000', '001'].collect do | x |
-        cmd =  'plink --bfile '+
-          File.join(work_dir, 'zcall_temp', 'samples_part_'+x)+
-          ' --silent --out '+File.join(work_dir, 'plink_'+x)
+        stem = File.join(work_dir, 'zcall_temp', 'samples_part_'+x)
+        assert_equal(4, File.readlines(stem+'.fam').size)
+        cmd =  'plink --bfile '+stem+' --silent --out '+
+          File.join(work_dir, 'plink_'+x)
         assert(system(cmd))
       end
       remove_work_dir(work_dir)
