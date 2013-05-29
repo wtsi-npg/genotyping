@@ -56,9 +56,9 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
                                                    $publisher_uri,
                                                    \@samples,
                                                    $ssdb, $now, $groups);
-  Description: Publishes a Genome Studio export, IDAT and XML file pairs to
-               iRODS with attendant metadata. Skips any files where consent
-               is absent. Republishes any file that is already published,
+  Description: Publish a Genome Studio export, IDAT and XML file pairs to
+               iRODS with attendant metadata. Skip any files where consent
+               is absent. Republish any file that is already published,
                but whose checksum has changed.
   Returntype : integer number of files published
   Caller     : general

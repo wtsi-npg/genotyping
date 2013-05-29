@@ -84,7 +84,7 @@ sub update_sample_genders {
                being an arrayref of two values; chromosome and physical
                position.
   Example    : $n = update_snp_locations(\*STDIN, \*STDOUT, \%locations)
-  Description: Updates a stream of Plink BIM format records with new SNP
+  Description: Update a stream of Plink BIM format records with new SNP
                location (chromosome name and physical position) information
                and writes it to another stream. The chromosome names must be
                in Plink encoded numeric format.

@@ -32,7 +32,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
   Arg [1]    : sample hashref
   Example    : my @meta = make_infinium_metadata($sample)
-  Description: Returns a list of metadata key/value pairs describing the
+  Description: Return a list of metadata key/value pairs describing the
                sample. Includes the beadchip identifier.
   Returntype : array of arrayrefs
   Caller     : general
@@ -51,7 +51,7 @@ sub make_infinium_metadata {
 
   Arg [1]    : 
   Example    : my @meta = make_analysis_metadata()
-  Description: Returns a list of metadata key/value pairs describing an analysis.
+  Description: Return a list of metadata key/value pairs describing an analysis.
   Returntype : array of arrayrefs
   Caller     : general
 
