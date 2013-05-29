@@ -36,7 +36,7 @@ Requires a populated pipeline database.
     DESC
 
     usage <<-USAGE
-    GenotypeGenoSNP args
+    GenotypeZCall args
 
 Arguments:
 
@@ -59,7 +59,7 @@ Arguments:
 e.g.
 
  library: genotyping
- workflow: Genotyping::Workflows::GenotypeGenoSNP
+ workflow: Genotyping::Workflows::GenotypeZCall
  arguments:
      - /work/my_project/my_analysis.db
      - sample_batch_1
