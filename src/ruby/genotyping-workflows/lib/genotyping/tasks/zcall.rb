@@ -110,8 +110,7 @@ def zcall_evaluate_available?()
                                     :argument => :size, :value => chunk_size)
       end
 
-      sample_ranges = make_ranges(start_sample, end_sample, chunk_size, 
-                                  simtools=false)
+      sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
       return chunk_size, sample_ranges
     end
 

@@ -112,7 +112,7 @@ module Genotyping
   # Returns an Array of Ranges which are indices for chunked
   # data processing. Given a start index, end index and a chunk size,
   # returns the relevant indices.
-  def make_ranges(from, to, chunk_size, simtools=true)
+  def make_ranges(from, to, chunk_size)
     unless to >= from
       raise ArgumentError, "'to' (#{to}) was not > 'from' (#{from})"
     end
@@ -129,13 +129,9 @@ module Genotyping
       ranges << (ranges.last.end .. ranges.last.end + partial_range)
     end
 
-
-    if simtools
-      # subtract 1 from endpoint -- to work with simtools index convention
-      ranges.collect { |range| Range.new(range.begin + from, range.end + from -1)  }
-    else
-      ranges.collect { |range| Range.new(range.begin + from, range.end + from) }
-    end
+    ranges.collect { 
+      |range| Range.new(range.begin + from, range.end + from -1)  
+    }
       
   end
 
