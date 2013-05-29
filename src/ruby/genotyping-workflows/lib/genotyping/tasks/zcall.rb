@@ -67,9 +67,26 @@ def zcall_evaluate_available?()
 
     # private methods for internal use
     private 
-    # Generate path for evaluation chunk .json output
-    def get_evaluation_path(work_dir, i)
-      name = "evaluation_part_%03d.json" % i # pad with leading zeroes
+   
+    def default_threshold_paths(egt_path, work_dir, zstart, ztotal)
+      # generate default threshold.txt paths
+      # equivalent to method used in zcall calibration.py
+      egt_name = File.basename(egt_path)
+      items = egt_name.split(/\./)
+      items.pop()
+      base = items.join('.')
+      thresholds = []
+      zscores = Array(Range.new(zstart, zstart+ztotal, true))
+      zscores.each do |z|
+        t = 'thresholds_'+base+'_z%02d.txt' % z
+        thresholds.push(File.join(work_dir, t))
+      end
+      return thresholds
+    end
+
+    # Generate path for evaluation/calling chunk .json output
+    def get_sample_subset_path(work_dir, i)
+      name = "samples_part_%03d.json" % i # pad with leading zeroes
       File.join(work_dir, name)
     end
 
@@ -96,6 +113,25 @@ def zcall_evaluate_available?()
       sample_ranges = make_ranges(start_sample, end_sample, chunk_size)
       return chunk_size, sample_ranges
     end
+
+    def write_sample_subsets(sample_ranges, sample_json, out_dir)
+      # write sample .json files with subsets of main file
+      samples = JSON.load(File.read(sample_json))
+      out_paths = Array.new
+      sample_ranges.each_with_index.collect do |range, i|
+        gtc_output = Array.new
+        out_path = get_sample_subset_path(out_dir, i)
+        out_paths.push(out_path)
+        samples[range].collect do |sample|
+          gtc_output.push(sample)  # append hash to list
+        end
+        out_file = File.new(out_path, mode='w')
+        JSON.dump(gtc_output, out_file)
+        out_file.close # need to ensure file closure!
+      end
+      return out_paths
+    end
+
     public # end of private methods
 
     # Prepares threshold.txt files for zcall
@@ -128,14 +164,9 @@ def zcall_evaluate_available?()
                    cli_arg_map(cli_args,
                                :prefix => '--')].flatten.join(' ')
         threshold_json = File.join(work_dir, 'thresholds.json')
-        threshold_text = []
-        zscores = [6,7,8]
-        zscores.each do |z|
-          t = 'thresholds_HumanExome-12v1_z0'+z.to_s()+'.txt'
-          threshold_text.push(File.join(work_dir, t))
-        end
+        threshold_text = default_threshold_paths(egt_file, work_dir, 
+                                                 zstart, ztotal)
         expected = [threshold_json, threshold_text].flatten
-
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
                    :result => lambda { [threshold_json, threshold_text] },
@@ -164,7 +195,7 @@ def zcall_evaluate_available?()
         evaluation_args = sample_ranges.each_with_index.collect do |range, i|
           {:thresholds => threshold_json, :bpm => manifest, :egt => egt_file,
             :gtc => sample_json, :start => range.begin, :end => range.end,
-            :out => get_evaluation_path(temp_dir, i)  
+            :out => get_sample_subset_path(temp_dir, i)  
           }
         end
         out_paths = evaluation_args.collect do |args|
@@ -172,16 +203,19 @@ def zcall_evaluate_available?()
         end
         index_path = File.join(work_dir, METRIC_INDEX)
         unless File.exists?(index_path)
-          JSON.dump(out_paths, File.new(index_path, mode='w'))
+          index_file = File.new(index_path, mode='w')
+          JSON.dump(out_paths, index_file)
+          index_file.close # need to ensure file closure!
         end
         commands = evaluation_args.collect do |args| 
           cmd = [EVALUATE, cli_arg_map(args, :prefix => '--')]
           cmd.join(' ')
         end
-
+        # prepend work_dir and index to each args list, forming margs_arrays
         margs_arrays = evaluation_args.collect { | args |
           [work_dir, args]
         }.each_with_index.collect { |elt, i| [i] + elt }
+        # set up async task array with task ID and logfile
         task_id = task_identity(:evaluate_thresholds, *margs_arrays)
         log = File.join(log_dir, task_id + '.%I.log')
         async = async_task_array(margs_arrays, commands, work_dir, log,
@@ -190,9 +224,9 @@ def zcall_evaluate_available?()
                                  },
                                  :result => lambda { index_path },
                                  :async => async)
-        if async.include?(nil)
+        if async.include?(nil) # one or more expected outputs is missing
           result = nil
-        else
+        else # all expected outputs present
           result = index_path
         end
         return result
@@ -249,46 +283,59 @@ def zcall_evaluate_available?()
       end
     end
     
-    def run_zcall_array(thresholds, sample_json, manifest, egt_file, work_dir,
+    def run_zcall_array(thresholds, sample_json, manifest, egt_file,
                         args = {}, async ={})
       # run zcall in parallel on subsets of samples
       # write series of sample .json files, submit zcall commands as job array
-      # combine plink outputs after job array completion
-      #  using plink --merge-list; needs list of .bed/.bim/.fam files
+      # can later use use existing 'merge bed' task to combine plink outputs
       args, work_dir, log_dir = process_task_args(args)
+      temp_dir = File.join(work_dir, 'zcall_temp')
+      Dir.mkdir(temp_dir) unless File.exist?(temp_dir)
       if args_available?(thresholds, sample_json, manifest, egt_file, work_dir)
         start_sample = args[:start] || 0
         end_sample = args[:end]
         chunk_size, sample_ranges = 
           get_sample_ranges(start_sample, end_sample, args)
-        #puts sample_ranges.inspect
-        sample_subsets = write_sample_subsets(sample_ranges, sample_json, 
-                                              work_dir)
-        return 1
+        subset_paths = write_sample_subsets(sample_ranges, sample_json, 
+                                            temp_dir)
+        call_args = Array.new
+        bed_paths = Array.new
+        commands = subset_paths.each_with_index.collect do |subset, i|
+          prefix = "samples_part_%03d" % i
+          cli_args = {
+            :thresholds => thresholds,
+            :bpm => manifest,
+            :egt => egt_file,
+            :samples => subset,
+            :out => temp_dir,
+            :plink => prefix,
+            :binary => ''
+          }
+          call_args.push(cli_args)
+          bed_paths.push(File.join(temp_dir, prefix+".bed"))
+          cmd = [CALL, cli_arg_map(cli_args, :prefix => '--')]
+          cmd.join(' ')
+        end
+        margs_arrays = call_args.collect { | args |
+          [work_dir, args]
+        }.each_with_index.collect { |elt, i| [i] + elt }
+        # set up async task array with task ID and logfile
+        task_id = task_identity(:run_zcall, *margs_arrays)
+        log = File.join(log_dir, task_id + '.%I.log')
+        async = async_task_array(margs_arrays, commands, work_dir, log,
+                                 :post => lambda { 
+                                   ensure_files(bed_paths, :error => false)
+                                 },
+                                 :result => lambda { |i| bed_paths[i] },
+                                 :async => async)
+        if async.include?(nil) # one or more expected outputs is missing
+          result = nil
+        else # all expected outputs present
+          result = [async, temp_dir]
+        end
+        return result
       end
     end
-
-    private
-    def write_sample_subsets(sample_ranges, sample_json, work_dir)
-      # write sample .json files with subsets of main file
-      
-      #puts sample_ranges.inspect
-      puts sample_json
-      samples = JSON.load(File.read(sample_json))
-      sample_ranges.each do |x|
-        puts x.inspect
-      end
-      
-    end
-
-    #  
-      # iterate over sample ranges and write new .json file for each
-    #  sample_ranges.each |x| do
-    #    puts x.inspect
-    #  end
-    #end
-
-    
 
   end # module ZCall
 end # module Genotyping::Tasks

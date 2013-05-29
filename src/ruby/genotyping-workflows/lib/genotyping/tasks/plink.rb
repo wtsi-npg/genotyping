@@ -109,6 +109,46 @@ module Genotyping::Tasks
       end
     end
 
+    def transpose_bed_array(inputs, outputs, args = {}, async = {})
+      # as for transpose_bed, but transpose multiple files in parallel
+      # inputs/outputs are Plink .bed filenames
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(inputs, outputs, work_dir)
+        if inputs.size != outputs.size
+          raise 'Mismatched input/output list lengths'
+        end
+        targs = Array.new
+        out_paths = Array.new
+        commands = inputs.zip(outputs).collect do |input, output|
+          cli_args = {
+            :noweb => true,
+            :make_bed => true,
+            :bfile => File.basename(input, '.bed'),
+            :recode => true,
+            :transpose => true,
+            :out => File.basename(output, '.bed')}
+          targs.push(cli_args)
+          out_paths.push(output)
+          command = [PLINK, cli_arg_map(cli_args, :prefix => '--') { |key|
+                       key.gsub(/_/, '-')
+                     }].flatten
+          command.join(' ')
+        end
+        margs_arrays = targs.collect { | args |
+          [work_dir, args]
+        }.each_with_index.collect { |elt, i| [i] + elt }
+        task_id = task_identity(:transpose_bed_array, *margs_arrays)
+        log = File.join(log_dir, task_id + '.%I.log')
+        async_task_array(margs_arrays, commands, work_dir, log,
+                         :post => lambda { 
+                           ensure_files(out_paths, :error => false)
+                         },
+                         :result => lambda { |i| out_paths[i] },
+                         :async => async)
+      end
+    end
+
     def update_annotation(bed_file, sample_json, snp_json, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
