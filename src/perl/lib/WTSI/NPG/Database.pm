@@ -15,7 +15,7 @@ use Log::Log4perl;
   Arg [2]    : inifile => string
   Example    : WTSI::NPG::Database::<some class>->new
                  (name => 'my_database', inifile => 'my_database.ini')
-  Description: Returns a new database handle configured from an
+  Description: Return a new database handle configured from an
                .ini-style file.
   Returntype : WTSI::NPG::Database
   Caller     : general
@@ -37,7 +37,7 @@ sub new {
   Arg [2]    : inifile => string
   Example    : $db->configure(name => 'my_database',
                               inifile => 'my_database.ini')
-  Description: Configures an exisiting database handle from an
+  Description: Configure an exisiting database handle from an
                .ini-style file.
   Returntype : WTSI::NPG::Database
   Caller     : constructor, general
@@ -70,7 +70,7 @@ sub configure {
 
   Arg [1]    : None
   Example    : $db->inifile
-  Description: Returns the current .ini-style file.
+  Description: Return the current .ini-style file.
   Returntype : string
   Caller     : general
 
@@ -90,7 +90,7 @@ sub inifile {
 
   Arg [n]    : key => value
   Example    : my $dbh = $db->connect(AutoCommit => 0, RaiseError => 1)->dbh;
-  Description: Connects to the configured database using DBI. Additional
+  Description: Connect to the configured database using DBI. Additional
                DBI connection arguments may be supplied as key => value
                pairs.
   Returntype : WTSI::NPG::Database
@@ -120,7 +120,7 @@ sub connect {
 
   Arg [1]    : None
   Example    : $db->disconnect
-  Description: Disconnects the database handle.
+  Description: Disconnect the database handle.
   Returntype : 
   Caller     : general
 
@@ -139,7 +139,7 @@ sub disconnect {
 
   Arg [1]    : None
   Example    : $db->is_connected
-  Description: Returns true if the database handle is connected.
+  Description: Return true if the database handle is connected.
   Returntype : boolean
   Caller     : general
 
@@ -155,7 +155,7 @@ sub is_connected {
 
   Arg [1]    : None
   Example    : $db->dbh
-  Description: Returns the current database handle.
+  Description: Return the current database handle.
   Returntype : DBI handle
   Caller     : general
 
@@ -171,7 +171,7 @@ sub dbh {
 
   Arg [1]    : None
   Example    : $db->name
-  Description: Returns the current database name.
+  Description: Return the current database name.
   Returntype : string
   Caller     : general
 
@@ -191,7 +191,7 @@ sub name {
 
   Arg [1]    : None
   Example    : $db->data_source
-  Description: Returns the current database data source.
+  Description: Return the current database data source.
   Returntype : string
   Caller     : general
 
@@ -211,7 +211,7 @@ sub data_source {
 
   Arg [1]    : None
   Example    : $db->username
-  Description: Returns the current database user name.
+  Description: Return the current database user name.
   Returntype : string
   Caller     : general
 
@@ -230,7 +230,7 @@ sub username {
 
   Arg [1]    : None
   Example    : $db->password
-  Description: Returns the current database password.
+  Description: Return the current database password.
   Returntype : string or undef
   Caller     : general
 
@@ -249,7 +249,7 @@ sub password {
 
   Arg [1]    : None
   Example    : $db->log
-  Description: Returns the current logger.
+  Description: Return the current logger.
   Returntype : Logger object
   Caller     : general
 

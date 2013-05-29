@@ -13,7 +13,7 @@ our @EXPORT_OK = qw(common_stem trim);
   Arg [1]    : string
   Arg [2]    : string
   Example    : $stem = common_stem("foo13240a", "foo199")
-  Description: Returns the common part of the two arguments, starting
+  Description: Return the common part of the two arguments, starting
                from the left (index 0). If one or more of the arguments
                are empty strings, or the arguments differ at the first
                character, an empty string is returned.

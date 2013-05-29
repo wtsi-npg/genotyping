@@ -64,7 +64,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
   Arg [1]    : A SequenceScape study ID.
   Example    : make_group_name(1234))
-  Description: Returns an iRODS group name given a SequenceScape study ID.
+  Description: Return an iRODS group name given a SequenceScape study ID.
   Returntype : string
   Caller     : general
 
@@ -80,7 +80,7 @@ sub make_group_name {
 
   Arg [1]    : iRODS group name
   Example    : find_or_create_group($name)
-  Description: Creates a new iRODS group if it does not exist. Returns
+  Description: Create a new iRODS group if it does not exist. Returns
                the group name.
   Returntype : string
   Caller     : general
@@ -111,7 +111,7 @@ sub find_or_make_group {
 
   Arg [1]    : iRODS group name
   Example    : group_exists($name)
-  Description: Returns true if the group exists, or false otherwise
+  Description: Return true if the group exists, or false otherwise
   Returntype : boolean
   Caller     : general
 
@@ -127,7 +127,7 @@ sub group_exists {
 
   Arg [1]    : new iRODS group name
   Example    : add_group($name)
-  Description: Creates a new group. Raises an error if the group exists
+  Description: Create a new group. Raises an error if the group exists
                already. Returns the group name. The group name is not escaped
                in nay way.
   Returntype : string
@@ -151,7 +151,7 @@ sub add_group {
 
   Arg [1]    : An existing iRODS group name.
   Example    : remove_group($name)
-  Description: Creates a new group. Raises an error if the group exists
+  Description: Remove a group. Raises an error if the group does not exist.
                already. Returns the group name. The group name is not escaped
                in any way.
   Returntype : string
@@ -177,7 +177,7 @@ sub remove_group {
   Arg [2]    : An iRODS group name.
   Arg [3]    : One or more data objects or collections
   Example    : set_group_access('read', 'public', $object1, $object2)
-  Description: Sets the access rights on one or more objects for a group,
+  Description: Set the access rights on one or more objects for a group,
                returning the objects.
   Returntype : array
   Caller     : general
@@ -204,7 +204,7 @@ sub set_group_access {
 
   Arg [1]    : None
   Example    : $dir = ipwd()
-  Description: Returns the current iRODS working directory.
+  Description: Return the current iRODS working directory.
   Returntype : string
   Caller     : general
 
@@ -220,7 +220,7 @@ sub ipwd {
 
   Arg [1]    : iRODS data object name
   Example    : $cs = get_object_checksum('/my/path/lorem.txt')
-  Description: Returns the MD5 checksum of an iRODS data object.
+  Description: Return the MD5 checksum of an iRODS data object.
   Returntype : string
   Caller     : general
 
@@ -254,7 +254,7 @@ sub get_object_checksum {
 
   Arg [1]    : iRODS data object name
   Example    : checksum_object('/my/path/lorem.txt')
-  Description: Returns true if the MD5 checksum in the metadata of an iRODS
+  Description: Return true if the MD5 checksum in the metadata of an iRODS
                object is identical to the MD5 caluclated by iRODS.
   Returntype : boolean
   Caller     : general
@@ -290,7 +290,7 @@ sub checksum_object {
 
   Arg [1]    : iRODS data object name
   Example    : $obj = list_object($object)
-  Description: Returns the full path of the object.
+  Description: Return the full path of the object.
   Returntype : string
   Caller     : general
 
@@ -325,7 +325,7 @@ sub list_object {
   Arg [1]    : Name of file to add to iRODs
   Arg [2]    : iRODS data object name
   Example    : add_object('lorem.txt', '/my/path/lorem.txt')
-  Description: Adds a file to iRODS.
+  Description: Add a file to iRODS.
   Returntype : string
   Caller     : general
 
@@ -351,7 +351,7 @@ sub add_object {
 
   Arg [1]    : iRODS data object name
   Example    : remove_object('/my/path/lorem.txt')
-  Description: Removes a data object.
+  Description: Remove a data object.
   Returntype : string
   Caller     : general
 
@@ -371,7 +371,7 @@ sub remove_object {
 
   Arg [1]    : iRODS data object name
   Example    : get_object_meta('/my/path/lorem.txt')
-  Description: Gets metadata on a data object. Where there are multiple
+  Description: Get metadata on a data object. Where there are multiple
                values for one key, the values are contained in an array under
                that key.
   Returntype : hash
@@ -397,7 +397,7 @@ sub get_object_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : add_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
-  Description: Adds metadata to a data object. Returns an array of
+  Description: Add metadata to a data object. Return an array of
                the new key, value and units.
   Returntype : array
   Caller     : general
@@ -463,7 +463,7 @@ sub batch_object_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : remove_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
-  Description: Removes metadata from a data object. Returns an array of
+  Description: Remove metadata from a data object. Return an array of
                the removed key, value and units.
   Returntype : array
   Caller     : general
@@ -501,8 +501,8 @@ sub remove_object_meta {
   Arg [3]    : value
   Arg [4]    : units
   Example    : find_objects_by_meta('/my/path/foo%', 'id', 'ABCD1234')
-  Description: Finds objects by their metadata, restricted to a parent collection.
-               Returns a list of collections.
+  Description: Find objects by their metadata, restricted to a parent collection.
+               Return a list of collections.
   Returntype : array
   Caller     : general
 
@@ -539,7 +539,7 @@ sub find_objects_by_meta {
 
   Arg [1]    : iRODS collection name
   Example    : $dir = list_collection($coll)
-  Description: Returns the contents of the collection as two arrayrefs,
+  Description: Return the contents of the collection as two arrayrefs,
                the first listing data objects, the second listing nested
                collections.
   Returntype : array
@@ -591,7 +591,7 @@ sub list_collection {
 
   Arg [1]    : iRODS collection name
   Example    : add_collection('/my/path/foo')
-  Description: Makes a new collection in iRODS. Returns the new collection.
+  Description: Make a new collection in iRODS. Return the new collection.
   Returntype : string
   Caller     : general
 
@@ -614,7 +614,7 @@ sub add_collection {
 
   Arg [2]    : iRODS collection name
   Example    : put_collection('/my/path/foo', '/archive')
-  Description: Makes a new collection in iRODS. Returns the new collection.
+  Description: Make a new collection in iRODS. Return the new collection.
   Returntype : string
   Caller     : general
 
@@ -645,7 +645,7 @@ sub put_collection {
 
   Arg [1]    : iRODS collection name
   Example    : remove_collection('/my/path/foo')
-  Description: Removes a collection and contents, recursively.
+  Description: Remove a collection and contents, recursively.
   Returntype : string
   Caller     : general
 
@@ -665,7 +665,7 @@ sub remove_collection {
 
   Arg [1]    : iRODS data collection name
   Example    : get_collection_meta('/my/path/lorem.txt')
-  Description: Gets metadata on a collection. Where there are multiple
+  Description: Get metadata on a collection. Where there are multiple
                values for one key, the values are contained in an array under
                that key.
   Returntype : hash
@@ -690,7 +690,7 @@ sub get_collection_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : add_collection_meta('/my/path/foo', 'id', 'ABCD1234')
-  Description: Adds metadata to a collection. Returns an array of
+  Description: Add metadata to a collection. Return an array of
                the new key, value and units.
   Returntype : array
   Caller     : general
@@ -729,7 +729,7 @@ sub add_collection_meta {
   Arg [3]    : value
   Arg [4]    : units (optional)
   Example    : remove_collection_meta('/my/path/foo', 'id', 'ABCD1234')
-  Description: Removes metadata from a collection object. Returns an array of
+  Description: Removes metadata from a collection object. Return an array of
                the removed key, value and units.
   Returntype : array
   Caller     : general
@@ -768,8 +768,8 @@ sub remove_collection_meta {
   Arg [3]    : value
   Arg [4]    : units
   Example    : find_collections_by_meta('/my/path/foo%', 'id', 'ABCD1234')
-  Description: Finds collections by their metadata, restricted to a parent collection.
-               Returns a list of collections.
+  Description: Find collections by their metadata, restricted to a parent collection.
+               Return a list of collections.
   Returntype : array
   Caller     : general
 
@@ -800,6 +800,20 @@ sub find_collections_by_meta {
   return \@colls;
 }
 
+=head2 meta_exists
+
+  Arg [1]    : string key
+  Arg [2]    : string value
+  Arg [3]    : hash metadata
+  Example    : meta_exists('foo', 99, %meta)
+  Description: Return true if hash %meta contains a key with a specific
+               value
+  Returntype : boolean
+  Caller     : general
+
+=cut
+
+
 sub meta_exists {
   my ($key, $value, %meta) = @_;
 
@@ -820,7 +834,7 @@ sub meta_exists {
 
   Arg [1]    : string path to a file
   Example    : my $md5 = md5sum($filename)
-  Description: Calculates the MD5 checksum of a file.
+  Description: Calculate the MD5 checksum of a file.
   Returntype : string
   Caller     : general
 
@@ -845,7 +859,7 @@ sub md5sum {
   Arg [1]    : string path to a file
   Arg [2]    : MD5 checksum (optional)
   Example    : my $path = hash_path($filename)
-  Description: Returns a hashed path 3 directories deep, each level having
+  Description: Return a hashed path 3 directories deep, each level having
                a maximum of 256 subdirectories, calculated from the file's
                MD5. If the optional MD5 argument is supplied, the MD5
                calculation is skipped and the provided value is used instead.
@@ -930,7 +944,7 @@ sub collect_files {
                returns true if that object is to be collected.
   Arg [3]    : Maximum depth to search below the starting directory.
   Example    : @dirs = collect_dirs('/home', $modified, 2)
-  Description: Returns an array of directory names present under the specified
+  Description: Return an array of directory names present under the specified
                root, for which the test predicate returns true, up to the
                specified depth.
   Returntype : array of strings (dir names)
@@ -1003,7 +1017,7 @@ sub make_collector {
   Arg [1]    : time in seconds since the epoch
   Arg [2]    : time in seconds since the epoch
   Example    : $test = modified_between($start_time, $end_time)
-  Description: Returns a function that accepts a single argument (a
+  Description: Return a function that accepts a single argument (a
                file name string) and returns true if that file has
                last been modified between the two specified times in
                seconds (inclusive).

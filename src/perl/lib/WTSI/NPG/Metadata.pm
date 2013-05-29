@@ -48,7 +48,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
   Arg [1]    : DateTime creation time
   Arg [2]    : string publisher (LDAP URI of publisher)
   Example    : my @meta = make_creation_metadata($time, $publisher)
-  Description: Returns a list of metadata key/value pairs describing the
+  Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
   Caller     : general
@@ -68,7 +68,7 @@ sub make_creation_metadata {
 
   Arg [1]    : DateTime modification time
   Example    : my @meta = make_modification_metadata($time)
-  Description: Returns a list of metadata key/value pairs describing the
+  Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
   Caller     : general
@@ -87,7 +87,7 @@ sub make_modification_metadata {
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
   Arg [2]    : WTSI::NPG::Database::Warehouse DB handle
   Example    : my @meta = make_sample_metadata($sample, $db)
-  Description: Returns a list of metadata key/value pairs describing the
+  Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
   Caller     : general
@@ -164,7 +164,7 @@ sub make_sample_metadata {
   Arg [1]    : string filename
   Arg [2]    : array of valid file suffix strings
   Example    : my @meta = make_file_metadata($sample)
-  Description: Returns a list of metadata key/value pairs describing a file,
+  Description: Return a list of metadata key/value pairs describing a file,
                including the file 'type' (suffix) and MD5 checksum.
   Returntype : array of arrayrefs
   Caller     : general
@@ -190,7 +190,7 @@ sub make_file_metadata {
 
   Arg [1]    : metadata array
   Example    : My $consent = has_consent(@meta);
-  Description: Returns true if the sample metadata contains an indication that
+  Description: Return true if the sample metadata contains an indication that
                consent has been given.
   Returntype : boolean
   Caller     : general

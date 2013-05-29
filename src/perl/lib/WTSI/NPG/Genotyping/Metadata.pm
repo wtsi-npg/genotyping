@@ -31,7 +31,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
   Arg [1]    : sample hashref from WTSI::NPG::Genotyping::Database::Infinium
   Example    : my @meta = make_infinium_metadata($sample)
-  Description: Returns a list of metadata key/value pairs describing the
+  Description: Return a list of metadata key/value pairs describing the
                sample in the Infinium LIMS. Includes the beadchip identifier.
   Returntype : array of arrayrefs
   Caller     : general
@@ -52,7 +52,7 @@ sub make_infinium_metadata {
 
   Arg [1]    : Arrayref of genotyping project titles
   Example    : my @meta = make_analysis_metadata(\@titles)
-  Description: Returns a list of metadata key/value pairs describing an analysis
+  Description: Return a list of metadata key/value pairs describing an analysis
                including the genotyping project names involved.
   Returntype : array of arrayrefs
   Caller     : general

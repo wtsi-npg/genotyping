@@ -15,7 +15,7 @@ our @EXPORT_OK = qw(read_sample_json
 
   Arg [1]    : filename
   Example    : @samples = read_sample_json($file)
-  Description: Returns sample metadata hashes, one per sample, from a JSON file.
+  Description: Return sample metadata hashes, one per sample, from a JSON file.
   Returntype : array
   Caller     : general
 
@@ -38,7 +38,7 @@ sub read_sample_json {
 
   Arg [1]    : filename
   Example    : @snps = read_snp_json($file)
-  Description: Returns SNP metadata hashes, one per SNP, from a JSON file.
+  Description: Return SNP metadata hashes, one per SNP, from a JSON file.
   Returntype : array
   Caller     : general
 
