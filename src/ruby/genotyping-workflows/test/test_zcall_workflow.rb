@@ -67,9 +67,11 @@ class TestWorkflowZCall < Test::Unit::TestCase
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :egt => egt_file,
                                            :chunk_size => 12,
+                                           :zstart => 5,
+                                           :ztotal => 3,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 2880 # was 720
+      timeout = 1800 # was 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeZCall,
                              timeout, work_dir, log, args)
