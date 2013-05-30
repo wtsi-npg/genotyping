@@ -43,10 +43,6 @@ class TestWorkflowZCall < Test::Unit::TestCase
     super(name)
     @msg_host = Socket.gethostname
     @msg_port = 11300
-    @queue = ENV['LSB_DEFAULTQUEUE']
-    unless @queue
-      @queue = :small
-    end
   end
 
   def data_path
@@ -55,10 +51,12 @@ class TestWorkflowZCall < Test::Unit::TestCase
 
   def test_genotype_zcall
     manifest = ENV['BEADPOOL_MANIFEST']
+    egt_file = ENV['BEADPOOL_EGT']
+    unless egt_file
+      egt_file = '/nfs/gapi/data/genotype/zcall_test/'+
+        'Human670-QuadCustom_v1_A.egt'
+    end
     name = 'test_genotype_zcall'
-
-    # TODO get .egt from environment or config
-    egt_file = '/nfs/gapi/data/genotype/zcall_test/Human670-QuadCustom_v1_A.egt'
 
     run_test_if(lambda { manifest }, "Manifest not found, skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
@@ -71,7 +69,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
                                            :chunk_size => 12,
                                            :memory => 2048,
                                            :select => 'lenny'}]
-      timeout = 1440 # was 720
+      timeout = 2880 # was 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeZCall,
                              timeout, work_dir, log, args)
