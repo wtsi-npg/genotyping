@@ -11,7 +11,7 @@ use warnings;
 use strict;
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
 use Cwd;
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 sub getLinkThumbnail {
     # get thumbnail link HTML for given image path; optionally supply height & width in pixels
@@ -98,5 +98,5 @@ close $out;
 
 # test output for XML validity
 open my $fh, "<", $outPath;
-if (WTSI::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
+if (WTSI::NPG::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
 else { close $fh; exit(1); } # error found

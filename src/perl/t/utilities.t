@@ -1,4 +1,4 @@
-# Tests WTSI::Genotyping::Utilities
+# Tests WTSI::NPG::Genotyping::Utilities
 
 use utf8;
 
@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Test::More tests => 11;
 
-use WTSI::Genotyping qw(common_stem);
+use WTSI::NPG::Utilities qw(common_stem);
 
 # common_stem
 is(common_stem('', ''), '');

@@ -18,8 +18,8 @@ use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Log::Log4perl qw(:easy);
-use WTSI::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
-use WTSI::Genotyping::QC::QCPlotTests;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
+use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");

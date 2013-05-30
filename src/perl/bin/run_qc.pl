@@ -11,12 +11,12 @@ use Getopt::Long;
 use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
-use WTSI::Genotyping::Version qw(write_version_log);
-use WTSI::Genotyping::QC::MetricExclusion qw(filterCR);
-use WTSI::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
+use WTSI::NPG::Genotyping::Version qw(write_version_log);
+use WTSI::NPG::Genotyping::QC::MetricExclusion qw(filterCR);
+use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
     readQCFileNames);
-use WTSI::Genotyping::QC::Reports qw(createReports);
+use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";

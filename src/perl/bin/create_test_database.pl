@@ -9,8 +9,8 @@ use warnings;
 use strict;
 use Carp;
 use Getopt::Long;
-use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping::QC::QCPlotShared qw/defaultConfigDir/;
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultConfigDir/;
 
 my ($sampleGenderPath, $dbPath, $iniPath, $plateSize, $plateTotal, 
     $flip, $excl, $help);

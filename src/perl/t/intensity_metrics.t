@@ -8,8 +8,8 @@ use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use Test::More tests => 3;
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
-use WTSI::Genotyping::QC::SimFiles qw/headerParams readSampleNames
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
+use WTSI::NPG::Genotyping::QC::SimFiles qw/headerParams readSampleNames
  writeIntensityMetrics/;
 
 my $testDir = "/nfs/users/nfs_i/ib5/mygit/github/genotyping/src/perl/t/";
