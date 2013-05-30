@@ -29,6 +29,7 @@ use WTSI::NPG::Publication qw(get_wtsi_uri
                               pair_rg_channel_files);
 use WTSI::NPG::Expression::Publication qw(publish_expression_analysis);
 use WTSI::NPG::Utilities qw(trim);
+use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = DEBUG, A1
@@ -55,45 +56,63 @@ my $log;
 
 our $DEFAULT_INI = $ENV{HOME} . '/.npg/genotyping.ini';
 
-our $DEFAULT_ANALYSIS_DEST = '/archive/GAPI/exp/analysis';
-our $DEFAULT_SAMPLE_DEST = '/archive/GAPI/exp/infinium';
+# our $DEFAULT_ANALYSIS_DEST = '/archive/GAPI/exp/analysis';
+# our $DEFAULT_SAMPLE_DEST = '/archive/GAPI/exp/infinium';
 
 run() unless caller();
 
 sub run {
   my $dbfile;
   my $log4perl_config;
+  my $analysis_source;
+  my $manifest;
   my $publish_analysis_dest;
-  my $publish_samples_dest;
-  my $source;
+  my $publish_sample_dest;
+  my $sample_source;
   my $verbose;
 
-  GetOptions('analysis-dest=s' => \$publish_analysis_dest,
-             'help'            => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'       => \$log4perl_config,
-             'sample-dest=s'   => \$publish_samples_dest,
-             'source=s'        => \$source,
-             'verbose'         => \$verbose);
+  GetOptions('analysis-dest=s'   => \$publish_analysis_dest,
+             'analysis-source=s' => \$analysis_source,
+             'help'              => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'         => \$log4perl_config,
+             'manifest=s'        => \$manifest,
+             'sample-dest=s'     => \$publish_sample_dest,
+             'sample-source=s'   => \$sample_source,
+             'verbose'           => \$verbose);
+
+  unless ($analysis_source) {
+    pod2usage(-msg => "An --analysis-source argument is required\n",
+              -exitval => 3);
+  }
+  unless ($sample_source) {
+    pod2usage(-msg => "A --sample-source argument is required\n",
+              -exitval => 3);
+  }
 
   unless ($publish_analysis_dest) {
     pod2usage(-msg => "An --analysis-dest argument is required\n",
               -exitval => 3);
   }
-  unless ($publish_samples_dest) {
-    pod2usage(-msg => "A --samples-dest argument is required\n",
+  unless ($publish_sample_dest) {
+    pod2usage(-msg => "A --sample-dest argument is required\n",
               -exitval => 3);
   }
 
-  unless ($source) {
-    pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 3);
-  }
-  unless (-e $source) {
-    pod2usage(-msg => "No such source as '$source'\n",
+  unless (-e $analysis_source) {
+    pod2usage(-msg => "No such analysis source as '$analysis_source'\n",
               -exitval => 4);
   }
-  unless (-d $source) {
-    pod2usage(-msg => "The --source argument was not a directory\n",
+  unless (-d $analysis_source) {
+    pod2usage(-msg => "The --analysis-source argument was not a directory\n",
+              -exitval => 4);
+  }
+
+  unless (-e $sample_source) {
+    pod2usage(-msg => "No such sample source as '$sample_source'\n",
+              -exitval => 4);
+  }
+  unless (-d $sample_source) {
+    pod2usage(-msg => "The --sample-source argument was not a directory\n",
               -exitval => 4);
   }
 
@@ -112,8 +131,9 @@ sub run {
   }
 
   my $config ||= $DEFAULT_INI;
+  my $in = maybe_stdin($manifest);
 
-  my @samples = parse_beadchip_table(\*STDIN);
+  my @samples = parse_beadchip_table($in);
   unless (@samples) {
     $log->logcroak("Found no sample rows in input: stopping\n");
   }
@@ -126,11 +146,11 @@ sub run {
   my $sections_patt = join('|', @sections);
   my $filename_regex = qr{($beadchips_patt)_($sections_patt)_$channel.(idat|xml)$}msxi;
 
-  my $dir = abs_path('./Illumina');
+  my $sample_dir = abs_path($sample_source);
   my $file_test = sub { return $_[0] =~ $filename_regex };
   my $relative_depth = 3;
 
-  my @paths = collect_files($dir, $file_test, $relative_depth);
+  my @paths = collect_files($sample_dir, $file_test, $relative_depth);
   my $samples = add_paths(\@samples, \@paths);
 
   my $uid = `whoami`;
@@ -147,10 +167,11 @@ sub run {
      inifile => $config)->connect(RaiseError => 1);
   $ssdb->log($log);
 
-  $log->info("Publishing from '$source' to '$publish_samples_dest' as ", $name);
+  $log->info("Publishing samples from '$sample_source' to '$publish_sample_dest' as ", $name);
+  $log->info("Publishing analysis from '$analysis_source' to '$publish_analysis_dest' as ", $name);
 
-  publish_expression_analysis($source, $creator_uri, $publish_analysis_dest,
-                              $publish_samples_dest, $publisher_uri, $samples,
+  publish_expression_analysis($analysis_source, $creator_uri, $publish_analysis_dest,
+                              $publish_sample_dest, $publisher_uri, $samples,
                               $ssdb, $now, $make_groups);
 }
 
@@ -194,7 +215,7 @@ sub parse_beadchip_table {
   my @samples;
 
   while (my $line = <$fh>) {
-    ++ $line_count;
+    ++$line_count;
     chomp($line);
     next if $line =~ m/^\s*$/;
 
@@ -322,20 +343,23 @@ __END__
 
 =head1 SYNOPSIS
 
-publish_expression_data --source <directory> \
-  --analysis-dest <irods collection> \
-  --sample-dest <irods collection> [--verbose]
+publish_expression_data --analysis-source <directory> --analysis-dest <collection>
+                        --sample-source <directory> --sample-dest <collection>
+                        [--manifest <file>] [--verbose]
 
 Options:
 
-  --analysis-dest The data destination root collection for the analysis data
-                  in iRODS. E.g. /archive/GAPI/exp/analysis
-  --help          Display help.
-  --logconf       A log4perl configuration file. Optional.
-  --samples-dest  The data destination root collection for the sample data
-                  in iRODS. E.g. /archive/GAPI/exp/infinium
-  --source        The root directory of the analysis.
-  --verbose       Print messages while processing. Optional.
+  --analysis-dest   The data destination root collection for the analysis data
+                    in iRODS. E.g. /archive/GAPI/exp/analysis
+  --analysis-source The root directory of the analysis.
+  --help            Display help.
+  --logconf         A log4perl configuration file. Optional.
+  --manifest        Tab-delimted chip loading manifest. Optional, defaults to
+                    STDIN.
+  --sample-dest     The data destination root collection for the sample data
+                    in iRODS. E.g. /archive/GAPI/exp/infinium
+  --sample-source   The root directory of all samples.
+  --verbose         Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
