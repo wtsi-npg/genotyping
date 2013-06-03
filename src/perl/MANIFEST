@@ -44,6 +44,7 @@ etc/reportIntro.tex
 etc/snpsets.ini
 etc/states.ini
 etc/x_pseudoautosomal.txt
+genotyping.db
 lib/WTSI/NPG/Database.pm
 lib/WTSI/NPG/Database/Warehouse.pm
 lib/WTSI/NPG/Expression/Metadata.pm
@@ -133,7 +134,6 @@ t/irods/test/file1.txt
 t/irods/test/file2.txt
 t/perlcriticrc
 t/qc/.gitattributes
-t/qc/alpha/pipeline_summary.lof
 t/qc_small.t
 t/qc_test_data/README.txt
 t/qc_test_data/small_test.bed
@@ -142,8 +142,20 @@ t/qc_test_data/small_test.db
 t/qc_test_data/small_test.fam
 t/qc_test_data/small_test.sim
 t/reports.t
+t/reports/crHetDensityHeatmap.pdf
+t/reports/crHetDensityScatter.pdf
+t/reports/failScatterDetail.pdf
+t/reports/failScatterPlot.pdf
+t/reports/failsCombined.pdf
+t/reports/failsIndividual.pdf
 t/reports/qc_results.json
 t/reports/sample_xhet_gender_thresholds.txt
+t/reports/scatter_call_rate_000.pdf
+t/reports/scatter_duplicate_000.pdf
+t/reports/scatter_gender_000.pdf
+t/reports/scatter_heterozygosity_000.pdf
+t/reports/scatter_magnitude_000.pdf
+t/reports/scatter_xydiff_000.pdf
 t/reports/test_pipeline.db
 t/update_illuminus_input.t
 t/update_illuminus_input/columns.json
