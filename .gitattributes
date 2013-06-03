@@ -1,4 +1,6 @@
-# do not attempt diff on PLINK format data files; treat as binary
+# do not attempt diff binary format data files
 *.bed -crlf -diff
-*.bim -crlf -diff
-*.fam -crlf -diff
+*.sim -crlf -diff
+*.pdf -crlf -diff
+*.db -crlf -diff
+
