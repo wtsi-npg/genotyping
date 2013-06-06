@@ -1,5 +1,5 @@
 
-# Tests WTSI::Genotyping::Database::SNP
+# Tests WTSI::NPG::Genotyping::Database::SNP
 
 use utf8;
 
@@ -8,10 +8,10 @@ use warnings;
 
 use Test::More tests => 8;
 
-BEGIN { use_ok('WTSI::Genotyping::Database::SNP'); }
-require_ok('WTSI::Genotyping::Database::SNP');
+BEGIN { use_ok('WTSI::NPG::Genotyping::Database::SNP'); }
+require_ok('WTSI::NPG::Genotyping::Database::SNP');
 
-use WTSI::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::Database::SNP;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -21,7 +21,7 @@ SKIP: {
   skip "$db_credentials credentials file not present", 6
     unless -e $db_credentials;
 
-  my $db = WTSI::Genotyping::Database::SNP->new
+  my $db = WTSI::NPG::Genotyping::Database::SNP->new
     (name   => 'snp',
      inifile => $db_credentials);
 

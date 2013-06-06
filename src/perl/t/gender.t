@@ -6,16 +6,16 @@
 use strict;
 use warnings;
 use Carp;
-use Cwd;
+use Cwd qw/abs_path/;
 use FindBin qw($Bin);
 use File::Temp qw/tempdir/;
 use Log::Log4perl;
 use JSON;
 use Test::More tests => 26;
-use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping::QC::GenderCheck;
-use WTSI::Genotyping::QC::GenderCheckDatabase;
-use WTSI::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::QC::GenderCheck;
+use WTSI::NPG::Genotyping::QC::GenderCheckDatabase;
+use WTSI::NPG::Genotyping::QC::QCPlotTests qw/createTestDatabase/;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -23,7 +23,7 @@ my $start = time();
 my $dbWorkDir = "$Bin/.."; # must change dir to genoytping/src/perl for default pipeline database config
 chdir($dbWorkDir);
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plink = "$Bin/qc_test_data/alpha";
+my $plink = "$Bin/gender/alpha";
 my $outDir = "$Bin/gender/";
 my $inputDir = $outDir;
 my $title = "Alpha";
@@ -32,6 +32,9 @@ my $refFile = "$inputDir/benchmark_gender.json";
 my $runName = "pipeline_run";
 my $largeInputPath = "$inputDir/sample_xhet_gender_large.txt";
 my $largeInputRef = "$inputDir/benchmark_gender_large.json";
+
+# The directory contains the R scripts
+$ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 
 # read benchmark genders for comparison
 

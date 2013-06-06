@@ -17,10 +17,16 @@ use Log::Log4perl qw(:easy);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
-use WTSI::Genotyping qw(maybe_stdin maybe_stdout common_stem
-                        read_sample_json
-                        find_column_indices filter_columns
-                        read_it_column_names update_it_columns write_gt_calls);
+
+use WTSI::NPG::Utilities::IO qw(maybe_stdin
+                                maybe_stdout);
+use WTSI::NPG::Utilities::DelimitedFiles qw(find_column_indices
+                                            filter_columns);
+
+use WTSI::NPG::Genotyping qw(read_sample_json);
+use WTSI::NPG::Genotyping::Illuminus qw(read_it_column_names
+                                        update_it_columns
+                                        write_gt_calls);
 
 Log::Log4perl->easy_init($ERROR);
 

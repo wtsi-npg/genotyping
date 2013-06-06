@@ -10,11 +10,11 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping;
-use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping::Database::Infinium;
-use WTSI::Genotyping::Database::Warehouse;
-use WTSI::Genotyping::Database::SNP;
+use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::Database::Infinium;
+use WTSI::NPG::Genotyping::Database::SNP;
+
 
 our $AUTOCALL_PASS = 'Pass';
 our $WTSI_NAMESPACE = 'wtsi';
@@ -71,22 +71,22 @@ sub run {
     print STDERR "Updating $db using config from $config\n";
   }
 
-  my $pipedb = WTSI::Genotyping::Database::Pipeline->new
+  my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => $config,
      dbfile => $dbfile)->connect
        (RaiseError => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
-  my $ifdb = WTSI::Genotyping::Database::Infinium->new
+  my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name   => 'infinium',
      inifile =>  $config)->connect(RaiseError => 1);
 
-  my $ssdb = WTSI::Genotyping::Database::Warehouse->new
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError => 1);
 
-  my $snpdb = WTSI::Genotyping::Database::SNP->new
+  my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
@@ -168,6 +168,7 @@ sub run {
          my $if_well = $if_sample->{'well'};
          my $if_name = $if_sample->{'sample'};
          my $if_status = $if_sample->{'status'};
+         my $if_rowcol = $if_sample->{'beadchip_section'};
 
          my $ss_plate;
          if (exists $cache{$if_sample->{'plate'}}) {
@@ -176,9 +177,10 @@ sub run {
          else {
            $ss_plate = $ssdb->find_infinium_plate($if_barcode);
          }
-
          my $address = $pipedb->address->find({label1 => $if_well});
          my $ss_sample = $ss_plate->{$address->label2};
+         my $ss_supply = $ss_plate->{'supplier_name'};
+         unless (defined($ss_supply)) { $ss_supply = ""; } # field may be null
 
          # Untracked
          my $ss_id = $ss_sample->{sanger_sample_id} ||
@@ -198,7 +200,9 @@ sub run {
          my $sample = $dataset->add_to_samples({name => $if_name,
                                                 sanger_sample_id => $ss_id,
                                                 beadchip => $if_chip,
-                                                include => 0});
+                                                include => 0,
+                                                supplier_name => $ss_supply,
+                                                rowcol => $if_rowcol});
 
          # If consent has been withdrawn, do not analyse and do not
          # look in SNP for Sequenom genotypes

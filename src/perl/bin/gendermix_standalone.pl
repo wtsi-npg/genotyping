@@ -26,7 +26,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use WTSI::Genotyping::QC::GenderCheck;
+use WTSI::NPG::Genotyping::QC::GenderCheck;
 
 my %opts = ();
 GetOptions(\%opts, "help", "input=s", "input-format=s", "output-dir=s", 

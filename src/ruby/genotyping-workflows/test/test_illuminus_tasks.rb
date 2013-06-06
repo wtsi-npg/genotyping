@@ -57,14 +57,17 @@ class TestIlluminusTasks < Test::Unit::TestCase
       work_dir = make_work_dir('test_call_from_sim_p', data_path)
 
       sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
-        mock_study('mock_study', 5, 2000, {:work_dir => work_dir,
-                                           :log_dir => work_dir})
+        mock_study('mock_study', 5, 2000, 
+                   {:work_dir => work_dir,
+                    :log_dir => work_dir},
+                   :select => 'lenny')
       end
 
       sim_file = wait_for('gtc_to_sim', 60, 5) do
         gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir => work_dir,
-                    :log_dir => work_dir})
+                    :log_dir => work_dir},
+                   :select => 'lenny')
       end
 
       call_files1 = wait_for('test_call_from_sim_p', 120, 5) do
@@ -76,8 +79,8 @@ class TestIlluminusTasks < Test::Unit::TestCase
                          :end => 2000,
                          :size => 100,
                          :group_size => 5,
-                         :plink=> false},
-                        :queue => :small)
+                         :plink => false},
+                        :select => 'lenny')
       end
 
       assert_equal(20, call_files1.size)

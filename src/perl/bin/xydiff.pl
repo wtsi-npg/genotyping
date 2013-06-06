@@ -11,7 +11,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use WTSI::Genotyping::QC::SimFiles;
+use WTSI::NPG::Genotyping::QC::SimFiles;
 
 my ($help, $inPath, $outPath, $fh, $out, $verbose, $probeNum);
 

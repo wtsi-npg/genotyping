@@ -59,10 +59,9 @@ module Genotyping::Tasks
           log = File.join(log_dir, task_id + '.log')
 
           if wait # postcondition to check for completion of QC
-            f =  File.join(work_dir, output, 'supplementary', 'finished.txt')
-            finish = [ f, ]
+            f =  File.join(output, 'supplementary', 'finished.txt')
             async_task(margs, command, work_dir, log,
-                       :post => lambda {ensure_files(finish, :error => false)},
+                       :post => lambda {ensure_files([f,], :error => false)},
                        :result => lambda { true },
                        :async => async)
           else

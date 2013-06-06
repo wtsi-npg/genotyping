@@ -11,8 +11,8 @@ use JSON;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::Genotyping::Database::Pipeline;
-use WTSI::Genotyping qw(maybe_stdout);
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Utilities::IO qw(maybe_stdout);
 
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -47,7 +47,7 @@ sub run {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
   }
 
-  my $pipedb = WTSI::Genotyping::Database::Pipeline->new
+  my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => $config,
      dbfile => $dbfile)->connect

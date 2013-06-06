@@ -20,7 +20,7 @@ module Genotyping::Workflows
 
   class GenotypeGenoSNP < Percolate::Workflow
     include Genotyping
-    include Genotyping::Tasks::Database
+    include Genotyping::Tasks::Metadata
     include Genotyping::Tasks::GenotypeCall
     include Genotyping::Tasks::Simtools
     include Genotyping::Tasks::GenoSNP
@@ -76,15 +76,18 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :chunk_size)
+                               :select, :chunk_size)
 
       async_defaults = {:memory => 1024}
-      async = lsf_args(args, async_defaults, :memory, :queue)
+      async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 20
+      gtconfig = args.delete(:config)
+
       args.delete(:memory)
       args.delete(:queue)
+      args.delete(:select)
 
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
@@ -95,16 +98,17 @@ Returns:
 
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
+      cjname = run_name + '.chr.json'
       smname = run_name + '.genosnp.sim'
       gsname = run_name + '.genosnp.bed'
 
-      sjson = sample_intensities(dbfile, run_name, sjname, args)
+      siargs = {:config => gtconfig}.merge(args)
+      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       num_samples = count_samples(sjson)
 
-      smargs = {:normalize => false,
-                :snp_meta => njname}.merge(args)
+      smargs = {:normalize => false }.merge(args)
 
-      smfile, njson = gtc_to_sim(sjson, manifest, smname, smargs, async)
+      smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
       gsargs = {:samples => sjson,
                 :start => 0,
                 :end => num_samples,
@@ -113,14 +117,17 @@ Returns:
                 :plink => true,
                 :debug => true}.merge(args)
 
-      gschunks = call_from_sim_p(smfile, njson, manifest, run_name + '.' + chunk_size.to_s,
+      njson, cjson = parse_manifest(manifest, njname, cjname, args)
+
+      gschunks = call_from_sim_p(smfile, njson, manifest, 
+                                 run_name + '.' + chunk_size.to_s,
                                  gsargs, async)
       gschunks = gschunks.flatten if gschunks
       gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
                                  sjson, njson, args, async)
 
       qcargs = {:run => run_name}.merge(args)
-      gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs)
+      gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs, async)
 
       [gsfile, gsquality] if [gsfile, gsquality].all?
     end

@@ -13,39 +13,39 @@ use JSON;
 use Test::More tests => 92;
 use Test::Exception;
 
-BEGIN { use_ok('WTSI::Genotyping::iRODS'); }
-require_ok('WTSI::Genotyping::iRODS');
+BEGIN { use_ok('WTSI::NPG::iRODS'); }
+require_ok('WTSI::NPG::iRODS');
 
-use WTSI::Genotyping::iRODS qw(ipwd
-                               list_object
-                               add_object
-                               remove_object
-                               add_object_meta
-                               get_object_meta
-                               remove_object_meta
-                               find_objects_by_meta
+use WTSI::NPG::iRODS qw(ipwd
+                        list_object
+                        add_object
+                        remove_object
+                        add_object_meta
+                        get_object_meta
+                        remove_object_meta
+                        find_objects_by_meta
 
-                               get_object_checksum
-                               checksum_object
+                        get_object_checksum
+                        checksum_object
 
-                               list_collection
-                               add_collection
-                               put_collection
-                               remove_collection
-                               get_collection_meta
-                               add_collection_meta
-                               find_collections_by_meta
+                        list_collection
+                        add_collection
+                        put_collection
+                        remove_collection
+                        get_collection_meta
+                        add_collection_meta
+                        find_collections_by_meta
 
-                               group_exists
-                               add_group
-                               set_group_access
+                        group_exists
+                        add_group
+                        set_group_access
 
-                               collect_files
-                               collect_dirs
-                               modified_between
-                               md5sum
-                               hash_path
-                               meta_exists);
+                        collect_files
+                        collect_dirs
+                        modified_between
+                        md5sum
+                        hash_path
+                        meta_exists);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -53,8 +53,9 @@ my $data_path = "t/irods";
 my $test_file = "$data_path/test.txt";
 my $test_dir = "$data_path/test";
 
-my $test_collection = 'test_collection.' . $$;
-my $test_object = 'test_object.' . $$;
+# Deliberate spaces in names
+my $test_collection = 'test_ _collection.' . $$;
+my $test_object = 'test_ _object.' . $$;
 
 my %meta = map { 'attribute' . $_ => 'value' . $_ } 0..9;
 my %expected = map { $_ => [$meta{$_}] } keys %meta;
@@ -203,7 +204,7 @@ ok(remove_object($lorem_object));
 
 # group exists
 ok(group_exists('rodsadmin'));
-ok(! group_exists('no_such_group_exists'));
+ok(!group_exists('no_such_group_exists'));
 
 # A hack to see if there are admin rights for the following tests. I can't
 # find a clean way to list these rights in iRODS.
@@ -284,6 +285,7 @@ is(md5sum("$data_path/md5sum/lorem.txt"), '39a4aa291ca849d601e4e5b8ed627a04');
 is(hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
 
 is(hash_path("$data_path/md5sum/lorem.txt", 'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
+
 
 END {
   if ($dir1 && -d $dir1) {

@@ -21,7 +21,12 @@ use FindBin qw($Bin);
 use Getopt::Long;
 use IO::Uncompress::Gunzip; # for duplicate_full.txt.gz
 use JSON;
-use WTSI::Genotyping::QC::QCPlotShared qw(defaultJsonConfig parseLabel getPlateLocationsFromPath readQCFileNames $UNKNOWN_PLATE $UNKNOWN_ADDRESS);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig
+                                               parseLabel
+                                               getPlateLocationsFromPath
+                                               readQCFileNames
+                                               $UNKNOWN_PLATE
+                                               $UNKNOWN_ADDRESS);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -172,7 +177,7 @@ sub resultsDuplicate {
     close $in;
     # read call rates for duplicated samples
     my (%duplicateCR, @samples);
-    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($crHetPath);
     foreach my $ref (@data) {
         my @fields = @$ref;
         my ($sample, $cr) = ($fields[0], $fields[1]);
@@ -209,7 +214,7 @@ sub resultsGender {
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
     my ($threshold, $inPath) = @_;
-    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
     my %results;
     foreach my $ref (@data) {
 	my ($sample, $xhet, $inferred, $supplied) = @$ref;
@@ -231,7 +236,7 @@ sub resultsHet {
 sub resultsIdentity {
     # read results of concordance check with sequenom results
     my ($threshold, $inPath) = @_;
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my @data =  WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
 	my @fields = @$ref;
@@ -258,7 +263,7 @@ sub resultsMinimum {
     # read simple results file and apply minimum threshold
     # use for cr, normalised magnitude
     my ($threshold, $inPath) = @_;
-    my @data = WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
         my @fields = @$ref;
@@ -278,13 +283,13 @@ sub resultsMetricSd {
     my ($threshold, $index, $inPath, $startLine) = @_;
     my (@samples, @values, $pass, %results);
     unless (-e $inPath) { return (); } # silently return empty hash if input does not exist
-    my @data =  WTSI::Genotyping::QC::QCPlotShared::readSampleData($inPath, $startLine);
+    my @data =  WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath, $startLine);
     foreach my $ref (@data) {
 	my @fields = @$ref;
 	push(@samples, $fields[0]);
 	push(@values, $fields[$index]);
     }
-    my ($mean, $sd) = WTSI::Genotyping::QC::QCPlotShared::meanSd(@values);
+    my ($mean, $sd) = WTSI::NPG::Genotyping::QC::QCPlotShared::meanSd(@values);
     my $min = $mean - $threshold*$sd;
     my $max = $mean + $threshold*$sd;
     for (my $i=0;$i<@samples;$i++) {
@@ -336,14 +341,14 @@ sub writeResults {
 sub run {
     # main method to run script
     my ($inputDir, $configPath, $dbPath, $iniPath, $outPath) = @_;
-    my %thresholds = WTSI::Genotyping::QC::QCPlotShared::readThresholds($configPath);
-    my @metricNames = WTSI::Genotyping::QC::QCPlotShared::readQCNameArray($configPath);
+    my %thresholds = WTSI::NPG::Genotyping::QC::QCPlotShared::readThresholds($configPath);
+    my @metricNames = WTSI::NPG::Genotyping::QC::QCPlotShared::readQCNameArray($configPath);
     my @metrics = ();
     foreach my $metric (@metricNames) { 
 	# use metrics with defined thresholds
 	if (defined($thresholds{$metric})) { push(@metrics, $metric); }
     } 
-    my %inputNames = WTSI::Genotyping::QC::QCPlotShared::readQCMetricInputs($configPath);
+    my %inputNames = WTSI::NPG::Genotyping::QC::QCPlotShared::readQCMetricInputs($configPath);
     my $out;
     open($out, ">", $outPath) || die "Cannot open output path $outPath: $!"; 
     writeResults($out, $inputDir, $dbPath, $iniPath, \@metrics, \%thresholds, \%inputNames);

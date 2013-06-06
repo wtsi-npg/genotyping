@@ -3,11 +3,13 @@
 use warnings;
 use strict;
 use Carp;
-use WrapDBI;
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
-use WTSI::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
-use WTSI::Genotyping::QC::QCPlotShared qw(readThresholds);
+use WTSI::NPG::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
+
+our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 # Check identity of genotyped data against sequenom
 # Input: files of genotypes in tab-delimited format, one row per SNP
@@ -30,11 +32,12 @@ use WTSI::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 my $help;
 my ($outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
-    $outputFailedPairsMatch, $configPath,
+    $outputFailedPairsMatch, $configPath, $iniPath,
     $minCheckedSNPs, $minIdent, $log);
 
 GetOptions("results=s"   => \$outputResults,
            "config=s"    => \$configPath,
+           "ini=s"       => \$iniPath,
            "fail=s"      => \$outputFail,
            "gt=s"        => \$outputGT,
            "min_snps=i"  => \$minCheckedSNPs,
@@ -50,7 +53,10 @@ Options:
 --fail=PATH         Output path for failures
 --gt=PATH           Output path for genotypes by SNP and sample
 --log=PATH          Output path for log file
---config=PATH       Config path in .json format with QC thresholds; at least one of config or min_ident must be given.
+--config=PATH       Config path in .json format with QC thresholds. 
+                    At least one of config or min_ident must be given.
+--ini=PATH          Path to .ini file with additional configuration. 
+                    Defaults to: $DEFAULT_INI
 --min_snps=NUMBER   Minimum number of SNPs for comparison
 --min_ident=NUMBER  Minimum threshold of SNP matches for identity; if given, overrides value in config file; 0 <= NUMBER <= 1
 --help              Print this help text and exit
@@ -80,7 +86,7 @@ if (!$minIdent) {
 }
 
 run($plinkPrefix, $outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
-    $outputFailedPairsMatch, $minCheckedSNPs, $minIdent, $log);
+    $outputFailedPairsMatch, $minCheckedSNPs, $minIdent, $log, $iniPath);
 
 sub compareGenotypes {
     # read plink and (if available) sequenom genotypes by SNP and sample
@@ -213,35 +219,6 @@ sub getSampleNamesIDs {
     return (\%samples, \@sampleNames, $total);
 }
 
-sub getSequenomCallData {
-    # get results from sequenom DB query, for each sample ID
-    # inputs: sequenom query, hash of sample ids by sample name
-    # query using Sequenom sample name, known as "sample ID"
-    # index results using Plink sample name
-    my %sampleIDs = %{ shift() };
-    my ($dbh, $sth, %sqnmCalls, %sqnmSnps, %missingSamples);
-    ($dbh, $sth) = sequenomQueryBySample(); # database & statement handles
-    my $totalCalls = 0;
-    foreach my $sample (keys(%sampleIDs)) {
-        $sth->execute($sampleIDs{$sample}); # query DB with sample ID
-        foreach my $row (@{$sth->fetchall_arrayref}) {
-            #print STDERR $sampleIDs{$sample}."\t".join("\t", @{$row})."\n";
-            my ($well, $snp, $call, $conf, $disregard) = @{$row};
-            # $disregard==0 by construction of DB query
-            $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
-            next if $call =~ /[N]{2}/;              # skip 'NN' calls
-            $sqnmCalls{$sample}{$snp} = $call;
-            $sqnmSnps{$snp} = 1;
-            $totalCalls += 1;
-        }
-        if (!$sqnmCalls{$sample}) { $missingSamples{$sample} = 1; }
-    }
-    # clean up database objects
-    $sth->finish;
-    $dbh->disconnect;
-    return (\%sqnmCalls, \%sqnmSnps, \%missingSamples, $totalCalls);
-}
-
 sub readPlinkCalls {
     # read genotype calls by sample & snp from given plink_binary object
     # requires list of sample names in same order as in plink file
@@ -284,26 +261,6 @@ sub revComp {
 	else {push(@rev, 'N'); }
     }
     return join('', @rev);
-}
-
-sub sequenomQueryBySample {
-    # connect to Sequenom results DB, query for results by sample ID
-    # return DB connection and query objects
-    my $dbh = WrapDBI->connect('snp');
-    my $sth = $dbh->prepare(qq(
-select distinct well_assay.id_well, snp_name.snp_name,
-genotype.genotype, genotype.confidence, genotype.disregard
-from well_assay, snpassay_snp, snp_name, genotype, individual
-where well_assay.id_assay = snpassay_snp.id_assay
-and snpassay_snp.id_snp = snp_name.id_snp
-and (snp_name.snp_name_type = 1 or snp_name.snp_name_type = 6)
-and genotype.id_assay = snpassay_snp.id_assay
-and genotype.id_ind = individual.id_ind
-and disregard = 0
-and confidence <> 'A'
-and individual.clonename = ?
-));
-    return ($dbh, $sth);
 }
 
 sub writeComparisonResults {
@@ -446,7 +403,7 @@ sub run {
     # 'main' method to run identity check
     my ($plinkPrefix, $outputGT, $outputResults, $outputFail, 
         $outputFailedPairs, $outputFailedPairsMatch, $minCheckedSNPs, 
-        $minIdent, $log) = @_;
+        $minIdent, $log, $iniPath) = @_;
     my $logfile;
     if ($log) { open $logfile, ">", $log || die $!; }
     my $pb = new plink_binary::plink_binary($plinkPrefix);
@@ -455,8 +412,12 @@ sub run {
     my ($samplesRef, $sampleNamesRef, $total) = getSampleNamesIDs($pb);
     if ($log) { print $logfile $total." samples read from PLINK binary.\n"; }
     # get Sequenom genotypes for all samples 
+    $iniPath ||= $DEFAULT_INI;
+    my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+        (name   => 'snp',
+         inifile => $iniPath)->connect(RaiseError => 1);
     my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
-        = getSequenomCallData($samplesRef);
+        = $snpdb->data_by_sample($samplesRef);
     if ($log) { print $logfile $sqnmTotal." calls read from Sequenom.\n"; }
     # get PLINK genotypes for all samples; can take a while!
     my ($plinkCallsRef, $duration) 
