@@ -322,13 +322,13 @@ sub add_path {
 
   my $count = scalar @matches;
   if ($count == 0) {
-    $log->logerror("Missing $type file for sample '$id' matching $pattern");
+    $log->logcroak("Missing $type file for sample '$id' matching $pattern");
   }
   elsif (scalar @matches == 1) {
     $sample->{$type} = $matches[0];
   }
   else {
-    $log->logerror("Multiple $type paths for sample '$id': [",
+    $log->logcroak("Multiple $type paths for sample '$id': [",
                    join(', ', @matches), "]");
   }
 
