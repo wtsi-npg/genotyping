@@ -7,11 +7,14 @@ use warnings;
 use Carp;
 
 use WTSI::NPG::Database;
+use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Schema;
 
 use base 'WTSI::NPG::Database';
 our $AUTOLOAD;
 
+our $sqlite = 'sqlite3';
+our $pipeline_ddl = 'pipeline_ddl.sql';
 our $genders_ini = 'genders.ini';
 our $methods_ini = 'methods.ini';
 our $relations_ini = 'relations.ini';
@@ -98,20 +101,13 @@ sub initialize {
 sub create {
   my ($self, $file, $ini) = @_;
 
-  my $sql_path = $ini->val($self->name, 'sqlpath');
-  my $sqlite = $ini->val($self->name, 'sqlite');
+  my $default_ddl = WTSI::NPG::Genotyping::config_dir() . '/' . $pipeline_ddl;
+  my $sql_path = $ini->val($self->name, 'sqlpath', $default_ddl);
+  my $sqlite = $ini->val($self->name, 'sqlite', $sqlite);
   my $log = $self->log;
 
-  unless ($sql_path) {
-    $log->logconfess("Failed to create database: sql_path declaration is missing from ",
-                     $self->inifile);
-  }
   unless (-e $sql_path) {
     $log->logconfess("Failed to create database: DDL file '$sql_path' is missing");
-  }
-  unless ($sqlite) {
-    $log->logconfess("Failed to create database: sqlite declaration is missing from ",
-                     $self->inifile);
   }
 
   if (-e $file) {
