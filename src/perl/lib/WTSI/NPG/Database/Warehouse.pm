@@ -50,11 +50,12 @@ sub find_infinium_plate {
          pl.barcode,
          wl.map
        FROM
-         current_plates pl, current_samples sm, current_wells wl
+         current_plates pl, current_samples sm, current_wells wl, current_aliquots aq
        WHERE
          pl.infinium_barcode = ?
          AND wl.plate_barcode = pl.barcode
-         AND wl.sample_internal_id = sm.internal_id);
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
 
   $self->log->trace("Executing: '$query' with args [$plate_name]");
 
@@ -103,12 +104,13 @@ sub find_infinium_sample_by_plate {
          pl.plate_purpose_name,
          wl.map
        FROM
-         current_plates pl, current_samples sm, current_wells wl
+         current_plates pl, current_samples sm, current_wells wl, current_aliquots aq
        WHERE
          pl.infinium_barcode = ?
          AND wl.plate_barcode = pl.barcode
-         AND wl.sample_internal_id = sm.internal_id
-         AND wl.map = ?);
+         AND wl.map = ?
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
 
   $self->log->debug("Executing: '$query' with args [$plate_name, $unpadded_map]");
   my $sth = $dbh->prepare($query);
@@ -156,10 +158,12 @@ sub find_infinium_gex_sample {
        FROM
          current_samples sm,
          current_wells wl,
+         current_aliquots aq,
          current_plates pl,
          current_plate_purposes pp
        WHERE sm.sanger_sample_id = ?
-       AND wl.sample_internal_id = sm.internal_id
+       AND aq.sample_internal_id = sm.internal_id
+       AND wl.internal_id = aq.receptacle_internal_id
        AND pl.barcode = wl.plate_barcode
        AND pl.plate_purpose_internal_id = pp.internal_id
        AND pp.name like '%GEX%');
