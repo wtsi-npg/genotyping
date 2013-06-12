@@ -164,7 +164,8 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1,
+                                  mysql_enable_utf8 => 1);
   $ssdb->log($log);
 
   $log->info("Publishing samples from '$sample_source' to '$publish_sample_dest' as ", $name);
@@ -231,7 +232,8 @@ sub parse_beadchip_table {
 
       if ($sample_key eq $sample_row[$sample_key_col]) {
         push(@samples,
-             {sanger_sample_id => $sample_row[$sample_id_col],
+             {sanger_sample_id => validate_sample_id($sample_row[$sample_id_col],
+                                                     $line_count),
               beadchip         => validate_beadchip($sample_row[$beadchip_col],
                                                     $line_count),
               beadchip_section => validate_section($sample_row[$section_col],
@@ -272,6 +274,20 @@ sub parse_beadchip_table {
   }
 
   return @samples;
+}
+
+sub validate_sample_id {
+  my ($sample_id, $line) = @_;
+
+  unless (defined $sample_id) {
+    $log->logcroak("Missing sample ID at line $line\n");
+  }
+
+  if ($sample_id !~ /^\S+$/) {
+    $log->logcroak("Invalid sample ID '$sample_id' at line $line\n");
+  }
+
+  return $sample_id;
 }
 
 sub validate_beadchip {
@@ -316,19 +332,19 @@ sub add_paths {
 sub add_path {
   my ($sample, $file_key, $type, $paths) = @_;
 
-  my $id = $sample->{sample_id};
+  my $id = $sample->{sanger_sample_id};
   my $pattern = $sample->{$file_key}; # 'idat_file' or 'xml_file'
   my @matches = grep { m{$pattern$}msxi } @$paths;
 
   my $count = scalar @matches;
   if ($count == 0) {
-    $log->logcroak("Missing $type file for sample '$id' matching $pattern");
+    $log->logcroak("Failed to find the $type file $pattern for sample '$id' under the sample-source directory");
   }
   elsif (scalar @matches == 1) {
     $sample->{$type} = $matches[0];
   }
   else {
-    $log->logcroak("Multiple $type paths for sample '$id': [",
+    $log->logcroak("Found multiple $type files matching $pattern for sample '$id': [",
                    join(', ', @matches), "]");
   }
 

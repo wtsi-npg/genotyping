@@ -11,7 +11,7 @@ use DateTime;
 use File::Basename;
 use File::Find;
 use Getopt::Long;
-use Log::Log4perl qw(:easy);;
+use Log::Log4perl;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
@@ -145,7 +145,8 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1,
+                                  mysql_enable_utf8 => 1);
   # $ssdb->log($log);
 
   my $uid = `whoami`;
