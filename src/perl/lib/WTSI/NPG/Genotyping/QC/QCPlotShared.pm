@@ -20,42 +20,38 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultConfigDir defaultPipelineDBConfig defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
-use vars qw/$ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
-$INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
-$ini_path = defaultConfigDir($INI_FILE_DEFAULT);
+use vars qw/$UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+
 $UNKNOWN_PLATE = "Unknown_plate";
 $UNKNOWN_ADDRESS = "Unknown_address";  
 
 # duplicate threshold is currently hard-coded in /software/varinf/bin/genotype_qc/pairwise_concordance_bed
 
 sub defaultConfigDir {
-    my $iniPath = shift;
-    $iniPath ||= $INI_FILE_DEFAULT;
-    my $ini = Config::Tiny->read($iniPath);
-    my $configDir = $ini->{pipeline}->{'inipath'}; # typically src/perl/etc
-    return $configDir;
+  return WTSI::NPG::Genotyping::config_dir();
+}
+
+sub defaultPipelineDBConfig {
+  return defaultConfigDir()."/pipeline.ini";
 }
 
 sub defaultJsonConfig {
-    my $iniPath = shift;
-    $iniPath ||= $INI_FILE_DEFAULT;
-    my $json = defaultConfigDir($iniPath)."/qc_config.json";
-    return $json;
+  return defaultConfigDir()."/qc_config.json";
 }
 
 sub defaultTexIntroPath {
-    my $iniPath = shift;
-    my $intro = defaultConfigDir($iniPath)."/reportIntro.tex";
-    return $intro;
+  return defaultConfigDir()."/reportIntro.tex";
 }
 
 sub getDatabaseObject {
     # set up database object
     my $dbfile = shift;
     my $inifile = shift;
-    $inifile ||= $INI_FILE_DEFAULT;
+
+    $inifile ||= defaultPipelineDBConfig();
+
     my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
 	 inifile => $inifile,
@@ -166,7 +162,7 @@ sub openDatabase {
     # open connection to pipeline DB
     my $dbfile = shift;
     my $inifile = shift;
-    $inifile ||= $INI_FILE_DEFAULT;
+    $inifile ||= defaultPipelineDBConfig();
     my $start = getcwd;
     # very hacky, but ensures paths in .ini file interpreted correctly
     my $etc_dir = defaultConfigDir($inifile);

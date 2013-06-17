@@ -26,8 +26,10 @@ our @EXPORT_OK = qw(base_dir
 =cut
 
 sub base_dir {
-  my ($vol, $dirs, $file) = File::Spec->splitpath($INC{"WTSI/NPG/Genotyping.pm"});
-  my ($base) = $dirs =~ m{^(.*)\blib/};
+  my ($vol, $dirs, $file) =
+    File::Spec->splitpath($INC{"WTSI/NPG/Genotyping.pm"});
+
+  my ($base) = $dirs =~ m{^(.+)\blib};
 
   unless (defined $base) {
     confess "Failed to parse installed base directory from '$dirs'\n";
@@ -39,7 +41,7 @@ sub base_dir {
 =head2 config_dir
 
   Arg [1]    : None.
-  Example    : my $base = install_base();
+  Example    : my $dir = config_dir);
   Description: Return the installed configuration file directory.
   Returntype : string
   Caller     : general
@@ -48,7 +50,7 @@ sub base_dir {
 
 sub config_dir {
   my $base = base_dir();
-  return abs_path(File::Spec->catdir(File::Spec->updir(), 'etc'));
+  return abs_path(File::Spec->catdir($base, 'etc'));
 }
 
 
