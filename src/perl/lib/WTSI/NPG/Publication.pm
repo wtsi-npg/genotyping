@@ -9,41 +9,42 @@ use File::Basename qw(basename fileparse);
 use Net::LDAP;
 use URI;
 
-use WTSI::NPG::iRODS qw(make_group_name
-                        group_exists
-                        find_or_make_group
-                        set_group_access
-                        list_object
-                        add_object
-                        checksum_object
-                        get_object_meta
-                        add_object_meta
-                        find_objects_by_meta
-                        list_collection
-                        add_collection
-                        put_collection
-                        get_collection_meta
+use WTSI::NPG::iRODS qw(add_collection
                         add_collection_meta
+                        add_object
+                        add_object_meta
+                        checksum_object
+                        find_objects_by_meta
+                        find_or_make_group
+                        find_zone_name
+                        get_collection_meta
+                        get_object_meta
+                        group_exists
+                        hash_path
+                        list_collection
+                        list_object
+                        make_group_name
                         meta_exists
-                        hash_path);
+                        put_collection
+                        set_group_access);
 
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
+                           has_consent
                            make_creation_metadata
-                           make_modification_metadata
                            make_file_metadata
-                           make_sample_metadata
-                           has_consent);
+                           make_modification_metadata
+                           make_sample_metadata);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(get_wtsi_uri
-                    get_publisher_uri
+our @EXPORT_OK = qw(expected_irods_groups
                     get_publisher_name
+                    get_publisher_uri
+                    get_wtsi_uri
+                    grant_group_access
                     pair_rg_channel_files
                     publish_file
-                    update_object_meta
                     update_collection_meta
-                    expected_irods_groups
-                    grant_group_access);
+                    update_object_meta);
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -231,8 +232,11 @@ sub publish_file {
 
     update_object_meta($target, \@meta);
 
-    my @groups = expected_irods_groups(@meta);
-    grant_group_access($target, 'read', $make_groups, @groups);
+    my $zone = find_zone_name($target);
+    my @zoned_groups = map { sprintf("$_#$zone") }
+      expected_irods_groups(@meta);
+
+    grant_group_access($target, 'read', $make_groups, @zoned_groups);
   }
   else {
     $log->info("Skipping publication of $target because no consent was given");
@@ -240,7 +244,6 @@ sub publish_file {
 
   return $target;
 }
-
 
 =head2 expected_irods_groups
 
