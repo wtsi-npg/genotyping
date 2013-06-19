@@ -36,11 +36,13 @@ my $embedded_conf = q(
    log4perl.logger.quiet             = DEBUG, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8     = 1
    log4perl.appender.A1.stderr   = 0
    log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 
    log4perl.appender.A2          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A2.utf8     = 1
    log4perl.appender.A2.stderr   = 0
    log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
@@ -196,6 +198,7 @@ sub run {
 # Any whitespace-only lines are ignored.
 sub parse_beadchip_table {
   my ($fh) = @_;
+  binmode($fh, ':utf8');
 
   # For error reporting
   my $line_count = 0;

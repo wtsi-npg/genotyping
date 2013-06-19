@@ -13,8 +13,10 @@ use WTSI::NPG::Genotyping::Schema;
 use base 'WTSI::NPG::Database';
 our $AUTOLOAD;
 
-our $sqlite = 'sqlite3';
-our $pipeline_ddl = 'pipeline_ddl.sql';
+our $default_sqlite = 'sqlite3';
+our $default_ddl_file = 'pipeline_ddl.sql';
+
+our $pipeline_ini = 'pipeline.ini';
 our $genders_ini = 'genders.ini';
 our $methods_ini = 'methods.ini';
 our $relations_ini = 'relations.ini';
@@ -101,9 +103,11 @@ sub initialize {
 sub create {
   my ($self, $file, $ini) = @_;
 
-  my $default_ddl = WTSI::NPG::Genotyping::config_dir() . '/' . $pipeline_ddl;
-  my $sql_path = $ini->val($self->name, 'sqlpath', $default_ddl);
-  my $sqlite = $ini->val($self->name, 'sqlite', $sqlite);
+  my $config_dir = WTSI::NPG::Genotyping::config_dir();
+  my $default_sql_path = "$config_dir/$default_ddl_file";
+
+  my $sql_path = $ini->val($self->name, 'sqlpath', $default_sql_path);
+  my $sqlite = $ini->val($self->name, 'sqlite', $default_sqlite);
   my $log = $self->log;
 
   unless (-e $sql_path) {
@@ -138,8 +142,11 @@ sub create {
 sub populate {
   my $self = shift;
 
+  my $config_dir = WTSI::NPG::Genotyping::config_dir();
+  my $default_ini_path = $config_dir;
+
   my $ini = Config::IniFiles->new(-file => $self->inifile);
-  my $ini_path = $ini->val($self->name, 'inipath');
+  my $ini_path = $ini->val($self->name, 'inipath', $default_ini_path);
 
   unless ($self->is_connected) {
     $self->log->logconfess('Failed to populate database: not connected');
@@ -427,6 +434,8 @@ sub _populate_states {
 sub _insert_list_from_ini {
   my ($self, $class, $inifile, $param) = @_;
 
+  $self->log->debug("Loading $class from INI file $inifile $param");
+
   my @objects;
   my $ini = Config::IniFiles->new(-file => $inifile);
   foreach my $sect ($ini->Sections) {
@@ -441,6 +450,8 @@ sub _insert_list_from_ini {
 
 sub _insert_from_ini {
   my ($self, $class, $inifile) = @_;
+
+  $self->log->debug("Loading $class from INI file $inifile");
 
   my @objects;
   my $ini = Config::IniFiles->new(-file => $inifile);

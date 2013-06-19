@@ -60,6 +60,7 @@ sub run {
      inifile => $config,
      dbfile => $dbfile)->connect
        (RaiseError => 1,
+        sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
   my $in = maybe_stdin($input);
