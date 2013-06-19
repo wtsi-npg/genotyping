@@ -17,4 +17,4 @@ use WTSI::NPG::Genotyping qw(base_dir
 
 is(base_dir(), abs_path('./blib'), 'Incorrect base_dir');
 
-is(config_dir(), abs_path('../etc'), 'Incorrent config_dir');
+is(config_dir(), abs_path('./blib/etc'), 'Incorrent config_dir');

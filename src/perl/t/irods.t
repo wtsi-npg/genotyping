@@ -10,13 +10,14 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 92;
+use Test::More tests => 96;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
 require_ok('WTSI::NPG::iRODS');
 
-use WTSI::NPG::iRODS qw(ipwd
+use WTSI::NPG::iRODS qw(find_zone_name
+                        ipwd
                         list_object
                         add_object
                         remove_object
@@ -285,6 +286,12 @@ is(md5sum("$data_path/md5sum/lorem.txt"), '39a4aa291ca849d601e4e5b8ed627a04');
 is(hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
 
 is(hash_path("$data_path/md5sum/lorem.txt", 'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
+
+# find_zone_name
+is(find_zone_name('/Sanger1'), 'Sanger1');
+is(find_zone_name(ipwd()), 'Sanger1');
+is(find_zone_name('no_such_path'), 'Sanger1');
+is(find_zone_name('/no_such_zone'), 'no_such_zone');
 
 
 END {

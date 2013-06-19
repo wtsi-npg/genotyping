@@ -27,8 +27,8 @@ my $build = Build->new
    conf_files => {'etc/log4perl.conf' => 'etc/log4perl.conf',
                   'etc/qc_config.json' => 'etc/qc_config.json',
                   'etc/reportIntro.tex' => 'etc/reportIntro.tex',
-                  'etc/x_pseudoautosomal.txt' => 'etc/x_pseudoautosomal.txt'},
-   sql_files => {'sql/pipeline_ddl.sql' => 'sql/pipeline_ddl.sql'},
+                  'etc/x_pseudoautosomal.txt' => 'etc/x_pseudoautosomal.txt',
+                  'etc/pipeline_ddl.sql' => 'etc/pipeline_ddl.sql'},
    R_files => {
        '../r/bin/check_xhet_gender.R' => 'bin/check_xhet_gender.R',
        '../r/bin/heatmapCrHetDensity.R' => 'bin/heatmapCrHetDensity.R',
@@ -47,7 +47,6 @@ my $build = Build->new
 
 $build->add_build_element('conf');
 $build->add_build_element('ini');
-$build->add_build_element('sql');
 $build->add_build_element('R');
 
 $build->create_build_script;

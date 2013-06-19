@@ -38,6 +38,7 @@ sub run {
      dbfile => $dbfile,
      overwrite => $overwrite)->connect
        (RaiseError => 1,
+        sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON')->populate->disconnect;
 
   if ($verbose) {

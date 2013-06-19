@@ -11,7 +11,8 @@ use File::Find;
 use Log::Log4perl;
 
 use base 'Exporter';
-our @EXPORT_OK = qw(ipwd
+our @EXPORT_OK = qw(find_zone_name
+                    ipwd
                     list_object
                     add_object
                     get_object_checksum
@@ -48,6 +49,7 @@ our @EXPORT_OK = qw(ipwd
                     hash_path);
 
 our $IADMIN = 'iadmin';
+our $IGROUPADMIN = 'igroupadmin';
 our $ICHKSUM = 'ichksum';
 our $IMETA = 'imeta';
 our $IMKDIR = 'imkdir';
@@ -59,11 +61,37 @@ our $ICHMOD = 'ichmod';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
+=head2 find_zone_name
+
+  Arg [1]    : An absolute iRODS path.
+  Example    : find_zone('/zonename/path')
+  Description: Return an iRODS zone name given a path.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub find_zone_name {
+  my ($path) = @_;
+
+  defined $path or $log->logconfess('A defined path argument is required');
+
+  my $abs_path = _ensure_absolute($path);
+  $abs_path =~ s/^\///;
+  my @path = split('/', $abs_path);
+  my $zone = shift @path;
+
+  unless ($zone) {
+    $log->logconfess("Failed to parse iRODS zone from path '$path'");
+  }
+
+  return $zone;
+}
 
 =head2 make_group_name
 
   Arg [1]    : A SequenceScape study ID.
-  Example    : make_group_name(1234))
+  Example    : make_group_name(1234)
   Description: Return an iRODS group name given a SequenceScape study ID.
   Returntype : string
   Caller     : general
@@ -120,7 +148,7 @@ sub find_or_make_group {
 sub group_exists {
   my ($name) = @_;
 
-  grep { /^$name$/ } _run_command($IADMIN, 'lg');
+  grep { /^$name$/ } _run_command($IGROUPADMIN, 'lg');
 }
 
 =head2 add_group
@@ -790,8 +818,8 @@ sub find_collections_by_meta {
   }
 
   my @colls = _safe_select('"%s"', qq("SELECT COUNT(COLL_NAME)
-                                      WHERE META_COLL_ATTR_NAME = '$key'
-                                      AND META_COLL_ATTR_VALUE = '$value' $unit_clause
+                                       WHERE META_COLL_ATTR_NAME = '$key'
+                                       AND META_COLL_ATTR_VALUE = '$value' $unit_clause
                                       AND COLL_NAME LIKE '$root'"),
                           '"%s"', qq("SELECT COLL_NAME
                                       WHERE META_COLL_ATTR_NAME = '$key'
@@ -1044,6 +1072,7 @@ sub _run_command {
 
   open(my $exec, '-|', "$command")
     or $log->logconfess("Failed open pipe to command '$command': $!");
+  binmode($exec, ':utf8');
 
   $log->debug("Running child '$command'");
 

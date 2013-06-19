@@ -16,7 +16,8 @@ use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Carp;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig $INI_FILE_DEFAULT);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultPipelineDBConfig
+                                               defaultJsonConfig);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
@@ -34,8 +35,8 @@ GetOptions("config=s"      => \$configPath,
     );
 
 $inPath     ||= './qc_results.json';
-$iniPath    ||= $INI_FILE_DEFAULT;
-$configPath ||= defaultJsonConfig($iniPath);
+$iniPath    ||= defaultPipelineDBConfig();
+$configPath ||= defaultJsonConfig();
 $crHetPath  ||= './sample_cr_het.txt';
 $failText   ||= 'failTotals.txt';
 $comboText  ||= 'failCombos.txt';
@@ -57,7 +58,7 @@ if ($help) {
 Options:
 --input=PATH        Path to input file; defaults to ./qc_results.json
 --output-dir=PATH   Path to output directory; defaults to current working directory
---config=PATH       Path to .json config file; local default found from $INI_FILE_DEFAULT
+--config=PATH       Path to .json config file
 --title=STRING      Title for experiment to display in plots
 --help              Print this help text and exit
 Unspecified options will receive default values.
