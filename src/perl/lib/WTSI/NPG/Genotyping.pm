@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping;
 use warnings;
 use strict;
 use Carp;
-use Cwd qw(abs_path);
+use Cwd qw(abs_path getcwd);
 use File::Spec;
 use JSON;
 
@@ -32,7 +32,9 @@ sub base_dir {
   my ($base) = $dirs =~ m{^(.+)\blib};
 
   unless (defined $base) {
-    confess "Failed to parse installed base directory from '$dirs'\n";
+    my $cwd = getcwd();
+    warn "Failed to parse installed base directory from '$dirs', using $cwd\n";
+    $base = $cwd;;
   }
 
   return abs_path($base);
