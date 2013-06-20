@@ -58,7 +58,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
     end
     name = 'test_genotype_zcall'
 
-    run_test_if(lambda { method(:zcall_available?) && manifest },
+    run_test_if(lambda { zcall_available? && manifest },
                 "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
