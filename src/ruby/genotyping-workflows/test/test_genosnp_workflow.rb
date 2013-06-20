@@ -33,6 +33,7 @@ require File.join(testpath, 'test_helper')
 class TestWorkflows < Test::Unit::TestCase
   include TestHelper
   include Genotyping
+  include Genotyping::Tasks
 
   def initialize(name)
     super(name)
@@ -44,39 +45,12 @@ class TestWorkflows < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_genotype_illuminus
-    manifest = ENV['BEADPOOL_MANIFEST']
-    name = 'test_genotype_illuminus'
-
-    run_test_if(lambda { manifest }, "Skipping #{name}") do
-      work_dir = make_work_dir(name, data_path)
-      dbfile = File.join(work_dir, name + '.db')
-      run_name = 'run1'
-      pipe_ini = File.join(data_path, 'genotyping.ini')
-
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
-      args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :config => pipe_ini,
-                                           :gender_method => 'Supplied',
-                                           :chunk_size => 10000,
-                                           :memory => 2048,
-                                           :select => 'lenny'}]
-      timeout = 1400
-      log = 'percolate.log'
-      result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
-                             timeout, work_dir, log, args)
-      assert(result)
-
-      Percolate.log.close
-      remove_work_dir(work_dir) if result
-    end
-  end
-
   def test_genotype_genosnp
     manifest = ENV['BEADPOOL_MANIFEST']
     name = 'test_genotype_genosnp'
 
-    run_test_if(lambda { manifest }, "Skipping #{name}") do
+    run_test_if(lambda { method(:genosnp_available?) && manifest },
+                "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
