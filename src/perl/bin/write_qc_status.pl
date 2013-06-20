@@ -236,16 +236,16 @@ sub resultsHet {
 sub resultsIdentity {
     # read results of concordance check with sequenom results
     my ($threshold, $inPath) = @_;
-    my @data =  WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
 	my @fields = @$ref;
-	my ($sample, $concord) = ($fields[0], $fields[3]);
+	my ($sample, $concord, $status) = ($fields[0], $fields[3], $fields[4]);
 	my $pass;
 	if ($concord eq '.') {  # identity concordance not available -- assume pass
 	    $pass = 1;
 	    $concord = 'NA';
-	} elsif ($concord >= $threshold) { 
+	} elsif ($status eq 'Skipped' || $concord >= $threshold) { 
 	    $pass = 1; 
 	} else { 
 	    $pass = 0; 
