@@ -1,6 +1,0 @@
-# Pairwise check for possible ID swaps, on all samples which failed identity check.
-# Check A:B finds Sequenom calls for B and compares to Illumina calls for A
-# MIN_IDENTITY_FOR_MATCH:0.9
-Illumina	Sequenom	common_SNPs	matching_calls	concordance	result
-249470_F02_HELIC5274730	249441_F11_HELIC5102138	20	20	1.000	SWAP_WARNING
-249441_F11_HELIC5102138	249470_F02_HELIC5274730	20	20	1.000	SWAP_WARNING
