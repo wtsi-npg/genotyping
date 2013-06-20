@@ -49,7 +49,7 @@ class TestWorkflows < Test::Unit::TestCase
     manifest = ENV['BEADPOOL_MANIFEST']
     name = 'test_genotype_genosnp'
 
-    run_test_if(lambda { method(:genosnp_available?) && manifest },
+    run_test_if(lambda { genosnp_available? && manifest },
                 "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
