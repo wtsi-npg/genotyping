@@ -75,7 +75,7 @@ $outputFail ||= 'identity_check_fail.txt';
 $outputFailedPairs ||= 'identity_check_failed_pairs.txt';
 $outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
 $log ||= 'identity_check.log';
-$minCheckedSNPs ||= 10;
+$minCheckedSNPs ||= 20;
 if (!$minIdent) {
     if ($configPath) {
         my %thresholds = readThresholds($configPath);
