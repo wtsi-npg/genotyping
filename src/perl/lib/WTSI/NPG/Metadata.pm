@@ -11,7 +11,7 @@ use UUID;
 use WTSI::NPG::iRODS qw(md5sum);
 
 use base 'Exporter';
-our @EXPORT_OK = qw($SAMPLE_NAME_META_KEY;
+our @EXPORT_OK = qw($SAMPLE_NAME_META_KEY
                     $SAMPLE_ID_META_KEY
                     $SAMPLE_SUPPLIER_NAME_META_KEY
                     $SAMPLE_COMMON_NAME_META_KEY
