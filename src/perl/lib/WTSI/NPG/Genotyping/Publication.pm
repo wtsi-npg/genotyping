@@ -30,7 +30,8 @@ use WTSI::NPG::iRODS qw(make_group_name
                         meta_exists
                         hash_path);
 
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
+use WTSI::NPG::Metadata qw($SAMPLE_NAME_META_KEY
+                           $STUDY_ID_META_KEY
                            make_creation_metadata
                            make_modification_metadata
                            make_file_metadata
@@ -281,10 +282,13 @@ sub publish_analysis_directory {
     $uuid = $uuid_meta[0]->[1];
 
     foreach my $title (@project_titles) {
-      # Find the sample-level data for this analysis
+      # Find the sample-level data for this genotyping project
       my @sample_data =  @{find_objects_by_meta($sample_archive_pattern,
                                                 'dcterms:title',
                                                 $title)};
+      # Find the samples included at the analysis stage
+      my %included_samples =
+        make_included_sample_table($title, $pipedb, $run_name);
 
       if (@sample_data) {
         $log->info("Adding cross-reference metadata to " . scalar @sample_data .
@@ -292,21 +296,41 @@ sub publish_analysis_directory {
 
         my %studies_seen;
 
+      DATUM:
         foreach my $sample_datum (@sample_data) {
           # Xref analysis to sample studies
           my %sample_meta = get_object_meta($sample_datum);
-          my @sample_studies = @{$sample_meta{$STUDY_ID_META_KEY}};
 
-          foreach my $sample_study (@sample_studies) {
-            unless (exists $studies_seen{$sample_study}) {
-              push(@analysis_meta, [$STUDY_ID_META_KEY => $sample_study]);
-              $studies_seen{$sample_study}++;
-            }
+          my @sanger_sample_id = @{$sample_meta{$SAMPLE_NAME_META_KEY}};
+          unless (@sanger_sample_id) {
+            $log->warn("Found no Sanger sample ID for '$sample_datum'");
+            next DATUM;
+          }
+          unless (scalar @sanger_sample_id == 1) {
+            $log->warn("Found multiple Sanger sample IDs for '$sample_datum': [",
+                       join(",", @sanger_sample_id), "]");
+            next DATUM;
           }
 
-          # Xref samples to analysis UUID
-          update_object_meta($sample_datum, \@uuid_meta);
-          ++$num_samples;
+          # Only Xref the sample is it was not excluded at the
+          # analysis stage
+          if (exists $included_samples{$sanger_sample_id[0]}) {
+            my @sample_studies = @{$sample_meta{$STUDY_ID_META_KEY}};
+
+            foreach my $sample_study (@sample_studies) {
+              unless (exists $studies_seen{$sample_study}) {
+                push(@analysis_meta, [$STUDY_ID_META_KEY => $sample_study]);
+                $studies_seen{$sample_study}++;
+              }
+            }
+
+            # Xref samples to analysis UUID
+            update_object_meta($sample_datum, \@uuid_meta);
+            ++$num_samples;
+          }
+          else {
+            $log->info("Excluding sample '$sanger_sample_id[0]' from this analysis");
+          }
         }
 
         ++$num_projects;
@@ -332,6 +356,25 @@ sub publish_analysis_directory {
   }
 
   return $uuid;
+}
+
+# Find samples marked as excluded during the analysis
+sub make_included_sample_table {
+  my ($project_title, $pipedb, $run_name) = @_;
+
+  my %sample_table;
+
+  my @samples = $pipedb->sample->search
+    ({'piperun.name' => $run_name,
+      'dataset.if_project' => $project_title,
+      'me.include' => 1},
+     {join => {dataset => 'piperun'}});
+
+  foreach my $sample (@samples) {
+    $sample_table{$sample->sanger_sample_id} = $sample;
+  }
+
+  return %sample_table;
 }
 
 1;
