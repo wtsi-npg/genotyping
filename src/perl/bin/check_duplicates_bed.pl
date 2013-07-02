@@ -131,7 +131,7 @@ $snp_file->autoflush(1);
 print $snp_file map { $_ . "\n" } @use_snps;
 
 # execute binary to write pairwise concordance 
-my $cmd = "/software/varinf/bin/genotype_qc/pairwise_concordance_bed -n $snp_file $bfile";
+my $cmd = "pairwise_concordance_bed -n $snp_file $bfile";
 system($cmd) && die qq(Error running command "$cmd": $!);
 
 # gzip pairwise output file; can be quite large, >> 1 GB
