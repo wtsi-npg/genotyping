@@ -11,42 +11,41 @@ use File::Find;
 use Log::Log4perl;
 
 use base 'Exporter';
-our @EXPORT_OK = qw(find_zone_name
-                    ipwd
-                    list_object
+our @EXPORT_OK = qw(
+                    add_collection
+                    add_collection_meta
+                    add_group
                     add_object
-                    get_object_checksum
-                    checksum_object
-                    remove_object
                     add_object_meta
                     batch_object_meta
-                    get_object_meta
-                    remove_object_meta
+                    checksum_object
+                    collect_dirs
+                    collect_files
+                    find_collections_by_meta
                     find_objects_by_meta
-
+                    find_or_make_group
+                    find_zone_name
+                    get_collection_meta
+                    get_object_checksum
+                    get_object_meta
+                    group_exists
+                    hash_path
+                    ipwd
                     list_collection
-                    add_collection
+                    list_groups
+                    list_object
+                    make_collector
+                    make_group_name
+                    md5sum
+                    meta_exists
+                    modified_between
                     put_collection
                     remove_collection
-                    add_collection_meta
-                    get_collection_meta
                     remove_collection_meta
-                    find_collections_by_meta
-
-                    meta_exists
-
-                    make_group_name
-                    find_or_make_group
-                    group_exists
-                    add_group
+                    remove_object
+                    remove_object_meta
                     set_group_access
-
-                    collect_files
-                    collect_dirs
-                    make_collector
-                    modified_between
-                    md5sum
-                    hash_path);
+);
 
 our $IADMIN = 'iadmin';
 our $IGROUPADMIN = 'igroupadmin';
@@ -134,6 +133,19 @@ sub find_or_make_group {
   return $group;
 }
 
+=head2 list_groups
+
+  Arg [1]    : None
+  Example    : list_groups()
+  Description: Returns a list of iRODS groups
+  Returntype : arrayr
+  Caller     : general
+
+=cut
+
+sub list_groups {
+  return _run_command($IGROUPADMIN, 'lg');
+}
 
 =head2 group_exists
 
@@ -148,7 +160,7 @@ sub find_or_make_group {
 sub group_exists {
   my ($name) = @_;
 
-  grep { /^$name$/ } _run_command($IGROUPADMIN, 'lg');
+  grep { /^$name$/ } list_groups();
 }
 
 =head2 add_group
