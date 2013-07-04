@@ -10,43 +10,42 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 96;
+use Test::More tests => 97;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
 require_ok('WTSI::NPG::iRODS');
 
-use WTSI::NPG::iRODS qw(find_zone_name
-                        ipwd
-                        list_object
-                        add_object
-                        remove_object
-                        add_object_meta
-                        get_object_meta
-                        remove_object_meta
-                        find_objects_by_meta
-
-                        get_object_checksum
-                        checksum_object
-
-                        list_collection
+use WTSI::NPG::iRODS qw(
                         add_collection
+                        add_collection_meta
+                        add_group
+                        add_object
+                        add_object_meta
+                        checksum_object
+                        collect_dirs
+                        collect_files
+                        find_collections_by_meta
+                        find_objects_by_meta
+                        find_zone_name
+                        get_collection_meta
+                        get_object_checksum
+                        get_object_meta
+                        group_exists
+                        hash_path
+                        ipwd
+                        list_collection
+                        list_groups
+                        list_object
+                        md5sum
+                        meta_exists
+                        modified_between
                         put_collection
                         remove_collection
-                        get_collection_meta
-                        add_collection_meta
-                        find_collections_by_meta
-
-                        group_exists
-                        add_group
+                        remove_object
+                        remove_object_meta
                         set_group_access
-
-                        collect_files
-                        collect_dirs
-                        modified_between
-                        md5sum
-                        hash_path
-                        meta_exists);
+);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -202,6 +201,8 @@ ok(checksum_object($lorem_object));
 
 ok(remove_object($lorem_object));
 
+# list_groups
+ok(grep { /rodsadmin/ } list_groups());
 
 # group exists
 ok(group_exists('rodsadmin'));
