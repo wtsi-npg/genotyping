@@ -19,8 +19,6 @@ use Pod::Usage;
 use URI;
 use UUID;
 
-use Data::Dumper;
-
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::iRODS qw(collect_files);
 use WTSI::NPG::Publication qw(get_wtsi_uri

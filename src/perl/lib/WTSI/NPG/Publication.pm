@@ -233,8 +233,7 @@ sub publish_file {
     update_object_meta($target, \@meta);
 
     my $zone = find_zone_name($target);
-    my @zoned_groups = map { sprintf("$_#$zone") }
-      expected_irods_groups(@meta);
+    my @zoned_groups = map { "$_#$zone" } expected_irods_groups(@meta);
 
     grant_group_access($target, 'read', $make_groups, @zoned_groups);
   }
@@ -359,12 +358,7 @@ sub grant_group_access {
       set_group_access($access, find_or_make_group($group), $target);
     }
     else {
-      if (group_exists($group)) {
-        set_group_access($access, $group, $target);
-      }
-      else {
-        $log->warn("Cannot give group '$group' '$access' access to $target because this group does not exist (in no-create groups mode)");
-      }
+      set_group_access($access, $group, $target);
     }
   }
 }

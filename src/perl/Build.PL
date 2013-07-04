@@ -10,9 +10,11 @@ use Build;
 
 my $build = Build->new
   (module_name => 'WTSI::Genotyping',
+   dist_author => ['Iain Bancarz <ib5@sanger.ac.uk>',
+                   'Keith James <kdj@sanger.ac.uk>'],
    dist_abstract => 'WTSI genotyping data management tools',
-   dist_version => 0.1.0,
-   license  => 'gpl3',
+   dist_version => '0.8.1',
+   license  => 'gpl',
    requires => {'Carp' => 0,
                 'Test::More' => 0,
                 'Test::Exception' => 0,
