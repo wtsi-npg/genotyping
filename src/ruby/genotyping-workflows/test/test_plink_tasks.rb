@@ -50,7 +50,7 @@ class TestPlinkTasks < Test::Unit::TestCase
   end
 
   def test_merge_bed
-    run_test_if(method(:plink_available?), "Skipping test_merge_bed") do
+    run_test_if(method(:plink_merge_available?), "Skipping test_merge_bed") do
       work_dir = make_work_dir('test_merge_bed', data_path)
 
       bed_files = (0..4).collect { |i| File.join(data_path, "mock_study1.part.#{i}.bed")  }
