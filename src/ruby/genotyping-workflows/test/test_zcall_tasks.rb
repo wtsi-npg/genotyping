@@ -75,7 +75,8 @@ class TestZCallTasks < Test::Unit::TestCase
       t_json, t_files = wait_for('test_zcall_prepare', 180, 5) do
         prepare_thresholds(@egt, zstart, ztotal,  
                            {:work_dir => work_dir,
-                             :log_dir => work_dir})
+                            :log_dir => work_dir},
+                           :select => 'lenny')
       end
 
       assert(File.exist?(t_json))
@@ -98,15 +99,15 @@ class TestZCallTasks < Test::Unit::TestCase
  
       metrics_path = wait_for('test_zcall_evaluate', 120, 5) do
         evaluate_thresholds(@threshold_json, @sample_json, @manifest, @egt,
-                            {
-                              :start => 0, :end => 8, :size => 4,
-                              :work_dir => work_dir
-                            })
+                            {:start => 0, :end => 8, :size => 4,
+                             :work_dir => work_dir},
+                            :select => 'lenny')
       end
 
       merged_path = wait_for('test_zcall_merge', 120, 5) do
         merge_evaluation(metrics_path,  @threshold_json,
-                         { :work_dir => work_dir })
+                         {:work_dir => work_dir},
+                         :select => 'lenny')
       end
       merged_file = File.open(merged_path)
       assert_equal(JSON.load(merged_file),
@@ -123,7 +124,8 @@ class TestZCallTasks < Test::Unit::TestCase
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run', 120, 5) do
         run_zcall(@thresholds_z6, @sample_json, @manifest, @egt, work_dir,
-                  { :work_dir => work_dir })
+                  {:work_dir => work_dir},
+                  :select => 'lenny')
       end
       cmd = 'plink --bfile '+File.join(work_dir, 'zcall')+
         ' --silent --out '+File.join(work_dir, 'plink')
@@ -139,8 +141,9 @@ class TestZCallTasks < Test::Unit::TestCase
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run_array', 120, 5) do
         run_zcall_array(@thresholds_z6, @sample_json, @manifest, @egt,
-                        { :start => 0, :end => 8, :size => 4,
-                          :work_dir => work_dir })
+                        {:start => 0, :end => 8, :size => 4,
+                         :work_dir => work_dir},
+                        :select => 'lenny')
       end
       Percolate.log.close
       assert_equal(2, result.size)
