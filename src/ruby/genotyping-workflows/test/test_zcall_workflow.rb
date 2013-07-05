@@ -66,7 +66,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :egt => egt_file,
-                                           :chunk_size => 12,
+                                           :chunk_size => 3,
                                            :zstart => 5,
                                            :ztotal => 3,
                                            :memory => 2048,
