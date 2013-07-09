@@ -13,7 +13,7 @@ use Pod::Usage;
 
 use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin maybe_stdout);
-use WTSI::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::Database::Pipeline;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
