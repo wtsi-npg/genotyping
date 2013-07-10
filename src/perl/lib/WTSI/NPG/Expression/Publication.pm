@@ -112,13 +112,11 @@ sub publish_expression_analysis{
 
     foreach my $sample (@$samples) {
       my $ss_sample = $ssdb->find_infinium_gex_sample($sample->{sanger_sample_id});
-      my $studies = $ssdb->find_sample_studies($ss_sample->{internal_id});
-      foreach my $study (@$studies) {
-        my $study_id = $study->{internal_id};
-        unless (exists $studies_seen{$study_id}) {
-          push(@analysis_meta, [$STUDY_ID_META_KEY => $study_id]);
-          $studies_seen{$study_id}++;
-        }
+      my $study_id = $ss_sample->{study_id};
+
+      unless (exists $studies_seen{$study_id}) {
+        push(@analysis_meta, [$STUDY_ID_META_KEY => $study_id]);
+        $studies_seen{$study_id}++;
       }
 
       my @meta;

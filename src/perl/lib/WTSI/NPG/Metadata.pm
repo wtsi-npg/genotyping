@@ -63,7 +63,6 @@ sub make_creation_metadata {
           ['dcterms:publisher' => $publisher]);
 }
 
-
 =head2 make_modification_metadata
 
   Arg [1]    : DateTime modification time
@@ -81,7 +80,6 @@ sub make_modification_metadata {
   return (['dcterms:modified' => $modification_time]);
 }
 
-
 =head2 make_sample_metadata
 
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
@@ -98,10 +96,6 @@ sub make_sample_metadata {
   my ($ss_sample, $ssdb) = @_;
 
   my $internal_id = $ss_sample->{internal_id};
-
-  $log->debug("Looking up studies for " . $internal_id);
-
-  my @ss_studies = @{$ssdb->find_sample_studies($internal_id)};
 
   my @meta = ([$SAMPLE_ID_META_KEY => $internal_id]);
 
@@ -131,6 +125,16 @@ sub make_sample_metadata {
     $log->logcluck(sprintf($message_template, 'sanger_sample_id'));
   }
 
+  if (defined $ss_sample->{study_id}) {
+     push(@meta, [$STUDY_ID_META_KEY => $ss_sample->{study_id}]);
+  }
+  else {
+    $log->logcluck(sprintf($message_template, 'study_id'));
+  }
+
+  if (defined $ss_sample->{study_title}) {
+    push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
+  }
   if (defined $ss_sample->{supplier_name}) {
     push(@meta, [$SAMPLE_SUPPLIER_NAME_META_KEY => $ss_sample->{supplier_name}]);
   }
@@ -147,17 +151,8 @@ sub make_sample_metadata {
     push(@meta, [$SAMPLE_COMMON_NAME_META_KEY => $ss_sample->{common_name}]);
   }
 
-  foreach my $ss_study (@ss_studies) {
-    push(@meta, [$STUDY_ID_META_KEY => $ss_study->{internal_id}]);
-
-    if (defined $ss_study->{study_title}) {
-      push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
-    }
-  }
-
   return @meta;
 }
-
 
 =head2 make_file_metadata
 
@@ -184,7 +179,6 @@ sub make_file_metadata {
 
   return @meta;
 }
-
 
 =head2 has_consent
 
@@ -221,7 +215,6 @@ sub has_consent {
 
   return $consent;
 }
-
 
 1;
 

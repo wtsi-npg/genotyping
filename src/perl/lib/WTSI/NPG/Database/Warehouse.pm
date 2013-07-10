@@ -46,6 +46,7 @@ sub find_infinium_plate {
          HEX(sm.uuid),
          sm.supplier_name,
          sm.gender,
+         aq.study_internal_id AS study_id,
          pl.barcode_prefix,
          pl.barcode,
          wl.map
@@ -99,6 +100,7 @@ sub find_infinium_sample_by_plate {
          sm.gender,
          sm.cohort,
          sm.control,
+         aq.study_internal_id AS study_id,
          pl.barcode_prefix,
          pl.barcode,
          pl.plate_purpose_name,
@@ -151,6 +153,7 @@ sub find_infinium_gex_sample {
           sm.gender,
           sm.cohort,
           sm.control,
+          aq.study_internal_id AS study_id,
           pl.barcode_prefix,
           pl.barcode,
           pl.plate_purpose_name,
