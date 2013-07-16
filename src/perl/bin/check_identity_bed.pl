@@ -417,7 +417,7 @@ sub run {
         (name   => 'snp',
          inifile => $iniPath)->connect(RaiseError => 1);
     my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
-        = $snpdb->data_by_sample($samplesRef);
+        = $snpdb->find_sequenom_calls_by_sample($samplesRef);
     if ($log) { print $logfile $sqnmTotal." calls read from Sequenom.\n"; }
     # get PLINK genotypes for all samples; can take a while!
     my ($plinkCallsRef, $duration) 
