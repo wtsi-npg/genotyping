@@ -50,7 +50,7 @@ sub filterMetricsMultiple {
     # filter on multiple metrics
     my ($dbPath, $configPath, $resultPath, $metricThresholdsRef) = @_;
     my %samplePass;
-    my %metricThresholds = %{$metricsThresholdsRef};
+    my %metricThresholds = %{$metricThresholdsRef};
     my %metricResults = readMetricResultHash($resultPath, $configPath);
     foreach my $uri (keys %metricResults) {
         my %results = %{$metricResults{$uri}};
@@ -59,7 +59,7 @@ sub filterMetricsMultiple {
             my @result = @{$results{$metric}};
             if ($type=='min' && $result[1] >= $threshold) {
                 $samplePass{$uri} = 1;
-            } elif (($type=='max' && $result[1] <= $threshold)) {
+            } elsif (($type=='max' && $result[1] <= $threshold)) {
                 $samplePass{$uri} = 1;
             } else {
                 $samplePass{$uri} = 0;
