@@ -165,7 +165,7 @@ system($cmd);
 ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
 ok(-r 'pipeline_summary.pdf', "PDF summary found from standalone script");
 system("rm -f pipeline_summary.log pipeline_summary.tex");
-print "\tTest dataset Alpha finished.\n";
+print "\tTest dataset $testName finished.\n";
 
 my $duration = time() - $start;
-print "QC test Alpha finished.  Duration: $duration s\n";
+print "QC test $testName finished.  Duration: $duration s\n";
