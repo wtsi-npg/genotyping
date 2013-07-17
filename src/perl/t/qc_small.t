@@ -10,7 +10,8 @@ use Carp;
 use Cwd qw/abs_path/;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 49;
+use Test::More tests => 50;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
@@ -23,6 +24,7 @@ my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
+my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
@@ -71,6 +73,12 @@ $status = system("$bin/write_qc_status.pl --dbpath=$dbfile --inipath=$iniPath");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
+
+## test merge of .json results
+my @mergeInputs = ('qc_results.json', $mafhet);
+my $merged = 'qc_merged.json';
+mergeJsonResults(\@mergeInputs, $merged);
+ok(jsonPathOK($merged), "Merged QC results in valid format");
 
 ### test creation of plots ###
 

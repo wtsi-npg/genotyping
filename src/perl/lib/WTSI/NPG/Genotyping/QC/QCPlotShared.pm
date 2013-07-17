@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -129,6 +129,24 @@ sub getSummaryStats {
     return ($total, $fails, $passRate, $mean, $sd);
 }
 
+sub hashKeysEqual {
+    my %hash1 = %{ shift() };
+    my %hash2 = %{ shift() };
+    my (%keys1, %keys2);
+    my $equal = 1;
+    foreach my $key (keys %hash1) { $keys1{$key} = 1; }
+    foreach my $key (keys %hash2) { $keys2{$key} = 1; }
+    foreach my $key (keys %hash1) { # is hash2 <= hash1 ?
+        if (!$keys2{$key}) { $equal = 0; last; }
+    }
+    if ($equal) { # is hash1 <= hash2 ?
+        foreach my $key (keys %hash2) {
+            if (!$keys1{$key}) { $equal = 0; last; }
+        }
+    }
+    return $equal;
+}
+
 sub meanSd {
     # find mean and standard deviation of input list
     # first pass -- mean
@@ -156,6 +174,41 @@ sub median {
     my $length = @inputs;
     my $mid = floor($length/2);
     return $inputs[$mid];
+}
+
+sub mergeJsonResults {
+    # merge qc_results.json format files
+    # result is a hash (indexed by sample) of hashes (indexed by metric)
+    # use to include results of MAF/het calculation from plinktools
+    my @inPaths = @{ shift() };
+    my $outPath = shift;
+    my @results;
+    foreach my $inPath (@inPaths) {
+        my %result = %{decode_json(readFileToString($inPath))};
+        push @results, \%result;
+    }
+    my %merged = %{$results[0]};
+    for (my $i=1;$i<@results;$i++) {
+        if (!hashKeysEqual($results[0], $results[$i])) {
+            croak('Samples not identical for '.$inPaths[0].' and '
+                  .$inPaths[$i]);
+        }
+        my %result = %{$results[$i]};
+        foreach my $name (keys %result) {
+            my %sampleOld = %{$merged{$name}};
+            my %sampleNew = %{$result{$name}};
+            foreach my $metric (keys %sampleNew) {
+                if ($sampleOld{$metric}) {
+                    croak("Refusing to overwrite metric key $metric");
+                }
+                $sampleOld{$metric} = $sampleNew{$metric};
+            }
+            $merged{$name} = \%sampleOld;
+        }
+    }
+    open my $out, ">", $outPath || croak "Cannot open output $outPath";
+    print $out encode_json(\%merged);
+    close $out || croak "Cannot close output $outPath";
 }
 
 sub numeric {
