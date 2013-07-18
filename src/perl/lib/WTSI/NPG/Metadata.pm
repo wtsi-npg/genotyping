@@ -11,23 +11,26 @@ use UUID;
 use WTSI::NPG::iRODS qw(md5sum);
 
 use base 'Exporter';
-our @EXPORT_OK = qw($SAMPLE_NAME_META_KEY
-                    $SAMPLE_ID_META_KEY
-                    $SAMPLE_SUPPLIER_NAME_META_KEY
-                    $SAMPLE_COMMON_NAME_META_KEY
+our @EXPORT_OK = qw(
                     $SAMPLE_ACCESSION_NUMBER_META_KEY
                     $SAMPLE_COHORT_META_KEY
-                    $SAMPLE_CONTROL_META_KEY
+                    $SAMPLE_COMMON_NAME_META_KEY
                     $SAMPLE_CONSENT_META_KEY
+                    $SAMPLE_CONTROL_META_KEY
+                    $SAMPLE_ID_META_KEY
+                    $SAMPLE_NAME_META_KEY
+                    $SAMPLE_SUPPLIER_NAME_META_KEY
                     $STUDY_ID_META_KEY
                     $STUDY_TITLE_META_KEY
 
+                    has_consent
                     make_creation_metadata
+                    make_fingerprint
+                    make_md5_metadata
                     make_modification_metadata
-                    make_file_metadata
+                    make_type_metadata
                     make_sample_metadata
-
-                    has_consent);
+);
 
 our $SAMPLE_NAME_META_KEY             = 'sample';
 our $SAMPLE_ID_META_KEY               = 'sample_id';
@@ -158,31 +161,42 @@ sub make_sample_metadata {
   return @meta;
 }
 
-
-=head2 make_file_metadata
+=head2 make_type_metadata
 
   Arg [1]    : string filename
   Arg [2]    : array of valid file suffix strings
-  Example    : my @meta = make_file_metadata($sample)
-  Description: Return a list of metadata key/value pairs describing a file,
-               including the file 'type' (suffix) and MD5 checksum.
+  Example    : my @meta = make_type_metadata($sample, '.txt', '.csv')
+  Description: Return a list of metadata key/value pairs describing
+               the file 'type' (suffix).
   Returntype : array of arrayrefs
   Caller     : general
 
 =cut
 
-sub make_file_metadata {
+sub make_type_metadata {
   my ($file, @suffixes) = @_;
 
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
-
-  my $md5 = md5sum($file);
   $suffix =~ s{^\.?}{}msxi;
 
-  my @meta = ([md5    => $md5],
-              ['type' => $suffix]);
+  return (['type' => $suffix]);
+}
 
-  return @meta;
+=head2 make_md5_metadata
+
+  Arg [1]    : string filename
+  Example    : my @meta = make_md5_metadata($sample)
+  Description: Return a list of metadata key/value pairs describing the
+               file MD5 checksum.
+  Returntype : array of arrayrefs
+  Caller     : general
+
+=cut
+
+sub make_md5_metadata {
+  my ($file) = @_;
+
+  return ([md5 => md5sum($file)]);
 }
 
 
@@ -220,6 +234,25 @@ sub has_consent {
   }
 
   return $consent;
+}
+
+
+sub make_fingerprint {
+  my ($keys, $meta) = @_;
+
+  my @fingerprint;
+  foreach my $key (@$keys) {
+    my @tuple = grep { $_->[0] eq $key } @$meta;
+    unless (@tuple) {
+      my $meta_str = join(', ', map { join ' => ', @$_ } @$meta);
+      $log->logconfess("Failed to make fingerprint from [$meta_str]: ",
+                       "missing '$key'");
+    }
+
+    push(@fingerprint, @tuple);
+  }
+
+  return @fingerprint;
 }
 
 
