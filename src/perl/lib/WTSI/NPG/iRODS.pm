@@ -30,6 +30,7 @@ our @EXPORT_OK = qw(
                     get_object_meta
                     group_exists
                     hash_path
+                    icd
                     ipwd
                     list_collection
                     list_groups
@@ -39,19 +40,26 @@ our @EXPORT_OK = qw(
                     md5sum
                     meta_exists
                     modified_between
+                    move_object
+                    move_collection
                     put_collection
                     remove_collection
                     remove_collection_meta
                     remove_object
                     remove_object_meta
+                    replace_object
                     set_group_access
 );
 
+# TODO: add mod_object_meta/mod_collection_meta
+
 our $IADMIN = 'iadmin';
 our $IGROUPADMIN = 'igroupadmin';
+our $ICD = 'icd';
 our $ICHKSUM = 'ichksum';
-our $IMETA = 'imeta';
+our $IMETA = 'mimeta'; # Customised client
 our $IMKDIR = 'imkdir';
+our $IMV = 'imv';
 our $IPUT = 'iput';
 our $IQUEST = 'iquest';
 our $IRM = 'irm';
@@ -240,6 +248,28 @@ sub set_group_access {
   return @objects;
 }
 
+=head2 icd
+
+  Arg [1]    : An iRODS path
+  Example    : $dir = icd($path)
+  Description: Set and return the current iRODS working directory.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub icd {
+  my ($collection) = @_;
+
+  defined $collection or $log->logconfess('A defined collection argument is required');
+  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
+
+  $collection =~ s!/$!!;
+  my @wd = _run_command($ICD, qq{"$collection"});
+
+  return shift @wd;
+}
+
 =head2 ipwd
 
   Arg [1]    : None
@@ -342,12 +372,10 @@ sub list_object {
   defined $object or $log->logconfess('A defined object argument is required');
   $object eq '' and $log->logconfess('A non-empty object argument is required');
 
+  $object = _ensure_absolute($object);
   my ($data_name, $collection) = fileparse($object);
-  $collection =~ s!/$!!;
 
-  if ($collection eq '.') {
-      $collection = ipwd();
-  }
+  $collection =~ s!/$!!;
 
   my $command = join(' ', $IQUEST, '"%s"',
                      qq("SELECT DATA_NAME
@@ -385,6 +413,59 @@ sub add_object {
   _run_command($IPUT, qq("$file"), qq("$target"));
 
   return $target;
+}
+
+=head2 replace_object
+
+  Arg [1]    : Name of file to add to iRODs
+  Arg [2]    : iRODS data object name
+  Example    : add_object('lorem.txt', '/my/path/lorem.txt')
+  Description: Replace a file in iRODS.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub replace_object {
+  my ($file, $target) = @_;
+
+  defined $file or $log->logconfess('A defined file argument is required');
+  defined $target or $log->logconfess('A defined target (object) argument is required');
+  $file eq '' and $log->logconfess('A non-empty file argument is required');
+  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
+
+  $target = _ensure_absolute($target);
+  $log->debug("Replacing object '$target'");
+
+  _run_command($IPUT, '-f', qq("$file"), qq("$target"));
+
+  return $target;
+}
+
+=head2 move_object
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : iRODS data object name
+  Example    : move_object('/my/path/lorem.txt', '/my/path/ipsum.txt')
+  Description: Move a data object.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub move_object {
+  my ($source, $target) = @_;
+
+  defined $source or $log->logconfess('A defined source (object) argument is required');
+  $source eq '' and $log->logconfess('A non-empty source (object) argument is required');
+  defined $target or $log->logconfess('A defined target (object) argument is required');
+  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
+
+  $log->debug("Moving object from '$source' to '$target'");
+
+  _run_command($IMV, qq("$source"), qq("$target"));
+
+  return $target
 }
 
 =head2 remove_object
@@ -490,7 +571,7 @@ sub batch_object_meta {
   # success.
 
   if ($?) {
-    $log->logconfess("Execution of '$IMETA' failed with exit code: $?");
+    $log->logconfess("Execution of '$IMETA' failed with exit code: " . ($? >> 8));
   }
 
   return $object;
@@ -534,6 +615,7 @@ sub remove_object_meta {
   return ($key, $value, $units);
 }
 
+
 =head2 find_objects_by_meta
 
   Arg [1]    : iRODS collection pattern
@@ -548,31 +630,18 @@ sub remove_object_meta {
 
 =cut
 
+
 sub find_objects_by_meta {
-  my ($root, $key, $value, $units) = @_;
+  my ($root, @query_specs) = @_;
 
   defined $root or $log->logconfess('A defined root argument is required');
   $root eq '' and $log->logconfess('A non-empty root argument is required');
 
-  my $unit_clause;
-  if (defined $units) {
-    $unit_clause = qq(AND META_DATA_ATTR_UNITS = '$units');
-  }
-  else {
-    $unit_clause = '';
-  }
+  my $zone = find_zone_name($root);
+  my $query = _make_imeta_query(@query_specs);
+  my @results = _run_command($IMETA, '-z', $zone, 'qu', '-d', $query);
 
-  $log->debug("Finding by metadata '$key'  => '$value'");
-
-  my @objs = _safe_select('"%s"', qq("SELECT COUNT(DATA_NAME)
-                                      WHERE META_DATA_ATTR_NAME = '$key'
-                                      AND META_DATA_ATTR_VALUE = '$value' $unit_clause
-                                      AND COLL_NAME LIKE '$root'"),
-                          '"%s/%s"', qq("SELECT COLL_NAME, DATA_NAME
-                                         WHERE META_DATA_ATTR_NAME = '$key'
-                                         AND META_DATA_ATTR_VALUE = '$value' $unit_clause
-                                         AND COLL_NAME LIKE '$root'"));
-  return \@objs;
+  return grep { /^$root/ } @results;
 }
 
 =head2 list_collection
@@ -679,6 +748,35 @@ sub put_collection {
   _run_command($IPUT, '-r', qq("$dir"), qq("$target"));
 
   return $target . '/' . basename($dir);
+}
+
+=head2 move_collection
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : iRODS collection name
+  Example    : move_collection('/my/path/lorem.txt', '/my/path/ipsum.txt')
+  Description: Move a collection.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub move_collection {
+  my ($source, $target) = @_;
+
+  defined $source or $log->logconfess('A defined source (collection) argument is required');
+  $source eq '' and $log->logconfess('A non-empty source (collection) argument is required');
+  defined $target or $log->logconfess('A defined target (collection) argument is required');
+  $target eq '' and $log->logconfess('A non-empty target (collection) argument is required');
+
+  $source =~ s!/$!!;
+  $target =~ s!/$!!;
+
+  $log->debug("Moving collection from '$source' to '$target'");
+
+  _run_command($IMV, qq("$source"), qq("$target"));
+
+  return $target
 }
 
 =head2 remove_collection
@@ -816,28 +914,17 @@ sub remove_collection_meta {
 =cut
 
 sub find_collections_by_meta {
-  my ($root, $key, $value, $units) = @_;
+  my ($root, @query_specs) = @_;
 
   defined $root or $log->logconfess('A defined root argument is required');
   $root eq '' and $log->logconfess('A non-empty root argument is required');
 
-  my $unit_clause;
-  if (defined $units) {
-    $unit_clause = qq(AND META_COLL_ATTR_UNITS = '$units');
-  }
-  else {
-    $unit_clause = '';
-  }
+  my $zone = find_zone_name($root);
+  my $query = _make_imeta_query(@query_specs);
+  my @results = _run_command($IMETA, '-z', $zone, 'qu', '-C', $query);
 
-  my @colls = _safe_select('"%s"', qq("SELECT COUNT(COLL_NAME)
-                                       WHERE META_COLL_ATTR_NAME = '$key'
-                                       AND META_COLL_ATTR_VALUE = '$value' $unit_clause
-                                      AND COLL_NAME LIKE '$root'"),
-                          '"%s"', qq("SELECT COLL_NAME
-                                      WHERE META_COLL_ATTR_NAME = '$key'
-                                      AND META_COLL_ATTR_VALUE = '$value' $unit_clause
-                                      AND COLL_NAME LIKE '$root'"));
-  return \@colls;
+  # imeta doesn't permit filtering by path, natively.
+  return grep { /^$root/ } @results;
 }
 
 =head2 meta_exists
@@ -1082,11 +1169,14 @@ sub _run_command {
 
   my $command = join(' ', @command);
 
-  open(my $exec, '-|', "$command")
+  open(my $exec, '-|', "$command 2>/dev/null")
     or $log->logconfess("Failed open pipe to command '$command': $!");
   binmode($exec, ':utf8');
 
-  $log->debug("Running child '$command'");
+  my $logformat_command = $command;
+  $logformat_command =~ s/\n//g;
+  $logformat_command =~ s/\s+/ /g;
+  $log->debug("Running child '$logformat_command'");
 
   my @result;
   while (<$exec>) {
@@ -1094,7 +1184,7 @@ sub _run_command {
     push(@result, $_);
   }
 
-  close($exec) or warn "Failed to close pipe to command '$command'\n";
+  close($exec);
 
   my $returned = $?;
   if ($returned) {
@@ -1123,6 +1213,8 @@ sub _ensure_absolute {
   return $absolute;
 }
 
+
+# To be replaced by natice JSON output from mimeta
 sub _parse_raw_meta {
   my @raw_meta = @_;
 
@@ -1157,6 +1249,29 @@ sub _parse_raw_meta {
   return %meta;
 }
 
+sub _make_imeta_query {
+  my @query_specs = @_;
+
+  scalar @query_specs or
+    $log->logconfess('At least one query_spec argument is required');
+
+  my @query_clauses;
+  foreach my $spec (@query_specs) {
+    unless (ref $spec eq 'ARRAY') {
+      $log->logconfess("The query_spec '$spec' was not an array reference");
+    }
+
+    my ($key, $value, $unit) = @$spec;
+    if (defined $unit) {
+      $log->logwarn("Ignoring unit in query spec [$key, $value, $unit]");
+    }
+
+    push(@query_clauses, "$key = $value");
+  }
+
+  return join(' and ', @query_clauses);
+}
+
 sub _safe_select {
   my ($ctemplate, $icount, $qtemplate, $iquery) = @_;
 
@@ -1173,10 +1288,11 @@ sub _safe_select {
 sub _irm {
   my @args = @_;
 
-  _run_command($IRM, '-r', join(' ', @args));
+  _run_command($IRM, '-r', '-f', join(' ', @args));
 
   return @args;
 }
+
 
 1;
 
