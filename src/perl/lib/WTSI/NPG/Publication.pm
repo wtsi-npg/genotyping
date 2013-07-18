@@ -25,13 +25,17 @@ use WTSI::NPG::iRODS qw(add_collection
                         list_object
                         make_group_name
                         meta_exists
+                        move_object
                         put_collection
+                        remove_object_meta
+                        replace_object
                         set_group_access);
 
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
                            has_consent
                            make_creation_metadata
-                           make_file_metadata
+                           make_md5_metadata
+                           make_type_metadata
                            make_modification_metadata
                            make_sample_metadata);
 
@@ -41,6 +45,7 @@ our @EXPORT_OK = qw(expected_irods_groups
                     get_publisher_uri
                     get_wtsi_uri
                     grant_group_access
+                    grant_study_access
                     pair_rg_channel_files
                     publish_file
                     update_collection_meta
@@ -177,14 +182,11 @@ sub pair_rg_channel_files {
   Arg [4]    : Publication path in iRODS
   Arg [5]    : URI object of publisher (typically an LDAP URI)
   Arg [6]    : DateTime object of publication
-  Arg [7]    : Make iRODs groups as necessary if true
-  Arg [8]    : Log4perl logger
+  Arg [7]    : Log4perl logger
 
   Example    : my $data_obj = publish_file($file, \@metadata, $creator_uri,
-                                          '/my/file', $publisher_uri,
-                                          $now, $groups);
-  Description: Publish a file to iRODS with attendant metadata.
-               Skip any file where consent is absent. Republish any
+                                          '/my/file', $publisher_uri, $now);
+  Description: Publish a file to iRODS with attendant metadata. Republish any
                file that is already published, but whose checksum has
                changed.
   Returntype : path to new iRODS data object
@@ -194,7 +196,7 @@ sub pair_rg_channel_files {
 
 sub publish_file {
   my ($file, $sample_meta, $creator_uri, $publish_dest, $publisher_uri,
-      $time, $make_groups, $log) = @_;
+      $time) = @_;
 
   my $basename = fileparse($file);
   # Make a path based on the file's MD5 to enable even distribution
@@ -202,75 +204,73 @@ sub publish_file {
 
   $publish_dest =~ s!/$!//!;
   my $dest_collection = $publish_dest . '/' . $hash_path;
-
   unless (list_collection($dest_collection)) {
     add_collection($dest_collection);
   }
 
   my $target = $dest_collection. '/' . $basename;
+  my $zone = find_zone_name($target);
 
   my @meta = @$sample_meta;
+  my $meta_str = join(', ', map { join ' => ', @$_ } @meta);
 
-  if (has_consent(@meta)) {
-    if (list_object($target)) {
-      if (checksum_object($target)) {
-        $log->info("Skipping publication of $target because checksum is unchanged");
-      }
-      else {
-        $log->info("Republishing $target because checksum is changed");
-        $target = add_object($file, $target);
-        push(@meta, make_modification_metadata($time));
-      }
+  # Find existing data from same experiment, if any
+  my @matching = find_objects_by_meta("/$zone", @meta);
+  # Find existing copies of this file
+  my @existing_objects = grep { fileparse($_) eq $basename } @matching;
+  my $existing_object;
+  my %existing_meta;
+
+  if (scalar @existing_objects >1) {
+    $log->logconfess("While publishing '$target' identified by ",
+                     "{ $meta_str }, found >1 existing sample data: [",
+                     join(', ', @existing_objects), "]");
+  }
+  elsif (@existing_objects) {
+    $existing_object = $existing_objects[0];
+    %existing_meta = get_object_meta($existing_object);
+    $log->logwarn("While publishing '$target' identified by ",
+                  "{ $meta_str }, found existing sample data: '$existing_object']");
+  }
+
+  # Even with different MD5 values, the new and old data objects could
+  # be in the same collection because we use only the first 3 bytes of
+  # the hash string to define the collection path
+  if (list_object($target)) {
+    if (checksum_object($target)) {
+      $log->info("Skipping publication of '$target' because checksum is unchanged");
     }
     else {
-      $log->info("Publishing $target");
-      push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
-      $target = add_object($file, $target);
+      $log->info("Republishing '$target' in situ because checksum is changed");
+      $target = replace_object($file, $target);
+      purge_object_meta($target, 'md5', \%existing_meta);
+      push(@meta, make_md5_metadata($file));
+      push(@meta, make_modification_metadata($time));
     }
-
-    push(@meta, make_file_metadata($file, '.idat', '.gtc', '.xml', '.txt'));
-
-    update_object_meta($target, \@meta);
-
-    my $zone = find_zone_name($target);
-    my @zoned_groups = map { "$_#$zone" } expected_irods_groups(@meta);
-
-    grant_group_access($target, 'read', $make_groups, @zoned_groups);
   }
   else {
-    $log->info("Skipping publication of $target because no consent was given");
+    if ($existing_object) {
+      $log->info("Republishing and moving '$target' because checksum is changed");
+      move_object($existing_object, $target); # Moves the metadata
+      replace_object($file, $target);
+      purge_object_meta($target, 'md5', \%existing_meta);
+      push(@meta, make_md5_metadata($file));
+      push(@meta, make_modification_metadata($time));
+    }
+    else {
+      $log->info("Publishing '$target'");
+      $target = add_object($file, $target);
+      push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
+      push(@meta, make_type_metadata($file, '.idat', '.gtc', '.xml', '.txt', '.csv'));
+      push(@meta, make_md5_metadata($file));
+    }
   }
+
+  update_object_meta($target, \@meta);
 
   return $target;
 }
 
-=head2 expected_irods_groups
-
-  Arg [1]    : array of arrayrefs (metadata)
-  Example    : @groups = expected_irods_groups(@meta)
-  Description: Return an array of iRODS group names given metadata containing
-               >=1 study_id under the key $STUDY_ID_META_KEY
-  Returntype : array of string
-  Caller     : general
-
-=cut
-
-sub expected_irods_groups {
-  my @meta = @_;
-
-  my @ss_study_ids = _metadata_for_key(\@meta, $STUDY_ID_META_KEY);
-  unless (@ss_study_ids) {
-    $log->logconfess("Did not find any study information in metadata");
-  }
-
-  my @groups;
-  foreach my $study_id (@ss_study_ids) {
-    my $group_name = make_group_name($study_id);
-    push(@groups, $group_name);
-  }
-
-  return @groups;
-}
 
 =head2 update_object_meta
 
@@ -294,10 +294,10 @@ sub update_object_meta {
     my ($key, $value, $units) = @$elt;
 
     if (meta_exists($key, $value, %current_meta)) {
-      $log->debug("Skipping addition of key '$key' value '$value' to '$target' (exists)");
+      $log->debug("Skipping addition of key '$key' ",
+                  "value '$value' to '$target' (exists)");
     }
     else {
-      $log->debug("Adding key '$key' value '$value' to '$target'");
       add_object_meta($target, $key, $value, $units);
     }
   }
@@ -325,7 +325,8 @@ sub update_collection_meta {
     my ($key, $value, $units) = @$elt;
 
     if (meta_exists($key, $value, %current_meta)) {
-      $log->debug("Skipping addition of key '$key' value '$value' to '$target' (exists)");
+      $log->debug("Skipping addition of key '$key' ",
+                  "value '$value' to '$target' (exists)");
     }
     else {
       $log->debug("Adding key '$key' value '$value' to '$target'");
@@ -334,12 +335,75 @@ sub update_collection_meta {
   }
 }
 
+=head2 purge_object_meta
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : key
+  Example    : purge_object_meta('/my/path/lorem.txt', 'id')
+  Description: Remove all metadata for a particular key from a data object.
+               Return an array of the removed values.
+  Returntype : array
+  Caller     : general
+
+=cut
+
+sub purge_object_meta {
+  my ($object, $key, $meta) = @_;
+
+  defined $object or $log->logconfess('A defined object argument is required');
+  defined $key or $log->logconfess('A defined key argument is required');
+
+  $object eq '' and $log->logconfess('A non-empty object argument is required');
+  $key eq '' and $log->logconfess('A non-empty key argument is required');
+
+  my @purged;
+  if (exists $meta->{$key}) {
+    my @values = @{$meta->{$key}};
+    foreach my $value (@values) {
+      remove_object_meta($object, $key, $value);
+      push(@purged, $value);
+    }
+  }
+  else {
+    $log->logconfess("Metadata under key '$key' does not exist for $object");
+  }
+
+  return @purged;
+}
+
+=head2 expected_irods_groups
+
+  Arg [1]    : array of arrayrefs (metadata)
+  Example    : @groups = expected_irods_groups(@meta)
+  Description: Return an array of iRODS group names given metadata containing
+               >=1 study_id under the key $STUDY_ID_META_KEY
+  Returntype : array of string
+  Caller     : general
+
+=cut
+
+sub expected_irods_groups {
+  my @meta = @_;
+
+  my @ss_study_ids = _metadata_for_key(\@meta, $STUDY_ID_META_KEY);
+  unless (@ss_study_ids) {
+    $log->logwarn("Did not find any study information in metadata");
+  }
+
+  my @groups;
+  foreach my $study_id (@ss_study_ids) {
+    my $group_name = make_group_name($study_id);
+    push(@groups, $group_name);
+  }
+
+  return @groups;
+}
+
 =head2 grant_group_access
 
   Arg [1]    : iRODS collection or data object
   Arg [2]    : iRODS access level string ('read', 'all' etc.)
-  Arg [3]    : generate any required new groups
-  Arg [4]    : array of group names
+  Arg [3]    : array of group names
   Example    : grant_group_access('/my/object', 'read', 0, 'ss_1234', 'ss_1235')
   Description: Set iRODS group access on the spefied entity. If the 3rd argument
                is true, groups that do not exist will be created.
@@ -349,18 +413,22 @@ sub update_collection_meta {
 =cut
 
 sub grant_group_access {
-  my ($target, $access, $make_groups, @groups) = @_;
+  my ($target, $access, @groups) = @_;
 
   foreach my $group (@groups) {
     $log->info("Giving group '$group' '$access' access to $target");
 
-    if ($make_groups) {
-      set_group_access($access, find_or_make_group($group), $target);
-    }
-    else {
-      set_group_access($access, $group, $target);
-    }
+    set_group_access($access, $group, $target);
   }
+}
+
+sub grant_study_access {
+  my ($target, $level, $meta) = @_;
+
+  my $zone = find_zone_name($target);
+  my @zoned_groups = map { "$_#$zone" } expected_irods_groups(@$meta);
+
+  grant_group_access($target, $level, @zoned_groups);
 }
 
 sub _metadata_for_key {
