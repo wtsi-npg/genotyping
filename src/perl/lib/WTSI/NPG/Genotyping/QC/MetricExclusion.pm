@@ -3,6 +3,7 @@
 
 # Flag samples for exclusion in pipeline database, based on metric values
 # Use to exclude samples with low Gencall CR from Illuminus input
+# Also use to exclude samples failing QC from zCall
 
 package WTSI::NPG::Genotyping::QC::MetricExclusion;
 
@@ -28,7 +29,6 @@ sub applyThresholds {
     my %results = %{shift()};
     my $logPath = shift;
     my %samplePass;
-    my ($oldFail, $minFail, $maxFail) = (0,0,0);
     my %fail;
     my $failTotal = 0;
     foreach my $metric (@metrics) { $fail{$metric}=0; }
@@ -40,13 +40,10 @@ sub applyThresholds {
             if ($metric eq 'gender' || $metric eq 'identity' || 
                 $metric eq 'duplicate') {
                 $newPass = $oldPass;
-                unless ($oldPass) { $oldFail++; }
             } elsif (defined($min{$metric}) && $value < $min{$metric}) {
                 $newPass = 0;
-                $minFail++;
             } elsif (defined($max{$metric}) && $value > $max{$metric}) {
                 $newPass = 0;
-                $maxFail++;
             }
             if ($newPass==0) { $sampleOK = 0; $fail{$metric}++; }
         }
@@ -101,18 +98,13 @@ sub runFilter {
     # 5. exclude failed samples from database
     my %config = %{decode_json(readFileToString(shift()))};
     my %results = %{decode_json(readFileToString(shift()))};
-    my $logPath = shift;
     if (keys(%results)==0) { croak "Sample results input is empty"; }
     my $dbPath = shift;
+    my $logPath = shift;
     my ($minRef, $maxRef, $metricsRef) = generateThresholds(\%config,\%results);
     my %samplePass = applyThresholds($minRef, $maxRef, $metricsRef, 
                                      \%results, $logPath);
-    my ($pass, $total);
-    foreach my $uri (keys %samplePass) {
-        $total++;
-        if ($samplePass{$uri}) { $pass++; }
-    }
-    #updateDatabase($dbPath, \%samplePass);
+    updateDatabase($dbPath, \%samplePass);
 }
 
 sub sigmaMinMax {
