@@ -111,6 +111,8 @@ sub publish_idat_files {
                                                $if_sample->{'well'});
         my @meta;
         push(@meta, make_infinium_metadata($if_sample));
+
+        # TODO: decouple Sequencescape interaction from publication
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
         my @fingerprint = infinium_fingerprint(@meta);
@@ -119,6 +121,8 @@ sub publish_idat_files {
           my $object = publish_file($file, \@fingerprint,
                                     $creator_uri->as_string, $publish_dest,
                                     $publisher_uri->as_string, $time);
+
+          # TODO: decouple access control from publication
           my @groups = expected_irods_groups(@meta);
           grant_group_access($object, 'read', @groups);
 
@@ -189,6 +193,8 @@ sub publish_gtc_files {
 
         my @meta;
         push(@meta, make_infinium_metadata($if_sample));
+
+        # TODO: decouple Sequencescape interaction from publication
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
         my @fingerprint = infinium_fingerprint(@meta);
@@ -196,6 +202,8 @@ sub publish_gtc_files {
         my $object = publish_file($file, \@fingerprint,
                                   $creator_uri->as_string, $publish_dest,
                                   $publisher_uri->as_string, $time);
+
+        # TODO: decouple access control from publication
         my @groups = expected_irods_groups(@meta);
         grant_group_access($object, 'read', @groups);
 
@@ -233,6 +241,8 @@ sub publish_infinium_file {
                                            $if_sample->{'well'});
     my @meta;
     push(@meta, make_infinium_metadata($if_sample));
+
+    # TODO: decouple Sequencescape interaction from publication
     push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
     my @fingerprint = infinium_fingerprint(@meta);
@@ -240,6 +250,8 @@ sub publish_infinium_file {
     $object = publish_file($file, \@fingerprint,
                            $creator_uri->as_string, $publish_dest,
                            $publisher_uri->as_string, $time);
+
+    # TODO: decouple access control from publication
     my @groups = expected_irods_groups(@meta);
     grant_group_access($object, 'read', @groups);
   };
@@ -281,6 +293,7 @@ sub publish_sequenom_files {
 
   my $tmpdir = tempdir(CLEANUP => 1);
   my $current_file;
+  my $plate_name;
 
   foreach my $key (sort keys %$plate) {
     eval {
@@ -288,8 +301,9 @@ sub publish_sequenom_files {
       my $first = $records[0];
       my @keys = sort keys %$first;
 
+      $plate_name = $first->{plate};
       my $file = sprintf("%s/%s_%s.csv", $tmpdir,
-                         $first->{plate}, $first->{well});
+                         $plate_name, $first->{well});
       $current_file = $file;
 
       my $record_count = write_sequenom_csv_file($file, \@keys, \@records);
@@ -301,8 +315,6 @@ sub publish_sequenom_files {
       my $object = publish_file($file, \@fingerprint,
                                 $creator_uri, $publish_dest,
                                 $publisher_uri, $time);
-      my @groups = expected_irods_groups(@meta);
-      grant_group_access($object, 'read', @groups);
 
       unlink $file;
       ++$published;
@@ -317,7 +329,7 @@ sub publish_sequenom_files {
     }
   }
 
-  $log->info("Published $published/$total CSV files for '$plate' ",
+  $log->info("Published $published/$total CSV files for '$plate_name' ",
              "to '$publish_dest'");
 
   return $published;
