@@ -8,9 +8,10 @@ use strict;
 use warnings;
 use Carp;
 use Cwd qw/abs_path/;
+use Digest::MD5;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 50;
+use Test::More tests => 52;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
@@ -26,6 +27,7 @@ my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
 my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
+my $excludeConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -126,6 +128,18 @@ my @png = qw /crHetDensityScatter.png  failScatterPlot.png
 foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
+
+## test exclusion of invalid results
+$cmd = "$bin/exclude_samples.pl --config $excludeConfig --results ".
+    "qc_merged.json --db $dbfile";
+is(system($cmd), 0, "Exclude samples for zCall pre-filter");
+my $md5 = Digest::MD5->new;
+open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
+binmode($fh);
+while (<$fh>) { $md5->add($-); }
+close $fh || croak "Cannot close pipeline DB $dbfile";
+is($md5->hexdigest, '19487b128774a92720eff14e208c10a7', 
+   "MD5 checksum of database after exclusion");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
