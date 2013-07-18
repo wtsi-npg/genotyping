@@ -6,11 +6,16 @@ use strict;
 use warnings;
 use Carp;
 use File::Basename qw(basename fileparse);
+use File::Temp qw(tempdir);
 use Net::LDAP;
+use Text::CSV;
 use URI;
 
-use WTSI::NPG::Genotyping::Metadata qw(make_infinium_metadata
-                                       make_analysis_metadata);
+use WTSI::NPG::Genotyping::Metadata qw(make_analysis_metadata
+                                       make_infinium_metadata
+                                       make_sequenom_metadata
+                                       infinium_fingerprint
+                                       sequenom_fingerprint);
 
 use WTSI::NPG::iRODS qw(make_group_name
                         group_exists
@@ -33,8 +38,6 @@ use WTSI::NPG::iRODS qw(make_group_name
 use WTSI::NPG::Metadata qw($SAMPLE_NAME_META_KEY
                            $STUDY_ID_META_KEY
                            make_creation_metadata
-                           make_modification_metadata
-                           make_file_metadata
                            make_sample_metadata);
 
 use WTSI::NPG::Publication qw(pair_rg_channel_files
@@ -48,6 +51,7 @@ use base 'Exporter';
 our @EXPORT_OK = qw($DEFAULT_SAMPLE_ARCHIVE_PATTERN
                     publish_idat_files
                     publish_gtc_files
+                    publish_sequenom_files
                     publish_analysis_directory);
 
 
@@ -67,11 +71,10 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
   Arg [5]    : Infinium database handle
   Arg [6]    : SequenceScape Warehouse database handle
   Arg [7]    : DateTime object of publication
-  Arg [8]    : Make iRODs groups as necessary if true
 
   Example    : my $n = publish_idat_files(\@files, $creator_uri,
                                           '/my/project', $publisher_uri,
-                                          $ifdb, $ssdb, $now, $groups);
+                                          $ifdb, $ssdb, $now);
   Description: Publishes IDAT file pairs to iRODS with attendant metadata.
                Skips any files where consent is absent. Republishes any
                file that is already published, but whose checksum has
@@ -83,7 +86,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
 sub publish_idat_files {
   my ($files, $creator_uri, $publish_dest, $publisher_uri,
-      $ifdb, $ssdb, $time, $make_groups) = @_;
+      $ifdb, $ssdb, $time) = @_;
 
   my @paired = pair_rg_channel_files($files, 'idat');
   my $pairs = scalar @paired;
@@ -103,15 +106,26 @@ sub publish_idat_files {
 
     if ($if_sample) {
       eval {
-        my $ss_sample = $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
-                                                             $if_sample->{'well'});
+        my $ss_sample =
+          $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
+                                               $if_sample->{'well'});
         my @meta;
         push(@meta, make_infinium_metadata($if_sample));
+
+        # TODO: decouple Sequencescape interaction from publication
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
+        my @fingerprint = infinium_fingerprint(@meta);
+
         foreach my $file ($red, $grn) {
-          publish_file($file, \@meta,  $creator_uri->as_string, $publish_dest,
-                       $publisher_uri->as_string, $time, $make_groups, $log);
+          my $object = publish_file($file, \@fingerprint,
+                                    $creator_uri->as_string, $publish_dest,
+                                    $publisher_uri->as_string, $time);
+
+          # TODO: decouple access control from publication
+          my @groups = expected_irods_groups(@meta);
+          grant_group_access($object, 'read', @groups);
+
           ++$published;
         }
       };
@@ -133,6 +147,7 @@ sub publish_idat_files {
   return $published;
 }
 
+
 =head2 publish_gtc_files
 
   Arg [1]    : arrayref of GTC file names
@@ -142,11 +157,10 @@ sub publish_idat_files {
   Arg [5]    : Infinium database handle
   Arg [6]    : SequenceScape Warehouse database handle
   Arg [7]    : DateTime object of publication
-  Arg [8]    : Make iRODs groups as necessary if true
 
   Example    : my $n = publish_gtc_files(\@files, $creator_uri,
                                          '/my/project', $publisher_uri,
-                                         $ifdb, $ssdb, $now, $groups);
+                                         $ifdb, $ssdb, $now);
   Description: Publishes GTC files to iRODS with attendant metadata.
                Skips any files where consent is absent. Republishes any
                file that is already published, but whose checksum has
@@ -158,7 +172,7 @@ sub publish_idat_files {
 
 sub publish_gtc_files {
   my ($files, $creator_uri, $publish_dest, $publisher_uri,
-      $ifdb, $ssdb, $time, $make_groups) = @_;
+      $ifdb, $ssdb, $time) = @_;
 
   my $total = scalar @$files;
   my $published = 0;
@@ -173,15 +187,26 @@ sub publish_gtc_files {
 
     if ($if_sample) {
       eval {
-        my $ss_sample = $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
-                                                             $if_sample->{'well'});
+        my $ss_sample =
+          $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
+                                               $if_sample->{'well'});
 
         my @meta;
         push(@meta, make_infinium_metadata($if_sample));
+
+        # TODO: decouple Sequencescape interaction from publication
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
-        publish_file($file, \@meta, $creator_uri->as_string, $publish_dest,
-                     $publisher_uri->as_string, $time, $make_groups, $log);
+        my @fingerprint = infinium_fingerprint(@meta);
+
+        my $object = publish_file($file, \@fingerprint,
+                                  $creator_uri->as_string, $publish_dest,
+                                  $publisher_uri->as_string, $time);
+
+        # TODO: decouple access control from publication
+        my @groups = expected_irods_groups(@meta);
+        grant_group_access($object, 'read', @groups);
+
         ++$published;
       };
 
@@ -198,6 +223,114 @@ sub publish_gtc_files {
   }
 
   $log->info("Published $published/$total GTC files to '$publish_dest'");
+
+  return $published;
+}
+
+# TODO: refactor the above publish_idat_files and publish_tc_file to
+# use this method
+sub publish_infinium_file {
+  my ($file, $creator_uri, $publish_dest, $publisher_uri,
+      $if_sample, $ssdb, $time) = @_;
+
+  my $object;
+
+  eval {
+    my $ss_sample =
+      $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
+                                           $if_sample->{'well'});
+    my @meta;
+    push(@meta, make_infinium_metadata($if_sample));
+
+    # TODO: decouple Sequencescape interaction from publication
+    push(@meta, make_sample_metadata($ss_sample, $ssdb));
+
+    my @fingerprint = infinium_fingerprint(@meta);
+
+    $object = publish_file($file, \@fingerprint,
+                           $creator_uri->as_string, $publish_dest,
+                           $publisher_uri->as_string, $time);
+
+    # TODO: decouple access control from publication
+    my @groups = expected_irods_groups(@meta);
+    grant_group_access($object, 'read', @groups);
+  };
+
+  if ($@) {
+    $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
+  }
+
+  return $object;
+}
+
+=head2 publish_sequenom_files
+
+  Arg [1]    : Sequenom plate name
+  Arg [2]    : URI object of creator
+  Arg [3]    : string publication destination in iRODS
+  Arg [4]    : URI object of publisher (typically an LDAP URI)
+  Arg [5]    : DateTime object of publication
+
+  Example    : my $n = publish_sequenom_files('plate1', $creator_uri,
+                                              '/my/project', $publisher_uri,
+                                              $now);
+  Description: Publishes Sequenom CSV files to iRODS with attendant metadata.
+               Republishes any file that is already published, but whose
+               checksum has changed. One file is created for each well that
+               has been analysed.
+  Returntype : integer number of files published
+  Caller     : general
+
+=cut
+
+sub publish_sequenom_files {
+  my ($plate, $creator_uri, $publish_dest, $publisher_uri, $time) = @_;
+
+  my $total = scalar keys %$plate;
+  my $published = 0;
+
+  $log->debug("Publishing $total CSV files");
+
+  my $tmpdir = tempdir(CLEANUP => 1);
+  my $current_file;
+  my $plate_name;
+
+  foreach my $key (sort keys %$plate) {
+    eval {
+      my @records = @{$plate->{$key}};
+      my $first = $records[0];
+      my @keys = sort keys %$first;
+
+      $plate_name = $first->{plate};
+      my $file = sprintf("%s/%s_%s.csv", $tmpdir,
+                         $plate_name, $first->{well});
+      $current_file = $file;
+
+      my $record_count = write_sequenom_csv_file($file, \@keys, \@records);
+      $log->debug("Wrote $record_count records into $file");
+
+      my @meta = make_sequenom_metadata($first);
+      my @fingerprint = sequenom_fingerprint(@meta);
+
+      my $object = publish_file($file, \@fingerprint,
+                                $creator_uri, $publish_dest,
+                                $publisher_uri, $time);
+
+      unlink $file;
+      ++$published;
+    };
+
+    if ($@) {
+      $log->error("Failed to publish '$current_file' to ",
+                  "'$publish_dest': ", $@);
+    }
+    else {
+      $log->debug("Published '$current_file': $published of $total");
+    }
+  }
+
+  $log->info("Published $published/$total CSV files for '$plate_name' ",
+             "to '$publish_dest'");
 
   return $published;
 }
@@ -245,7 +378,8 @@ sub publish_analysis_directory {
   my $leaf_collection = join('/', $target, basename($dir));
 
   if (list_collection($leaf_collection)) {
-    $log->logcroak("An iRODS collection already exists at '$leaf_collection'. " .
+    $log->logcroak("An iRODS collection already exists at ",
+                   "'$leaf_collection'. ",
                    "Please move or delete it before proceeding.");
   }
 
@@ -257,7 +391,8 @@ sub publish_analysis_directory {
   }
 
   unless (@project_titles) {
-    $log->logcroak("The analysis database contained no data for run '$run_name'")
+    $log->logcroak("The analysis database contained no data for ",
+                   "run '$run_name'")
   }
 
   my $analysis_coll;
@@ -291,7 +426,7 @@ sub publish_analysis_directory {
         make_included_sample_table($title, $pipedb, $run_name);
 
       if (@sample_data) {
-        $log->info("Adding cross-reference metadata to " . scalar @sample_data .
+        $log->info("Adding cross-reference metadata to ", scalar @sample_data,
                    " data objects in genotyping project '$title'");
 
         my %studies_seen;
@@ -307,8 +442,8 @@ sub publish_analysis_directory {
             next DATUM;
           }
           unless (scalar @sanger_sample_id == 1) {
-            $log->warn("Found multiple Sanger sample IDs for '$sample_datum': [",
-                       join(",", @sanger_sample_id), "]");
+            $log->warn("Found multiple Sanger sample IDs for ",
+                       "'$sample_datum': [", join(",", @sanger_sample_id), "]");
             next DATUM;
           }
 
@@ -329,7 +464,8 @@ sub publish_analysis_directory {
             ++$num_samples;
           }
           else {
-            $log->info("Excluding sample '$sanger_sample_id[0]' from this analysis");
+            $log->info("Excluding sample '", $sanger_sample_id[0],
+                       "' from this analysis");
           }
         }
 
@@ -345,14 +481,16 @@ sub publish_analysis_directory {
     my @groups = expected_irods_groups(@analysis_meta);
     my $make_groups = 0;
 
-    grant_group_access($analysis_coll, '-r read', $make_groups, @groups);
+    grant_group_access($analysis_coll, '-r read', @groups);
   };
 
   if ($@) {
     $log->error("Failed to publish: ", $@);
   }
   else {
-    $log->info("Published '$dir' to '$analysis_coll' and cross-referenced $num_samples data objects in $num_projects projects");
+    $log->info("Published '$dir' to '$analysis_coll' and ",
+               "cross-referenced $num_samples data objects in ",
+               "$num_projects projects");
   }
 
   return $uuid;
@@ -375,6 +513,53 @@ sub make_included_sample_table {
   }
 
   return %sample_table;
+}
+
+# Write to a file subset of data in records that match keys
+sub write_sequenom_csv_file {
+  my ($file, $keys, $records) = @_;
+  my $records_written = 0;
+
+  # Transform to the required output headers
+  my $fn = sub {
+    my $x = shift;
+    $x =~ '^WELL$'                    && return 'WELL_POSITION';
+    $x =~ /^(ASSAY|GENOTYPE|SAMPLE)$/ && return $x . '_ID';
+    return $x;
+  };
+
+  my @header = map { uc } @$keys;
+  @header = map { $fn->($_) } @header;
+
+  my $csv = Text::CSV->new({eol              => "\n",
+                            sep_char         => "\t",
+                            allow_whitespace => undef,
+                            quote_char       => undef});
+  $csv->column_names(\@header);
+
+  # Handle UTF8 because users can enter arbitrary plate names
+  open(my $out, '>:encoding(utf8)', $file)
+    or $log->logcroak("Failed to open Sequenom CSV file '$file'",
+                      " for writing: $!");
+  $csv->print($out, \@header)
+    or $log->logcroak("Failed to write header [", join(", ", @header),
+                      "] to '$file': ", $csv->error_diag);
+
+  foreach my $record (@$records) {
+    my @columns;
+    foreach my $key (@$keys) {
+      push(@columns, $record->{$key});
+    }
+
+    $csv->print($out, \@columns)
+      or $log->logcroak("Failed to write record [", join(", ", @columns),
+                        "] to '$file': ", $csv->error_diag);
+    ++$records_written;
+  }
+
+  close($out);
+
+  return $records_written;
 }
 
 1;

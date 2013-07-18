@@ -14,7 +14,8 @@ use URI;
 
 use Data::Dumper;
 
-use WTSI::NPG::Expression::Metadata qw(make_infinium_metadata
+use WTSI::NPG::Expression::Metadata qw(infinium_fingerprint
+                                       make_infinium_metadata
                                        make_analysis_metadata);
 
 use WTSI::NPG::iRODS qw(hash_path
@@ -25,7 +26,6 @@ use WTSI::NPG::iRODS qw(hash_path
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
                            make_creation_metadata
                            make_modification_metadata
-                           make_file_metadata
                            make_sample_metadata);
 
 use WTSI::NPG::Publication qw(publish_file
@@ -55,7 +55,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
                                                    '/my/project',
                                                    $publisher_uri,
                                                    \@samples,
-                                                   $ssdb, $now, $groups);
+                                                   $ssdb, $now);
   Description: Publish a Genome Studio export, IDAT and XML file pairs to
                iRODS with attendant metadata. Skip any files where consent
                is absent. Republish any file that is already published,
@@ -67,7 +67,7 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
 sub publish_expression_analysis{
   my ($dir, $creator_uri,  $publish_analysis_dest, $publish_samples_dest,
-      $publisher_uri, $samples, $ssdb, $time, $make_groups) = @_;
+      $publisher_uri, $samples, $ssdb, $time) = @_;
 
   my @beadchips = uniq(map { $_->{beadchip} } @$samples);
   my @sections = map { $_->{beadchip_section} } @$samples;
@@ -79,7 +79,8 @@ sub publish_expression_analysis{
   my $leaf_collection = join('/', $analysis_target, basename($dir));
 
   if (list_collection($leaf_collection)) {
-    $log->logcroak("An iRODS collection already exists at '$leaf_collection'. " .
+    $log->logcroak("An iRODS collection already exists at ",
+                   "'$leaf_collection'. ",
                    "Please move or delete it before proceeding.");
   }
 
@@ -111,12 +112,15 @@ sub publish_expression_analysis{
     my %studies_seen;
 
     foreach my $sample (@$samples) {
-      my $ss_sample = $ssdb->find_infinium_gex_sample($sample->{sanger_sample_id});
-      my $study_id = $ss_sample->{study_id};
-
-      unless (exists $studies_seen{$study_id}) {
-        push(@analysis_meta, [$STUDY_ID_META_KEY => $study_id]);
-        $studies_seen{$study_id}++;
+      my $ss_sample =
+        $ssdb->find_infinium_gex_sample($sample->{sanger_sample_id});
+      my $studies = $ssdb->find_sample_studies($ss_sample->{internal_id});
+      foreach my $study (@$studies) {
+        my $study_id = $study->{internal_id};
+        unless (exists $studies_seen{$study_id}) {
+          push(@analysis_meta, [$STUDY_ID_META_KEY => $study_id]);
+          $studies_seen{$study_id}++;
+        }
       }
 
       my @meta;
@@ -124,12 +128,12 @@ sub publish_expression_analysis{
       push(@meta, make_sample_metadata($ss_sample, $ssdb));
       push(@meta, @uuid_meta);
 
-      publish_file($sample->{idat_path}, \@meta, $creator_uri->as_string,
-                   $publish_samples_dest, $publisher_uri->as_string, $time,
-                   $make_groups, $log);
-      publish_file($sample->{xml_path}, \@meta, $creator_uri->as_string,
-                   $publish_samples_dest, $publisher_uri->as_string, $time,
-                   $make_groups, $log);
+      my @fingerprint = infinium_fingerprint(@meta);
+
+      publish_file($sample->{idat_path}, \@fingerprint, $creator_uri->as_string,
+                   $publish_samples_dest, $publisher_uri->as_string, $time);
+      publish_file($sample->{xml_path}, \@fingerprint, $creator_uri->as_string,
+                   $publish_samples_dest, $publisher_uri->as_string, $time);
 
       $num_samples++;
     }
@@ -137,14 +141,15 @@ sub publish_expression_analysis{
     update_collection_meta($analysis_coll, \@analysis_meta);
 
     my @groups = expected_irods_groups(@analysis_meta);
-    grant_group_access($analysis_coll, '-r read', $make_groups, @groups);
+    grant_group_access($analysis_coll, '-r read', @groups);
   };
 
   if ($@) {
     $log->error("Failed to publish: ", $@);
   }
   else {
-    $log->info("Published '$dir' to '$analysis_coll' and cross-referenced $num_samples data objects");
+    $log->info("Published '$dir' to '$analysis_coll' and cross-referenced ",
+               "$num_samples data objects");
   }
 
   return $uuid;
