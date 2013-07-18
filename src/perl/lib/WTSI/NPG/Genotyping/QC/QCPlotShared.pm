@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/decode_json defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 use vars qw/$ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 $INI_FILE_DEFAULT = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -249,6 +249,22 @@ sub parseLabel {
     return ($x, $y);
 }
 
+sub parseThresholds {
+    # read QC metric thresholds from contents of .json config 
+    my %config = @_;
+    my %thresholds = %{$config{"Metrics_thresholds"}};
+    my %qcMetricNames;
+    foreach my $name (@{$config{"name_array"}}) {
+        $qcMetricNames{$name} = 1;
+    }
+    foreach my $name (keys(%thresholds)) { # validate metric names
+        unless ($qcMetricNames{$name}) {
+            croak "Unknown QC metric name: $!";
+        }
+    }
+    return %thresholds;
+}
+
 sub plateLabel {
     # label each plate with plate count and (possibly truncated) plate name
     # ensures meaningful representation of very long plate names
@@ -312,7 +328,6 @@ sub readQCFileNames {
 sub readQCNameConfig {
     # read qc metric names from JSON config
     my $inPath = shift();
-    #$inPath ||= $Bin."/../json/qc_name_config.json";
     my %names = %{decode_json(readFileToString($inPath))};
     return %names;
 }
@@ -383,14 +398,7 @@ sub readThresholds {
     # read QC metric thresholds from config path
     my $configPath = shift;
     my %config = %{decode_json(readFileToString($configPath))};
-    my %thresholds = %{$config{"Metrics_thresholds"}};
-    my %qcMetricNames = readQCNameHash($configPath);
-    foreach my $name (keys(%thresholds)) { # validate metric names
-	unless ($qcMetricNames{$name}) {
-	    croak "Unknown QC metric name: $!";
-	}
-    }
-    return %thresholds;
+    return parseThresholds(%config);
 }
 
 1;
