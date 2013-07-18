@@ -27,7 +27,7 @@ my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
 my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
-my $excludeConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
+my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -130,16 +130,16 @@ foreach my $png (@png) {
 }
 
 ## test exclusion of invalid results
-$cmd = "$bin/exclude_samples.pl --config $excludeConfig --results ".
+$cmd = "$bin/filter_samples.pl --thresholds $filterConfig --results ".
     "qc_merged.json --db $dbfile";
-is(system($cmd), 0, "Exclude samples for zCall pre-filter");
+is(system($cmd), 0, "Exit status of pre-filter script");
 my $md5 = Digest::MD5->new;
 open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
 binmode($fh);
 while (<$fh>) { $md5->add($-); }
 close $fh || croak "Cannot close pipeline DB $dbfile";
 is($md5->hexdigest, '19487b128774a92720eff14e208c10a7', 
-   "MD5 checksum of database after exclusion");
+   "MD5 checksum of database after filtering");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
