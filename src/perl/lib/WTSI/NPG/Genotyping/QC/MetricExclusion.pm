@@ -114,6 +114,9 @@ sub sigmaMinMax {
     my %results = %{$resultsRef};
     my @values;
     foreach my $uri (keys %results) {
+        if (!defined($results{$uri}{$metric})) {
+            croak "No results for sample $uri, metric $metric";
+        }
         my ($pass, $value) = @{$results{$uri}{$metric}};
         push @values, $value;
     }
