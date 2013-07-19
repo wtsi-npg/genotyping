@@ -9,7 +9,8 @@ use File::Basename qw(basename fileparse);
 use Net::LDAP;
 use URI;
 
-use WTSI::NPG::iRODS qw(add_collection
+use WTSI::NPG::iRODS qw(
+                        add_collection
                         add_collection_meta
                         add_object
                         add_object_meta
@@ -18,18 +19,21 @@ use WTSI::NPG::iRODS qw(add_collection
                         find_or_make_group
                         find_zone_name
                         get_collection_meta
+                        get_object_checksum
                         get_object_meta
                         group_exists
                         hash_path
                         list_collection
                         list_object
                         make_group_name
+                        md5sum
                         meta_exists
                         move_object
                         put_collection
                         remove_object_meta
                         replace_object
-                        set_group_access);
+                        set_group_access
+);
 
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
                            has_consent
@@ -200,7 +204,8 @@ sub publish_file {
 
   my $basename = fileparse($file);
   # Make a path based on the file's MD5 to enable even distribution
-  my $hash_path = hash_path($file);
+  my $md5 = md5sum($file);
+  my $hash_path = hash_path($file, $md5);
 
   $publish_dest =~ s!/$!//!;
   my $dest_collection = $publish_dest . '/' . $hash_path;
@@ -230,47 +235,64 @@ sub publish_file {
     $existing_object = $existing_objects[0];
     %existing_meta = get_object_meta($existing_object);
     $log->logwarn("While publishing '$target' identified by ",
-                  "{ $meta_str }, found existing sample data: '$existing_object']");
+                  "{ $meta_str }, found existing sample data: ",
+                  "'$existing_object']");
+
+    unless (checksum_object($existing_object)) {
+      $log->logwarn("Checksum metadata for existing sample data ",
+                    "'$existing_object' is missing or out of date");
+    }
   }
 
   # Even with different MD5 values, the new and old data objects could
-  # be in the same collection because we use only the first 3 bytes of
-  # the hash string to define the collection path
+  # have the same path because we use only the first 3 bytes of the
+  # hash string to define the collection path and the file basenames
+  # are identical.
+
   if (list_object($target)) {
-    if (checksum_object($target)) {
-      $log->info("Skipping publication of '$target' because checksum is unchanged");
+    my $target_md5 = get_object_checksum($target);
+
+    if ($md5 eq $target_md5) {
+      $log->info("Skipping publication of '$target' because the checksum ",
+                 "is unchanged");
     }
     else {
-      $log->info("Republishing '$target' in situ because checksum is changed");
+      $log->info("Republishing '$target' in situ because the checksum ",
+                 "is changed");
       $target = replace_object($file, $target);
       purge_object_meta($target, 'md5', \%existing_meta);
       push(@meta, make_md5_metadata($file));
       push(@meta, make_modification_metadata($time));
     }
   }
-  else {
-    if ($existing_object) {
-      $log->info("Republishing and moving '$target' because checksum is changed");
-      move_object($existing_object, $target); # Moves the metadata
-      replace_object($file, $target);
+  elsif ($existing_object) {
+    my $existing_md5 = get_object_checksum($existing_object);
+
+    if ($md5 eq $existing_md5) {
+      $log->info("Skipping publication of '$target' because existing object ",
+                 "'$existing_object' exists with the same checksum");
+    }
+    else {
+      $log->info("Moving '$existing_object' to '$target' and republishing",
+                 "over it because the checksum is changed");
+      move_object($existing_object, $target); # Moves any metadata
       purge_object_meta($target, 'md5', \%existing_meta);
       push(@meta, make_md5_metadata($file));
       push(@meta, make_modification_metadata($time));
     }
-    else {
-      $log->info("Publishing '$target'");
-      $target = add_object($file, $target);
-      push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
-      push(@meta, make_type_metadata($file, '.idat', '.gtc', '.xml', '.txt', '.csv'));
-      push(@meta, make_md5_metadata($file));
-    }
+  }
+  else {
+    $log->info("Publishing new object '$target'");
+    $target = add_object($file, $target);
+    push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
+    push(@meta, make_type_metadata($file, '.idat', '.gtc', '.xml', '.txt', '.csv'));
+    push(@meta, make_md5_metadata($file));
   }
 
   update_object_meta($target, \@meta);
 
   return $target;
 }
-
 
 =head2 update_object_meta
 
