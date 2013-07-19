@@ -1,0 +1,142 @@
+
+digraph illuminus_genotyping {
+    concentrate=true;
+    ratio=compress;
+    rotate=0;
+    
+    node [fontname="Sans-serif" fontsize=12.0]
+    edge [fontname="Sans-serif"]
+
+    "sample_intensities.pl"                             [shape=parallelogram fontsize=10.0]
+    "ready_infinium.pl"                                 [shape=parallelogram fontsize=10.0]
+    "write_snp_metadata.pl"                             [shape=parallelogram fontsize=10.0]
+    "gtc-to-bed"                                        [shape=parallelogram fontsize=10.0]
+    "simtools"                                          [shape=parallelogram fontsize=10.0]
+    "Illuminus"                                         [shape=parallelogram fontsize=10.0]
+    
+    "update_plink_annotation.pl"                        [shape=parallelogram fontsize=10.0]
+    "GenCall QC"                                        [shape=parallelogram fontsize=10.0]
+    "Illuminus QC"                                      [shape=parallelogram fontsize=10.0]
+    
+    "Plink transpose"                                   [shape=parallelogram fontsize=10.0]
+    "Plink merge"                                       [shape=parallelogram fontsize=10.0]
+    
+    node [fontname="Sans-serif", style=filled, color=slategray2]
+    edge [fontname="Sans-serif"]
+    
+    "Infinium\nLIMS"                                    [shape=doublecircle]
+    "Pipeline\nrun"                                     [shape=doublecircle]
+    "Sequencescape\nWarehouse"                          [shape=doublecircle]
+    "SNP"                                               [shape=doublecircle] 
+    
+    "Infinium chip manifest"                            [shape=note]
+    "GTC"                                               [shape=folder]
+    
+    "Sample JSON"                                       [shape=note]
+    "SNP JSON"                                          [shape=note]
+    "Chromosome JSON"                                   [shape=note]
+    
+    "Sample major Plink BED"                            [shape=note]
+    
+    "SNP major Plink BED"                               [shape=note]
+    "GenCall Plink BIM"                                 [shape=note]
+    "GenCall Plink FAM"                                 [shape=note]
+    
+    "Illuminus Plink BED"                               [shape=note]
+    "Illuminus Plink BIM"                               [shape=note]
+    "Illuminus Plink FAM"                               [shape=note]
+    
+    "Illuminus Plink BED 2"                             [shape=note]
+    "Illuminus Plink BIM 2"                             [shape=note]
+    "Illuminus Plink FAM 2"                             [shape=note]
+
+    "Illuminus Plink BIM 3"                             [shape=note]
+    "Illuminus Plink FAM 3"                             [shape=note]
+    
+    "SIM"                                               [shape=note]
+    
+    "GenCall QC report"                                 [shape=folder]
+    
+    "Illuminus QC report"                               [shape=folder]
+    
+    subgraph cluster0 {
+        "Infinium chip manifest"
+        "GTC"
+    }
+    
+    subgraph cluster1 {
+        "SNP major Plink BED"
+        "GenCall Plink BIM"
+        "GenCall Plink FAM"
+    }
+    
+    subgraph cluster2 {
+        "Illuminus Plink BED"
+        "Illuminus Plink BIM"
+        "Illuminus Plink FAM"
+    }
+
+    "Infinium\nLIMS"           -> "ready_infinium.pl"
+    "SNP"                      -> "ready_infinium.pl"
+    "Sequencescape\nWarehouse" -> "ready_infinium.pl"
+    "ready_infinium.pl"        -> "Pipeline\nrun"
+    
+    "Pipeline\nrun"         -> "sample_intensities.pl"
+    "sample_intensities.pl" -> "Sample JSON" 
+    
+    "Infinium chip manifest" -> "write_snp_metadata.pl"
+    "write_snp_metadata.pl"  -> "SNP JSON"
+    "write_snp_metadata.pl"  -> "Chromosome JSON"
+
+    "SNP JSON"                   -> "update_plink_annotation.pl"
+    "Sample JSON"                -> "update_plink_annotation.pl"
+    "update_plink_annotation.pl" -> "Illuminus Plink BIM"
+    "update_plink_annotation.pl" -> "Illuminus Plink FAM"  
+
+    "Infinium chip manifest" -> "simtools"
+    "GTC"                    -> "simtools"
+    "SNP JSON"               -> "simtools"
+    "simtools"               -> "SIM"
+
+    "GTC"        -> "gtc-to-bed"
+    "gtc-to-bed" -> "Sample major Plink BED"
+    "gtc-to-bed" -> "GenCall Plink BIM"
+    "gtc-to-bed" -> "GenCall Plink FAM"
+    
+    "Sample major Plink BED" -> "Plink transpose"
+    "Plink transpose"        -> "SNP major Plink BED"
+    
+    "SNP major Plink BED" -> "GenCall QC"
+    "GenCall Plink BIM"   -> "GenCall QC"
+    "GenCall Plink FAM"   -> "GenCall QC"
+    "GenCall QC"          ->  "GenCall QC report"
+    "GenCall QC"          -> "Pipeline\nrun" [label="Quality control exclusion" style=dashed]
+    
+    "SIM"             -> "simtools"
+    "simtools"        -> "Illuminus"
+    "Chromosome JSON" -> "Illuminus"
+    "SNP JSON"        -> "Illuminus"
+    
+    "Illuminus" -> "Illuminus Plink BED"
+    "Illuminus" -> "Illuminus Plink BIM"
+    "Illuminus" -> "Illuminus Plink FAM" 
+    
+    "Illuminus Plink BED" -> "Plink merge"
+    "Illuminus Plink BIM" -> "Plink merge"
+    "Illuminus Plink FAM" -> "Plink merge"
+    "Plink merge"         -> "Illuminus Plink BED 2"
+    "Plink merge"         -> "Illuminus Plink BIM 2"
+    "Plink merge"         -> "Illuminus Plink FAM 2"
+    
+    "SNP JSON"                   -> "update_plink_annotation.pl"
+    "Sample JSON"                -> "update_plink_annotation.pl"
+    "Illuminus Plink BIM 2"      -> "update_plink_annotation.pl"
+    "Illuminus Plink FAM 2"      -> "update_plink_annotation.pl"
+    "update_plink_annotation.pl" -> "Illuminus Plink BIM 3"
+    "update_plink_annotation.pl" -> "Illuminus Plink FAM 3"
+    
+    "Illuminus Plink BED 2" -> "Illuminus QC"
+    "Illuminus Plink BIM 3" -> "Illuminus QC"
+    "Illuminus Plink FAM 3" -> "Illuminus QC"
+    "Illuminus QC" -> "Illuminus QC report"
+}
