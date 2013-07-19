@@ -136,9 +136,9 @@ is(system($cmd), 0, "Exit status of pre-filter script");
 my $md5 = Digest::MD5->new;
 open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
 binmode($fh);
-while (<$fh>) { $md5->add($-); }
+while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close pipeline DB $dbfile";
-is($md5->hexdigest, '19487b128774a92720eff14e208c10a7', 
+is($md5->hexdigest, '563039775c9c104fc725d924aa073e9e', 
    "MD5 checksum of database after filtering");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
