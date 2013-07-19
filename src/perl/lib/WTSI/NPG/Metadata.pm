@@ -136,7 +136,7 @@ sub make_sample_metadata {
   }
 
   if (defined $ss_sample->{study_title}) {
-    push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
+    push(@meta, [$STUDY_TITLE_META_KEY => $ss_sample->{study_title}]);
   }
   if (defined $ss_sample->{supplier_name}) {
     push(@meta, [$SAMPLE_SUPPLIER_NAME_META_KEY => $ss_sample->{supplier_name}]);
