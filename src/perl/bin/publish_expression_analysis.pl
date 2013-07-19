@@ -14,6 +14,7 @@ use File::Basename qw(basename);
 use Getopt::Long;
 use List::MoreUtils qw(firstidx uniq);
 use Log::Log4perl;
+use Log::Log4perl::Level;
 use Net::LDAP;
 use Pod::Usage;
 use URI;
@@ -30,26 +31,12 @@ use WTSI::NPG::Utilities qw(trim);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = ERROR, A1
 
-   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8     = 1
-   log4perl.appender.A1.stderr   = 0
-   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A2.utf8     = 1
-   log4perl.appender.A2.stderr   = 0
-   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.Filter   = F2
-
-   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
-   log4perl.filter.F2.LevelMin      = WARN
-   log4perl.filter.F2.LevelMax      = FATAL
-   log4perl.filter.F2.AcceptOnMatch = true
 );
 
 my $log;
@@ -62,9 +49,10 @@ our $DEFAULT_INI = $ENV{HOME} . '/.npg/genotyping.ini';
 run() unless caller();
 
 sub run {
-  my $dbfile;
-  my $log4perl_config;
   my $analysis_source;
+  my $dbfile;
+  my $debug;
+  my $log4perl_config;
   my $manifest;
   my $publish_analysis_dest;
   my $publish_sample_dest;
@@ -73,6 +61,7 @@ sub run {
 
   GetOptions('analysis-dest=s'   => \$publish_analysis_dest,
              'analysis-source=s' => \$analysis_source,
+             'debug'             => \$debug,
              'help'              => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'         => \$log4perl_config,
              'manifest=s'        => \$manifest,
@@ -122,11 +111,13 @@ sub run {
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('npg.irods.publish');
+      $log->level($INFO);
     }
-    else {
-      $log = Log::Log4perl->get_logger('quiet');
+    elsif ($debug) {
+      $log->level($DEBUG);
     }
   }
 
@@ -160,7 +151,6 @@ sub run {
   my $publisher_uri = get_publisher_uri($uid);
   my $name = get_publisher_name($publisher_uri);
   my $now = DateTime->now();
-  my $make_groups = 0;
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
@@ -168,12 +158,16 @@ sub run {
                                   mysql_enable_utf8 => 1);
   $ssdb->log($log);
 
-  $log->info("Publishing samples from '$sample_source' to '$publish_sample_dest' as ", $name);
-  $log->info("Publishing analysis from '$analysis_source' to '$publish_analysis_dest' as ", $name);
+  $log->info("Publishing samples from '$sample_source' ",
+             "to '$publish_sample_dest' as ", $name);
+  $log->info("Publishing analysis from '$analysis_source' ",
+             "to '$publish_analysis_dest' as ", $name);
 
-  publish_expression_analysis($analysis_source, $creator_uri, $publish_analysis_dest,
-                              $publish_sample_dest, $publisher_uri, $samples,
-                              $ssdb, $now, $make_groups);
+  publish_expression_analysis($analysis_source, $creator_uri,
+                              $publish_analysis_dest,
+                              $publish_sample_dest,
+                              $publisher_uri, $samples,
+                              $ssdb, $now);
 }
 
 # Expects a tab-delimited text file. Useful data start after line

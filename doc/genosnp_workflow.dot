@@ -1,0 +1,102 @@
+
+digraph genosnp_genotyping {
+    concentrate=true;
+    ratio=compress;
+    rotate=0;
+    
+    node [fontname="Sans-serif" fontsize=12.0]
+    edge [fontname="Sans-serif"]
+
+    "sample_intensities.pl"                             [shape=parallelogram fontsize=10.0]
+    "ready_infinium.pl"                                 [shape=parallelogram fontsize=10.0]
+    "write_snp_metadata.pl"                             [shape=parallelogram fontsize=10.0]
+    "simtools"                                          [shape=parallelogram fontsize=10.0]
+    "GenoSNP"                                           [shape=parallelogram fontsize=10.0]
+    
+    "update_plink_annotation.pl"                        [shape=parallelogram fontsize=10.0]
+    "GenoSNP QC"                                        [shape=parallelogram fontsize=10.0]
+    "Plink merge"                                       [shape=parallelogram fontsize=10.0]
+    
+    node [fontname="Sans-serif", style=filled, color=slategray2]
+    edge [fontname="Sans-serif"]
+
+    "Infinium\nLIMS"                                    [shape=doublecircle]
+    "Pipeline\nrun"                                     [shape=doublecircle]
+    "Sequencescape\nWarehouse"                          [shape=doublecircle]
+    "SNP"                                               [shape=doublecircle] 
+    
+    "Infinium chip manifest"                            [shape=note]
+    "GTC"                                               [shape=folder]
+    
+    "Sample JSON"                                       [shape=note]
+    "SNP JSON"                                          [shape=note]
+ 
+    "GenoSNP Plink BED"                                 [shape=note]
+    "GenoSNP Plink BIM"                                 [shape=note]
+    "GenoSNP Plink FAM"                                 [shape=note]
+    
+    "GenoSNP Plink BED 2"                               [shape=note]
+    "GenoSNP Plink BIM 2"                               [shape=note]
+    "GenoSNP Plink FAM 2"                               [shape=note]
+
+    "GenoSNP Plink BIM 3"                               [shape=note]
+    "GenoSNP Plink FAM 3"                               [shape=note]
+
+    "SIM" [shape=note]
+    "GenoSNP QC report"                                 [shape=folder]
+
+    subgraph cluster0 {
+        "Infinium chip manifest"
+        "GTC"
+    }
+    
+    subgraph cluster1 {
+        "GenoSNP Plink BED"
+        "GenoSNP Plink BIM"
+        "GenoSNP Plink FAM"
+    }
+
+    "Infinium\nLIMS"           -> "ready_infinium.pl"
+    "SNP"                      -> "ready_infinium.pl"
+    "Sequencescape\nWarehouse" -> "ready_infinium.pl"
+    "ready_infinium.pl"        -> "Pipeline\nrun"
+    
+    "Pipeline\nrun"         -> "sample_intensities.pl"
+    "sample_intensities.pl" -> "Sample JSON" 
+    
+    "Infinium chip manifest" -> "write_snp_metadata.pl"
+    "write_snp_metadata.pl"  -> "SNP JSON"
+    "write_snp_metadata.pl"  -> "Chromosome JSON"
+
+    "Infinium chip manifest" -> "simtools"
+    "GTC"                    -> "simtools"
+    "SNP JSON"               -> "simtools"
+    "simtools"               -> "SIM"
+
+    "SIM"             -> "simtools"
+    "simtools"        -> "GenoSNP"
+    "SNP JSON"        -> "GenoSNP"
+
+    "GenoSNP" -> "GenoSNP Plink BED"
+    "GenoSNP" -> "GenoSNP Plink BIM"
+    "GenoSNP" -> "GenoSNP Plink FAM" 
+    
+    "GenoSNP Plink BED" -> "Plink merge"
+    "GenoSNP Plink BIM" -> "Plink merge"
+    "GenoSNP Plink FAM" -> "Plink merge"
+    "Plink merge"         -> "GenoSNP Plink BED 2"
+    "Plink merge"         -> "GenoSNP Plink BIM 2"
+    "Plink merge"         -> "GenoSNP Plink FAM 2"
+    
+    "SNP JSON"                   -> "update_plink_annotation.pl"
+    "Sample JSON"                -> "update_plink_annotation.pl"
+    "GenoSNP Plink BIM 2"      -> "update_plink_annotation.pl"
+    "GenoSNP Plink FAM 2"      -> "update_plink_annotation.pl"
+    "update_plink_annotation.pl" -> "GenoSNP Plink BIM 3"
+    "update_plink_annotation.pl" -> "GenoSNP Plink FAM 3"
+    
+    "GenoSNP Plink BED 2" -> "GenoSNP QC"
+    "GenoSNP Plink BIM 3" -> "GenoSNP QC"
+    "GenoSNP Plink FAM 3" -> "GenoSNP QC"
+    "GenoSNP QC" -> "GenoSNP QC report"
+}

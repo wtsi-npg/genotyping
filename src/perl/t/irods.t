@@ -10,7 +10,7 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 97;
+use Test::More tests => 105;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
@@ -33,6 +33,7 @@ use WTSI::NPG::iRODS qw(
                         get_object_meta
                         group_exists
                         hash_path
+                        icd
                         ipwd
                         list_collection
                         list_groups
@@ -40,10 +41,12 @@ use WTSI::NPG::iRODS qw(
                         md5sum
                         meta_exists
                         modified_between
+                        move_object
                         put_collection
                         remove_collection
                         remove_object
                         remove_object_meta
+                        replace_object
                         set_group_access
 );
 
@@ -52,12 +55,13 @@ Log::Log4perl::init('etc/log4perl_tests.conf');
 my $data_path = "t/irods";
 my $test_file = "$data_path/test.txt";
 my $test_dir = "$data_path/test";
+my $irods_test_collection = "irods_test" . $$;
 
 # Deliberate spaces in names
 my $test_collection = 'test_ _collection.' . $$;
 my $test_object = 'test_ _object.' . $$;
 
-my %meta = map { 'attribute' . $_ => 'value' . $_ } 0..9;
+my %meta = map { 'attribute' . $_ . $$ => 'value' . $_ .$$ } 0..8;
 my %expected = map { $_ => [$meta{$_}] } keys %meta;
 
 # list_collection
@@ -111,11 +115,19 @@ is_deeply(\%collmeta, \%expected);
 foreach my $attr (keys %meta) {
   my $value = $meta{$attr};
   my $root = $wd;
-  my @found = find_collections_by_meta("$root%", $attr, $value);
+  my @found = find_collections_by_meta($root, [$attr, $value]);
 
   ok(scalar @found == 1);
 }
 
+my @collection_specs;
+foreach my $attr (keys %meta) {
+  my $value = $meta{$attr};
+  push(@collection_specs, [$attr, $value]);
+}
+
+my @found = find_collections_by_meta($wd, @collection_specs);
+ok(scalar @found == 1);
 
 # add_object
 dies_ok { add_object(undef, $test_object) }
@@ -124,6 +136,35 @@ dies_ok { add_object($test_file, undef) }
   'Expected to fail adding a file as an undefined object';
 my $new_object = add_object($test_file, $test_object);
 ok($new_object);
+dies_ok { add_object($test_file, $test_object) }
+  'Expected to fail adding a file that requires overwriting';
+
+# replace_object
+my $to_replace = 'to_replace.' . $$;
+
+dies_ok { replace_object(undef, $to_replace) }
+  'Expected to fail replacing a missing file as an object';
+dies_ok { replace_object($test_file, undef) }
+  'Expected to fail replacing a file as an undefined object';
+
+add_object($test_file, $to_replace);
+my $replaced_object = replace_object($test_file, $to_replace);
+ok($replaced_object);
+ok(list_object($replaced_object));
+ok(remove_object($replaced_object));
+
+# move_object
+my $to_move = 'to_move.' . $$;
+my $moved = 'moved.' . $$;
+add_object($test_file, $to_move);
+
+ok(list_object($to_move));
+ok(!list_object($moved));
+is($moved, move_object($to_move, $moved));
+ok(!list_object($to_move));
+ok(list_object($moved));
+remove_object($moved);
+
 
 # set_group_access
 dies_ok { set_group_access('no_such_permission', 'public', $new_object) }
@@ -158,7 +199,7 @@ dies_ok { get_object_meta() }
 foreach my $attr (keys %meta) {
   my $value = $meta{$attr};
   my $root = $wd;
-  my @found = find_objects_by_meta("$root%", $attr, $value);
+  my @found = find_objects_by_meta($root, [$attr, $value]);
 
   ok(scalar @found == 1);
 }
