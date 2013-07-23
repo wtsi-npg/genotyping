@@ -14,12 +14,11 @@ use WTSI::NPG::iRODS qw(
                         add_collection_meta
                         add_object
                         add_object_meta
-                        checksum_object
+                        calculate_checksum
                         find_objects_by_meta
                         find_or_make_group
                         find_zone_name
                         get_collection_meta
-                        get_object_checksum
                         get_object_meta
                         group_exists
                         hash_path
@@ -33,6 +32,7 @@ use WTSI::NPG::iRODS qw(
                         remove_object_meta
                         replace_object
                         set_group_access
+                        validate_checksum_metadata
 );
 
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
@@ -203,9 +203,11 @@ sub publish_file {
       $time) = @_;
 
   my $basename = fileparse($file);
+
   # Make a path based on the file's MD5 to enable even distribution
   my $md5 = md5sum($file);
   my $hash_path = hash_path($file, $md5);
+  $log->debug("Checksum of file '$file' to be published is '$md5'");
 
   $publish_dest =~ s!/$!//!;
   my $dest_collection = $publish_dest . '/' . $hash_path;
@@ -234,13 +236,28 @@ sub publish_file {
   elsif (@existing_objects) {
     $existing_object = $existing_objects[0];
     %existing_meta = get_object_meta($existing_object);
+    my @existing_meta_str;
+    foreach my $key (sort keys %existing_meta) {
+      push(@existing_meta_str,
+           "$key => [" . join(', ', @{$existing_meta{$key}}) . "]");
+    }
+
     $log->logwarn("While publishing '$target' identified by ",
                   "{ $meta_str }, found existing sample data: ",
-                  "'$existing_object']");
+                  "'$existing_object' identified by { ",
+                  join(', ', @existing_meta_str), " }");
 
-    unless (checksum_object($existing_object)) {
+    unless (exists $existing_meta{'md5'}) {
       $log->logwarn("Checksum metadata for existing sample data ",
-                    "'$existing_object' is missing or out of date");
+                    "'$existing_object' is missing");
+      $log->info("Adding missing checksum metadata for existing sample data ",
+                 "'$existing_object'");
+      update_object_meta($target, [make_md5_metadata($file)]);
+    }
+
+    unless (validate_checksum_metadata($existing_object)) {
+      $log->error("Checksum metadata for existing sample data ",
+                  "'$existing_object' is out of date");
     }
   }
 
@@ -250,7 +267,8 @@ sub publish_file {
   # are identical.
 
   if (list_object($target)) {
-    my $target_md5 = get_object_checksum($target);
+    my $target_md5 = calculate_checksum($target);
+    $log->debug("Checksum of existing target '$target' is '$target_md5'");
 
     if ($md5 eq $target_md5) {
       $log->info("Skipping publication of '$target' because the checksum ",
@@ -266,7 +284,9 @@ sub publish_file {
     }
   }
   elsif ($existing_object) {
-    my $existing_md5 = get_object_checksum($existing_object);
+    my $existing_md5 = calculate_checksum($existing_object);
+    $log->debug("Checksum of existing object '$existing_md5' ",
+                "is '$existing_md5'");
 
     if ($md5 eq $existing_md5) {
       $log->info("Skipping publication of '$target' because existing object ",
@@ -274,7 +294,8 @@ sub publish_file {
     }
     else {
       $log->info("Moving '$existing_object' to '$target' and republishing",
-                 "over it because the checksum is changed");
+                 "over it because the checksum is changed from ",
+                 "'$existing_md5' to '$md5'");
       move_object($existing_object, $target); # Moves any metadata
       purge_object_meta($target, 'md5', \%existing_meta);
       push(@meta, make_md5_metadata($file));
