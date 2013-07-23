@@ -18,7 +18,7 @@ our @EXPORT_OK = qw(
                     add_object
                     add_object_meta
                     batch_object_meta
-                    checksum_object
+                    calculate_checksum
                     collect_dirs
                     collect_files
                     find_collections_by_meta
@@ -26,7 +26,6 @@ our @EXPORT_OK = qw(
                     find_or_make_group
                     find_zone_name
                     get_collection_meta
-                    get_object_checksum
                     get_object_meta
                     group_exists
                     hash_path
@@ -49,6 +48,7 @@ our @EXPORT_OK = qw(
                     remove_object_meta
                     replace_object
                     set_group_access
+                    validate_checksum_metadata
 );
 
 # TODO: add mod_object_meta/mod_collection_meta
@@ -286,17 +286,17 @@ sub ipwd {
   return shift @wd;
 }
 
-=head2 get_object_checksum
+=head2 calculate_checksum
 
   Arg [1]    : iRODS data object name
-  Example    : $cs = get_object_checksum('/my/path/lorem.txt')
+  Example    : $cs = calculate_checksum('/my/path/lorem.txt')
   Description: Return the MD5 checksum of an iRODS data object.
   Returntype : string
   Caller     : general
 
 =cut
 
-sub get_object_checksum {
+sub calculate_checksum {
   my ($object) = @_;
 
   defined $object or $log->logconfess('A defined object argument is required');
@@ -320,10 +320,10 @@ sub get_object_checksum {
   return $checksum;
 }
 
-=head2 checksum_object
+=head2 validate_checksum_metadata
 
   Arg [1]    : iRODS data object name
-  Example    : checksum_object('/my/path/lorem.txt')
+  Example    : validate_checksum_metadata('/my/path/lorem.txt')
   Description: Return true if the MD5 checksum in the metadata of an iRODS
                object is identical to the MD5 caluclated by iRODS.
   Returntype : boolean
@@ -331,14 +331,14 @@ sub get_object_checksum {
 
 =cut
 
-sub checksum_object {
+sub validate_checksum_metadata {
   my ($object) = @_;
 
   my $identical = 0;
   my %meta = get_object_meta($object);
 
   if (exists $meta{md5}) {
-    my $irods_md5 = get_object_checksum($object);
+    my $irods_md5 = calculate_checksum($object);
     my $md5 = shift @{$meta{md5}};
 
     if ($md5 eq $irods_md5) {

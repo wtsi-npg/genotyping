@@ -22,14 +22,14 @@ use WTSI::NPG::iRODS qw(
                         add_group
                         add_object
                         add_object_meta
-                        checksum_object
+                        validate_checksum_metadata
                         collect_dirs
                         collect_files
                         find_collections_by_meta
                         find_objects_by_meta
                         find_zone_name
                         get_collection_meta
-                        get_object_checksum
+                        calculate_checksum
                         get_object_meta
                         group_exists
                         hash_path
@@ -221,16 +221,16 @@ my $lorem_object = 'lorem_object.' . $$;
 
 ok(add_object($lorem_file, $lorem_object));
 
-# get_object_checksum
+# calculate_checksum
 my $expected_checksum = '39a4aa291ca849d601e4e5b8ed627a04';
 my $invalid_checksum = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
-is(get_object_checksum($lorem_object), $expected_checksum);
+is(calculate_checksum($lorem_object), $expected_checksum);
 
 is_deeply([add_object_meta($lorem_object, 'md5', $invalid_checksum)],
           ['md5', $invalid_checksum, '']);
 
-# checksum_object
-ok(! checksum_object($lorem_object));
+# validate_checksum_metadata
+ok(! validate_checksum_metadata($lorem_object));
 
 is_deeply([remove_object_meta($lorem_object, 'md5', $invalid_checksum)],
           ['md5', $invalid_checksum, '']);
@@ -238,7 +238,7 @@ is_deeply([remove_object_meta($lorem_object, 'md5', $invalid_checksum)],
 is_deeply([add_object_meta($lorem_object, 'md5', $expected_checksum)],
           ['md5', $expected_checksum, '']);
 
-ok(checksum_object($lorem_object));
+ok(validate_checksum_metadata($lorem_object));
 
 ok(remove_object($lorem_object));
 
