@@ -17,23 +17,25 @@ use WTSI::NPG::Genotyping::Metadata qw(make_analysis_metadata
                                        infinium_fingerprint
                                        sequenom_fingerprint);
 
-use WTSI::NPG::iRODS qw(make_group_name
-                        group_exists
-                        find_or_make_group
-                        set_group_access
-                        list_object
+use WTSI::NPG::iRODS qw(
+                        add_collection
+                        add_collection_meta
                         add_object
-                        checksum_object
-                        get_object_meta
                         add_object_meta
                         find_objects_by_meta
-                        list_collection
-                        add_collection
-                        put_collection
+                        find_or_make_group
                         get_collection_meta
-                        add_collection_meta
+                        get_object_meta
+                        group_exists
+                        hash_path
+                        list_collection
+                        list_object
+                        make_group_name
                         meta_exists
-                        hash_path);
+                        put_collection
+                        set_group_access
+                        validate_checksum_metadata
+);
 
 use WTSI::NPG::Metadata qw($SAMPLE_NAME_META_KEY
                            $STUDY_ID_META_KEY
