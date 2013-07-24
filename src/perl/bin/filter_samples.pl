@@ -82,8 +82,14 @@ unless ($thresholdsPath) {
     }
 }
 
-foreach my $inPath ($resultsPath, $thresholdsPath, $dbPath) {
-    if (!(-e $inPath)) { die "Input path $inPath does not exist"; }
+my @types = qw/results thresholds database/;
+my @inPaths = ($resultsPath, $thresholdsPath, $dbPath);
+foreach (my $i=0; $i<@inPaths; $i++) {
+    if (!defined($inPaths[$i])) {
+        die "No value specified for $types[$i] input path";
+    } elsif (!(-e $inPaths[$i])) { 
+        die "Input path \"$inPaths[$i]\" for $types[$i] does not exist";
+    }
 }
 $logPath ||= $logDefault;
 runFilter($thresholdsPath, $resultsPath, $dbPath, $logPath);
