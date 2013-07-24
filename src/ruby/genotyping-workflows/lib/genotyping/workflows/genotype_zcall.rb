@@ -25,6 +25,7 @@ module Genotyping::Workflows
     include Genotyping::Tasks::GenoSNP
     include Genotyping::Tasks::Plink
     include Genotyping::Tasks::QualityControl
+    include Genotyping::Tasks::Simtools
     include Genotyping::Tasks::ZCall
 
     description <<-DESC
@@ -52,6 +53,11 @@ Arguments:
     Optional, defaults to 20.
     zstart: <integer> start for range of candidate integer z scores. Optional.
     ztotal: <integer> total number of candidate integer z scores. Optional.
+    filterconfig: <path> to .json file with thresholds for prefilter on GenCall 
+QC. Optional; if absent, uses default zcall thresholds (requires config 
+argument to be specified).
+    nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
+overrides the filterconfig argument.
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
@@ -75,11 +81,11 @@ Returns:
     USAGE
 
     def run(dbfile, run_name, work_dir, args = {})
-      # TODO run QC on GenCall output (similar to Illuminus) & exclude failures
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :egt, :queue, :memory,
-                               :select, :chunk_size, :zstart, :ztotal, :min_cr)
+                               :select, :chunk_size, :zstart, :ztotal, 
+                               :filterconfig, :nofilter)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -90,7 +96,8 @@ Returns:
       gtconfig = args.delete(:config)
       zstart = args.delete(:zstart) || 1  # wider z range for production
       ztotal = args.delete(:ztotal) || 10
-      min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
+      fconfig = args.delete(:filterconfig) || nil
+      nofilter = args.delete(:nofilter) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -106,6 +113,7 @@ Returns:
       gcsjname = run_name + '.gencall.sample.json'
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'
+      smname =  run_name + '.gencall.sim'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
@@ -117,25 +125,58 @@ Returns:
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
-      ## run gencall QC to apply gencall CR filter and find genders
-      gcqcargs = {:run => run_name,
-                  :post_filter_cr => min_cr}.merge(args)
+      ## prefilter on QC metrics and thresholds to exclude bad samples
+      filtered = nil
+      if nofilter # prefilter cancellation in effect
+        filtered = true
+      else
+        ## run plinktools to find maf/het on transposed .bed output
+        hmjson = het_by_maf(gcsfile, work_dir, run_name, args, async)
 
-      gcqcdir = File.join(work_dir, 'gencall_qc')
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                  async, true)
+        ## get .sim file from GTC files for intensity metrics
+        smargs = {:normalize => true }.merge(args)
+        smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
+
+        ## run gencall QC to apply gencall CR filter and find genders
+        gcquality = nil
+        if smfile
+          gcqcargs = {:run => run_name,
+                      :sim => smfile}.merge(args)
+          gcqcdir = File.join(work_dir, 'gencall_qc')
+          gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                      async, true)
+        end
+        mqcjson = nil
+        if gcquality and hmjson
+          ## merge results from plinktools MAF/het and generic QC
+          gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
+          mqcpath = File.join(work_dir, 'run1.gencall.merged_qc.json')
+          mqcjson = merge_qc_results([gcqcjson, hmjson], mqcpath, args)
+        end
+        if mqcjson
+          ## apply prefilter to exclude samples from zcall input
+          if fconfig then fargs = {:thresholds => fconfig}.merge(args)
+          else fargs = {:default => "zcall"}.merge(args)
+          end
+          filtered = filter_samples(mqcjson, dbfile, fargs)
+        end
+      end
 
       sjson = nil
-      if gcquality
+      if filtered
+        ## find sample intensity data
         siargs = {:config => gtconfig}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       end
+
       num_samples = count_samples(sjson)
 
       result = nil
       if sjson
         result = prepare_thresholds(egt_file, zstart, ztotal, args, async)
       end
+
+      # TODO skip evaluation if only one Z calue has been specified
       tjson = nil
       tjson = result[0] if result
       evargs = {:samples => sjson,
@@ -184,7 +225,7 @@ Returns:
       metrics = JSON.parse(File.read(mjson)) if mjson
       return metrics['BEST_THRESHOLDS']
     end
-
+    
   end # end of class
 
 end # end of module

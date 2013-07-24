@@ -19,6 +19,12 @@
 module Genotyping::Tasks
 
   RUN_QC = 'run_qc.pl'
+  HET_BY_MAF = 'het_by_maf.py'
+
+  # Returns true if the het_by_maf script is available.
+  def het_by_maf_available?()
+    system("which #{HET_BY_MAF} >/dev/null 2>&1")
+  end
 
   module QualityControl
     include Genotyping::Tasks
@@ -71,7 +77,49 @@ module Genotyping::Tasks
           end
         end
       end
+    end # quality_control
+
+
+    # Find heterozygosity for high/low minor allele frequency
+    #
+    # Arguments:
+    # - input (String): Plink binary dataset stem 
+    #   (path without .bed, .bim, .fam extension)
+    # - output (String): Path to output directory
+    # - threshold (float): Boundary between high and low MAF, between 0 and 1
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    # 
+    # Returns:
+    # - Path to output file
+
+    def het_by_maf(input, output, run_name, args={}, async={}, threshold=0.01)
+
+      args, work_dir, log_dir = process_task_args(args)
+
+      unless het_by_maf_available?
+        raise "Plinktools het_by_maf script not available!"
+      end
+      
+      if args_available?(input, output, work_dir)
+        base = File.basename(input, File.extname(input)) # remove .bed suffix
+        outfile = File.join(output, run_name+'.gencall.het_by_maf.json')
+        cli_args = args.merge({:in => base,
+                               :out => outfile,
+                               :threshold => threshold})
+        margs = [input, output]
+        command = [HET_BY_MAF,
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
+        task_id = task_identity(:het_by_maf, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        async_task(margs, command, work_dir, log,
+                   :post => lambda {ensure_files([outfile,], :error => false)},
+                   :result => lambda { outfile },
+                   :async => async)
+      end
     end
+
 
   end
 end

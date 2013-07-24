@@ -8,9 +8,11 @@ use strict;
 use warnings;
 use Carp;
 use Cwd qw/abs_path/;
+use Digest::MD5;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 49;
+use Test::More tests => 52;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
@@ -23,7 +25,9 @@ my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
+my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
+my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -72,6 +76,12 @@ is($status, 0, "write_qc_status.pl exit status");
 ## test output
 ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 
+## test merge of .json results
+my @mergeInputs = ('qc_results.json', $mafhet);
+my $merged = 'qc_merged.json';
+mergeJsonResults(\@mergeInputs, $merged);
+ok(jsonPathOK($merged), "Merged QC results in valid format");
+
 ### test creation of plots ###
 
 ## PDF scatterplots for each metric
@@ -119,6 +129,18 @@ foreach my $png (@png) {
     ok(pngPathOK($png), "PNG output $png in valid format");
 }
 
+## test exclusion of invalid results
+$cmd = "$bin/filter_samples.pl --thresholds $filterConfig --results ".
+    "qc_merged.json --db $dbfile";
+is(system($cmd), 0, "Exit status of pre-filter script");
+my $md5 = Digest::MD5->new;
+open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
+binmode($fh);
+while (<$fh>) { $md5->add($_); }
+close $fh || croak "Cannot close pipeline DB $dbfile";
+is($md5->hexdigest, '563039775c9c104fc725d924aa073e9e', 
+   "MD5 checksum of database after filtering");
+
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
@@ -157,7 +179,7 @@ system($cmd);
 ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
 ok(-r 'pipeline_summary.pdf', "PDF summary found from standalone script");
 system("rm -f pipeline_summary.log pipeline_summary.tex");
-print "\tTest dataset Alpha finished.\n";
+print "\tTest dataset $testName finished.\n";
 
 my $duration = time() - $start;
-print "QC test Alpha finished.  Duration: $duration s\n";
+print "QC test $testName finished.  Duration: $duration s\n";
