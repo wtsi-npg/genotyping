@@ -1,7 +1,7 @@
-# /usr/bin/env perl
+#! /software/bin/perl
 
 #
-# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2013 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,32 +27,38 @@ use strict;
 use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
 
-my @inPaths;
+my $input1;
+my $input2;
 my $outPath;
 my $help;
 
-GetOptions("in=s"  => \@inPaths,
-           "out=s" => \$outPath,
-           "help"  => \$help);
+GetOptions("input1=s"  => \$input1,
+           "input2=s"  => \$input2,
+           "output=s"  => \$outPath,
+           "help"      => \$help);
+
+my $outDefault = "qc_merged.json";
 if ($help) {
     my $helpText = "Usage: $0 [ options ] 
 
 --help     Print this help text and exit
---in       Input files, in the form of qc_results.json as produced by 
-           genotyping pipeline QC. Should have congruent sample identifiers and 
-           disjoint metrics. Specify exactly twice.
---out      Path for .json output
-
-Example usage: $0 --in qc_foo.json --in qc_bar.json --out qc_merged.json
+--input1   Input file, in the form of qc_results.json as produced by 
+           genotyping pipeline QC. Required.
+--input2   Input file, in same format as input1 above. Input files must 
+           have congruent sample identifiers and disjoint metrics. Required.
+--output   Path for .json output. Optional, defaults to $outDefault
 ";
     print STDERR $helpText;
     exit 0;
-} elsif (@inPaths!=2) {
-    print STDERR "Must specify exactly two input paths!\n";
-    exit 1;
-} elsif (!(-e $inPaths[0] && -e $inPaths[1])) {
-    print STDERR "Input file does not exist!\n";
-    exit 1;
-} else {
-    mergeJsonResults(\@inPaths, $outPath);
 }
+
+my @inPaths = ($input1, $input2);
+foreach my $inPath (@inPaths) {
+    if (!(-e $inPath)) {
+        print STDERR "Input file \"$inPath\" does not exist!\n";
+        exit 1;
+    }
+}
+$outPath ||= $outDefault;
+mergeJsonResults(\@inPaths, $outPath);
+
