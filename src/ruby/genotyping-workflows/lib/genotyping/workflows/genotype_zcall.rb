@@ -137,7 +137,7 @@ Returns:
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
 
-        ## run gencall QC to apply gencall CR filter and find genders
+        ## run gencall QC to get metrics for prefiltering
         gcquality = nil
         if smfile
           gcqcargs = {:run => run_name,
@@ -171,26 +171,31 @@ Returns:
 
       num_samples = count_samples(sjson)
 
-      result = nil
+      tresult = nil
       if sjson
-        result = prepare_thresholds(egt_file, zstart, ztotal, args, async)
+        tresult = prepare_thresholds(egt_file, zstart, ztotal, args, async)
       end
 
-      # TODO skip evaluation if only one Z calue has been specified
-      tjson = nil
-      tjson = result[0] if result
-      evargs = {:samples => sjson,
-                :start => 0,
-                :end => num_samples,
-                :size => chunk_size}.merge(args)
-      evjson = evaluate_thresholds(tjson, sjson, manifest, egt_file, 
-                                   evargs, async)
-      msfile = File.join(work_dir, 'metric_summary.txt')
-      metric_args = {:text => msfile }.merge(args)
-      metric_json = merge_evaluation(evjson, tjson, metric_args, async)
       best_t = nil
-      best_t = read_best_thresholds(metric_json) if metric_json
+      if tresult
+        if ztotal == 1  # skip evaluation if only one Z value given
+          best_t = tresult[1][0]
+        else # run zcall calibration
+          tjson = tresult[0]
+          evargs = {:samples => sjson,
+                    :start => 0,
+                    :end => num_samples,
+                    :size => chunk_size}.merge(args)
+          evjson = evaluate_thresholds(tjson, sjson, manifest, egt_file, 
+                                       evargs, async)
+          msfile = File.join(work_dir, 'metric_summary.txt')
+          metric_args = {:text => msfile }.merge(args)
+          metric_json = merge_evaluation(evjson, tjson, metric_args, async)
+          best_t = read_best_thresholds(metric_json) if metric_json
+        end
+      end
 
+      ## run zcall with chosen threshold
       zargs = {:start => 0,
                :end => num_samples,
                :size => chunk_size}.merge(args)
