@@ -34,7 +34,13 @@ sub applyThresholds {
     foreach my $metric (@metrics) { $fail{$metric}=0; }
     foreach my $uri (keys %results) {
         my $sampleOK = 1;
+        unless (defined($results{$uri})) {
+            croak "Result not found for URI \"$uri\"";
+        }
         foreach my $metric (@metrics) {
+            unless (defined($results{$uri}{$metric})) {
+                croak "Result not found for metric \"$metric\" at URI $uri";
+            }
             my ($oldPass, $value) = @{$results{$uri}{$metric}};
             my $newPass = 1;
             if ($metric eq 'gender' || $metric eq 'identity' || 
