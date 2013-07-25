@@ -9,7 +9,7 @@ use File::Temp qw(tempdir);
 use POSIX qw(ceil);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
  getPlateLocationsFromPath meanSd readMetricResultHash readQCMetricInputs
- readThresholds plateLabel $INI_FILE_DEFAULT);
+ readThresholds plateLabel);
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(wrapCommand wrapPlotCommand);
 use Exporter;
 

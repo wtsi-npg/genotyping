@@ -31,11 +31,13 @@ my $embedded_conf = q(
    log4perl.logger.quiet             = DEBUG, A2
 
    log4perl.appender.A1          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8     = 1
    log4perl.appender.A1.stderr   = 0
    log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 
    log4perl.appender.A2          = Log::Log4perl::Appender::Screen
+   log4perl.appender.A2.utf8     = 1
    log4perl.appender.A2.stderr   = 0
    log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
@@ -122,6 +124,7 @@ sub run {
      inifile => $config,
      dbfile => $dbfile)->connect
        (RaiseError => 1,
+        sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
   my $uid = `whoami`;

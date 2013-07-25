@@ -110,6 +110,7 @@ Returns:
               :log_dir => log_dir}.merge(args)
       maybe_version_log(log_dir)
 
+      run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'

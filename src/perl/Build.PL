@@ -10,9 +10,11 @@ use Build;
 
 my $build = Build->new
   (module_name => 'WTSI::Genotyping',
+   dist_author => ['Iain Bancarz <ib5@sanger.ac.uk>',
+                   'Keith James <kdj@sanger.ac.uk>'],
    dist_abstract => 'WTSI genotyping data management tools',
-   dist_version => 0.1.0,
-   license  => 'gpl3',
+   dist_version => '0.8.2',
+   license  => 'gpl',
    requires => {'Carp' => 0,
                 'Test::More' => 0,
                 'Test::Exception' => 0,
@@ -27,8 +29,8 @@ my $build = Build->new
    conf_files => {'etc/log4perl.conf' => 'etc/log4perl.conf',
                   'etc/qc_config.json' => 'etc/qc_config.json',
                   'etc/reportIntro.tex' => 'etc/reportIntro.tex',
-                  'etc/x_pseudoautosomal.txt' => 'etc/x_pseudoautosomal.txt'},
-   sql_files => {'sql/pipeline_ddl.sql' => 'sql/pipeline_ddl.sql'},
+                  'etc/x_pseudoautosomal.txt' => 'etc/x_pseudoautosomal.txt',
+                  'etc/pipeline_ddl.sql' => 'etc/pipeline_ddl.sql'},
    R_files => {
        '../r/bin/check_xhet_gender.R' => 'bin/check_xhet_gender.R',
        '../r/bin/heatmapCrHetDensity.R' => 'bin/heatmapCrHetDensity.R',
@@ -47,7 +49,6 @@ my $build = Build->new
 
 $build->add_build_element('conf');
 $build->add_build_element('ini');
-$build->add_build_element('sql');
 $build->add_build_element('R');
 
 $build->create_build_script;
