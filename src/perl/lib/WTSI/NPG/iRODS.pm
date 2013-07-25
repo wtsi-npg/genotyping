@@ -618,12 +618,11 @@ sub remove_object_meta {
 
 =head2 find_objects_by_meta
 
-  Arg [1]    : iRODS collection pattern
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units
-  Example    : find_objects_by_meta('/my/path/foo%', 'id', 'ABCD1234')
-  Description: Find objects by their metadata, restricted to a parent collection.
+  Arg [1]    : iRODS collection
+  Arg [2]    : arrayref key value tuples
+  Example    : find_objects_by_meta('/my/path/foo', ['id' => 'ABCD1234'])
+  Description: Find objects by their metadata, restricted to a parent
+               collection.
                Return a list of collections.
   Returntype : array
   Caller     : general
@@ -901,12 +900,11 @@ sub remove_collection_meta {
 
 =head2 find_collections_by_meta
 
-  Arg [1]    : iRODS collection pattern
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units
-  Example    : find_collections_by_meta('/my/path/foo%', 'id', 'ABCD1234')
-  Description: Find collections by their metadata, restricted to a parent collection.
+  Arg [1]    : iRODS collection
+  Arg [2]    : arrayref key value tuples
+  Example    : find_collections_by_meta('/my/path/foo', ['id' => 'ABCD1234'])
+  Description: Find collections by their metadata, restricted to a parent
+               collection.
                Return a list of collections.
   Returntype : array
   Caller     : general
