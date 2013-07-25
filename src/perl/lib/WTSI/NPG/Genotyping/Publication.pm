@@ -11,11 +11,16 @@ use Net::LDAP;
 use Text::CSV;
 use URI;
 
-use WTSI::NPG::Genotyping::Metadata qw(make_analysis_metadata
+use WTSI::NPG::Genotyping::Metadata qw(
+                                       $SEQUENOM_PLATE_NAME_META_KEY
+                                       $SEQUENOM_PLATE_WELL_META_KEY
+
+                                       infinium_fingerprint
+                                       make_analysis_metadata
                                        make_infinium_metadata
                                        make_sequenom_metadata
-                                       infinium_fingerprint
-                                       sequenom_fingerprint);
+                                       sequenom_fingerprint
+);
 
 use WTSI::NPG::iRODS qw(
                         add_collection
@@ -50,16 +55,19 @@ use WTSI::NPG::Publication qw(pair_rg_channel_files
                               grant_group_access);
 
 use base 'Exporter';
-our @EXPORT_OK = qw($DEFAULT_SAMPLE_ARCHIVE_PATTERN
+our @EXPORT_OK = qw(
+                    $DEFAULT_SAMPLE_ARCHIVE
                     publish_idat_files
                     publish_gtc_files
                     publish_sequenom_files
-                    publish_analysis_directory);
+                    publish_analysis_directory
+                    update_sequenom_metadata
+);
 
 
 # This is the collection will be searched for sample data to cross
 # reference with an analysis
-our $DEFAULT_SAMPLE_ARCHIVE_PATTERN = '/archive/GAPI/gen/infinium%';
+our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/gen/infinium';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -118,15 +126,14 @@ sub publish_idat_files {
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
         my @fingerprint = infinium_fingerprint(@meta);
-
         foreach my $file ($red, $grn) {
-          my $object = publish_file($file, \@fingerprint,
-                                    $creator_uri->as_string, $publish_dest,
-                                    $publisher_uri->as_string, $time);
+          my $data_object = publish_file($file, \@fingerprint,
+                                         $creator_uri->as_string, $publish_dest,
+                                         $publisher_uri->as_string, $time);
 
           # TODO: decouple access control from publication
           my @groups = expected_irods_groups(@meta);
-          grant_group_access($object, 'read', @groups);
+          grant_group_access($data_object, 'read', @groups);
 
           ++$published;
         }
@@ -192,7 +199,6 @@ sub publish_gtc_files {
         my $ss_sample =
           $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
                                                $if_sample->{'well'});
-
         my @meta;
         push(@meta, make_infinium_metadata($if_sample));
 
@@ -200,14 +206,13 @@ sub publish_gtc_files {
         push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
         my @fingerprint = infinium_fingerprint(@meta);
-
-        my $object = publish_file($file, \@fingerprint,
-                                  $creator_uri->as_string, $publish_dest,
-                                  $publisher_uri->as_string, $time);
+        my $data_object = publish_file($file, \@fingerprint,
+                                       $creator_uri->as_string, $publish_dest,
+                                       $publisher_uri->as_string, $time);
 
         # TODO: decouple access control from publication
         my @groups = expected_irods_groups(@meta);
-        grant_group_access($object, 'read', @groups);
+        grant_group_access($data_object, 'read', @groups);
 
         ++$published;
       };
@@ -235,7 +240,7 @@ sub publish_infinium_file {
   my ($file, $creator_uri, $publish_dest, $publisher_uri,
       $if_sample, $ssdb, $time) = @_;
 
-  my $object;
+  my $data_object;
 
   eval {
     my $ss_sample =
@@ -248,21 +253,20 @@ sub publish_infinium_file {
     push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
     my @fingerprint = infinium_fingerprint(@meta);
-
-    $object = publish_file($file, \@fingerprint,
-                           $creator_uri->as_string, $publish_dest,
-                           $publisher_uri->as_string, $time);
+    $data_object = publish_file($file, \@fingerprint,
+                                $creator_uri->as_string, $publish_dest,
+                                $publisher_uri->as_string, $time);
 
     # TODO: decouple access control from publication
     my @groups = expected_irods_groups(@meta);
-    grant_group_access($object, 'read', @groups);
+    grant_group_access($data_object, 'read', @groups);
   };
 
   if ($@) {
     $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
   }
 
-  return $object;
+  return $data_object;
 }
 
 =head2 publish_sequenom_files
@@ -313,11 +317,9 @@ sub publish_sequenom_files {
 
       my @meta = make_sequenom_metadata($first);
       my @fingerprint = sequenom_fingerprint(@meta);
-
-      my $object = publish_file($file, \@fingerprint,
-                                $creator_uri, $publish_dest,
-                                $publisher_uri, $time);
-
+      my $data_object = publish_file($file, \@fingerprint,
+                                     $creator_uri, $publish_dest,
+                                     $publisher_uri, $time);
       unlink $file;
       ++$published;
     };
@@ -337,6 +339,52 @@ sub publish_sequenom_files {
   return $published;
 }
 
+
+sub update_sequenom_metadata {
+  my ($data_object, $snpdb, $ssdb) = @_;
+
+  my %current_meta = get_object_meta($data_object);
+  my $plate_name = get_single_metadata_value($data_object,
+                                             $SEQUENOM_PLATE_NAME_META_KEY,
+                                             %current_meta);
+  my $well = get_single_metadata_value($data_object,
+                                       $SEQUENOM_PLATE_WELL_META_KEY,
+                                       %current_meta);
+  $log->debug("Found plate well '$plate_name': '$well' in ",
+              "current metadata of '$data_object'");
+
+  my $plate_id = $snpdb->find_sequenom_plate_id($plate_name);
+  if (defined $plate_id) {
+    $log->debug("Found Sequencescape plate identifier '$plate_id' for ",
+                "'$data_object'");
+
+    my $plate = $ssdb->find_plate($plate_id);
+    my $unpadded_map = $well;
+    $unpadded_map =~ s/0//;
+
+    unless (exists $plate->{$unpadded_map}) {
+      $log->logconfess("Failed to update metadata for '$data_object': ",
+                       "failed to find plate '$plate_name' well '$well'");
+    }
+
+    $log->debug("Updating metadata for '$data_object' from plate ",
+                "'$plate_name' well '$well'");
+
+    my @meta = make_sample_metadata($plate->{$unpadded_map});
+    update_object_meta($data_object, \@meta);
+
+    # TODO: decouple access control from publication
+    my @groups = expected_irods_groups(@meta);
+    grant_group_access($data_object, 'read', @groups);
+  }
+  else {
+    $log->info("Skipping update of metadata for '$data_object': ",
+               "plate name '$plate_name' is not present in SNP database");
+  }
+}
+
+
+
 =head2 publish_analysis_directory
 
   Arg [1]    : directory containing the analysis results
@@ -345,7 +393,7 @@ sub publish_sequenom_files {
   Arg [4]    : URI object of publisher (typically an LDAP URI)
   Arg [5]    : genotyping pipeline database handle
   Arg [6]    : pipeline run name in pipeline database
-  Arg [7]    : sample data archive pattern used to search for sample data
+  Arg [7]    : sample data archive used to search for sample data
                to cross reference
   Arg [7]    : DateTime object of publication
 
@@ -353,7 +401,7 @@ sub publish_sequenom_files {
                    publish_analysis_directory($dir, $creator_uri,
                                              '/my/project', $publisher_uri,
                                              $pipedb, 'run1',
-                                             '/archive/GAPI/gen/infinium%',
+                                             '/archive/GAPI/gen/infinium',
                                              $now);
   Description: Publishes an analysis directory to an iRODS collection. Adds
                to the collection metadata describing the genotyping projects
@@ -369,7 +417,7 @@ sub publish_sequenom_files {
 
 sub publish_analysis_directory {
   my ($dir, $creator_uri, $publish_dest, $publisher_uri, $pipedb, $run_name,
-      $sample_archive_pattern, $time) = @_;
+      $sample_archive, $time) = @_;
 
   my $basename = fileparse($pipedb->dbfile);
   # Make a path based on the database file's MD5 to enable even distribution
@@ -420,9 +468,8 @@ sub publish_analysis_directory {
 
     foreach my $title (@project_titles) {
       # Find the sample-level data for this genotyping project
-      my @sample_data =  @{find_objects_by_meta($sample_archive_pattern,
-                                                'dcterms:title',
-                                                $title)};
+      my @sample_data =  @{find_objects_by_meta($sample_archive,
+                                                ['dcterms:title' => $title])};
       # Find the samples included at the analysis stage
       my %included_samples =
         make_included_sample_table($title, $pipedb, $run_name);
@@ -481,8 +528,6 @@ sub publish_analysis_directory {
     update_collection_meta($analysis_coll, \@analysis_meta);
 
     my @groups = expected_irods_groups(@analysis_meta);
-    my $make_groups = 0;
-
     grant_group_access($analysis_coll, '-r read', @groups);
   };
 
@@ -562,6 +607,24 @@ sub write_sequenom_csv_file {
   close($out);
 
   return $records_written;
+}
+
+sub get_single_metadata_value {
+  my ($target, $key, %meta) = @_;
+
+  unless (exists $meta{$key}) {
+    $log->logconfess("Failed to update metadata for '$target': ",
+                     "key '$key' is missing from current metadata");
+  }
+
+  my @values = @{$meta{$key}};
+   if (scalar @values > 1) {
+    $log->logconfess("Invalid metadata on '$target': key '$key'",
+                     "has >1 value in current metadata: [",
+                     join(', ', @values), "]");
+  }
+
+  return shift @values;
 }
 
 1;
