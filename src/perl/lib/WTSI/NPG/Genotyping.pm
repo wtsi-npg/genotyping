@@ -5,11 +5,56 @@ package WTSI::NPG::Genotyping;
 use warnings;
 use strict;
 use Carp;
+use Cwd qw(abs_path getcwd);
+use File::Spec;
 use JSON;
 
 use base 'Exporter';
-our @EXPORT_OK = qw(read_sample_json
+our @EXPORT_OK = qw(base_dir
+                    config_dir
+                    read_sample_json
                     read_snp_json);
+
+=head2 base_dir
+
+  Arg [1]    : None.
+  Example    : my $base = base_dir();
+  Description: Return the installed base directory.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub base_dir {
+  my ($vol, $dirs, $file) =
+    File::Spec->splitpath($INC{"WTSI/NPG/Genotyping.pm"});
+
+  my ($base) = $dirs =~ m{^(.+)\blib};
+
+  unless (defined $base) {
+    my $cwd = getcwd();
+    warn "Failed to parse installed base directory from '$dirs', using $cwd\n";
+    $base = $cwd;;
+  }
+
+  return abs_path($base);
+}
+
+=head2 config_dir
+
+  Arg [1]    : None.
+  Example    : my $dir = config_dir);
+  Description: Return the installed configuration file directory.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub config_dir {
+  my $base = base_dir();
+  return abs_path(File::Spec->catdir($base, 'etc'));
+}
+
 
 =head2 read_sample_json
 

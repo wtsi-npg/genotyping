@@ -10,14 +10,20 @@ use UUID;
 
 use WTSI::NPG::iRODS qw(md5sum);
 
+use WTSI::NPG::Metadata qw(make_fingerprint);
+
 use base 'Exporter';
-our @EXPORT_OK = qw($EXPRESSION_PROJECT_TITLE_META_KEY
+our @EXPORT_OK = qw(
                     $EXPRESSION_ANALYSIS_UUID_META_KEY
-                    $EXPRESSION_BEADCHIP_META_KEY
                     $EXPRESSION_BEADCHIP_DESIGN_META_KEY
+                    $EXPRESSION_BEADCHIP_META_KEY
                     $EXPRESSION_BEADCHIP_SECTION_META_KEY
+                    $EXPRESSION_PROJECT_TITLE_META_KEY
+
+                    infinium_fingerprint
+                    make_analysis_metadata
                     make_infinium_metadata
-                    make_analysis_metadata);
+);
 
 our $EXPRESSION_PROJECT_TITLE_META_KEY = 'dcterms:title';
 our $EXPRESSION_ANALYSIS_UUID_META_KEY = 'analysis_uuid';
@@ -66,6 +72,14 @@ sub make_analysis_metadata {
   my @meta = ([$EXPRESSION_ANALYSIS_UUID_META_KEY => $uuid_str]);
 
   return @meta;
+}
+
+sub infinium_fingerprint {
+  my @meta = @_;
+
+  return make_fingerprint([$EXPRESSION_BEADCHIP_META_KEY,
+                           $EXPRESSION_BEADCHIP_SECTION_META_KEY],
+                          \@meta);
 }
 
 1;

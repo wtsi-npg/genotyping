@@ -13,7 +13,7 @@ use Pod::Usage;
 
 use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin maybe_stdout);
-use WTSI::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::Database::Pipeline;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
@@ -74,6 +74,7 @@ sub run {
      inifile => $config,
      dbfile => $dbfile)->connect
        (RaiseError => 1,
+        sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
   my @valid_designs = map { $_->name } $pipedb->snpset->all;

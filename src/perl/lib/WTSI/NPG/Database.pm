@@ -49,12 +49,15 @@ sub configure {
 
   $self->name($args{name});
   $self->inifile($args{inifile});
-  my $ini = Config::IniFiles->new(-file => $self->inifile);
 
   unless ($self->name) {
-    $self->log->logconfess('No data source name was defined.')
+    $self->log->logconfess('The data source name was not defined.')
+  }
+  unless ($self->inifile) {
+    $self->log->logconfess('The ini file was not defined.')
   }
 
+  my $ini = Config::IniFiles->new(-file => $self->inifile);
   $self->data_source($ini->val($self->name, 'data_source'));
   $self->username($ini->val($self->name, 'username'));
   $self->password($ini->val($self->name, 'password'));
@@ -261,7 +264,16 @@ sub log {
     $self->{_log} = $args[0];
   }
 
-  return $self->{_log};
+  my $log;
+  if ($self->{_log}) {
+    $log = $self->{_log};
+  }
+  else {
+    $log = Log::Log4perl->get_logger('npg');
+    $log->logcluck("Attempted to use a null Log4perl logger");
+  }
+
+  return $log;
 }
 
 

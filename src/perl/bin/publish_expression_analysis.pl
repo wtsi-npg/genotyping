@@ -14,12 +14,11 @@ use File::Basename qw(basename);
 use Getopt::Long;
 use List::MoreUtils qw(firstidx uniq);
 use Log::Log4perl;
+use Log::Log4perl::Level;
 use Net::LDAP;
 use Pod::Usage;
 use URI;
 use UUID;
-
-use Data::Dumper;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::iRODS qw(collect_files);
@@ -29,71 +28,80 @@ use WTSI::NPG::Publication qw(get_wtsi_uri
                               pair_rg_channel_files);
 use WTSI::NPG::Expression::Publication qw(publish_expression_analysis);
 use WTSI::NPG::Utilities qw(trim);
+use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = ERROR, A1
 
-   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.stderr   = 0
-   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A2.stderr   = 0
-   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.Filter   = F2
-
-   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
-   log4perl.filter.F2.LevelMin      = WARN
-   log4perl.filter.F2.LevelMax      = FATAL
-   log4perl.filter.F2.AcceptOnMatch = true
 );
 
 my $log;
 
 our $DEFAULT_INI = $ENV{HOME} . '/.npg/genotyping.ini';
 
-our $DEFAULT_ANALYSIS_DEST = '/archive/GAPI/exp/analysis';
-our $DEFAULT_SAMPLE_DEST = '/archive/GAPI/exp/infinium';
+# our $DEFAULT_ANALYSIS_DEST = '/archive/GAPI/exp/analysis';
+# our $DEFAULT_SAMPLE_DEST = '/archive/GAPI/exp/infinium';
 
 run() unless caller();
 
 sub run {
+  my $analysis_source;
   my $dbfile;
+  my $debug;
   my $log4perl_config;
+  my $manifest;
   my $publish_analysis_dest;
-  my $publish_samples_dest;
-  my $source;
+  my $publish_sample_dest;
+  my $sample_source;
   my $verbose;
 
-  GetOptions('analysis-dest=s' => \$publish_analysis_dest,
-             'help'            => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'       => \$log4perl_config,
-             'sample-dest=s'   => \$publish_samples_dest,
-             'source=s'        => \$source,
-             'verbose'         => \$verbose);
+  GetOptions('analysis-dest=s'   => \$publish_analysis_dest,
+             'analysis-source=s' => \$analysis_source,
+             'debug'             => \$debug,
+             'help'              => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'         => \$log4perl_config,
+             'manifest=s'        => \$manifest,
+             'sample-dest=s'     => \$publish_sample_dest,
+             'sample-source=s'   => \$sample_source,
+             'verbose'           => \$verbose);
+
+  unless ($analysis_source) {
+    pod2usage(-msg => "An --analysis-source argument is required\n",
+              -exitval => 3);
+  }
+  unless ($sample_source) {
+    pod2usage(-msg => "A --sample-source argument is required\n",
+              -exitval => 3);
+  }
 
   unless ($publish_analysis_dest) {
     pod2usage(-msg => "An --analysis-dest argument is required\n",
               -exitval => 3);
   }
-  unless ($publish_samples_dest) {
-    pod2usage(-msg => "A --samples-dest argument is required\n",
+  unless ($publish_sample_dest) {
+    pod2usage(-msg => "A --sample-dest argument is required\n",
               -exitval => 3);
   }
 
-  unless ($source) {
-    pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 3);
-  }
-  unless (-e $source) {
-    pod2usage(-msg => "No such source as '$source'\n",
+  unless (-e $analysis_source) {
+    pod2usage(-msg => "No such analysis source as '$analysis_source'\n",
               -exitval => 4);
   }
-  unless (-d $source) {
-    pod2usage(-msg => "The --source argument was not a directory\n",
+  unless (-d $analysis_source) {
+    pod2usage(-msg => "The --analysis-source argument was not a directory\n",
+              -exitval => 4);
+  }
+
+  unless (-e $sample_source) {
+    pod2usage(-msg => "No such sample source as '$sample_source'\n",
+              -exitval => 4);
+  }
+  unless (-d $sample_source) {
+    pod2usage(-msg => "The --sample-source argument was not a directory\n",
               -exitval => 4);
   }
 
@@ -103,17 +111,20 @@ sub run {
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('npg.irods.publish');
+      $log->level($INFO);
     }
-    else {
-      $log = Log::Log4perl->get_logger('quiet');
+    elsif ($debug) {
+      $log->level($DEBUG);
     }
   }
 
   my $config ||= $DEFAULT_INI;
+  my $in = maybe_stdin($manifest);
 
-  my @samples = parse_beadchip_table(\*STDIN);
+  my @samples = parse_beadchip_table($in);
   unless (@samples) {
     $log->logcroak("Found no sample rows in input: stopping\n");
   }
@@ -126,11 +137,11 @@ sub run {
   my $sections_patt = join('|', @sections);
   my $filename_regex = qr{($beadchips_patt)_($sections_patt)_$channel.(idat|xml)$}msxi;
 
-  my $dir = abs_path('./Illumina');
+  my $sample_dir = abs_path($sample_source);
   my $file_test = sub { return $_[0] =~ $filename_regex };
   my $relative_depth = 3;
 
-  my @paths = collect_files($dir, $file_test, $relative_depth);
+  my @paths = collect_files($sample_dir, $file_test, $relative_depth);
   my $samples = add_paths(\@samples, \@paths);
 
   my $uid = `whoami`;
@@ -140,18 +151,23 @@ sub run {
   my $publisher_uri = get_publisher_uri($uid);
   my $name = get_publisher_name($publisher_uri);
   my $now = DateTime->now();
-  my $make_groups = 0;
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1,
+                                  mysql_enable_utf8 => 1);
   $ssdb->log($log);
 
-  $log->info("Publishing from '$source' to '$publish_samples_dest' as ", $name);
+  $log->info("Publishing samples from '$sample_source' ",
+             "to '$publish_sample_dest' as ", $name);
+  $log->info("Publishing analysis from '$analysis_source' ",
+             "to '$publish_analysis_dest' as ", $name);
 
-  publish_expression_analysis($source, $creator_uri, $publish_analysis_dest,
-                              $publish_samples_dest, $publisher_uri, $samples,
-                              $ssdb, $now, $make_groups);
+  publish_expression_analysis($analysis_source, $creator_uri,
+                              $publish_analysis_dest,
+                              $publish_sample_dest,
+                              $publisher_uri, $samples,
+                              $ssdb, $now);
 }
 
 # Expects a tab-delimited text file. Useful data start after line
@@ -174,6 +190,7 @@ sub run {
 # Any whitespace-only lines are ignored.
 sub parse_beadchip_table {
   my ($fh) = @_;
+  binmode($fh, ':utf8');
 
   # For error reporting
   my $line_count = 0;
@@ -194,7 +211,7 @@ sub parse_beadchip_table {
   my @samples;
 
   while (my $line = <$fh>) {
-    ++ $line_count;
+    ++$line_count;
     chomp($line);
     next if $line =~ m/^\s*$/;
 
@@ -210,7 +227,8 @@ sub parse_beadchip_table {
 
       if ($sample_key eq $sample_row[$sample_key_col]) {
         push(@samples,
-             {sanger_sample_id => $sample_row[$sample_id_col],
+             {sanger_sample_id => validate_sample_id($sample_row[$sample_id_col],
+                                                     $line_count),
               beadchip         => validate_beadchip($sample_row[$beadchip_col],
                                                     $line_count),
               beadchip_section => validate_section($sample_row[$section_col],
@@ -251,6 +269,20 @@ sub parse_beadchip_table {
   }
 
   return @samples;
+}
+
+sub validate_sample_id {
+  my ($sample_id, $line) = @_;
+
+  unless (defined $sample_id) {
+    $log->logcroak("Missing sample ID at line $line\n");
+  }
+
+  if ($sample_id !~ /^\S+$/) {
+    $log->logcroak("Invalid sample ID '$sample_id' at line $line\n");
+  }
+
+  return $sample_id;
 }
 
 sub validate_beadchip {
@@ -295,19 +327,19 @@ sub add_paths {
 sub add_path {
   my ($sample, $file_key, $type, $paths) = @_;
 
-  my $id = $sample->{sample_id};
+  my $id = $sample->{sanger_sample_id};
   my $pattern = $sample->{$file_key}; # 'idat_file' or 'xml_file'
   my @matches = grep { m{$pattern$}msxi } @$paths;
 
   my $count = scalar @matches;
   if ($count == 0) {
-    $log->logerror("Missing $type file for sample '$id' matching $pattern");
+    $log->logcroak("Failed to find the $type file $pattern for sample '$id' under the sample-source directory");
   }
   elsif (scalar @matches == 1) {
     $sample->{$type} = $matches[0];
   }
   else {
-    $log->logerror("Multiple $type paths for sample '$id': [",
+    $log->logcroak("Found multiple $type files matching $pattern for sample '$id': [",
                    join(', ', @matches), "]");
   }
 
@@ -322,20 +354,23 @@ __END__
 
 =head1 SYNOPSIS
 
-publish_expression_data --source <directory> \
-  --analysis-dest <irods collection> \
-  --sample-dest <irods collection> [--verbose]
+publish_expression_data --analysis-source <directory> --analysis-dest <collection>
+                        --sample-source <directory> --sample-dest <collection>
+                        [--manifest <file>] [--verbose]
 
 Options:
 
-  --analysis-dest The data destination root collection for the analysis data
-                  in iRODS. E.g. /archive/GAPI/exp/analysis
-  --help          Display help.
-  --logconf       A log4perl configuration file. Optional.
-  --samples-dest  The data destination root collection for the sample data
-                  in iRODS. E.g. /archive/GAPI/exp/infinium
-  --source        The root directory of the analysis.
-  --verbose       Print messages while processing. Optional.
+  --analysis-dest   The data destination root collection for the analysis data
+                    in iRODS. E.g. /archive/GAPI/exp/analysis
+  --analysis-source The root directory of the analysis.
+  --help            Display help.
+  --logconf         A log4perl configuration file. Optional.
+  --manifest        Tab-delimted chip loading manifest. Optional, defaults to
+                    STDIN.
+  --sample-dest     The data destination root collection for the sample data
+                    in iRODS. E.g. /archive/GAPI/exp/infinium
+  --sample-source   The root directory of all samples.
+  --verbose         Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 

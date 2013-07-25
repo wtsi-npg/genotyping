@@ -76,6 +76,7 @@ sub run {
      inifile => $config,
      dbfile => $dbfile)->connect
        (RaiseError => 1,
+        sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
@@ -84,7 +85,8 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1);
+     inifile =>  $config)->connect(RaiseError => 1,
+                                   mysql_enable_utf8 => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name   => 'snp',

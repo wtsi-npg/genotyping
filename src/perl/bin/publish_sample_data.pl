@@ -11,7 +11,8 @@ use DateTime;
 use File::Basename;
 use File::Find;
 use Getopt::Long;
-use Log::Log4perl qw(:easy);;
+use Log::Log4perl;
+use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
@@ -21,32 +22,17 @@ use WTSI::NPG::Genotyping::Publication qw(publish_idat_files
 use WTSI::NPG::iRODS qw(collect_files
                         collect_dirs
                         modified_between);
-use WTSI::NPG::Metadata qw(make_sample_metadata
-                           make_file_metadata
-                           make_creation_metadata);
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
                               get_publisher_name);
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = ERROR, A1
 
-   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.stderr   = 0
-   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A2.stderr   = 0
-   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.Filter   = F2
-
-   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
-   log4perl.filter.F2.LevelMin      = WARN
-   log4perl.filter.F2.LevelMax      = FATAL
-   log4perl.filter.F2.AcceptOnMatch = true
 );
 
 
@@ -59,23 +45,23 @@ sub run {
   my $config;
   my $days;
   my $days_ago;
+  my $debug;
   my $log4perl_config;
-  my $make_groups;
   my $publish_dest;
   my $source;
   my $type;
   my $verbose;
 
-  GetOptions('config=s'    => \$config,
-             'days=i'      => \$days,
-             'days-ago=i'  => \$days_ago,
-             'dest=s'      => \$publish_dest,
-             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'   => \$log4perl_config,
-             'make-groups' => \$make_groups,
-             'source=s'    => \$source,
-             'type=s'      => \$type,
-             'verbose'     => \$verbose);
+  GetOptions('config=s'   => \$config,
+             'days=i'     => \$days,
+             'days-ago=i' => \$days_ago,
+             'debug'      => \$debug,
+             'dest=s'     => \$publish_dest,
+             'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'  => \$log4perl_config,
+             'source=s'   => \$source,
+             'type=s'     => \$type,
+             'verbose'    => \$verbose);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
@@ -107,16 +93,17 @@ sub run {
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('npg.irods.publish');
+      $log->level($INFO);
     }
-    else {
-      $log = Log::Log4perl->get_logger('quiet');
+    elsif ($debug) {
+      $log->level($DEBUG);
     }
   }
 
   my $now = DateTime->now();
-
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch
@@ -145,7 +132,8 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1,
+                                  mysql_enable_utf8 => 1);
   # $ssdb->log($log);
 
   my $uid = `whoami`;
@@ -177,11 +165,11 @@ sub run {
 
   if ($type eq 'idat') {
     publish_idat_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                       $ifdb, $ssdb, $now, $make_groups);
+                       $ifdb, $ssdb, $now);
   }
   elsif ($type eq 'gtc') {
     publish_gtc_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                      $ifdb, $ssdb, $now, $make_groups);
+                      $ifdb, $ssdb, $now);
   }
   else {
     $log->logcroak("Unable to publish unknown data type '$type'");
@@ -201,7 +189,7 @@ publish_sample_data
 publish_sample_data [--config <database .ini file>] \
    [--days-ago <n>] [--days <n>] \
    --source <directory> --dest <irods collection> \
-   --type <data type> [--make-groups]
+   --type <data type>
 
 Options:
 
@@ -216,8 +204,6 @@ Options:
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
-  --make-groups Make an iRODS group for each study, as required. Optional,
-                defaults to false.
   --source      The root directory to search for sample data.
   --type        The data type to publish. One of [idat, gtc].
   --verbose     Print messages while processing. Optional.

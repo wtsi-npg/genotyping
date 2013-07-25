@@ -10,54 +10,58 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 92;
+use Test::More tests => 105;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
 require_ok('WTSI::NPG::iRODS');
 
-use WTSI::NPG::iRODS qw(ipwd
-                        list_object
-                        add_object
-                        remove_object
-                        add_object_meta
-                        get_object_meta
-                        remove_object_meta
-                        find_objects_by_meta
-
-                        get_object_checksum
-                        checksum_object
-
-                        list_collection
+use WTSI::NPG::iRODS qw(
                         add_collection
+                        add_collection_meta
+                        add_group
+                        add_object
+                        add_object_meta
+                        validate_checksum_metadata
+                        collect_dirs
+                        collect_files
+                        find_collections_by_meta
+                        find_objects_by_meta
+                        find_zone_name
+                        get_collection_meta
+                        calculate_checksum
+                        get_object_meta
+                        group_exists
+                        hash_path
+                        icd
+                        ipwd
+                        list_collection
+                        list_groups
+                        list_object
+                        md5sum
+                        meta_exists
+                        modified_between
+                        move_object
                         put_collection
                         remove_collection
-                        get_collection_meta
-                        add_collection_meta
-                        find_collections_by_meta
-
-                        group_exists
-                        add_group
+                        remove_object
+                        remove_object_meta
+                        replace_object
                         set_group_access
-
-                        collect_files
-                        collect_dirs
-                        modified_between
-                        md5sum
-                        hash_path
-                        meta_exists);
+);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
 my $data_path = "t/irods";
 my $test_file = "$data_path/test.txt";
 my $test_dir = "$data_path/test";
+my $irods_test_collection = "irods_test" . $$;
 
 # Deliberate spaces in names
 my $test_collection = 'test_ _collection.' . $$;
 my $test_object = 'test_ _object.' . $$;
 
-my %meta = map { 'attribute' . $_ => 'value' . $_ } 0..9;
+my %meta = map { 'attribute' . $_ . $$ => 'value' . $_ .$$ } 0..8;
 my %expected = map { $_ => [$meta{$_}] } keys %meta;
 
 # list_collection
@@ -111,11 +115,19 @@ is_deeply(\%collmeta, \%expected);
 foreach my $attr (keys %meta) {
   my $value = $meta{$attr};
   my $root = $wd;
-  my @found = find_collections_by_meta("$root%", $attr, $value);
+  my @found = find_collections_by_meta($root, [$attr, $value]);
 
   ok(scalar @found == 1);
 }
 
+my @collection_specs;
+foreach my $attr (keys %meta) {
+  my $value = $meta{$attr};
+  push(@collection_specs, [$attr, $value]);
+}
+
+my @found = find_collections_by_meta($wd, @collection_specs);
+ok(scalar @found == 1);
 
 # add_object
 dies_ok { add_object(undef, $test_object) }
@@ -124,6 +136,35 @@ dies_ok { add_object($test_file, undef) }
   'Expected to fail adding a file as an undefined object';
 my $new_object = add_object($test_file, $test_object);
 ok($new_object);
+dies_ok { add_object($test_file, $test_object) }
+  'Expected to fail adding a file that requires overwriting';
+
+# replace_object
+my $to_replace = 'to_replace.' . $$;
+
+dies_ok { replace_object(undef, $to_replace) }
+  'Expected to fail replacing a missing file as an object';
+dies_ok { replace_object($test_file, undef) }
+  'Expected to fail replacing a file as an undefined object';
+
+add_object($test_file, $to_replace);
+my $replaced_object = replace_object($test_file, $to_replace);
+ok($replaced_object);
+ok(list_object($replaced_object));
+ok(remove_object($replaced_object));
+
+# move_object
+my $to_move = 'to_move.' . $$;
+my $moved = 'moved.' . $$;
+add_object($test_file, $to_move);
+
+ok(list_object($to_move));
+ok(!list_object($moved));
+is($moved, move_object($to_move, $moved));
+ok(!list_object($to_move));
+ok(list_object($moved));
+remove_object($moved);
+
 
 # set_group_access
 dies_ok { set_group_access('no_such_permission', 'public', $new_object) }
@@ -158,7 +199,7 @@ dies_ok { get_object_meta() }
 foreach my $attr (keys %meta) {
   my $value = $meta{$attr};
   my $root = $wd;
-  my @found = find_objects_by_meta("$root%", $attr, $value);
+  my @found = find_objects_by_meta($root, [$attr, $value]);
 
   ok(scalar @found == 1);
 }
@@ -180,16 +221,16 @@ my $lorem_object = 'lorem_object.' . $$;
 
 ok(add_object($lorem_file, $lorem_object));
 
-# get_object_checksum
+# calculate_checksum
 my $expected_checksum = '39a4aa291ca849d601e4e5b8ed627a04';
 my $invalid_checksum = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
-is(get_object_checksum($lorem_object), $expected_checksum);
+is(calculate_checksum($lorem_object), $expected_checksum);
 
 is_deeply([add_object_meta($lorem_object, 'md5', $invalid_checksum)],
           ['md5', $invalid_checksum, '']);
 
-# checksum_object
-ok(! checksum_object($lorem_object));
+# validate_checksum_metadata
+ok(! validate_checksum_metadata($lorem_object));
 
 is_deeply([remove_object_meta($lorem_object, 'md5', $invalid_checksum)],
           ['md5', $invalid_checksum, '']);
@@ -197,10 +238,12 @@ is_deeply([remove_object_meta($lorem_object, 'md5', $invalid_checksum)],
 is_deeply([add_object_meta($lorem_object, 'md5', $expected_checksum)],
           ['md5', $expected_checksum, '']);
 
-ok(checksum_object($lorem_object));
+ok(validate_checksum_metadata($lorem_object));
 
 ok(remove_object($lorem_object));
 
+# list_groups
+ok(grep { /rodsadmin/ } list_groups());
 
 # group exists
 ok(group_exists('rodsadmin'));
@@ -285,6 +328,12 @@ is(md5sum("$data_path/md5sum/lorem.txt"), '39a4aa291ca849d601e4e5b8ed627a04');
 is(hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
 
 is(hash_path("$data_path/md5sum/lorem.txt", 'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
+
+# find_zone_name
+is(find_zone_name('/Sanger1'), 'Sanger1');
+is(find_zone_name(ipwd()), 'Sanger1');
+is(find_zone_name('no_such_path'), 'Sanger1');
+is(find_zone_name('/no_such_zone'), 'no_such_zone');
 
 
 END {
