@@ -135,7 +135,7 @@ Returns:
           # maf/het and intensity metrics are not calculated (or required)
           gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
           if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-          else fargs = {:default => "illuminus"}.merge(args)
+          else fargs = {:illuminus => true}.merge(args)
           end
           filtered = filter_samples(gcqcjson, dbfile, fargs)
         end

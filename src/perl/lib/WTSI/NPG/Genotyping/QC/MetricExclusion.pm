@@ -10,6 +10,7 @@ package WTSI::NPG::Genotyping::QC::MetricExclusion;
 use strict;
 use warnings;
 use Carp;
+use JSON;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/decode_json getDatabaseObject 
     meanSd readMetricResultHash parseThresholds readFileToString/;
 use Log::Log4perl qw(:easy);
@@ -29,6 +30,7 @@ sub applyThresholds {
     my %results = %{shift()};
     my $logPath = shift;
     my %samplePass;
+    my %metricPass;
     my %fail;
     my $failTotal = 0;
     foreach my $metric (@metrics) { $fail{$metric}=0; }
@@ -52,6 +54,7 @@ sub applyThresholds {
                 $newPass = 0;
             }
             if ($newPass==0) { $sampleOK = 0; $fail{$metric}++; }
+            $metricPass{$uri}{$metric} = $newPass;
         }
         if (!$sampleOK) { $failTotal++; }
         $samplePass{$uri} = $sampleOK;
@@ -67,7 +70,7 @@ sub applyThresholds {
         print $log "Pass_rate\t".(1 - $failTotal/$sampleTotal)."\n";
         close $log || croak "Cannot close log path $logPath";
     }
-    return %samplePass;
+    return (\%samplePass, \%metricPass);
 }
 
 sub generateThresholds {
@@ -106,11 +109,16 @@ sub runFilter {
     my %results = %{decode_json(readFileToString(shift()))};
     if (keys(%results)==0) { croak "Sample results input is empty"; }
     my $dbPath = shift;
+    my $outPath = shift;
     my $logPath = shift;
     my ($minRef, $maxRef, $metricsRef) = generateThresholds(\%config,\%results);
-    my %samplePass = applyThresholds($minRef, $maxRef, $metricsRef, 
-                                     \%results, $logPath);
-    updateDatabase($dbPath, \%samplePass);
+    my ($spRef, $mpRef) = applyThresholds($minRef, $maxRef, $metricsRef, 
+                                          \%results, $logPath);
+    updateDatabase($dbPath, $spRef);
+    open my $out, ">", $outPath || croak "Cannot open output $outPath";
+    print $out encode_json($mpRef);
+    close $out || croak "Cannot close output $outPath";
+    
 }
 
 sub sigmaMinMax {

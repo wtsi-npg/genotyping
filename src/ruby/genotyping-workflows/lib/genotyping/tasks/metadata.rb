@@ -130,34 +130,46 @@ module Genotyping::Tasks
     end
 
     # filter out samples which fail QC criteria
+    # apply thresholds and flag failing samples for exclusion in pipeline DB
+    #
+    # Arguments:
+    # - in (String): Path to .json QC results file
+    # - db (String): Path to pipeline SQLite DB file
+    # - log (String): Path to log file with summary of pass/fail rates
+    # - out (String): Path to .json file with detailed pass/fail by sample 
+    #   and metric
+    # - thresholds (String): Path to .json file with custom thresholds
+    # - default (String): One of "zcall" or "illuminus"; applies default 
+    #   thresholds
+    #
+    # Exactly one of (thresholds, default) must be specified.
 
-
-    def filter_samples(results, dbfile, args={}) #, fconfig=nil, default=nil,
-      #args={})   #, async={})
+    def filter_samples(results, dbfile, args={})
 
       args, work_dir, log_dir = process_task_args(args)
       if args_available?(results, dbfile, work_dir, log_dir)
+        args[:out] ||= File.join(work_dir, 'prefilter_results.json')
         logpath = File.join(log_dir, 'prefilter.log')
-        thresholds = args.delete(:thresholds)
-        default = args.delete(:default)
-        cli_args = args.merge({:results => results,
+        thresholds = args.delete(:thresholds) || nil
+        illuminus = args.delete(:illuminus) || nil
+        zcall = args.delete(:zcall) || nil
+        cli_args = args.merge({:in => results,
                                :db => dbfile,
-                               :log => logpath })
-        if thresholds # user-supplied thresholds file
+                               :log => logpath})
+        if thresholds and (!zcall) and (!illuminus) 
           cli_args[:thresholds] = thresholds
-        elsif default=="zcall"
+        elsif zcall and (!thresholds) and (!illuminus)
           cli_args[:zcall] = true
-        elsif default=="illuminus"
+        elsif illuminus and (!thresholds) and (!zcall)
           cli_args[:illuminus] = true
         else
-          raise ArgumentError, "Invalid arguments to filter_samples, must specify exactly one of: thresholds, zcall, illuminus"
+          raise ArgumentError, "Invalid arguments to filter_samples. Must specify exactly one of: thresholds=PATH, illuminus, zcall"
         end
         margs = [results, dbfile, work_dir]
         task_id = task_identity(:filter_samples, *margs)
         command = [FILTER_SAMPLES,  
                    cli_arg_map(cli_args, :prefix => '--') { |key|
                      key.gsub(/_/, '-') }].flatten.join(' ')
-        # $stderr.puts command
         log = File.join(log_dir, task_id + '.log')
         task(margs, command, work_dir,
              :result => lambda { true })

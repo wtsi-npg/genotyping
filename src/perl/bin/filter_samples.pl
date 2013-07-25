@@ -29,12 +29,13 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultConfigDir/;
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
-my ($resultsPath, $thresholdsPath, $dbPath, $logPath, $iniPath,
+my ($inPath, $thresholdsPath, $dbPath, $outPath, $logPath, $iniPath,
     $illuminus, $zcall, $help);
 
-GetOptions("results=s"      => \$resultsPath,
+GetOptions("in=s"           => \$inPath,
            "thresholds=s"   => \$thresholdsPath,
            "db=s"           => \$dbPath,
+           "out=s"          => \$outPath,
            "log=s"          => \$logPath,
            "ini=s"          => \$iniPath,
            "illuminus"      => \$illuminus,
@@ -42,6 +43,7 @@ GetOptions("results=s"      => \$resultsPath,
            "help"           => \$help);
 
 my $logDefault = "exclude_samples.log";
+my $outDefault = "exclude_samples.json";
 
 if ($help) {
     my $helpText = "Usage: $0 [ options ] 
@@ -49,7 +51,10 @@ if ($help) {
 --help                Print this help text and exit
 --thresholds  PATH    JSON file containing metric names and thresholds
                       Optional, default from ini and illuminus/zcall status.
---results     PATH    JSON file containing sample identifiers and metric values
+--in          PATH    JSON file containing sample identifiers and metric 
+                      values
+--out         PATH    Path for JSON output with filter pass/fail results. 
+                      Defaults to $outDefault
 --db          PATH    Path to genotyping pipeline SQLite database
 --log         PATH    Path to log file; defaults to $logDefault
 --ini         PATH    Path to .ini file for default threshold location. 
@@ -83,7 +88,7 @@ unless ($thresholdsPath) {
 }
 
 my @types = qw/results thresholds database/;
-my @inPaths = ($resultsPath, $thresholdsPath, $dbPath);
+my @inPaths = ($inPath, $thresholdsPath, $dbPath);
 foreach (my $i=0; $i<@inPaths; $i++) {
     if (!defined($inPaths[$i])) {
         die "No value specified for $types[$i] input path";
@@ -92,4 +97,4 @@ foreach (my $i=0; $i<@inPaths; $i++) {
     }
 }
 $logPath ||= $logDefault;
-runFilter($thresholdsPath, $resultsPath, $dbPath, $logPath);
+runFilter($thresholdsPath, $inPath, $dbPath, $outPath, $logPath);

@@ -114,6 +114,7 @@ Returns:
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'
       smname =  run_name + '.gencall.sim'
+      fname = run_name + '.prefilter_results.json'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
@@ -156,8 +157,9 @@ Returns:
         if mqcjson
           ## apply prefilter to exclude samples from zcall input
           if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-          else fargs = {:default => "zcall"}.merge(args)
+          else fargs = {:zcall => true}.merge(args)
           end
+          fargs[:out] = File.join(work_dir, fname)
           filtered = filter_samples(mqcjson, dbfile, fargs)
         end
       end
