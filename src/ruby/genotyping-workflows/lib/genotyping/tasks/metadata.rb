@@ -20,6 +20,8 @@ module Genotyping::Tasks
 
   SAMPLE_INTENSITIES = 'sample_intensities.pl'
   PARSE_MANIFEST = 'write_snp_metadata.pl'
+  MERGE_QC_RESULTS = 'merge_qc_results.pl'
+  FILTER_SAMPLES = 'filter_samples.pl'
 
   module Metadata
     include Genotyping::Tasks
@@ -94,6 +96,86 @@ module Genotyping::Tasks
              :result => lambda { expected })
       end
     end
+
+    # merge .json summary files from QC output
+    # use to combine generic QC with extra MAF/het check
+    #
+    # Arguments:
+    # - results (Array): Array containing two paths to results .json files
+    # - outfile (String): Path to .json output file
+    #
+    # (if required, could extend to recursively merge more than two files)
+
+    def merge_qc_results(results, outfile, args = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(results, outfile, work_dir)
+        if results.length!=2
+          raise ArgumentError "Must have exactly 2 .json result files to merge"
+        end
+        input1 = results[0]
+        input2 = results[1]
+        cli_args = args.merge({:input1 => results[0],
+                               :input2 => results[1],
+                               :output => outfile})
+        margs = [cli_args, work_dir]
+
+        command = [MERGE_QC_RESULTS,
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+
+        task(margs, command, work_dir,
+             :post => lambda { ensure_files([outfile,], :error => false) },
+             :result => lambda { outfile })
+      end
+    end
+
+    # filter out samples which fail QC criteria
+    # apply thresholds and flag failing samples for exclusion in pipeline DB
+    #
+    # Arguments:
+    # - in (String): Path to .json QC results file
+    # - db (String): Path to pipeline SQLite DB file
+    # - log (String): Path to log file with summary of pass/fail rates
+    # - out (String): Path to .json file with detailed pass/fail by sample 
+    #   and metric
+    # - thresholds (String): Path to .json file with custom thresholds
+    # - default (String): One of "zcall" or "illuminus"; applies default 
+    #   thresholds
+    #
+    # Exactly one of (thresholds, default) must be specified.
+
+    def filter_samples(results, dbfile, args={})
+
+      args, work_dir, log_dir = process_task_args(args)
+      if args_available?(results, dbfile, work_dir, log_dir)
+        args[:out] ||= File.join(work_dir, 'prefilter_results.json')
+        logpath = File.join(log_dir, 'prefilter.log')
+        thresholds = args.delete(:thresholds) || nil
+        illuminus = args.delete(:illuminus) || nil
+        zcall = args.delete(:zcall) || nil
+        cli_args = args.merge({:in => results,
+                               :db => dbfile,
+                               :log => logpath})
+        if thresholds and (!zcall) and (!illuminus) 
+          cli_args[:thresholds] = thresholds
+        elsif zcall and (!thresholds) and (!illuminus)
+          cli_args[:zcall] = true
+        elsif illuminus and (!thresholds) and (!zcall)
+          cli_args[:illuminus] = true
+        else
+          raise ArgumentError, "Invalid arguments to filter_samples. Must specify exactly one of: thresholds=PATH, illuminus, zcall"
+        end
+        margs = [results, dbfile, work_dir]
+        task_id = task_identity(:filter_samples, *margs)
+        command = [FILTER_SAMPLES,  
+                   cli_arg_map(cli_args, :prefix => '--') { |key|
+                     key.gsub(/_/, '-') }].flatten.join(' ')
+        log = File.join(log_dir, task_id + '.log')
+        task(margs, command, work_dir,
+             :result => lambda { true })
+      end
+    end
+
 
   end #  module Metadata
 end # module Genotyping::Tasks

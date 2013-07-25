@@ -65,11 +65,13 @@ class TestWorkflowZCall < Test::Unit::TestCase
       run_name = 'run1'
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      # Only 1 zscore in range; faster but omits threshold evaluation
+      # The evaluation is tested by test_zcall_tasks.rb
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :egt => egt_file,
-                                           :chunk_size => 12,
-                                           :zstart => 5,
-                                           :ztotal => 3,
+                                           :chunk_size => 3,
+                                           :zstart => 6,
+                                           :ztotal => 1,
                                            :memory => 2048,
                                            :select => 'lenny'}]
       timeout = 1800 # was 720

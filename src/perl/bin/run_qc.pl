@@ -12,7 +12,6 @@ use Carp;
 use Cwd qw(getcwd abs_path);
 use FindBin qw($Bin);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
-use WTSI::NPG::Genotyping::QC::MetricExclusion qw(filterCR);
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
     readQCFileNames);
@@ -31,7 +30,6 @@ GetOptions("help"              => \$help,
            "inipath=s"         => \$iniPath,
            "title=s"           => \$title,
            "run=s"             => \$runName,
-           "post-filter-cr=f"  => \$postCR,
     );
 
 if ($help) {
@@ -45,7 +43,6 @@ Options:
 --run=NAME        Name of run in pipeline database (needed for database update from gender check)
 --config=PATH     Path to .json file with QC thresholds; default is taken from inipath
 --title           Title for this analysis; will appear in plots
---post-filter-cr  Minimum call rate (CR) for post-filtering. Optional; requires dbpath. Samples with low call rate are marked for exclusion in pipline database. Does not affect current QC, but excludes samples from subsequent analysis. Eg. samples may be excluded from Illuminus input based on Gencall CR.
 ";
     exit(0);
 }
@@ -63,7 +60,6 @@ if (not -e $outDir) { mkdir($outDir); }
 elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
 $title ||= getDefaultTitle($outDir); 
-if ($postCR && !$dbPath) { croak "Must supply --dbpath for --post-filter-cr argument"; }
 my $texIntroPath = defaultTexIntroPath($iniPath);
 $texIntroPath = verifyAbsPath($texIntroPath);
 
@@ -210,8 +206,6 @@ sub run {
     my $qcDir = ".";
     createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
                   $genderThresholdPath, $qcDir, $texIntroPath);
-    ### apply call rate filter to database (if any) ###
-    if ($postCR) { filterCR($dbPath, $configPath, $resultPath, $postCR); }
     cleanup();
     chdir($startDir);
     return 1;

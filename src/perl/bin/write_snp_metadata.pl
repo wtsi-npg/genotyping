@@ -136,6 +136,9 @@ sub run {
                'snp=s'=> \$snpJson,
                'verbose' => \$verbose,
         );
+    unless (-e $manifest) {
+        croak("Manifest file \"$manifest\" does not exist");
+    }
     my @manifest = sortManifest(readManifest($manifest, $verbose));
     if ($snpJson) {
         open $out, ">", $snpJson || croak "Cannot open output $snpJson";
