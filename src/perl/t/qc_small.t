@@ -130,7 +130,7 @@ foreach my $png (@png) {
 }
 
 ## test exclusion of invalid results
-$cmd = "$bin/filter_samples.pl --thresholds $filterConfig --results ".
+$cmd = "$bin/filter_samples.pl --thresholds $filterConfig --in ".
     "qc_merged.json --db $dbfile";
 is(system($cmd), 0, "Exit status of pre-filter script");
 my $md5 = Digest::MD5->new;

@@ -97,4 +97,5 @@ foreach (my $i=0; $i<@inPaths; $i++) {
     }
 }
 $logPath ||= $logDefault;
+$outPath ||= $outDefault;
 runFilter($thresholdsPath, $inPath, $dbPath, $outPath, $logPath);
