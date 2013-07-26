@@ -110,12 +110,12 @@ sub set_access {
 
   my $items;
   if ($item_type eq 'object') {
-    $items = find_objects_by_meta($publish_root . '%',
-                                  $STUDY_ID_META_KEY, $study_id);
+    $items = find_objects_by_meta($publish_root,
+                                  [$STUDY_ID_META_KEY => $study_id]);
   }
   elsif ($item_type eq 'collection') {
-    $items = find_collections_by_meta($publish_root . '%',
-                                      $STUDY_ID_META_KEY, $study_id);
+    $items = find_collections_by_meta($publish_root,
+                                      [$STUDY_ID_META_KEY => $study_id]);
   }
   else {
     $log->logconfess("Invalid item_type '$item_type'");

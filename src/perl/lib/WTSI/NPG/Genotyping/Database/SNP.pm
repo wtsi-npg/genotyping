@@ -7,6 +7,65 @@ use warnings;
 
 use base 'WTSI::NPG::Database';
 
+=head2 find_sequenom_plate_id
+
+  Arg [1]    : A plate name from the Sequenom LIMS
+  Example    : $db->find_sequenom_plate_id('my_plate_name')
+  Description: Given the name of a Sequenom LIMS plate, return the
+               Sequencescape identifier ("internal_id") of that
+               plate.
+
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub find_sequenom_plate_id {
+  my ($self, $plate_name) = @_;
+
+  my $dbh = $self->dbh;
+
+  my $query =
+    qq(SELECT
+         dpn.name AS plate_id
+       FROM
+         dna_plate dp,
+         dnaplate_status dps,
+         dnaplatestatusdict dpsd,
+         dptypedict dptd,
+         dnaplate_name dpn,
+         dpnamedict dpnd
+       WHERE
+         dp.plate_name = ?
+       AND dp.id_dnaplate = dps.id_dnaplate
+       AND dps.status = dpsd.id_dict
+       AND dpsd.description = 'Imported to MSPEC1'
+       AND dpn.id_dnaplate = dp.id_dnaplate
+       AND dpnd.id_dict = dpn.name_type
+       AND dpnd.description = 'SequenceScape_ID'
+       AND dp.plate_type = dptd.id_dict
+       AND dptd.description = 'mspec'
+       ORDER BY dps.status_date DESC);
+
+  $self->log->trace("Executing: '$query' with args [$plate_name]");
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_name);
+
+  my @plate_ids;
+  while (my $row = $sth->fetchrow_array) {
+    push(@plate_ids, $row);
+  }
+
+  my $n = scalar @plate_ids;
+  if ($n > 1) {
+    $self->log->logconfess("$n plate identifiers were returned ",
+                           "where 1 was expected: [",
+                           join(', ', @plate_ids), "]");
+  }
+
+  return shift @plate_ids;
+}
+
 =head2 insert_sequenom_calls
 
   Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
