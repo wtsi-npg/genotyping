@@ -19,6 +19,8 @@ our @EXPORT_OK = qw(
                     $INFINIUM_BEADCHIP_META_KEY
                     $INFINIUM_BEADCHIP_SECTION_META_KEY
                     $INFINIUM_PROJECT_TITLE_META_KEY
+                    $SEQUENOM_PLATE_NAME_META_KEY
+                    $SEQUENOM_PLATE_WELL_META_KEY
 
                     infinium_fingerprint
                     make_analysis_metadata

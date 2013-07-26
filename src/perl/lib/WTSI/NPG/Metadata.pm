@@ -86,8 +86,7 @@ sub make_modification_metadata {
 =head2 make_sample_metadata
 
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
-  Arg [2]    : WTSI::NPG::Database::Warehouse DB handle
-  Example    : my @meta = make_sample_metadata($sample, $db)
+  Example    : my @meta = make_sample_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
@@ -96,7 +95,7 @@ sub make_modification_metadata {
 =cut
 
 sub make_sample_metadata {
-  my ($ss_sample, $ssdb) = @_;
+  my ($ss_sample) = @_;
 
   my $internal_id = $ss_sample->{internal_id};
 
