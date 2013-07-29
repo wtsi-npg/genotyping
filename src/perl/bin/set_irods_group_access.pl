@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use Log::Log4perl;
+use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
@@ -21,26 +22,12 @@ use WTSI::NPG::iRODS qw(find_collections_by_meta
 );
 
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = ERROR, A2
+   log4perl.logger.npg.irods.publish = ERROR, A1
 
-   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8     = 1
-   log4perl.appender.A1.stderr   = 0
-   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A2.utf8     = 1
-   log4perl.appender.A2.stderr   = 0
-   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.Filter   = F2
-
-   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
-   log4perl.filter.F2.LevelMin      = WARN
-   log4perl.filter.F2.LevelMax      = FATAL
-   log4perl.filter.F2.AcceptOnMatch = true
 );
 
 my $log;
@@ -49,19 +36,21 @@ run() unless caller();
 
 sub run {
   my $access_level;
+  my $debug;
   my $dry_run;
   my $log4perl_config;
   my $publish_root;
   my $studies_list;
   my $verbose;
 
-  GetOptions('access=s'    => \$access_level,
-             'dry-run'     => \$dry_run,
-             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'   => \$log4perl_config,
-             'root=s'      => \$publish_root,
-             'studies=s'   => \$studies_list,
-             'verbose'     => \$verbose);
+  GetOptions('access=s'  => \$access_level,
+             'debug'     => \$debug,
+             'dry-run'   => \$dry_run,
+             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s' => \$log4perl_config,
+             'root=s'    => \$publish_root,
+             'studies=s' => \$studies_list,
+             'verbose'   => \$verbose);
   $access_level ||= 'read';
 
   my @valid_levels = ('null', 'read', 'write', 'own');
@@ -82,11 +71,13 @@ sub run {
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('npg.irods.publish');
+      $log->level($INFO);
     }
-    else {
-      $log = Log::Log4perl->get_logger('quiet');
+    elsif ($debug) {
+      $log->level($DEBUG);
     }
   }
 
@@ -94,8 +85,10 @@ sub run {
 
   while (my $study_id = <$in>) {
     chomp($study_id);
-    $study_id =~ s/$\s+//;
+    $study_id =~ s/^\s+//;
     $study_id =~ s/\s+$//;
+
+    next unless $study_id;
 
     set_access($study_id, $publish_root, 'object',
                $access_level, $dry_run);
@@ -108,13 +101,13 @@ sub set_access {
   my ($study_id, $publish_root, $item_type, $access_level, $dry_run) = @_;
   my $plural = $item_type . 's';
 
-  my $items;
+  my @items;
   if ($item_type eq 'object') {
-    $items = find_objects_by_meta($publish_root,
+    @items = find_objects_by_meta($publish_root,
                                   [$STUDY_ID_META_KEY => $study_id]);
   }
   elsif ($item_type eq 'collection') {
-    $items = find_collections_by_meta($publish_root,
+    @items = find_collections_by_meta($publish_root,
                                       [$STUDY_ID_META_KEY => $study_id]);
   }
   else {
@@ -123,7 +116,7 @@ sub set_access {
 
   $log->debug("Searching for $plural in study '$study_id'");
 
-  my $item_count = scalar @$items;
+  my $item_count = scalar @items;
   my $set_count = 0;
   $log->debug("Found $item_count $plural in study '$study_id'");
 
@@ -132,7 +125,7 @@ sub set_access {
     $log->info("Setting $access_level access for group '$group' ",
                "for $item_count $plural in study '$study_id'");
 
-    foreach my $item (@$items) {
+    foreach my $item (@items) {
       my $zone = find_zone_name($item);
       my $zoned_group = "$group#$zone";
 
