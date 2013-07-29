@@ -61,6 +61,11 @@ sub run {
              'verbose'     => \$verbose);
   $config ||= $DEFAULT_INI;
 
+  unless ($publish_dest) {
+    pod2usage(-msg => "A --dest argument is required\n",
+              -exitval => 2);
+  }
+
   my $log;
 
   if ($log4perl_config) {
@@ -88,14 +93,11 @@ sub run {
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  # my $sequenom_root = '/seq/sequenom';
-  my $sequenom_root = '/Sanger1/home/kdj/test';
-
-  my @sequenom_data = find_objects_by_meta($sequenom_root, [type => 'csv']);
+  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv']);
   my $total = scalar @sequenom_data;
   my $updated = 0;
 
-  $log->info("Updating metadata on $total data objects in '$sequenom_root'");
+  $log->info("Updating metadata on $total data objects in '$publish_dest'");
 
   foreach my $data_object (@sequenom_data) {
     eval {
