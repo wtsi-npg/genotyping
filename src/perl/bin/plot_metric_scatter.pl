@@ -9,11 +9,11 @@ use Carp;
 use Getopt::Long;
 use FindBin qw($Bin);
 use Log::Log4perl qw(:easy);
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultPipelineDBConfig
+                                               defaultJsonConfig
                                                getPlateLocationsFromPath
                                                readMetricResultHash
-                                               readQCMetricInputs
-                                               $INI_FILE_DEFAULT);
+                                               readQCMetricInputs);
 use WTSI::NPG::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 
 Log::Log4perl->easy_init($ERROR);
@@ -61,7 +61,7 @@ Unspecified options will receive default values.
 $qcDir ||= '.';
 $outDir ||= $qcDir;
 $dbpath ||= $qcDir."/genotyping.db";
-$inipath ||= $INI_FILE_DEFAULT;
+$inipath ||= defaultPipelineDBConfig();
 $resultpath ||=  $qcDir."/qc_results.json";
 $gender ||=  $qcDir."/sample_xhet_gender_thresholds.txt";
 $config ||= defaultJsonConfig($inipath);

@@ -8,6 +8,57 @@ use Carp;
 
 use base 'WTSI::NPG::Database';
 
+sub find_plate {
+  my ($self, $plate_id) = @_;
+
+  unless (defined $plate_id) {
+    confess "The plate_id argument was undefined\n";
+  }
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT
+         sm.internal_id,
+         sm.sanger_sample_id,
+         sm.consent_withdrawn,
+         HEX(sm.uuid),
+         sm.name,
+         sm.common_name,
+         sm.supplier_name,
+         sm.accession_number,
+         sm.gender,
+         sm.cohort,
+         sm.control,
+         aq.study_internal_id AS study_id,
+         pl.barcode_prefix,
+         pl.barcode,
+         pl.plate_purpose_name,
+         wl.map
+       FROM
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
+       WHERE
+         pl.internal_id = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
+
+  $self->log->trace("Executing: '$query' with args [$plate_id]");
+
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_id);
+
+  my %plate;
+  while (my $row = $sth->fetchrow_hashref) {
+    $plate{$row->{map}} = $row;
+  }
+
+  return \%plate;
+}
+
 =head2 find_infinium_plate
 
   Arg [1]    : string
@@ -16,7 +67,8 @@ use base 'WTSI::NPG::Database';
                as a hashref with plate addresses as keys and values being
                a further hashref for each sample having the following keys
                and values:
-               { sanger_sample_id  => <WTSI sample name string>,
+               { internal_id,      => <SequenceScape plate id>,
+                 sanger_sample_id  => <WTSI sample name string>,
                  uuid              => <SequenceScape UUID blob as hexidecimal>,
                  consent_withdrawn => <boolean, true if now unconsented>,
                  supplier_name     => <Supplier provided name, may be undef>,
@@ -31,35 +83,47 @@ use base 'WTSI::NPG::Database';
 =cut
 
 sub find_infinium_plate {
-  my ($self, $plate_name) = @_;
+  my ($self, $infinium_barcode) = @_;
 
-  unless (defined $plate_name) {
-    confess "The plate_name argument was undefined\n";
+  unless (defined $infinium_barcode) {
+    confess "The infinium_barcode argument was undefined\n";
   }
 
   my $dbh = $self->dbh;
-
   my $query =
     qq(SELECT
+         sm.internal_id,
          sm.sanger_sample_id,
          sm.consent_withdrawn,
          HEX(sm.uuid),
+         sm.name,
+         sm.common_name,
          sm.supplier_name,
+         sm.accession_number,
          sm.gender,
+         sm.cohort,
+         sm.control,
+         aq.study_internal_id AS study_id,
          pl.barcode_prefix,
          pl.barcode,
+         pl.plate_purpose_name,
          wl.map
        FROM
-         current_plates pl, current_samples sm, current_wells wl
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
        WHERE
          pl.infinium_barcode = ?
          AND wl.plate_barcode = pl.barcode
-         AND wl.sample_internal_id = sm.internal_id);
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$plate_name]");
+  $self->log->trace("Executing: '$query' with args [$infinium_barcode]");
 
   my $sth = $dbh->prepare($query);
-  $sth->execute($plate_name);
+  $sth->execute($infinium_barcode);
 
   my %plate;
   while (my $row = $sth->fetchrow_hashref) {
@@ -70,10 +134,10 @@ sub find_infinium_plate {
 }
 
 sub find_infinium_sample_by_plate {
-  my ($self, $plate_name, $map) = @_;
+  my ($self, $infinium_barcode, $map) = @_;
 
-  unless (defined $plate_name) {
-    confess "The plate_name argument was undefined\n";
+  unless (defined $infinium_barcode) {
+    confess "The infinium_barcode argument was undefined\n";
   }
   unless (defined $map) {
     confess "The map argument was undefined\n";
@@ -83,11 +147,10 @@ sub find_infinium_sample_by_plate {
   $unpadded_map =~ s/0//;
 
   my $dbh = $self->dbh;
-
   my $query =
     qq(SELECT
-         sm.sanger_sample_id,
          sm.internal_id,
+         sm.sanger_sample_id,
          sm.consent_withdrawn,
          HEX(sm.uuid),
          sm.name,
@@ -95,24 +158,29 @@ sub find_infinium_sample_by_plate {
          sm.supplier_name,
          sm.accession_number,
          sm.gender,
-         sm.gender,
          sm.cohort,
          sm.control,
+         aq.study_internal_id AS study_id,
          pl.barcode_prefix,
          pl.barcode,
          pl.plate_purpose_name,
          wl.map
        FROM
-         current_plates pl, current_samples sm, current_wells wl
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
        WHERE
          pl.infinium_barcode = ?
          AND wl.plate_barcode = pl.barcode
-         AND wl.sample_internal_id = sm.internal_id
-         AND wl.map = ?);
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.map = ?
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->debug("Executing: '$query' with args [$plate_name, $unpadded_map]");
+  $self->log->debug("Executing: '$query' with args [$infinium_barcode, $unpadded_map]");
   my $sth = $dbh->prepare($query);
-  $sth->execute($plate_name, $unpadded_map);
+  $sth->execute($infinium_barcode, $unpadded_map);
 
   my @samples;
   while (my $row = $sth->fetchrow_hashref) {
@@ -135,11 +203,10 @@ sub find_infinium_gex_sample {
   }
 
   my $dbh = $self->dbh;
-
   my $query =
     qq(SELECT DISTINCT
-          sm.sanger_sample_id,
           sm.internal_id,
+          sm.sanger_sample_id,
           sm.consent_withdrawn,
           HEX(sm.uuid),
           sm.name,
@@ -149,6 +216,7 @@ sub find_infinium_gex_sample {
           sm.gender,
           sm.cohort,
           sm.control,
+          aq.study_internal_id AS study_id,
           pl.barcode_prefix,
           pl.barcode,
           pl.plate_purpose_name,
@@ -156,11 +224,14 @@ sub find_infinium_gex_sample {
        FROM
          current_samples sm,
          current_wells wl,
+         current_aliquots aq,
          current_plates pl,
          current_plate_purposes pp
        WHERE sm.sanger_sample_id = ?
-       AND wl.sample_internal_id = sm.internal_id
+       AND aq.sample_internal_id = sm.internal_id
+       AND wl.internal_id = aq.receptacle_internal_id
        AND pl.barcode = wl.plate_barcode
+       AND pl.barcode_prefix = wl.plate_barcode_prefix
        AND pl.plate_purpose_internal_id = pp.internal_id
        AND pp.name like '%GEX%');
 
@@ -186,7 +257,6 @@ sub find_sample_studies {
   my ($self, $sample_id) = @_;
 
   my $dbh = $self->dbh;
-
   my $query =
     qq(SELECT DISTINCT
          st.internal_id,
@@ -195,7 +265,9 @@ sub find_sample_studies {
          st.study_title,
          st.study_type
       FROM
-         current_samples sm, current_study_samples ss, current_studies st
+         current_samples sm,
+         current_study_samples ss,
+         current_studies st
        WHERE
          sm.internal_id = ?
          AND ss.sample_internal_id = sm.internal_id
@@ -212,7 +284,6 @@ sub find_sample_studies {
 
   return \@studies;
 }
-
 
 1;
 

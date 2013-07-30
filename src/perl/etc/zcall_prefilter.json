@@ -1,0 +1,29 @@
+{
+    "Metrics_thresholds": {
+        "call_rate": 0.98,
+        "duplicate": 0.98,
+        "gender": "NA",
+        "high_maf_het": 3,
+        "identity": 0.9,
+        "low_maf_het": 3,
+        "magnitude": 0.9
+    },
+    "Threshold_types": {
+        "call_rate": "Minimum",
+        "duplicate": "Maximum",
+        "gender": "NA",
+        "high_maf_het": "Standard deviations",
+        "identity": "Minimum",
+        "low_maf_het": "Standard deviations",
+        "magnitude": "Minimum"
+    },
+    "name_array": [
+        "identity",
+        "duplicate",
+        "gender",
+        "call_rate",
+        "low_maf_het",
+        "high_maf_het",
+        "magnitude"
+    ]
+}

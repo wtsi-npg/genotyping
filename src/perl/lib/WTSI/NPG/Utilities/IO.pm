@@ -32,7 +32,8 @@ sub maybe_stdin {
     }
 
     unless (-r $file) {
-      croak "file '$file' is not readable\n";
+      # Gives incorrect result on mounted Windows shares
+      # croak "file '$file' is not readable\n";
     }
 
     if (-d $file) {

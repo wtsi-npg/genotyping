@@ -11,23 +11,26 @@ use UUID;
 use WTSI::NPG::iRODS qw(md5sum);
 
 use base 'Exporter';
-our @EXPORT_OK = qw($SAMPLE_NAME_META_KEY;
-                    $SAMPLE_ID_META_KEY
-                    $SAMPLE_SUPPLIER_NAME_META_KEY
-                    $SAMPLE_COMMON_NAME_META_KEY
+our @EXPORT_OK = qw(
                     $SAMPLE_ACCESSION_NUMBER_META_KEY
                     $SAMPLE_COHORT_META_KEY
-                    $SAMPLE_CONTROL_META_KEY
+                    $SAMPLE_COMMON_NAME_META_KEY
                     $SAMPLE_CONSENT_META_KEY
+                    $SAMPLE_CONTROL_META_KEY
+                    $SAMPLE_ID_META_KEY
+                    $SAMPLE_NAME_META_KEY
+                    $SAMPLE_SUPPLIER_NAME_META_KEY
                     $STUDY_ID_META_KEY
                     $STUDY_TITLE_META_KEY
 
+                    has_consent
                     make_creation_metadata
+                    make_fingerprint
+                    make_md5_metadata
                     make_modification_metadata
-                    make_file_metadata
+                    make_type_metadata
                     make_sample_metadata
-
-                    has_consent);
+);
 
 our $SAMPLE_NAME_META_KEY             = 'sample';
 our $SAMPLE_ID_META_KEY               = 'sample_id';
@@ -63,7 +66,6 @@ sub make_creation_metadata {
           ['dcterms:publisher' => $publisher]);
 }
 
-
 =head2 make_modification_metadata
 
   Arg [1]    : DateTime modification time
@@ -81,12 +83,10 @@ sub make_modification_metadata {
   return (['dcterms:modified' => $modification_time]);
 }
 
-
 =head2 make_sample_metadata
 
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
-  Arg [2]    : WTSI::NPG::Database::Warehouse DB handle
-  Example    : my @meta = make_sample_metadata($sample, $db)
+  Example    : my @meta = make_sample_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
@@ -95,13 +95,9 @@ sub make_modification_metadata {
 =cut
 
 sub make_sample_metadata {
-  my ($ss_sample, $ssdb) = @_;
+  my ($ss_sample) = @_;
 
   my $internal_id = $ss_sample->{internal_id};
-
-  $log->debug("Looking up studies for " . $internal_id);
-
-  my @ss_studies = @{$ssdb->find_sample_studies($internal_id)};
 
   my @meta = ([$SAMPLE_ID_META_KEY => $internal_id]);
 
@@ -131,6 +127,16 @@ sub make_sample_metadata {
     $log->logcluck(sprintf($message_template, 'sanger_sample_id'));
   }
 
+  if (defined $ss_sample->{study_id}) {
+     push(@meta, [$STUDY_ID_META_KEY => $ss_sample->{study_id}]);
+  }
+  else {
+    $log->logcluck(sprintf($message_template, 'study_id'));
+  }
+
+  if (defined $ss_sample->{study_title}) {
+    push(@meta, [$STUDY_TITLE_META_KEY => $ss_sample->{study_title}]);
+  }
   if (defined $ss_sample->{supplier_name}) {
     push(@meta, [$SAMPLE_SUPPLIER_NAME_META_KEY => $ss_sample->{supplier_name}]);
   }
@@ -147,44 +153,46 @@ sub make_sample_metadata {
     push(@meta, [$SAMPLE_COMMON_NAME_META_KEY => $ss_sample->{common_name}]);
   }
 
-  foreach my $ss_study (@ss_studies) {
-    push(@meta, [$STUDY_ID_META_KEY => $ss_study->{internal_id}]);
-
-    if (defined $ss_study->{study_title}) {
-      push(@meta, [$STUDY_TITLE_META_KEY => $ss_study->{study_title}]);
-    }
-  }
-
   return @meta;
 }
 
-
-=head2 make_file_metadata
+=head2 make_type_metadata
 
   Arg [1]    : string filename
   Arg [2]    : array of valid file suffix strings
-  Example    : my @meta = make_file_metadata($sample)
-  Description: Return a list of metadata key/value pairs describing a file,
-               including the file 'type' (suffix) and MD5 checksum.
+  Example    : my @meta = make_type_metadata($sample, '.txt', '.csv')
+  Description: Return a list of metadata key/value pairs describing
+               the file 'type' (suffix).
   Returntype : array of arrayrefs
   Caller     : general
 
 =cut
 
-sub make_file_metadata {
+sub make_type_metadata {
   my ($file, @suffixes) = @_;
 
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
-
-  my $md5 = md5sum($file);
   $suffix =~ s{^\.?}{}msxi;
 
-  my @meta = ([md5    => $md5],
-              ['type' => $suffix]);
-
-  return @meta;
+  return (['type' => $suffix]);
 }
 
+=head2 make_md5_metadata
+
+  Arg [1]    : string filename
+  Example    : my @meta = make_md5_metadata($sample)
+  Description: Return a list of metadata key/value pairs describing the
+               file MD5 checksum.
+  Returntype : array of arrayrefs
+  Caller     : general
+
+=cut
+
+sub make_md5_metadata {
+  my ($file) = @_;
+
+  return ([md5 => md5sum($file)]);
+}
 
 =head2 has_consent
 
@@ -222,6 +230,23 @@ sub has_consent {
   return $consent;
 }
 
+sub make_fingerprint {
+  my ($keys, $meta) = @_;
+
+  my @fingerprint;
+  foreach my $key (@$keys) {
+    my @tuple = grep { $_->[0] eq $key } @$meta;
+    unless (@tuple) {
+      my $meta_str = join(', ', map { join ' => ', @$_ } @$meta);
+      $log->logconfess("Failed to make fingerprint from [$meta_str]: ",
+                       "missing '$key'");
+    }
+
+    push(@fingerprint, @tuple);
+  }
+
+  return @fingerprint;
+}
 
 1;
 

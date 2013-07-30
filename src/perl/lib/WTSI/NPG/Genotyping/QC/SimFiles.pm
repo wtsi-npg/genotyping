@@ -16,6 +16,7 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/headerParams readSampleNames writeIntensityMetrics/;
 our $HEADER_LENGTH = 16;
+our $MAX_NAN = 0.01; # maximum proportion of NaN values in .sim block
 
 sub computeMetric {
     # find (un-normalised) magnitude or xydiff, assuming 2 channels
@@ -70,15 +71,17 @@ sub findMetrics {
     my $probes = $params{'probes'};
     my $blocks = ceil($probes / $probesInBlock);
     my @names = readSampleNames($in, \%params);
-    my (%magTotals, %xyTotals);
+    my (%magTotals, %xyTotals, $nans);
     my $i = 0; # probe offset
     my $block = 0; # block count
+    my $nanTotal = 0; # NaN values in input
     while ($i < $probes) {
         if ($probesInBlock > $probes - $i) {
             $probesInBlock = $probes - $i; # reduce size for final block
         }
         my @args = ($in, $i, $probesInBlock, \%params);
-        my ($magRef, $xyRef) = metricTotalsForProbeBlock(@args);
+        my ($magRef, $xyRef, $nans) = metricTotalsForProbeBlock(@args);
+        $nanTotal += $nans;
         my @mags = @{$magRef};
         my @xy = @{$xyRef};
         for (my $j=0;$j<@names;$j++) {
@@ -98,7 +101,7 @@ sub findMetrics {
         $magTotals{$name} = $magTotals{$name} / $probes;
         $xyTotals{$name} = $xyTotals{$name} / $probes;
     }
-    return (\%magTotals, \%xyTotals);
+    return (\%magTotals, \%xyTotals, $nanTotal);
 }
 
 sub headerParams {
@@ -129,10 +132,13 @@ sub metricTotalsForProbeBlock {
     my ($in, $probeStart, $probeTotal, $paramsRef) = @_;
     my %params = %{$paramsRef};
     my $samples = $params{'samples'};
+    my $nanTotal;
     my (@magsByProbe, @magTable, @magTotalsBySample, @xyTotals);
     for (my $i=0;$i<$samples;$i++) { # foreach sample
-        my @intensities = readProbeRange($in, $i, $probeStart, 
-                                         $probeTotal, $paramsRef);
+        my ($intsRef, $nans) = readProbeRange($in, $i, $probeStart, 
+                                              $probeTotal, $paramsRef);
+        $nanTotal += $nans;
+        my @intensities = @{$intsRef};
         # update magnitude totals
         my @mag = computeMetric(\@intensities, 'magnitude');
         for (my $j=0;$j<@mag;$j++) { # foreach probe
@@ -157,7 +163,7 @@ sub metricTotalsForProbeBlock {
             }
         }
     }
-    return (\@magTotalsBySample, \@xyTotals);
+    return (\@magTotalsBySample, \@xyTotals, $nanTotal);
 }
 
 sub numericBytesByFormat {
@@ -202,9 +208,9 @@ sub readProbeRange {
     seek($fh, $start, 0);
     my $binary;
     read($fh, $binary, $probeBytes*$probeTotal);
-    my @block = unpackSignals($binary, $params{'numeric_bytes'}, 
-                              $params{'number_type'});
-    return @block;
+    my ($blockRef, $nans) = unpackSignals($binary, $params{'numeric_bytes'}, 
+                                          $params{'number_type'});
+    return ($blockRef, $nans);
 }
 
 sub readSampleNames {
@@ -246,7 +252,16 @@ sub unpackSignals {
         @signals = unpack("v$signals", $data);
         for (my $i=0;$i<$signals;$i++) { $signals[$i] = $signals[$i] / 1000; }
     }
-    return @signals;
+    my $nanCount = 0;    
+    my $maxNan = $signals*$MAX_NAN; # eg. allow no more than 1% NaN values
+    # clean up data by removing NaN values
+    foreach (my $i=0;$i<$signals;$i++) {
+        if ($signals[$i] eq 'nan') { 
+            $nanCount++; 
+            $signals[$i] = 0;
+        }
+    }
+    return (\@signals, $nanCount);
 }
 
 sub writeIntensityMetrics {
@@ -261,8 +276,14 @@ sub writeIntensityMetrics {
     print $log "Started: ".
         ctime(time())."Input: $inPath\n";
     my %params = headerParams($in);
-    my ($magRef, $xyRef) = findMetrics($in, $log, \%params, $probesInBlock);
+    my ($magRef, $xyRef, $nans) = findMetrics($in, $log, \%params, 
+                                              $probesInBlock);
     close $in || croak("Cannot close filehandle!");
+    if ($nans > 0) {
+        my $msg = "$nans NaN values found in .sim file $inPath";
+        print $log "WARNING: $msg\n";
+        carp $msg;
+    }
     my %mag = %{$magRef};
     my %xy = %{$xyRef};
     my @samples = sort(keys(%mag));
@@ -273,7 +294,7 @@ sub writeIntensityMetrics {
         printf($outMag "%s\t%.8f\n", ($sample, $mag{$sample})); 
         printf($outXY "%s\t%.8f\n", ($sample, $xy{$sample})); 
     }
-    print $log "Finished: ".ctime(time());
+    print $log "Output written.\nFinished: ".ctime(time())."\n";
     foreach my $fh ($log, $outMag, $outXY) {
         close $fh || croak("Cannot close filehandle!");
     }

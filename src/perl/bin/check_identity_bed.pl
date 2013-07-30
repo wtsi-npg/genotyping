@@ -75,7 +75,7 @@ $outputFail ||= 'identity_check_fail.txt';
 $outputFailedPairs ||= 'identity_check_failed_pairs.txt';
 $outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
 $log ||= 'identity_check.log';
-$minCheckedSNPs ||= 10;
+$minCheckedSNPs ||= 20;
 if (!$minIdent) {
     if ($configPath) {
         my %thresholds = readThresholds($configPath);
@@ -417,7 +417,7 @@ sub run {
         (name   => 'snp',
          inifile => $iniPath)->connect(RaiseError => 1);
     my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
-        = $snpdb->data_by_sample($samplesRef);
+        = $snpdb->find_sequenom_calls_by_sample($samplesRef);
     if ($log) { print $logfile $sqnmTotal." calls read from Sequenom.\n"; }
     # get PLINK genotypes for all samples; can take a while!
     my ($plinkCallsRef, $duration) 

@@ -46,17 +46,20 @@ Arguments:
 - work_dir (String): The working directory, an absolute path.
 - other arguments (keys and values):
 
-    config: <path> of custom pipeline database .ini file. Optional.
-    manifest: <path> of the chip manifest file. Required.
-    gender_method: <string> name of a gender determination method described in
+    - config: <path> of custom pipeline database .ini file. Optional.
+    - manifest: <path> of the chip manifest file. Required.
+    - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
-    chunk_size: <integer> number of SNPs to analyse in a single Illuminus jobs.
+    - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
     Optional, defaults to 2000.
-    memory: <integer> number of Mb to request for jobs.
-    queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
+    - memory: <integer> number of Mb to request for jobs.
+    - queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
-    min_cr: <float> Minimum Gencall CR (call rate) for Illuminus input samples.
-    Optional, defaults to 0.9.
+    - filterconfig: <path> to .json file with thresholds for prefilter on 
+    GenCall QC. Optional; if absent, uses default illuminus thresholds 
+    (requires config argument to be specified).
+    - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
+    overrides the filterconfig argument.
 
 e.g.
 
@@ -81,7 +84,7 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size, :gender_method, :min_cr)
+                               :select, :chunk_size, :gender_method)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -89,8 +92,9 @@ Returns:
       manifest = args.delete(:manifest) # TODO: find manifest automatically
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
-      min_cr = args.delete(:min_cr) || 0.9 # minimum gencall call rate
       gtconfig = args.delete(:config)
+      fconfig = args.delete(:filterconfig) || nil
+      nofilter = args.delete(:nofilter) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -103,6 +107,7 @@ Returns:
               :log_dir => log_dir}.merge(args)
       maybe_version_log(log_dir)
 
+      run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.illuminus.sample.json'
       njname = run_name + '.snp.json'
@@ -117,19 +122,31 @@ Returns:
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
       ## run gencall QC to apply gencall CR filter and find genders
-      gcqcargs = {:run => run_name,
-                  :post_filter_cr => min_cr}.merge(args)
+      gcqcargs = {:run => run_name }.merge(args)
 
       gcqcdir = File.join(work_dir, 'gencall_qc')
       gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
                                   async, true)
 
-      smfile = nil
+      filtered = nil
       if gcquality
+        if nofilter
+          filtered = true
+        else
+          # maf/het and intensity metrics are not calculated (or required)
+          gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
+          if fconfig then fargs = {:thresholds => fconfig}.merge(args)
+          else fargs = {:illuminus => true}.merge(args)
+          end
+          filtered = filter_samples(gcqcjson, dbfile, fargs)
+        end
+      end
+
+      smfile = nil
+      if filtered
         siargs = {:config => gtconfig,
                   :gender_method => gender_method}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
       end

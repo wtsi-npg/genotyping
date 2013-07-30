@@ -10,20 +10,33 @@ use UUID;
 
 use WTSI::NPG::iRODS qw(md5sum);
 
-use base 'Exporter';
-our @EXPORT_OK = qw($GENOTYPING_PROJECT_TITLE_META_KEY
-                    $GENOTYPING_ANALYSIS_UUID_META_KEY
-                    $GENOTYPING_BEADCHIP_META_KEY
-                    $GENOTYPING_BEADCHIP_DESIGN_META_KEY
-                    $GENOTYPING_BEADCHIP_SECTION_META_KEY
-                    make_infinium_metadata
-                    make_analysis_metadata);
+use WTSI::NPG::Metadata qw(make_fingerprint);
 
-our $GENOTYPING_PROJECT_TITLE_META_KEY = 'dcterms:title';
-our $GENOTYPING_ANALYSIS_UUID_META_KEY = 'analysis_uuid';
-our $GENOTYPING_BEADCHIP_META_KEY         = 'beadchip';
-our $GENOTYPING_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
-our $GENOTYPING_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
+use base 'Exporter';
+our @EXPORT_OK = qw(
+                    $GENOTYPING_ANALYSIS_UUID_META_KEY
+                    $INFINIUM_BEADCHIP_DESIGN_META_KEY
+                    $INFINIUM_BEADCHIP_META_KEY
+                    $INFINIUM_BEADCHIP_SECTION_META_KEY
+                    $INFINIUM_PROJECT_TITLE_META_KEY
+                    $SEQUENOM_PLATE_NAME_META_KEY
+                    $SEQUENOM_PLATE_WELL_META_KEY
+
+                    infinium_fingerprint
+                    make_analysis_metadata
+                    make_infinium_metadata
+                    make_sequenom_metadata
+                    sequenom_fingerprint
+);
+
+our $GENOTYPING_ANALYSIS_UUID_META_KEY  = 'analysis_uuid';
+our $INFINIUM_PROJECT_TITLE_META_KEY    = 'dcterms:title';
+our $INFINIUM_BEADCHIP_META_KEY         = 'beadchip';
+our $INFINIUM_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
+our $INFINIUM_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
+
+our $SEQUENOM_PLATE_NAME_META_KEY = 'sequenom_plate';
+our $SEQUENOM_PLATE_WELL_META_KEY = 'sequenom_well';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -41,11 +54,18 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 sub make_infinium_metadata {
   my ($if_sample) = @_;
 
-  return ([$GENOTYPING_PROJECT_TITLE_META_KEY    => $if_sample->{project}],
-          ['dcterms:identifier'                  => $if_sample->{sample}],
-          [$GENOTYPING_BEADCHIP_META_KEY         => $if_sample->{beadchip}],
-          [$GENOTYPING_BEADCHIP_SECTION_META_KEY => $if_sample->{beadchip_section}],
-          [$GENOTYPING_BEADCHIP_DESIGN_META_KEY  => $if_sample->{beadchip_design}]);
+  return ([$INFINIUM_PROJECT_TITLE_META_KEY    => $if_sample->{project}],
+          ['dcterms:identifier'                => $if_sample->{sample}],
+          [$INFINIUM_BEADCHIP_META_KEY         => $if_sample->{beadchip}],
+          [$INFINIUM_BEADCHIP_SECTION_META_KEY => $if_sample->{beadchip_section}],
+          [$INFINIUM_BEADCHIP_DESIGN_META_KEY  => $if_sample->{beadchip_design}]);
+}
+
+sub make_sequenom_metadata {
+  my ($well) = @_;
+
+  return ([$SEQUENOM_PLATE_NAME_META_KEY => $well->{plate}],
+          [$SEQUENOM_PLATE_WELL_META_KEY => $well->{well}]);
 }
 
 =head2 make_analysis_metadata
@@ -70,10 +90,27 @@ sub make_analysis_metadata {
   my @meta = ([$GENOTYPING_ANALYSIS_UUID_META_KEY => $uuid_str]);
 
   foreach my $title (@$genotyping_project_titles) {
-    push(@meta, [$GENOTYPING_PROJECT_TITLE_META_KEY => $title]);
+    push(@meta, [$INFINIUM_PROJECT_TITLE_META_KEY => $title]);
   }
 
   return @meta;
+}
+
+sub infinium_fingerprint {
+  my @meta = @_;
+
+  return make_fingerprint([$INFINIUM_BEADCHIP_META_KEY,
+                           $INFINIUM_BEADCHIP_DESIGN_META_KEY,
+                           $INFINIUM_BEADCHIP_SECTION_META_KEY],
+                          \@meta);
+}
+
+sub sequenom_fingerprint {
+  my @meta = @_;
+
+  return make_fingerprint([$SEQUENOM_PLATE_NAME_META_KEY,
+                           $SEQUENOM_PLATE_WELL_META_KEY],
+                          \@meta);
 }
 
 1;

@@ -90,4 +90,5 @@
 \bt/identity/.*\.txt$
 \bt/identity/.*\.log$
 
-\bt/reports/.*\.pdf$
+# Avoid Plink droppings
+\b.pversion$

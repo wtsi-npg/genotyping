@@ -19,6 +19,7 @@
 module Genotyping::Tasks
 
   PLINK = 'plink'
+  PLINK_MERGE = 'merge_bed.py'
   UPDATE_ANNOTATION = 'update_plink_annotation.pl'
 
   # Returns true if the Plink executable is available.
@@ -26,15 +27,20 @@ module Genotyping::Tasks
     system("which #{PLINK} >/dev/null 2>&1")
   end
 
+  # Returns true if the Plinktools merge script is available.
+  def plink_merge_available?()
+    system("which #{PLINK_MERGE} >/dev/null 2>&1")
+  end
+
   module Plink
     include Genotyping
     include Genotyping::Tasks
 
-    # Runs Plink to merge an Array of BED format files into a single file.
-    # file.
+    # Uses the Plinktools Python package to merge an Array of BED format files
+    # into a single file.
     #
     # Arguments:
-    # - bed_files (Array): The BED file names.
+    # - bed_files (Array): The BED file names. Should be absolute paths.
     # - output (String): The output file name.
     # - args (Hash): Arguments for the operation.
     #
@@ -42,43 +48,40 @@ module Genotyping::Tasks
     #
     # Returns:
     # - The merged Plink BED file name
+
     def merge_bed(bed_files, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
-
       if args_available?(bed_files, output, work_dir)
-        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
-        first_bed = bed_files.first
-        rest_bed = bed_files.slice(1, bed_files.size - 1)
-
-        merge_list = change_extname(output, '.parts')
-        File.open(merge_list, 'w') do |fofn|
-          rest_bed.sort.each { |bed| fofn.puts(plink_fileset(bed).join(' ')) }
+        output = File.basename(output, '.bed')
+        output = absolute_path?(output) ? output : 
+          absolute_path(output, work_dir)
+        merge_list = change_extname(output, '.parts.json')
+        # obtain 'stems' without the .bed extension for Plinktools input
+        stems = bed_files.collect do | bed_file |
+          File.join(File.dirname(bed_file), File.basename(bed_file, '.bed'))
         end
-
-        first_name = File.join(File.dirname(first_bed),
-                               File.basename(first_bed, '.bed'))
-        expected = plink_fileset(output)
-
-        cli_args = {:merge_list => merge_list,
-                    :noweb => true,
-                    :make_bed => true,
-                    :bfile => first_name,
-                    :out => File.basename(output, '.bed')}
-
-        command = [PLINK, cli_arg_map(cli_args, :prefix => '--') { |key|
+        out_file = File.new(merge_list, mode='w')
+        JSON.dump(stems, out_file)
+        out_file.close # need to ensure file closure
+        cli_args = {:list => merge_list,
+                    :out => output}
+        command = [PLINK_MERGE, cli_arg_map(cli_args, :prefix => '--') { |key|
           key.gsub(/_/, '-')
         }].flatten.join(' ')
 
         margs = [bed_files, work_dir, output]
         task_id = task_identity(:merge_bed, *margs)
         log = File.join(log_dir, task_id + '.log')
-
+        expected = plink_fileset(output+'.bed')
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
                    :result => lambda { expected.first },
                    :async => async)
       end
     end
+
+    # Runs Plink to transpose a BED format file from SNP-major to sample-major 
+    # or vice versa.
 
     def transpose_bed(bed_file, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)

@@ -7,6 +7,65 @@ use warnings;
 
 use base 'WTSI::NPG::Database';
 
+=head2 find_sequenom_plate_id
+
+  Arg [1]    : A plate name from the Sequenom LIMS
+  Example    : $db->find_sequenom_plate_id('my_plate_name')
+  Description: Given the name of a Sequenom LIMS plate, return the
+               Sequencescape identifier ("internal_id") of that
+               plate.
+
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub find_sequenom_plate_id {
+  my ($self, $plate_name) = @_;
+
+  my $dbh = $self->dbh;
+
+  my $query =
+    qq(SELECT
+         dpn.name AS plate_id
+       FROM
+         dna_plate dp,
+         dnaplate_status dps,
+         dnaplatestatusdict dpsd,
+         dptypedict dptd,
+         dnaplate_name dpn,
+         dpnamedict dpnd
+       WHERE
+         dp.plate_name = ?
+       AND dp.id_dnaplate = dps.id_dnaplate
+       AND dps.status = dpsd.id_dict
+       AND dpsd.description = 'Imported to MSPEC1'
+       AND dpn.id_dnaplate = dp.id_dnaplate
+       AND dpnd.id_dict = dpn.name_type
+       AND dpnd.description = 'SequenceScape_ID'
+       AND dp.plate_type = dptd.id_dict
+       AND dptd.description = 'mspec'
+       ORDER BY dps.status_date DESC);
+
+  $self->log->trace("Executing: '$query' with args [$plate_name]");
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_name);
+
+  my @plate_ids;
+  while (my $row = $sth->fetchrow_array) {
+    push(@plate_ids, $row);
+  }
+
+  my $n = scalar @plate_ids;
+  if ($n > 1) {
+    $self->log->logconfess("$n plate identifiers were returned ",
+                           "where 1 was expected: [",
+                           join(', ', @plate_ids), "]");
+  }
+
+  return shift @plate_ids;
+}
+
 =head2 insert_sequenom_calls
 
   Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
@@ -21,7 +80,6 @@ use base 'WTSI::NPG::Database';
 
                 the 'sanger_sample_id' (in SequenceScape)
                 the 'individual.clonename' (in SNP)
-
 
                As the genotyping pipeline database accepts both WTSI and
                externally-sourced samples from multiple centres, it uses a
@@ -46,8 +104,13 @@ sub insert_sequenom_calls {
          mapped_snp.position,
          genotype.genotype
        FROM
-         well_assay, snpassay_snp, snp_name, mapped_snp, snp_sequence,
-         genotype, individual
+         well_assay,
+         snpassay_snp,
+         snp_name,
+         mapped_snp,
+         snp_sequence,
+         genotype,
+         individual
        WHERE
          well_assay.id_assay = snpassay_snp.id_assay
          AND snpassay_snp.id_snp = snp_name.id_snp
@@ -96,7 +159,7 @@ sub insert_sequenom_calls {
   return $count;
 }
 
-=head2 data_by_sample
+=head2 find_sequenom_calls_by_sample
 
   Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
   Arg [2]    : Reference to a hash. Keys are sample names, values are
@@ -110,41 +173,56 @@ sub insert_sequenom_calls {
 
 =cut
 
-sub data_by_sample {
+sub find_sequenom_calls_by_sample {
     my $self = shift;
-    my %sampleIDs = %{ shift() };
-    my ($dbh, $sth, %sqnmCalls, %sqnmSnps, %missingSamples);
+    my %sample_ids = %{ shift() };
+    my ($dbh, $sth, %sqnm_calls, %sqnm_snps, %missing_samples);
     $dbh = $self->dbh;
     $sth = $dbh->prepare(qq(
-select distinct well_assay.id_well, snp_name.snp_name,
-genotype.genotype, genotype.confidence, genotype.disregard
-from well_assay, snpassay_snp, snp_name, genotype, individual
-where well_assay.id_assay = snpassay_snp.id_assay
-and snpassay_snp.id_snp = snp_name.id_snp
-and (snp_name.snp_name_type = 1 or snp_name.snp_name_type = 6)
-and genotype.id_assay = snpassay_snp.id_assay
-and genotype.id_ind = individual.id_ind
-and disregard = 0
-and confidence <> 'A'
-and individual.clonename = ?
-));
-    my $totalCalls = 0;
-    foreach my $sample (keys(%sampleIDs)) {
-        $sth->execute($sampleIDs{$sample}); # query DB with sample ID
-        foreach my $row (@{$sth->fetchall_arrayref}) {
-            my ($well, $snp, $call, $conf, $disregard) = @{$row};
-            # $disregard==0 by construction of DB query
-            $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
-            next if $call =~ /[N]{2}/;              # skip 'NN' calls
-            $sqnmCalls{$sample}{$snp} = $call;
-            $sqnmSnps{$snp} = 1;
-            $totalCalls += 1;
-        }
-        if (!$sqnmCalls{$sample}) { $missingSamples{$sample} = 1; }
+  SELECT DISTINCT
+    well_assay.id_well,
+    snp_name.snp_name,
+    genotype.genotype,
+    genotype.confidence,
+    genotype.disregard
+  FROM
+    well_assay,
+    snpassay_snp,
+    snp_name,
+    genotype,
+    individual
+  WHERE
+    well_assay.id_assay = snpassay_snp.id_assay
+  AND snpassay_snp.id_snp = snp_name.id_snp
+  AND (snp_name.snp_name_type = 1 OR snp_name.snp_name_type = 6)
+  AND genotype.id_assay = snpassay_snp.id_assay
+  AND genotype.id_ind = individual.id_ind
+  AND disregard = 0
+  AND confidence <> 'A'
+  AND individual.clonename = ?));
+
+    my $total_calls = 0;
+    foreach my $sample (keys(%sample_ids)) {
+      $sth->execute($sample_ids{$sample}); # query DB with sample ID
+
+      foreach my $row (@{$sth->fetchall_arrayref}) {
+        my ($well, $snp, $call, $conf, $disregard) = @{$row};
+        # $disregard==0 by construction of DB query
+        $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
+        next if $call =~ /[N]{2}/;              # skip 'NN' calls
+
+        $sqnm_calls{$sample}{$snp} = $call;
+        $sqnm_snps{$snp} = 1;
+        $total_calls += 1;
+      }
+
+      if (!$sqnm_calls{$sample}) {
+        $missing_samples{$sample} = 1;
+      }
     }
     $sth->finish;
     $dbh->disconnect;
-    return (\%sqnmCalls, \%sqnmSnps, \%missingSamples, $totalCalls);
+    return (\%sqnm_calls, \%sqnm_snps, \%missing_samples, $total_calls);
 }
 
 1;
