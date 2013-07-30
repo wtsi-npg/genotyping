@@ -58,6 +58,7 @@ QC. Optional; if absent, uses default zcall thresholds (requires config
 argument to be specified).
     nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
 overrides the filterconfig argument.
+    nosim: <boolean> Omit .sim files and intensity metrics for GenCall QC. Optional, defaults to false. Only relevant if filtering is enabled.
     memory: <integer> number of Mb to request for jobs.
     queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
     'normal'.
@@ -83,9 +84,9 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :egt, :queue, :memory,
-                               :select, :chunk_size, :zstart, :ztotal, 
-                               :filterconfig, :nofilter)
+      args = ensure_valid_args(args, :config, :manifest, :egt, :queue, 
+                               :memory, :select, :chunk_size, :zstart, 
+                               :ztotal, :filterconfig, :nofilter, :nosim)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -98,6 +99,7 @@ Returns:
       ztotal = args.delete(:ztotal) || 10
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
+      nosim = args.delete(:nosim) || nil # omit sim files for qc?
 
       args.delete(:memory)
       args.delete(:queue)
@@ -135,15 +137,19 @@ Returns:
         ## run plinktools to find maf/het on transposed .bed output
         hmjson = het_by_maf(gcsfile, work_dir, run_name, args, async)
 
-        ## get .sim file from GTC files for intensity metrics
-        smargs = {:normalize => true }.merge(args)
-        smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
-
+        gcqcargs = nil
+        if nosim
+          gcqcargs = {:run => run_name}.merge(args)
+        else
+          ## get .sim file from GTC files for intensity metrics
+          smargs = {:normalize => true }.merge(args)
+          smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
+          gcqcargs = {:run => run_name,
+            :sim => smfile}.merge(args)
+        end
         ## run gencall QC to get metrics for prefiltering
         gcquality = nil
-        if smfile
-          gcqcargs = {:run => run_name,
-                      :sim => smfile}.merge(args)
+        if gcqcargs
           gcqcdir = File.join(work_dir, 'gencall_qc')
           gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
                                       async, true)
