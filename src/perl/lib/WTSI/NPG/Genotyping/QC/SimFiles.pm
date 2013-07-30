@@ -69,7 +69,7 @@ sub findMetrics {
     my $probesInBlock = shift;
     $probesInBlock ||= 1000;
     my $timeOut = shift; # maximum time, in seconds
-    $timeOut ||=  28800; # default to 8 hours
+    $timeOut ||= 28800; # default to 8 hours
     my $probes = $params{'probes'};
     my $blocks = ceil($probes / $probesInBlock);
     my @names = readSampleNames($in, \%params);
@@ -82,7 +82,7 @@ sub findMetrics {
         if ($probesInBlock > $probes - $i) {
             $probesInBlock = $probes - $i; # reduce size for final block
         }
-        if ( (time - $start) > $timeOut) {
+        if ( (time() - $start) > $timeOut) {
             print STDERR "ERROR: Timeout after $timeOut s; exiting.\n";
             return (0,0,0);
         }
