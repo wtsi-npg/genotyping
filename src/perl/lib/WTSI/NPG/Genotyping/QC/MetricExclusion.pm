@@ -44,6 +44,8 @@ sub applyThresholds {
             unless (defined($results{$uri}{$metric}) || $warn{$metric}) {
                 carp "Result not found for metric \"$metric\"";
                 $warn{$metric} = 1; # warn on first occurrence only
+                $metricPass{$uri}{$metric} = 1;
+                next;
             }
             my ($oldPass, $value) = @{$results{$uri}{$metric}};
             my $newPass = 1;
