@@ -33,7 +33,7 @@ sub applyThresholds {
     my %metricPass;
     my %fail;
     my $failTotal = 0;
-    my $warn = {};
+    my %warn = {};
     foreach my $metric (@metrics) { $fail{$metric}=0; }
     foreach my $uri (keys %results) {
         my $sampleOK = 1;
