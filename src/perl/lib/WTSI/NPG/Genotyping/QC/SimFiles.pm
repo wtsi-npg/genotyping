@@ -68,6 +68,8 @@ sub findMetrics {
     my %params = %{ shift()};
     my $probesInBlock = shift;
     $probesInBlock ||= 1000;
+    my $timeOut = shift; # maximum time, in seconds
+    $timeOut ||=  28800; # default to 8 hours
     my $probes = $params{'probes'};
     my $blocks = ceil($probes / $probesInBlock);
     my @names = readSampleNames($in, \%params);
@@ -75,9 +77,14 @@ sub findMetrics {
     my $i = 0; # probe offset
     my $block = 0; # block count
     my $nanTotal = 0; # NaN values in input
+    my $start = time;
     while ($i < $probes) {
         if ($probesInBlock > $probes - $i) {
             $probesInBlock = $probes - $i; # reduce size for final block
+        }
+        if ( (time - $start) > $timeOut) {
+            print STDERR "ERROR: Timeout after $timeOut s; exiting.\n";
+            return (0,0,0);
         }
         my @args = ($in, $i, $probesInBlock, \%params);
         my ($magRef, $xyRef, $nans) = metricTotalsForProbeBlock(@args);
@@ -279,6 +286,11 @@ sub writeIntensityMetrics {
     my ($magRef, $xyRef, $nans) = findMetrics($in, $log, \%params, 
                                               $probesInBlock);
     close $in || croak("Cannot close filehandle!");
+    if ($magRef==0) {
+        print $log "ERROR: Intensity metric calculation timed out.\n";
+        close $log || croak("Cannot close log $logPath");
+        return 1;
+    }
     if ($nans > 0) {
         my $msg = "$nans NaN values found in .sim file $inPath";
         print $log "WARNING: $msg\n";
