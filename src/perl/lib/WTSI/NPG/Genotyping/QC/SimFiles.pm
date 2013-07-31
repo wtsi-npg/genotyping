@@ -83,7 +83,10 @@ sub findMetrics {
             $probesInBlock = $probes - $i; # reduce size for final block
         }
         if ( (time() - $start) > $timeOut) {
-            print STDERR "ERROR: Timeout after $timeOut s; exiting.\n";
+            my $msg = "Pipeline QC error. Intensity metric timeout ".
+                "after $timeOut s; exiting.\n";
+            print STDERR $msg;
+            print $log $msg;
             return (0,0,0);
         }
         my @args = ($in, $i, $probesInBlock, \%params);
