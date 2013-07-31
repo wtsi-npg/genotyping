@@ -144,8 +144,9 @@ Returns:
           ## get .sim file from GTC files for intensity metrics
           smargs = {:normalize => true }.merge(args)
           smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
-          gcqcargs = {:run => run_name,
-            :sim => smfile}.merge(args)
+          if smfile
+            gcqcargs = {:run => run_name, :sim => smfile}.merge(args)
+          end
         end
         ## run gencall QC to get metrics for prefiltering
         gcquality = nil
