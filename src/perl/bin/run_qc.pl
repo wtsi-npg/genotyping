@@ -20,7 +20,8 @@ use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 
-my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, $plinkPrefix, $runName, $postCR);
+my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, 
+    $plinkPrefix, $runName);
 
 GetOptions("help"              => \$help,
            "output-dir=s"      => \$outDir,
@@ -64,7 +65,7 @@ my $texIntroPath = defaultTexIntroPath($iniPath);
 $texIntroPath = verifyAbsPath($texIntroPath);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $postCR, $texIntroPath);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath);
 
 sub cleanup {
     # create a 'supplementary' directory in current working directory
@@ -149,7 +150,7 @@ sub verifyAbsPath {
 
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
-        $outDir, $title, $postCR, $texIntroPath) = @_;
+        $outDir, $title, $texIntroPath) = @_;
     my $startDir = getcwd;
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
