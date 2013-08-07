@@ -17,6 +17,11 @@ use Inline (C => Config =>
             CCFLAGS => '-lm');
 use Inline C => 'DATA';
 
+# Setting the Inline DIRECTORY parameter from user input (eg. command line 
+# argument) does not work for module import. Instead, the 
+# PERL_INLINE_DIRECTORY environment variable is set in the relevant Percolate 
+# workflows. It can also be set by the user if running QC manually.
+
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/headerParams readSampleNames writeIntensityMetrics/;
 our $HEADER_LENGTH = 16;
