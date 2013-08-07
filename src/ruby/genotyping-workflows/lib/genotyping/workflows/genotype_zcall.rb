@@ -105,6 +105,8 @@ Returns:
       args.delete(:queue)
       args.delete(:select)
 
+      ENV['PERL_INLINE_DIRECTORY'] = self.inline_dir
+
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
       Dir.mkdir(log_dir) unless File.exist?(log_dir)
