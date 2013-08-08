@@ -100,6 +100,8 @@ Returns:
       args.delete(:queue)
       args.delete(:select)
 
+      ENV['PERL_INLINE_DIRECTORY'] = self.inline_dir
+
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
       Dir.mkdir(log_dir) unless File.exist?(log_dir)
@@ -121,12 +123,20 @@ Returns:
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
-      ## run gencall QC to apply gencall CR filter and find genders
-      gcqcargs = {:run => run_name }.merge(args)
+      siargs = {:config => gtconfig,
+        :gender_method => gender_method}.merge(args)
+      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
+      smargs = {:normalize => true }.merge(args)
+      smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
 
-      gcqcdir = File.join(work_dir, 'gencall_qc')
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                  async, true)
+      ## run gencall QC to apply gencall CR filter and find genders
+      gcquality = nil
+      if smfile
+        gcqcargs = {:run => run_name, :sim => smfile }.merge(args)
+        gcqcdir = File.join(work_dir, 'gencall_qc')
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                    async, true)
+      end
 
       filtered = nil
       if gcquality
@@ -152,7 +162,7 @@ Returns:
       end
 
       cjson = nil
-      if smfile
+      if filtered
         njson, cjson = parse_manifest(manifest, njname, cjname, args)
       end
 
@@ -183,7 +193,7 @@ Returns:
                                  sjson, njson, args, async)
 
       qcargs = {:run => run_name,
-                :sim => smfile}.merge(args) # add smfile to qcargs
+                :sim => smfile}.merge(args)
 
       ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
 
