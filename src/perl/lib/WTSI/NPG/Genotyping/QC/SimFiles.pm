@@ -12,33 +12,21 @@ use Carp;
 use bytes;
 use POSIX qw(ceil ctime);
 use Exporter;
+use Inline (C => Config =>
+            AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"math.h\"",
+            CCFLAGS => '-lm');
+use Inline C => 'DATA';
+
+# Setting the Inline DIRECTORY parameter from user input (eg. command line 
+# argument) does not work for module import. Instead, the 
+# PERL_INLINE_DIRECTORY environment variable is set in the relevant Percolate 
+# workflows. It can also be set by the user if running QC manually.
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/headerParams readSampleNames writeIntensityMetrics/;
 our $HEADER_LENGTH = 16;
 our $MAX_NAN = 0.01; # maximum proportion of NaN values in .sim block
 
-sub computeMetric {
-    # find (un-normalised) magnitude or xydiff, assuming 2 channels
-    # list of intensities composed of (x,y) pairs
-    my @intensities = @{ shift() };
-    my $metric = shift;
-    my $i = 0;
-    my @values;
-    while ($i < @intensities) {
-        my $val;
-        if ($metric eq 'magnitude') {
-            $val = sqrt($intensities[$i]**2 + $intensities[$i+1]**2);
-        } elsif ($metric eq 'xydiff') {
-            $val = $intensities[$i+1] - $intensities[$i];
-        } else {
-            croak("Unknown metric name: \"$metric\"");
-        }
-        push(@values, $val);
-        $i += 2;
-    }
-    return @values;
-}
 
 sub extractSampleRange {
     # extract given range of samples from .sim file, and output
@@ -68,6 +56,8 @@ sub findMetrics {
     my %params = %{ shift()};
     my $probesInBlock = shift;
     $probesInBlock ||= 1000;
+    my $timeOut = shift; # maximum time, in seconds
+    $timeOut ||= 28800; # default to 8 hours
     my $probes = $params{'probes'};
     my $blocks = ceil($probes / $probesInBlock);
     my @names = readSampleNames($in, \%params);
@@ -75,9 +65,17 @@ sub findMetrics {
     my $i = 0; # probe offset
     my $block = 0; # block count
     my $nanTotal = 0; # NaN values in input
+    my $start = time;
     while ($i < $probes) {
         if ($probesInBlock > $probes - $i) {
             $probesInBlock = $probes - $i; # reduce size for final block
+        }
+        if ( (time() - $start) > $timeOut) {
+            my $msg = "Pipeline QC error. Intensity metric timeout ".
+                "after $timeOut s; exiting.\n";
+            print STDERR $msg;
+            print $log $msg;
+            return (0,0,0);
         }
         my @args = ($in, $i, $probesInBlock, \%params);
         my ($magRef, $xyRef, $nans) = metricTotalsForProbeBlock(@args);
@@ -140,13 +138,13 @@ sub metricTotalsForProbeBlock {
         $nanTotal += $nans;
         my @intensities = @{$intsRef};
         # update magnitude totals
-        my @mag = computeMetric(\@intensities, 'magnitude');
+        my @mag = Magnitudes(@intensities);
         for (my $j=0;$j<@mag;$j++) { # foreach probe
             $magsByProbe[$j] += $mag[$j];
         }
         push(@magTable, \@mag);
         # update xydiff totals
-        my @xy = computeMetric(\@intensities, 'xydiff');
+        my @xy = XYDiffs(@intensities);
         for (my $j=0;$j<@mag;$j++) { # foreach probe
             $xyTotals[$i] += $xy[$j];
         }
@@ -279,6 +277,11 @@ sub writeIntensityMetrics {
     my ($magRef, $xyRef, $nans) = findMetrics($in, $log, \%params, 
                                               $probesInBlock);
     close $in || croak("Cannot close filehandle!");
+    if ($magRef==0) {
+        print $log "ERROR: Intensity metric calculation timed out.\n";
+        close $log || croak("Cannot close log $logPath");
+        return 1;
+    }
     if ($nans > 0) {
         my $msg = "$nans NaN values found in .sim file $inPath";
         print $log "WARNING: $msg\n";
@@ -301,5 +304,37 @@ sub writeIntensityMetrics {
     return 1;
 }
 
-
 1;
+
+__DATA__
+__C__
+
+
+void IntensityMetrics(int mode, SV* params) {
+    /*  Mode is 0 for xydiff, 1 for magnitude
+        Input params are a list of (pairs of) input values */
+    Inline_Stack_Vars;
+    int total = Inline_Stack_Items;
+    int i;
+    for (i=0;i<total;i+=2) {
+        float x = SvNV(Inline_Stack_Item(i));       
+        float y = SvNV(Inline_Stack_Item(i+1));
+        float result;
+        if (mode==0) {
+            result = y - x;
+        } else if (mode==1) {
+            result = sqrt(x*x + y*y);
+        }
+        Inline_Stack_Item(i/2) = newSVnv(result);
+    }
+    Inline_Stack_Return(total/2);
+}
+
+void Magnitudes(SV* params, ...) {
+    return IntensityMetrics(1, params);
+}
+
+void XYDiffs(SV* params, ...) {
+    return IntensityMetrics(0, params);
+}
+

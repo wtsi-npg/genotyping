@@ -33,6 +33,7 @@ sub applyThresholds {
     my %metricPass;
     my %fail;
     my $failTotal = 0;
+    my %warned = ();
     foreach my $metric (@metrics) { $fail{$metric}=0; }
     foreach my $uri (keys %results) {
         my $sampleOK = 1;
@@ -41,7 +42,12 @@ sub applyThresholds {
         }
         foreach my $metric (@metrics) {
             unless (defined($results{$uri}{$metric})) {
-                croak "Result not found for metric \"$metric\" at URI $uri";
+                unless ($warned{$metric}) {
+                    carp "Result not found for metric \"$metric\"";
+                    $warned{$metric} = 1; # warn on first occurrence only
+                }
+                $metricPass{$uri}{$metric} = 1;
+                next;
             }
             my ($oldPass, $value) = @{$results{$uri}{$metric}};
             my $newPass = 1;
