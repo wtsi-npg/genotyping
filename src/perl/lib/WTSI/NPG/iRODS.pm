@@ -264,6 +264,7 @@ sub icd {
   defined $collection or $log->logconfess('A defined collection argument is required');
   $collection eq '' and $log->logconfess('A non-empty collection argument is required');
 
+  $collection = _ensure_absolute($collection);
   $collection =~ s!/$!!;
   my @wd = _run_command($ICD, qq{"$collection"});
 
@@ -385,7 +386,12 @@ sub list_object {
   my $name = `$command 2> /dev/null`;
   chomp($name);
 
-  return $name;
+  my $listed = "";
+  if ($name) {
+    $listed = _ensure_absolute($name);
+  }
+
+  return $listed;
 }
 
 =head2 add_object
@@ -460,6 +466,9 @@ sub move_object {
   $source eq '' and $log->logconfess('A non-empty source (object) argument is required');
   defined $target or $log->logconfess('A defined target (object) argument is required');
   $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
+
+  $source = _ensure_absolute($source);
+  $target = _ensure_absolute($target);
 
   $log->debug("Moving object from '$source' to '$target'");
 
@@ -636,6 +645,7 @@ sub find_objects_by_meta {
   defined $root or $log->logconfess('A defined root argument is required');
   $root eq '' and $log->logconfess('A non-empty root argument is required');
 
+  $root = _ensure_absolute($root);
   my $zone = find_zone_name($root);
   my $query = _make_imeta_query(@query_specs);
   my @results = _run_command($IMETA, '-z', $zone, 'qu', '-d', $query);
@@ -768,6 +778,8 @@ sub move_collection {
   defined $target or $log->logconfess('A defined target (collection) argument is required');
   $target eq '' and $log->logconfess('A non-empty target (collection) argument is required');
 
+  $source = _ensure_absolute($source);
+  $target = _ensure_absolute($target);
   $source =~ s!/$!!;
   $target =~ s!/$!!;
 
@@ -794,6 +806,9 @@ sub remove_collection {
   defined $collection or $log->logconfess('A defined collection argument is required');
   $collection eq '' and $log->logconfess('A non-empty collection argument is required');
 
+  $collection = _ensure_absolute($collection);
+  $collection =~ s!/$!!;
+
   $log->debug("Removing collection '$collection'");
   return _irm(qq("$collection"));
 }
@@ -815,6 +830,8 @@ sub get_collection_meta {
 
   defined $collection or $log->logconfess('A defined collection argument is required');
   $collection eq '' and $log->logconfess('A non-empty collection argument is required');
+
+  $collection = _ensure_absolute($collection);
   $collection =~ s!/$!!;
 
   return _parse_raw_meta(_run_command($IMETA, 'ls', '-C', qq("$collection")))
@@ -846,6 +863,7 @@ sub add_collection_meta {
   $value eq '' and $log->logconfess('A non-empty value argument is required');
 
   $units ||= '';
+  $collection = _ensure_absolute($collection);
   $collection =~ s!/$!!;
 
   $log->debug("Adding metadata pair '$key' -> '$value' to '$collection'");
@@ -885,6 +903,7 @@ sub remove_collection_meta {
   $value eq '' and $log->logconfess('A non-empty value argument is required');
 
   $units ||= '';
+  $collection = _ensure_absolute($collection);
   $collection =~ s!/$!!;
 
   $log->debug("Removing metadata pair '$key' -> '$value' from '$collection'");
@@ -916,6 +935,8 @@ sub find_collections_by_meta {
 
   defined $root or $log->logconfess('A defined root argument is required');
   $root eq '' and $log->logconfess('A non-empty root argument is required');
+
+  $root = _ensure_absolute($root);
 
   my $zone = find_zone_name($root);
   my $query = _make_imeta_query(@query_specs);

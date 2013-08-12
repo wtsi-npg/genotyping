@@ -160,7 +160,7 @@ add_object($test_file, $to_move);
 
 ok(list_object($to_move));
 ok(!list_object($moved));
-is($moved, move_object($to_move, $moved));
+is(move_object($to_move, $moved), "$wd/$moved");
 ok(!list_object($to_move));
 ok(list_object($moved));
 remove_object($moved);
@@ -177,7 +177,7 @@ ok(set_group_access(undef, 'public', $new_object));
 # list_object
 dies_ok { list_object() }
   'Expected to fail listing an undefined object';
-is(list_object($test_object), $test_object);
+is(list_object($test_object), "$wd/$test_object");
 
 # add_object_meta
 dies_ok { add_object_meta('no_such_object', 'attr', 'value') }
