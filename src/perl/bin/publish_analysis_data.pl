@@ -94,7 +94,7 @@ sub run {
               -exitval => 4);
   }
 
-  $archive_pattern ||= $WTSI::NPG::Genotyping::Publication::DEFAULT_SAMPLE_ARCHIVE_PATTERN;
+  $archive_pattern ||= $WTSI::NPG::Genotyping::Publication::DEFAULT_SAMPLE_ARCHIVE;
   $config ||= $DEFAULT_INI;
 
   my $log;
