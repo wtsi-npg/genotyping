@@ -468,8 +468,8 @@ sub publish_analysis_directory {
 
     foreach my $title (@project_titles) {
       # Find the sample-level data for this genotyping project
-      my @sample_data =  @{find_objects_by_meta($sample_archive,
-                                                ['dcterms:title' => $title])};
+      my @sample_data =  find_objects_by_meta($sample_archive,
+                                              ['dcterms:title' => $title]);
       # Find the samples included at the analysis stage
       my %included_samples =
         make_included_sample_table($title, $pipedb, $run_name);
