@@ -13,7 +13,7 @@ use bytes;
 use POSIX qw(ceil ctime);
 use Exporter;
 use Inline (C => Config =>
-            AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"math.h\"",
+	    AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"stdlib.h\"\n#include\"math.h\"\n#include\"inttypes.h\"\n",
             CCFLAGS => '-lm');
 use Inline C => 'DATA';
 
@@ -23,284 +23,19 @@ use Inline C => 'DATA';
 # workflows. It can also be set by the user if running QC manually.
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/headerParams readSampleNames writeIntensityMetrics/;
+our @EXPORT_OK = qw/printSimHeader writeIntensityMetrics/;
 our $HEADER_LENGTH = 16;
-our $MAX_NAN = 0.01; # maximum proportion of NaN values in .sim block
 
-
-sub extractSampleRange {
-    # extract given range of samples from .sim file, and output
-    # useful for creating small test datasets
-    my ($in, $out, $startIndex, $endIndex) = @_;
-    my $header = readHeader($in); 
-    print $out $header;
-    my @header = unpackHeader($header);
-    my $blockSize = blockSizeFromHeader(@header);
-    for (my $i=$startIndex;$i<$endIndex;$i++) {
-        my $start = $HEADER_LENGTH + $i*$blockSize;
-        my $data;
-        seek($in, $start, 0);
-        read($in, $data, $blockSize);
-        print $out $data;
-    }
-    return 1;
-}
-
-sub findMetrics {
-    # find mean xydiff and normalised magnitude for each sample
-    # read blocks of probes; find mean magnitude for each probe to normalize
-    # update running totals by sample for each block
-    my $in = shift;
-    my $log = shift;
-    select $log; $|++; # flush log immediately for each output
-    my %params = %{ shift()};
-    my $probesInBlock = shift;
-    $probesInBlock ||= 1000;
-    my $timeOut = shift; # maximum time, in seconds
-    $timeOut ||= 28800; # default to 8 hours
-    my $probes = $params{'probes'};
-    my $blocks = ceil($probes / $probesInBlock);
-    my @names = readSampleNames($in, \%params);
-    my (%magTotals, %xyTotals, $nans);
-    my $i = 0; # probe offset
-    my $block = 0; # block count
-    my $nanTotal = 0; # NaN values in input
-    my $start = time;
-    while ($i < $probes) {
-        if ($probesInBlock > $probes - $i) {
-            $probesInBlock = $probes - $i; # reduce size for final block
-        }
-        if ( (time() - $start) > $timeOut) {
-            my $msg = "Pipeline QC error. Intensity metric timeout ".
-                "after $timeOut s; exiting.\n";
-            print STDERR $msg;
-            print $log $msg;
-            return (0,0,0);
-        }
-        my @args = ($in, $i, $probesInBlock, \%params);
-        my ($magRef, $xyRef, $nans) = metricTotalsForProbeBlock(@args);
-        $nanTotal += $nans;
-        my @mags = @{$magRef};
-        my @xy = @{$xyRef};
-        for (my $j=0;$j<@names;$j++) {
-            $magTotals{$names[$j]} += $mags[$j];
-            $xyTotals{$names[$j]} += $xy[$j];
-        }
-        $i += $probesInBlock;
-        $block++;
-        if ($block % 10 == 0 || $i == $probes) {
-            my $timeStamp = ctime(time()); # ends with \n
-            my $msg = "Metrics found for block $block of $blocks, ".
-                "probe $i of $probes: $timeStamp";
-            print $log $msg;
-        }
-    }
-    foreach my $name (@names) { # find mean values across probes
-        $magTotals{$name} = $magTotals{$name} / $probes;
-        $xyTotals{$name} = $xyTotals{$name} / $probes;
-    }
-    return (\%magTotals, \%xyTotals, $nanTotal);
-}
-
-sub headerParams {
-    # read/compute .sim file parameters form header
-    my $in = shift;
-    my @header = unpackHeader(readHeader($in));
-    my ($magic, $version, $nameLength, $samples, $probes, $channels, 
-        $numberType) = @header;
-    my %params = (
-        'magic' => $magic,
-        'version' => $version,
-        'name_bytes' => $nameLength,
-        'samples' => $samples,
-        'probes' => $probes,
-        'channels' => $channels,
-        'number_type' => $numberType,
-        );
-    my $numericBytes = numericBytesByFormat($numberType);
-    my $sampleUnitBytes = $nameLength + ($probes * $channels * $numericBytes);
-    $params{'numeric_bytes'} = $numericBytes;
-    $params{'sample_unit_bytes'} = $sampleUnitBytes;
-    return %params;
-}
-
-sub metricTotalsForProbeBlock {
-    # find total (normalised) magnitude and xydiff 
-    # for all samples, for given range of probes
-    my ($in, $probeStart, $probeTotal, $paramsRef) = @_;
-    my %params = %{$paramsRef};
-    my $samples = $params{'samples'};
-    my $nanTotal;
-    my (@magsByProbe, @magTable, @magTotalsBySample, @xyTotals);
-    for (my $i=0;$i<$samples;$i++) { # foreach sample
-        my ($intsRef, $nans) = readProbeRange($in, $i, $probeStart, 
-                                              $probeTotal, $paramsRef);
-        $nanTotal += $nans;
-        my @intensities = @{$intsRef};
-        # update magnitude totals
-        my @mag = Magnitudes(@intensities);
-        for (my $j=0;$j<@mag;$j++) { # foreach probe
-            $magsByProbe[$j] += $mag[$j];
-        }
-        push(@magTable, \@mag);
-        # update xydiff totals
-        my @xy = XYDiffs(@intensities);
-        for (my $j=0;$j<@mag;$j++) { # foreach probe
-            $xyTotals[$i] += $xy[$j];
-        }
-    }
-    # find mean magnitude by probe
-    for (my $i=0; $i<$probeTotal; $i++) {
-        $magsByProbe[$i] = $magsByProbe[$i] / $samples;
-    }
-    # find normalized mag totals by sample
-    for (my $i=0;$i<$samples;$i++) { # foreach sample
-        for (my $j=0;$j<$probeTotal;$j++) { # foreach probe
-            if ($magsByProbe[$j] != 0) { 
-                $magTotalsBySample[$i] += $magTable[$i][$j] / $magsByProbe[$j];
-            }
-        }
-    }
-    return (\@magTotalsBySample, \@xyTotals, $nanTotal);
-}
-
-sub numericBytesByFormat {
-    # return number of bytes used for each numeric entry, for .sim format code
-    my $format = shift;
-    if ($format==0) { return 4; }
-    elsif ($format==1) { return 2; }
-    else { croak "Unknown .sim numeric format code: $format : $!"; }
-}
-
-sub readHeader {
-    # read .sim format header with no unpack
-    # header fields: 
-    # ($magic, $version, $nameLength, $samples, $probes, $channels, $numberType)
-    my $fh = shift;
-    seek($fh, 0, 0);
-    my $header;
-    read($fh, $header, $HEADER_LENGTH); # header = first 16 bytes
-    return $header;
-}
-
-sub readName {
-    # read name of sample with given $blockOffset
-     my ($fh, $nameLength, $blockOffset, $blockSize) = @_;
-     my $start = $HEADER_LENGTH + $blockOffset*$blockSize;
-     my $data;
-     seek($fh, $start, 0);
-     read($fh, $data, $nameLength);
-     my @words = unpack("a$nameLength", $data);
-     my $name = shift(@words);
-     return $name;
-}
-
-sub readProbeRange {
-    # read intensities for given sample and range of probes
-    my ($fh, $sampleOffset, $probeStart, $probeTotal, $paramsRef) = @_;
-    my %params = %{$paramsRef};
-    my $channels = $params{'channels'};
-    my $probeBytes = $params{'numeric_bytes'} * $channels;
-    my $start = $HEADER_LENGTH + ($sampleOffset*$params{'sample_unit_bytes'}) 
-        + $params{'name_bytes'} + ($probeBytes*$probeStart);
-    seek($fh, $start, 0);
-    my $binary;
-    read($fh, $binary, $probeBytes*$probeTotal);
-    my ($blockRef, $nans) = unpackSignals($binary, $params{'numeric_bytes'}, 
-                                          $params{'number_type'});
-    return ($blockRef, $nans);
-}
-
-sub readSampleNames {
-    # read names of all samples in order
-    my $in = shift;
-    my %params = %{ shift() };
-    my @names;
-    for (my $i=0;$i<$params{'samples'};$i++) {
-        my $name = readName($in, $params{'name_bytes'}, $i, 
-                            $params{'sample_unit_bytes'});
-        $name =~ s/\0//g; # strip off null padding
-        push(@names, $name);
-    }
-    return @names;
-}
-
-sub unpackHeader {
-    my $header = shift;
-    my @fields = unpack("A3CSLLCC", $header);
-    return @fields;
-}
-
-sub unpackSignals {
-    # unpack a chunk of binary data into signal values
-    # TODO replace this with C for better speed??
-    my ($data, $numericBytes, $numberType) = @_;
-    my $dataBytes = bytes::length($data);
-    if ($dataBytes % $numericBytes !=0) { 
-        croak "Incorrect number of bytes in signal data chunk: $!"; 
-    }
-    my $signals = $dataBytes/$numericBytes; # how many signal values?
-    my @signals;
-    if ($numberType==0) { 
-        # unpack/repack circumvents horrible Perl ambiguities in number format
-        @signals = unpack("V$signals", $data);
-        my $repacked = pack("L$signals", @signals);
-        @signals = unpack("f$signals", $repacked);
-    } elsif ($numberType==1) {
-        @signals = unpack("v$signals", $data);
-        for (my $i=0;$i<$signals;$i++) { $signals[$i] = $signals[$i] / 1000; }
-    }
-    my $nanCount = 0;    
-    my $maxNan = $signals*$MAX_NAN; # eg. allow no more than 1% NaN values
-    # clean up data by removing NaN values
-    foreach (my $i=0;$i<$signals;$i++) {
-        if ($signals[$i] eq 'nan') { 
-            $nanCount++; 
-            $signals[$i] = 0;
-        }
-    }
-    return (\@signals, $nanCount);
+sub printSimHeader {
+    my $simPath = shift;
+    PrintSimHeader($simPath);
 }
 
 sub writeIntensityMetrics {
     # find xydiff and normalised magnitude, and write to file
-    # arguments: paths for input/output; if no input path, use STDIN
-    my ($inPath, $outPathMag, $outPathXY, $logPath, $probesInBlock) = @_;
-    my $in;
-    if ($inPath) { open $in, "<", $inPath; }
-    else { $in = \*STDIN; $inPath = "STDIN"; }
-    $logPath ||= "intensity_metrics.log";
-    open my $log, ">", $logPath;
-    print $log "Started: ".
-        ctime(time())."Input: $inPath\n";
-    my %params = headerParams($in);
-    my ($magRef, $xyRef, $nans) = findMetrics($in, $log, \%params, 
-                                              $probesInBlock);
-    close $in || croak("Cannot close filehandle!");
-    if ($magRef==0) {
-        print $log "ERROR: Intensity metric calculation timed out.\n";
-        close $log || croak("Cannot close log $logPath");
-        return 1;
-    }
-    if ($nans > 0) {
-        my $msg = "$nans NaN values found in .sim file $inPath";
-        print $log "WARNING: $msg\n";
-        carp $msg;
-    }
-    my %mag = %{$magRef};
-    my %xy = %{$xyRef};
-    my @samples = sort(keys(%mag));
-    print $log "Opening output files: $outPathMag $outPathXY\n";
-    open my $outMag, ">", $outPathMag;
-    open my $outXY, ">", $outPathXY;
-    foreach my $sample (@samples) {
-        printf($outMag "%s\t%.8f\n", ($sample, $mag{$sample})); 
-        printf($outXY "%s\t%.8f\n", ($sample, $xy{$sample})); 
-    }
-    print $log "Output written.\nFinished: ".ctime(time())."\n";
-    foreach my $fh ($log, $outMag, $outXY) {
-        close $fh || croak("Cannot close filehandle!");
-    }
+    # alias for FindMetrics from in-line C
+    # arguments: input, magnitude output, xydiff output, verbose
+    FindMetrics(@_);
     return 1;
 }
 
@@ -309,32 +44,313 @@ sub writeIntensityMetrics {
 __DATA__
 __C__
 
+# define _FILE_OFFSET_BITS 64 // enable handling of large .sim files
 
-void IntensityMetrics(int mode, SV* params) {
-    /*  Mode is 0 for xydiff, 1 for magnitude
-        Input params are a list of (pairs of) input values */
-    Inline_Stack_Vars;
-    int total = Inline_Stack_Items;
-    int i;
-    for (i=0;i<total;i+=2) {
-        float x = SvNV(Inline_Stack_Item(i));       
-        float y = SvNV(Inline_Stack_Item(i+1));
-        float result;
-        if (mode==0) {
-            result = y - x;
-        } else if (mode==1) {
-            result = sqrt(x*x + y*y);
-        }
-        Inline_Stack_Item(i/2) = newSVnv(result);
+# define HEADSIZE 16  // size in bytes of .sim file header
+
+typedef struct simhead simhead;
+struct simhead {
+    // variables in header
+    char* magic;
+    unsigned char version;
+    uint16_t nameSize;
+    uint32_t samples;
+    uint32_t probes;
+    unsigned char channels;
+    unsigned char format;
+    // additional variables for derived quantities
+    int numericBytes;
+    int sampleUnitBytes;
+};
+
+void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
+		    char verbose);
+void metricsFromFile(char* inPath, float mags[], float xyds[], char* names[],
+                     int *np, char verbose);
+void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
+		      float *signals, int *nans, char *name);
+void readHeader(FILE *in, struct simhead *h);
+void printHeader(struct simhead *h);
+void readHeaderFromPath(char* inPath, struct simhead *hp);
+float sampleMag(int totalSamples, float signals[], float magByProbe[]);
+float sampleXYDiff(int totalSamples, float signals[]);
+void writeResults(char* outPath, int total, char* names[], float results[]);
+void FindMetrics(SV* args, ...);
+void PrintSimHeader(SV* args, ...);
+
+/*********************************************************/
+
+void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
+		    char verbose) {
+  /* Find mean magnitude for each probe 
+   Name and NaN count required for readSampleProbes, but not used here */
+  int i, j;
+  char *name;
+  float *signals;
+  name = (char*) malloc(header.nameSize+1);
+  signals = (float*) malloc(header.probes * header.channels * sizeof(float));
+  int nans = 0;
+  int *np = &nans;
+  for (i=0;i<header.samples;i++) {
+    readSampleProbes(in, i, header, signals, np, name);
+    if (i==0) {
+      for (j=0;j<10;j++) { printf("%f\t%f\n", signals[j], signals[j+1]); }
     }
-    Inline_Stack_Return(total/2);
+    for (j=0;j<header.probes*2;j+=2) {
+       float a = signals[j];
+       float b = signals[j+1];
+       magByProbe[j/2] += sqrt(a*a + b*b);
+    }
+  }
+  for (i=0;i<header.probes;i++) {
+    magByProbe[i] = magByProbe[i] / header.samples;
+  }
+  if (verbose) { 
+    printf("Found mean magnitude by probe.\n"); 
+    for (i=0;i<5;i++) { printf("%f\n", magByProbe[i]); }
+  }
 }
 
-void Magnitudes(SV* params, ...) {
-    return IntensityMetrics(1, params);
+void metricsFromFile(char* inPath, float mags[], float xyds[], 
+                     char* names[], int *np, char verbose) {
+  /* Read a .sim file; find sample names and intensity metrics */
+  FILE *in;
+  in = fopen(inPath, "r");
+  struct simhead header;
+  struct simhead *hp;
+  hp = &header;
+  readHeader(in, hp);
+  if (verbose) { printHeader(hp); }
+  /* read intensities and compute metrics
+   * need to normalize sample magnitude by mean magnitude for each probe */
+  int total;
+  float *signals, *magByProbe;
+  char *name;
+  name = (char*) malloc(header.nameSize+1);
+  total = header.probes * header.channels;
+  signals = (float*) malloc(total*sizeof(float));
+  magByProbe = (float*) malloc(header.probes*sizeof(float));
+  // first pass -- find mean magnitude of intensity by probe
+  findMagByProbe(in, header, magByProbe, verbose);
+  // second pass -- find xydiff and normalized magnitude for each sample
+  int i;
+  for (i=0;i<header.samples;i++) {
+    readSampleProbes(in, i, header, signals, np, name);
+    //char temp[header.nameSize+1];
+    //strcpy(temp, name);
+    
+    //names[i] = &temp;
+    strcpy(names[i], name); 
+    printf("%d:%s\n", i, names[i]);
+    mags[i] = sampleMag(header.samples, signals, magByProbe);
+    xyds[i] = sampleXYDiff(header.samples, signals);
+  }
+  /* Check that end of .sim file has been reached */
+  char last;
+  last = fgetc(in);
+  if (last!=EOF) { 
+    fprintf(stderr, "ERROR: Data found after expected end of .sim file.\n");
+    exit(1);
+  } else if (verbose) { 
+    printf("OK: End of .sim file found.\n"); 
+  }
+  fclose(in);
+  if (verbose) { printf("NaNs found:%d\n", *np); }
+  free(signals);
 }
 
-void XYDiffs(SV* params, ...) {
-    return IntensityMetrics(0, params);
+void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
+		      float *signals, int *nans, char *name) {
+    /* Read intensities for the Nth sample in the file
+       Record number of NaN intensites, and convert NaN values to 0 
+
+       start = header + sample offset + name + probe offset
+       start may be very high for large files, so use 'long long' type
+    */
+  
+  unsigned long long start, sampleUnitBytesL, offsetL, headSizeL;
+  sampleUnitBytesL = (unsigned long long) header.sampleUnitBytes;
+  offsetL = (unsigned long long) sampleOffset;
+  headSizeL = (unsigned long long) HEADSIZE;
+  start = headSizeL + (offsetL * sampleUnitBytesL);
+  int signalTotal = header.probes * header.channels;
+  int result;
+  result = fseeko(in, start, 0); 
+  if (result!=0) {  
+    fprintf(stderr, "ERROR: Seek failed in .sim file.\n");  
+    fprintf(stderr, "OFFSET:%llu\n", offsetL);
+    fprintf(stderr, "SAMPLE_UNIT_BYTES:%llu\n", sampleUnitBytesL);
+    fprintf(stderr, "ATTEMPTED_SEEK_POSITION:%llu\n", start);
+    fprintf(stderr, "TELL_POSITION:%llu\n", ftello(in));
+    exit(1);
+  }
+  fgets(name, header.nameSize+1, in);
+  fread(signals, header.numericBytes, signalTotal, in);
+  // loop over signals, convert nan's to 0 and count nan's
+  int i;
+  *nans = 0;
+  for (i=0;i<signalTotal;i++) {
+    if (isnan(signals[i])) {
+      signals[i] = 0;
+      *nans++;
+    }
+  }
 }
 
+void readHeader(FILE *in, struct simhead *hp) {
+  /* Reader header from a .sim file in standard format */
+  rewind(in);
+  char *magic = malloc(4);
+  fread(magic, 1, 3, in);
+  unsigned char version;
+  fread(&version, 1, 1, in);
+  uint16_t nameSize;
+  fread(&nameSize, 2, 1, in);
+  uint32_t samples;
+  fread(&samples, 4, 1, in);
+  uint32_t probes;
+  fread(&probes, 4, 1, in);
+  unsigned char channels;
+  fread(&channels, 1, 1, in);
+  unsigned char format;
+  fread(&format, 1, 1, in);
+  
+  (*hp).magic = magic;
+  (*hp).version = version;
+  (*hp).nameSize = nameSize;
+  (*hp).samples = samples;
+  (*hp).probes = probes;
+  (*hp).channels = channels;
+  (*hp).format = format;
+  int nb;
+  if (format == 0) { nb = 4; }
+  else if (format == 1) { nb = 2; }
+  (*hp).numericBytes = nb;
+  (*hp).sampleUnitBytes = nameSize + (probes * channels * nb);
+}
+
+void printHeader(struct simhead *hp) {
+  printf("MAGIC:%s\n", (*hp).magic);
+  printf("VERSION:%d\n", (*hp).version);
+  printf("NAME_SIZE:%d\n", (*hp).nameSize);
+  printf("SAMPLES:%d\n", (*hp).samples);
+  printf("PROBES:%d\n", (*hp).probes);
+  printf("CHANNELS:%d\n", (*hp).channels);
+  printf("FORMAT:%d\n", (*hp).format);
+  printf("NUMERIC_BYTES:%d\n", (*hp).numericBytes);
+  printf("SAMPLE_UNIT_BYTES:%d\n", (*hp).sampleUnitBytes);
+}
+
+void readHeaderFromPath(char* inPath, struct simhead *hp) {
+    FILE *in;
+    in = fopen(inPath, "r");
+    if (in==NULL) {
+      perror("ERROR: Could not open .sim file");
+      exit(1);
+    }
+    readHeader(in, hp);
+    int status = fclose(in);
+    if (status!=0) {
+      perror("ERROR: Could not close .sim file");
+      exit(1);
+    }
+}
+
+float sampleMag(int totalSamples, float signals[], float magByProbe[]) {
+  /* Find mean magnitude of intensity for given sample
+   * Normalize by mean magnitude for each probe 
+   * Assumes data has exactly 2 intensity channels */
+  int i = 0;
+  float mag = 0.0;
+  int totalSignals = totalSamples*2;
+  while (i<totalSignals) {
+    float a = signals[i];
+    float b = signals[i+1];
+    mag += sqrt(a*a + b*b)/magByProbe[i/2]; 
+    i+=2;
+  }
+  mag = mag / totalSamples;
+  return(mag);
+}
+
+float sampleXYDiff(int totalSamples, float signals[]) {
+  /* Find mean xydiff for given sample 
+   * By definition, xydiff = (second intensity) - (first intensity )
+   * Assumes data has exactly 2 intensity channels */
+  int i = 0;
+  float xyd = 0.0;
+  int totalSignals = totalSamples*2;
+  while (i<totalSignals) {
+    xyd += signals[i+1] - signals[i];
+    i+=2;
+  }
+  xyd = xyd / totalSamples;
+  return(xyd);
+}
+
+void writeResults(char* outPath, int total, char* names[], float results[]) {
+  /* Write arrays of names and metric values to given output path */
+  FILE *out;
+  out = fopen(outPath, "w");
+  int i;
+  for (i=0;i<total;i++) {
+    fprintf(out, "%s\t%f\n", names[i], results[i]);
+  }
+  fclose(out);
+}
+
+
+void FindMetrics(SV* args, ...) {
+  /* Find magnitude and xydiff metrics */
+  Inline_Stack_Vars;
+  char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
+  char *magPath = SvPV(Inline_Stack_Item(1), PL_na);
+  char *xydPath = SvPV(Inline_Stack_Item(2), PL_na);
+  char verbose =  SvPV(Inline_Stack_Item(3), PL_na);
+  // need header to find length of results arrays
+  struct simhead header;
+  struct simhead *hp;
+  FILE *in;
+  in = fopen(inPath, "r");
+  if (in==NULL) {
+    perror("ERROR: Could not open .sim file");
+    exit(1);
+  }
+  hp = &header;
+  readHeader(in, hp);
+  int status = fclose(in);
+  if (status!=0) {
+    perror("ERROR: Could not close .sim file");
+    exit(1);
+  }
+  float mags[header.samples];
+  float xyds[header.samples];
+  // create array of char pointers with enough space for each name
+  char **names; 
+  names = malloc(header.samples*sizeof(char*));
+  int i;
+  for (i=0;i<header.samples;i++) {
+    names[i] = malloc(header.nameSize+1);
+  }
+  int nans = 0; // NaN counter
+  int *np;
+  np = &nans;
+  metricsFromFile(inPath, mags, xyds, names, np, verbose);
+  if (*np > 0) {
+    fprintf(stderr, "Warning: %d NaN values found in .sim file.\n", *np);
+  }
+  writeResults(magPath, header.samples, names, mags);
+  writeResults(xydPath, header.samples, names, xyds);
+  if (verbose) { printf("Finished.\n"); }
+}
+
+void PrintSimHeader(SV* args, ...) {
+  /* Read header from a .sim file and print to stdout  */
+  Inline_Stack_Vars;
+  char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
+  struct simhead header;
+  struct simhead *hp;
+  hp = &header;
+  readHeaderFromPath(inPath, hp);
+  printHeader(hp);
+}
