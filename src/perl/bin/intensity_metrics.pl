@@ -78,9 +78,10 @@ struct simhead {
     int sampleUnitBytes;
 };
 
+void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
+		    char verbose);
 void metricsFromFile(char* inPath, float mags[], float xyds[], char* names[],
                      int *np, char verbose);
-void magnitudes(int total, float input[], float results[]);
 void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
 		      float *signals, int *nans, char *name);
 void readHeader(FILE *in, struct simhead *h);
@@ -92,80 +93,79 @@ void FindMetrics(SV* args, ...);
 
 /*********************************************************/
 
-void metricsFromFile(char* inPath, float mags[], float xyds[], 
-                     char* names[], int *np, char verbose) {
-    /* Read a .sim file; find sample names and intensity metrics */
-    FILE *in;
-    in = fopen(inPath, "r");
-    struct simhead header;
-    struct simhead *hp;
-    hp = &header;
-    readHeader(in, hp);
-    if (verbose) { printHeader(hp); }
-    /* read intensities and compute metrics
-     * need to normalize sample magnitude by mean magnitude for each probe
-     */
-    int total;
-    total = header.probes * header.channels;
-    float *signals, *magByProbe;
-    char *name;
-    name = (char*) malloc(header.nameSize+1);
-    signals = (float*) malloc(total*sizeof(float));
-    magByProbe = (float*) malloc(header.probes*sizeof(float));
-    // first pass -- find mean magnitude of intensity by probe
-    int i;
-    int j;
-    for (i=0;i<header.samples;i++) {
-        float probeMags[header.probes];
-        readSampleProbes(in, i, header, signals, np, name);
-	if (i==0) {
-	  for (j=0;j<10;j++) { printf("%f\t%f\n", signals[j], signals[j+1]); }
-	}
-        magnitudes(header.probes*header.channels, signals, probeMags);
-        for (j=0;j<header.probes;j++) {
-            magByProbe[j] += probeMags[j];
-        }
+void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
+		    char verbose) {
+  /* Find mean magnitude for each probe 
+   Name and NaN count required for readSampleProbes, but not used here */
+  int i, j;
+  char *name;
+  float *signals;
+  name = (char*) malloc(header.nameSize+1);
+  signals = (float*) malloc(header.probes * header.channels * sizeof(float));
+  int nans = 0;
+  int *np = &nans;
+  for (i=0;i<header.samples;i++) {
+    readSampleProbes(in, i, header, signals, np, name);
+    if (i==0) {
+      for (j=0;j<10;j++) { printf("%f\t%f\n", signals[j], signals[j+1]); }
     }
-    for (i=0;i<header.probes;i++) {
-        magByProbe[i] = magByProbe[i] / header.samples;
+    for (j=0;j<header.probes*2;j++) {
+       float a = signals[i];
+       float b = signals[i+1];
+       magByProbe[j/2] += sqrt(a*a + b*b);
     }
-    if (verbose) { 
-      printf("Found mean magnitude by probe.\n"); 
-      for (i=0;i<5;i++) { printf("%f\n", magByProbe[i]); }
-    }
-    // second pass -- find xydiff and normalized magnitude for each sample
-    for (i=0;i<header.samples;i++) {
-      readSampleProbes(in, i, header, signals, np, name);
-      //printf("%d:%s\n", i, name);
-      names[i] = name;
-      mags[i] = sampleMag(header.samples, signals, magByProbe);
-      xyds[i] = sampleXYDiff(header.samples, signals);
-    }
-    /* Check that end of .sim file has been reached */
-    char last;
-    last = fgetc(in);
-    if (last==EOF) { 
-      if (verbose) { printf("OK: End of .sim file found.\n"); }
-    } else { 
-      fprintf(stderr, "ERROR: Data found after expected end of .sim file.\n"); 
-      //fprintf(stderr, "FILE_POSITION:%llu\n", ftello(in));
-      //exit(1);
-    }
-    fclose(in);
-    if (verbose) { printf("NaNs found:%d\n", *np); }
-    free(signals);
+  }
+  for (i=0;i<header.probes;i++) {
+    magByProbe[i] = magByProbe[i] / header.samples;
+  }
+  if (verbose) { 
+    printf("Found mean magnitude by probe.\n"); 
+    for (i=0;i<5;i++) { printf("%f\n", magByProbe[i]); }
+  }
 }
 
-
-void magnitudes(int total, float input[], float results[]) {
-    /* find magnitudes of a list of (pairs of) input floats */
-    int i = 0;
-    while (i<total) {
-        float a = input[i];
-        float b = input[i+1];
-        results[i/2] = sqrt(a*a + b*b);
-        i+=2;
-    }
+void metricsFromFile(char* inPath, float mags[], float xyds[], 
+                     char* names[], int *np, char verbose) {
+  /* Read a .sim file; find sample names and intensity metrics */
+  FILE *in;
+  in = fopen(inPath, "r");
+  struct simhead header;
+  struct simhead *hp;
+  hp = &header;
+  readHeader(in, hp);
+  if (verbose) { printHeader(hp); }
+  /* read intensities and compute metrics
+   * need to normalize sample magnitude by mean magnitude for each probe */
+  int total;
+  float *signals, *magByProbe;
+  char *name;
+  name = (char*) malloc(header.nameSize+1);
+  total = header.probes * header.channels;
+  signals = (float*) malloc(total*sizeof(float));
+  magByProbe = (float*) malloc(header.probes*sizeof(float));
+  // first pass -- find mean magnitude of intensity by probe
+  findMagByProbe(in, header, magByProbe, verbose);
+  // second pass -- find xydiff and normalized magnitude for each sample
+  int i;
+  for (i=0;i<header.samples;i++) {
+    readSampleProbes(in, i, header, signals, np, name);
+    printf("%d:%s\n", i+1, name); 
+    names[i] = name;
+    mags[i] = sampleMag(header.samples, signals, magByProbe);
+    xyds[i] = sampleXYDiff(header.samples, signals);
+  }
+  /* Check that end of .sim file has been reached */
+  char last;
+  last = fgetc(in);
+  if (last!=EOF) { 
+    fprintf(stderr, "ERROR: Data found after expected end of .sim file.\n");
+    exit(1);
+  } else if (verbose) { 
+    printf("OK: End of .sim file found.\n"); 
+  }
+  fclose(in);
+  if (verbose) { printf("NaNs found:%d\n", *np); }
+  free(signals);
 }
 
 void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
@@ -188,9 +188,9 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
   if (result!=0) {  
     fprintf(stderr, "ERROR: Seek failed in .sim file.\n");  
     fprintf(stderr, "OFFSET:%llu\n", offsetL);
-    fprintf(stderr, "UNIT_BYTES:%llu\n", sampleUnitBytesL);
-    fprintf(stderr, "ATTEMPTED:%llu\n", start);
-    fprintf(stderr, "FILE_POSITION:%llu\n", ftello(in));
+    fprintf(stderr, "SAMPLE_UNIT_BYTES:%llu\n", sampleUnitBytesL);
+    fprintf(stderr, "ATTEMPTED_SEEK_POSITION:%llu\n", start);
+    fprintf(stderr, "TELL_POSITION:%llu\n", ftello(in));
     exit(1);
   }
   fgets(name, header.nameSize+1, in);
@@ -239,51 +239,51 @@ void readHeader(FILE *in, struct simhead *hp) {
 }
 
 void printHeader(struct simhead *hp) {
-    printf("MAGIC:%s\n", (*hp).magic);
-    printf("VERSION:%d\n", (*hp).version);
-    printf("NAME_SIZE:%d\n", (*hp).nameSize);
-    printf("SAMPLES:%d\n", (*hp).samples);
-    printf("PROBES:%d\n", (*hp).probes);
-    printf("CHANNELS:%d\n", (*hp).channels);
-    printf("FORMAT:%d\n", (*hp).format);
-    printf("NUMERIC_BYTES:%d\n", (*hp).numericBytes);
-    printf("SAMPLE_UNIT_BYTES:%d\n", (*hp).sampleUnitBytes);
+  printf("MAGIC:%s\n", (*hp).magic);
+  printf("VERSION:%d\n", (*hp).version);
+  printf("NAME_SIZE:%d\n", (*hp).nameSize);
+  printf("SAMPLES:%d\n", (*hp).samples);
+  printf("PROBES:%d\n", (*hp).probes);
+  printf("CHANNELS:%d\n", (*hp).channels);
+  printf("FORMAT:%d\n", (*hp).format);
+  printf("NUMERIC_BYTES:%d\n", (*hp).numericBytes);
+  printf("SAMPLE_UNIT_BYTES:%d\n", (*hp).sampleUnitBytes);
 }
 
 float sampleMag(int totalSamples, float signals[], float magByProbe[]) {
-    /* Find mean magnitude of intensity for given sample
-     * Normalize by mean magnitude for each probe 
-     * Assumes data has exactly 2 intensity channels */
-    int i = 0;
-    float mag = 0.0;
-    int totalSignals = totalSamples*2;
-    while (i<totalSignals) {
-        float a = signals[i];
-        float b = signals[i+1];
-        mag += (sqrt(a*a + b*b))/magByProbe[i/2]; 
-        i+=2;
-    }
-    mag = mag / totalSamples;
-    return(mag);
+  /* Find mean magnitude of intensity for given sample
+   * Normalize by mean magnitude for each probe 
+   * Assumes data has exactly 2 intensity channels */
+  int i = 0;
+  float mag = 0.0;
+  int totalSignals = totalSamples*2;
+  while (i<totalSignals) {
+    float a = signals[i];
+    float b = signals[i+1];
+    mag += sqrt(a*a + b*b)/magByProbe[i/2]; 
+    i+=2;
+  }
+  mag = mag / totalSamples;
+  return(mag);
 }
 
 float sampleXYDiff(int totalSamples, float signals[]) {
-    /* Find mean xydiff for given sample 
-     * By definition, xydiff = (second intensity) - (first intensity )
-     * Assumes data has exactly 2 intensity channels */
-    int i = 0;
-    float xyd = 0.0;
-    int totalSignals = totalSamples*2;
-    while (i<totalSignals) {
-        xyd += signals[i+1] - signals[i];
-        i+=2;
-    }
-    xyd = xyd / totalSamples;
-    return(xyd);
+  /* Find mean xydiff for given sample 
+   * By definition, xydiff = (second intensity) - (first intensity )
+   * Assumes data has exactly 2 intensity channels */
+  int i = 0;
+  float xyd = 0.0;
+  int totalSignals = totalSamples*2;
+  while (i<totalSignals) {
+    xyd += signals[i+1] - signals[i];
+    i+=2;
+  }
+  xyd = xyd / totalSamples;
+  return(xyd);
 }
 
 void writeResults(char* outPath, int total, char* names[], float results[]) {
-  /* Write arrays of names and metrics to given output path */
+  /* Write arrays of names and metric values to given output path */
   FILE *out;
   out = fopen(outPath, "w");
   int i;
@@ -296,34 +296,38 @@ void writeResults(char* outPath, int total, char* names[], float results[]) {
 
 void FindMetrics(SV* args, ...) {
 
-   Inline_Stack_Vars;
-   char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
-   char *magPath = SvPV(Inline_Stack_Item(1), PL_na);
-   char *xydPath = SvPV(Inline_Stack_Item(2), PL_na);
-   char verbose =  SvPV(Inline_Stack_Item(3), PL_na);
-
-   // need header to find length of results arrays
-   struct simhead header;
-   struct simhead *hp;
-   FILE *in;
-   in = fopen(inPath, "r");
-   if (in==NULL) {
-     perror("Could not open .sim file");
-     exit(1);
-   }
-   hp = &header;
-   readHeader(in, hp);
-   fclose(in);
-
-   float mags[header.samples];
-   float xyds[header.samples];
-   char* names[header.samples];
-   int nans = 0;
-   int *np;
-   np = &nans;
-   metricsFromFile(inPath, mags, xyds, names, np, verbose);
-   printf("Finished.\n");
-   writeResults(magPath, header.samples, names, mags);
-   writeResults(xydPath, header.samples, names, xyds);
+  Inline_Stack_Vars;
+  char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
+  char *magPath = SvPV(Inline_Stack_Item(1), PL_na);
+  char *xydPath = SvPV(Inline_Stack_Item(2), PL_na);
+  char verbose =  SvPV(Inline_Stack_Item(3), PL_na);
+  
+  // need header to find length of results arrays
+  struct simhead header;
+  struct simhead *hp;
+  FILE *in;
+  in = fopen(inPath, "r");
+  if (in==NULL) {
+    perror("Could not open .sim file");
+    exit(1);
+  }
+  hp = &header;
+  readHeader(in, hp);
+  fclose(in);
+  
+  float mags[header.samples];
+  float xyds[header.samples];
+  char *names[header.samples];
+  int nans = 0;
+  int *np;
+  np = &nans;
+  metricsFromFile(inPath, mags, xyds, names, np, verbose);
+  int i;
+  for (i=0;i<5;i++) {
+    printf("NAME:%d:%s\n", i, names[i]);
+  }
+  writeResults(magPath, header.samples, names, mags);
+  writeResults(xydPath, header.samples, names, xyds);
+  printf("Finished.\n");
 }
 
