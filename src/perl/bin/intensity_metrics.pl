@@ -4,15 +4,11 @@
 # October 2012
 
 # find normalized magnitude and xy intensity difference for each sample
-# input .sim binary format intensity file
-# replaces xydiff.pl
-
-# may take a few hours for full-sized projects, log provides progress report
+# uses inline C for greater speed
 
 use strict;
 use warnings;
 use Getopt::Long;
-#use WTSI::NPG::Genotyping::QC::SimFiles qw/writeIntensityMetrics/;
 use Inline (C => Config =>
             AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"stdlib.h\"\n#include\"math.h\"\n#include\"inttypes.h\"\n",
             CCFLAGS => '-lm');
@@ -109,9 +105,9 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
     if (i==0) {
       for (j=0;j<10;j++) { printf("%f\t%f\n", signals[j], signals[j+1]); }
     }
-    for (j=0;j<header.probes*2;j++) {
-       float a = signals[i];
-       float b = signals[i+1];
+    for (j=0;j<header.probes*2;j+=2) {
+       float a = signals[j];
+       float b = signals[j+1];
        magByProbe[j/2] += sqrt(a*a + b*b);
     }
   }
@@ -149,8 +145,12 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   int i;
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
-    printf("%d:%s\n", i+1, name); 
-    names[i] = name;
+    //char temp[header.nameSize+1];
+    //strcpy(temp, name);
+    
+    //names[i] = &temp;
+    strcpy(names[i], name); 
+    printf("%d:%s\n", i, names[i]);
     mags[i] = sampleMag(header.samples, signals, magByProbe);
     xyds[i] = sampleXYDiff(header.samples, signals);
   }
@@ -301,33 +301,40 @@ void FindMetrics(SV* args, ...) {
   char *magPath = SvPV(Inline_Stack_Item(1), PL_na);
   char *xydPath = SvPV(Inline_Stack_Item(2), PL_na);
   char verbose =  SvPV(Inline_Stack_Item(3), PL_na);
-  
   // need header to find length of results arrays
   struct simhead header;
   struct simhead *hp;
   FILE *in;
   in = fopen(inPath, "r");
   if (in==NULL) {
-    perror("Could not open .sim file");
+    perror("ERROR: Could not open .sim file");
     exit(1);
   }
   hp = &header;
   readHeader(in, hp);
-  fclose(in);
-  
+  int status = fclose(in);
+  if (status!=0) {
+    perror("ERROR: Could not close .sim file");
+    exit(1);
+  }
   float mags[header.samples];
   float xyds[header.samples];
-  char *names[header.samples];
-  int nans = 0;
+  // create array of char pointers with enough space for each name
+  char **names; 
+  names = malloc(header.samples*sizeof(char*));
+  int i;
+  for (i=0;i<header.samples;i++) {
+    names[i] = malloc(header.nameSize+1);
+  }
+  int nans = 0; // NaN counter
   int *np;
   np = &nans;
   metricsFromFile(inPath, mags, xyds, names, np, verbose);
-  int i;
-  for (i=0;i<5;i++) {
-    printf("NAME:%d:%s\n", i, names[i]);
+  if (*np > 0) {
+    fprintf(stderr, "Warning: %d NaN values found in .sim file.\n", *np);
   }
   writeResults(magPath, header.samples, names, mags);
   writeResults(xydPath, header.samples, names, xyds);
-  printf("Finished.\n");
+  if (verbose) { printf("Finished.\n"); }
 }
 
