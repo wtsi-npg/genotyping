@@ -93,9 +93,6 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
   int *np = &nans;
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
-    if (i==0) {
-      for (j=0;j<10;j++) { printf("%f\t%f\n", signals[j], signals[j+1]); }
-    }
     for (j=0;j<header.probes*2;j+=2) {
        float a = signals[j];
        float b = signals[j+1];
@@ -105,10 +102,7 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
   for (i=0;i<header.probes;i++) {
     magByProbe[i] = magByProbe[i] / header.samples;
   }
-  if (verbose) { 
-    printf("Found mean magnitude by probe.\n"); 
-    for (i=0;i<5;i++) { printf("%f\n", magByProbe[i]); }
-  }
+  if (verbose) { printf("Found mean magnitude by probe.\n"); }
 }
 
 void metricsFromFile(char* inPath, float mags[], float xyds[], 
@@ -120,7 +114,11 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   struct simhead *hp;
   hp = &header;
   readHeader(in, hp);
-  if (verbose) { printHeader(hp); }
+  if (verbose) { 
+    printf("###\nHeader data from .sim file:\n");
+    printHeader(hp); 
+    printf("###\n");
+  }
   /* read intensities and compute metrics
    * need to normalize sample magnitude by mean magnitude for each probe */
   int total;
@@ -136,15 +134,12 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   int i;
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
-    //char temp[header.nameSize+1];
-    //strcpy(temp, name);
-    
-    //names[i] = &temp;
     strcpy(names[i], name); 
-    printf("%d:%s\n", i, names[i]);
+    //printf("%d:%s\n", i, names[i]);
     mags[i] = sampleMag(header.samples, signals, magByProbe);
     xyds[i] = sampleXYDiff(header.samples, signals);
   }
+  if (verbose) { printf("Found intensity metrics.\n"); }
   /* Check that end of .sim file has been reached */
   char last;
   last = fgetc(in);
@@ -152,7 +147,7 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
     fprintf(stderr, "ERROR: Data found after expected end of .sim file.\n");
     exit(1);
   } else if (verbose) { 
-    printf("OK: End of .sim file found.\n"); 
+    printf("OK: End of .sim file reached.\n"); 
   }
   fclose(in);
   if (verbose) { printf("NaNs found:%d\n", *np); }
@@ -242,18 +237,18 @@ void printHeader(struct simhead *hp) {
 }
 
 void readHeaderFromPath(char* inPath, struct simhead *hp) {
-    FILE *in;
-    in = fopen(inPath, "r");
-    if (in==NULL) {
-      perror("ERROR: Could not open .sim file");
-      exit(1);
-    }
-    readHeader(in, hp);
-    int status = fclose(in);
-    if (status!=0) {
-      perror("ERROR: Could not close .sim file");
-      exit(1);
-    }
+  FILE *in;
+  in = fopen(inPath, "r");
+  if (in==NULL) {
+    perror("ERROR: Could not open .sim file");
+    exit(1);
+  }
+  readHeader(in, hp);
+  int status = fclose(in);
+  if (status!=0) {
+    perror("ERROR: Could not close .sim file");
+    exit(1);
+  }
 }
 
 float sampleMag(int totalSamples, float signals[], float magByProbe[]) {
@@ -306,23 +301,16 @@ void FindMetrics(SV* args, ...) {
   char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
   char *magPath = SvPV(Inline_Stack_Item(1), PL_na);
   char *xydPath = SvPV(Inline_Stack_Item(2), PL_na);
-  char verbose =  SvPV(Inline_Stack_Item(3), PL_na);
+  bool verboseB = SvTRUE(Inline_Stack_Item(3));
+  char verbose;
+  if (verboseB) { verbose = 1; }
+  else { verbose = 0; }
+  if (verbose) { printf("Starting intensity metric calculation.\n"); }
   // need header to find length of results arrays
   struct simhead header;
   struct simhead *hp;
-  FILE *in;
-  in = fopen(inPath, "r");
-  if (in==NULL) {
-    perror("ERROR: Could not open .sim file");
-    exit(1);
-  }
   hp = &header;
-  readHeader(in, hp);
-  int status = fclose(in);
-  if (status!=0) {
-    perror("ERROR: Could not close .sim file");
-    exit(1);
-  }
+  readHeaderFromPath(inPath, hp);
   float mags[header.samples];
   float xyds[header.samples];
   // create array of char pointers with enough space for each name
