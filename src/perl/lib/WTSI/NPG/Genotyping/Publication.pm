@@ -57,6 +57,7 @@ use WTSI::NPG::Publication qw(pair_rg_channel_files
 use base 'Exporter';
 our @EXPORT_OK = qw(
                     $DEFAULT_SAMPLE_ARCHIVE
+                    export_sequenom_files
                     publish_idat_files
                     publish_gtc_files
                     publish_sequenom_files
@@ -330,6 +331,48 @@ sub publish_sequenom_files {
   return $published;
 }
 
+sub export_sequenom_files {
+  my ($plate, $export_dest) = @_;
+
+  my $total = scalar keys %$plate;
+  my $exported = 0;
+
+  $log->debug("Exporting $total CSV files");
+
+  my $current_file;
+  my $plate_name;
+
+  foreach my $key (sort keys %$plate) {
+    eval {
+      my @records = @{$plate->{$key}};
+      my $first = $records[0];
+      my @keys = sort keys %$first;
+
+      $plate_name = $first->{plate};
+      my $file = sprintf("%s/%s_%s.csv", $export_dest,
+                         $plate_name, $first->{well});
+      $current_file = $file;
+
+      my $record_count = write_sequenom_csv_file($file, \@keys, \@records);
+      $log->debug("Wrote $record_count records into $file");
+
+      ++$exported;
+    };
+
+    if ($@) {
+      $log->error("Failed to export '$current_file' to ",
+                  "'$export_dest': ", $@);
+    }
+    else {
+      $log->debug("Exported '$current_file': $exported of $total");
+    }
+  }
+
+  $log->info("Exported $exported/$total CSV files for '$plate_name' ",
+             "to '$export_dest'");
+
+  return $exported;
+}
 
 sub update_sequenom_metadata {
   my ($data_object, $snpdb, $ssdb) = @_;
