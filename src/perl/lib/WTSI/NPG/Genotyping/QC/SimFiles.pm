@@ -10,8 +10,6 @@ package WTSI::NPG::Genotyping::QC::SimFiles;
 use strict;
 use warnings;
 use Carp;
-use bytes;
-use POSIX qw(ceil ctime);
 use Exporter;
 use Inline (C => Config =>
 	    AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"stdlib.h\"\n#include\"math.h\"\n#include\"inttypes.h\"\n",
@@ -25,7 +23,6 @@ use Inline C => 'DATA';
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/printSimHeader writeIntensityMetrics/;
-our $HEADER_LENGTH = 16;
 
 sub printSimHeader {
     my $simPath = shift;
