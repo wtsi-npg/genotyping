@@ -18,7 +18,7 @@ mkdir($inline);
 $ENV{'PERL_INLINE_DIRECTORY'} = $inline;
 
 my $outPathMag = $temp."/mag.txt";
-my $outPathXY = $temp."/xy.txt";
+my $outPathXY = $temp."/xyd.txt";
 my $logPath = $temp."/intensity.log";
 my $simNull = $temp."/foo.sim"; # does not exist!
 my $magNull = $temp."/foo_mag.txt";
@@ -40,7 +40,7 @@ ok(md5match($outPathXY, 'd839219a0be9a4f738885cd8a8f6b9a7'),
    "MD5 checksum for xydiff");
 
 $cmd = "$bin/intensity_metrics.pl --input $simNull --magnitude $magNull ".
-    "--xydiff $xydNull 2> /dev/null";
+    "--xydiff $xydNull &> /dev/null";
 isnt(0, system($cmd), "Intensity metric script exit status (missing input)");
 
 sub md5match {
