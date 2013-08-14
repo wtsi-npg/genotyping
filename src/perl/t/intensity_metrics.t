@@ -19,7 +19,6 @@ $ENV{'PERL_INLINE_DIRECTORY'} = $inline;
 
 my $outPathMag = $temp."/mag.txt";
 my $outPathXY = $temp."/xyd.txt";
-my $logPath = $temp."/intensity.log";
 my $simNull = $temp."/foo.sim"; # does not exist!
 my $magNull = $temp."/foo_mag.txt";
 my $xydNull = $temp."/foo_xyd.txt";
