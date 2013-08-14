@@ -30,7 +30,7 @@ require 'json'
 require 'genotyping'
 require File.join(testpath, 'test_helper')
 
-class TestGenotypeCallTasks < Test::Unit::TestCase
+class TestSimtoolsTasks < Test::Unit::TestCase
   include TestHelper
   include Genotyping
   include Genotyping::Tasks::GenotypeCall # for mock_study
@@ -60,11 +60,10 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
                                           :log_dir => work_dir})
       end
 
-      sim_file, metadata = wait_for('test_gtc_to_sim', 60, 5) do
+      sim_file = wait_for('test_gtc_to_sim', 60, 5) do
         gtc_to_sim(sample_json, manifest, 'mock_study.sim',
                    {:work_dir =>  work_dir,
-                    :log_dir => work_dir,
-                    :metadata => 'chr.json'})
+                    :log_dir => work_dir})
       end
 
       sim = SIM.new(sim_file)
@@ -75,6 +74,28 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
       assert_equal(100, sim.num_probes)
       assert_equal(2, sim.num_channels)
       assert_equal(5, sim.num_samples)
+
+      Percolate.log.close
+      remove_work_dir(work_dir)
+    end
+  end
+
+    def test_gtc_to_bed
+    run_test_if(method(:g2i_available?), "Skipping test_gtc_to_bed") do
+      work_dir = make_work_dir('test_gtc_to_bed', data_path)
+
+      sample_json, manifest, gtc_files = wait_for('mock_study', 60, 5) do
+        mock_study('mock_study', 5, 100, {:work_dir =>  work_dir,
+                                          :log_dir => work_dir})
+      end
+
+      bed_file = wait_for('test_gtc_to_bed', 60, 5) do
+        gtc_to_bed(sample_json, manifest, 'mock_study.bed',
+                   {:work_dir =>  work_dir,
+                    :log_dir => work_dir})
+      end
+
+      assert(File.exists?(bed_file))
 
       Percolate.log.close
       remove_work_dir(work_dir)
