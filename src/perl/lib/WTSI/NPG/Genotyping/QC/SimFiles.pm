@@ -3,6 +3,7 @@
 
 # module to read .sim intensity files
 # use to find magnitude & xydiff metrics for QC
+# Modified August 2013 to use inline C for greater speed
 
 package WTSI::NPG::Genotyping::QC::SimFiles;
 
@@ -110,14 +111,18 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   /* Read a .sim file; find sample names and intensity metrics */
   FILE *in;
   in = fopen(inPath, "r");
+  if (in==NULL) {
+      fprintf(stderr, "ERROR: Could not open .sim file %s\n", inPath);
+      exit(1);
+  }
   struct simhead header;
   struct simhead *hp;
   hp = &header;
   readHeader(in, hp);
   if (verbose) { 
-    printf("###\nHeader data from .sim file:\n");
-    printHeader(hp); 
-    printf("###\n");
+      printf("###\nHeader data from .sim file:\n");
+      printHeader(hp); 
+      printf("###\n");
   }
   /* read intensities and compute metrics
    * need to normalize sample magnitude by mean magnitude for each probe */
@@ -135,7 +140,6 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
     strcpy(names[i], name); 
-    //printf("%d:%s\n", i, names[i]);
     mags[i] = sampleMag(header.samples, signals, magByProbe);
     xyds[i] = sampleXYDiff(header.samples, signals);
   }
@@ -146,11 +150,12 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   if (last!=EOF) { 
     fprintf(stderr, "ERROR: Data found after expected end of .sim file.\n");
     exit(1);
-  } else if (verbose) { 
-    printf("OK: End of .sim file reached.\n"); 
-  }
-  fclose(in);
-  if (verbose) { printf("NaNs found:%d\n", *np); }
+  } else if (verbose) { printf("OK: End of .sim file reached.\n"); }
+  int status = fclose(in);
+  if (status != 0) {
+      fprintf(stderr, "ERROR: Could not close .sim file %s\n");
+      exit(1);
+  } else if (verbose) { printf("NaNs found:%d\n", *np); }
   free(signals);
 }
 
@@ -181,6 +186,10 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
   }
   fgets(name, header.nameSize+1, in);
   fread(signals, header.numericBytes, signalTotal, in);
+  if (ferror(in)) {
+      fprintf(stderr, "ERROR: Failed to read sample data from input .sim\n");
+      exit(1);
+  }
   // loop over signals, convert nan's to 0 and count nan's
   int i;
   *nans = 0;
@@ -209,6 +218,10 @@ void readHeader(FILE *in, struct simhead *hp) {
   fread(&channels, 1, 1, in);
   unsigned char format;
   fread(&format, 1, 1, in);
+  if (ferror(in)) {
+      fprintf(stderr, "ERROR: Failed to read header from input .sim\n");
+      exit(1);
+  }
   
   (*hp).magic = magic;
   (*hp).version = version;
@@ -287,13 +300,24 @@ void writeResults(char* outPath, int total, char* names[], float results[]) {
   /* Write arrays of names and metric values to given output path */
   FILE *out;
   out = fopen(outPath, "w");
-  int i;
-  for (i=0;i<total;i++) {
-    fprintf(out, "%s\t%f\n", names[i], results[i]);
+  if (out==NULL) {
+       fprintf(stderr, "ERROR: Could not open output %s\n", outPath);
+       exit(1);
   }
-  fclose(out);
+  int i, status;
+  for (i=0;i<total;i++) {
+    status = fprintf(out, "%s\t%f\n", names[i], results[i]);
+    if (status<=0) {
+        fprintf(stderr, "ERROR: Failed to write output to %s\n", outPath);
+        exit(1);
+    }
+  }
+  status = fclose(out);
+  if (status != 0) {
+      fprintf(stderr, "ERROR: Could not close output %s\n", outPath);
+      exit(1);
+  }
 }
-
 
 void FindMetrics(SV* args, ...) {
   /* Find magnitude and xydiff metrics */
