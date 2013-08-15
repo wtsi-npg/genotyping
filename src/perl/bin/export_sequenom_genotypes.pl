@@ -15,11 +15,9 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Database::Warehouse;
-use WTSI::NPG::Genotyping::Database::SNP;
-
-use WTSI::NPG::iRODS qw(find_objects_by_meta
-                        get_object_meta);
+use WTSI::NPG::Genotyping::Database::Sequenom;
+use WTSI::NPG::Genotyping::Publication qw(export_sequenom_files);
+use WTSI::NPG::iRODS;
 use WTSI::NPG::Metadata qw(make_sample_metadata
                            make_md5_metadata
                            make_type_metadata
@@ -27,10 +25,6 @@ use WTSI::NPG::Metadata qw(make_sample_metadata
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
                               get_publisher_name);
-
-use WTSI::NPG::Genotyping::Metadata qw($SEQUENOM_PLATE_NAME_META_KEY
-                                       $SEQUENOM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Genotyping::Publication qw(update_sequenom_metadata);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -42,29 +36,36 @@ my $embedded_conf = q(
 );
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $DEFAULT_DAYS = 4;
+our $DEFAULT_DAYS = 7;
 
 run() unless caller();
 
 sub run {
   my $config;
+  my $days;
+  my $days_ago;
   my $debug;
   my $log4perl_config;
-  my $publish_dest;
+  my $export_dest;
   my $verbose;
 
   GetOptions('config=s'    => \$config,
+             'days=i'      => \$days,
+             'days-ago=i'  => \$days_ago,
              'debug'       => \$debug,
-             'dest=s'      => \$publish_dest,
+             'dest=s'      => \$export_dest,
              'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'   => \$log4perl_config,
              'verbose'     => \$verbose);
-  $config ||= $DEFAULT_INI;
 
-  unless ($publish_dest) {
+  unless ($export_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
   }
+
+  $config ||= $DEFAULT_INI;
+  $days ||= $DEFAULT_DAYS;
+  $days_ago ||= 0;
 
   my $log;
 
@@ -84,38 +85,36 @@ sub run {
     }
   }
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
-                                   mysql_auto_reconnect => 1);
-
-  my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-    (name   => 'snp',
-     inifile => $config)->connect(RaiseError => 1);
-
-  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv']);
-  my $total = scalar @sequenom_data;
-  my $updated = 0;
-
-  $log->info("Updating metadata on $total data objects in '$publish_dest'");
-
-  foreach my $data_object (@sequenom_data) {
-    eval {
-      update_sequenom_metadata($data_object, $snpdb, $ssdb);
-      ++$updated;
-    };
-
-    if ($@) {
-      $log->error("Failed to update metadata for '$data_object': ", $@);
-    }
-    else {
-      $log->debug("Updated metadata for '$data_object': $updated of $total");
-    }
+  my $now = DateTime->now();
+  my $end;
+  if ($days_ago > 0) {
+    $end = DateTime->from_epoch
+      (epoch => $now->epoch())->subtract(days => $days_ago);
+  }
+  else {
+    $end = $now;
   }
 
-  $log->info("Updated metadata on $updated/$total data objects in ",
-             "'$publish_dest'");
+  my $begin = DateTime->from_epoch
+    (epoch => $end->epoch())->subtract(days => $days);
+
+  $log->info("Exporting Sequenom results to '$export_dest'",
+             " finished between ", $begin->iso8601,
+             " and ", $end->iso8601);
+
+   my $sqdb = WTSI::NPG::Genotyping::Database::Sequenom->new
+     (name    => 'mspec2',
+      inifile => $config)->connect(RaiseError => 1);
+
+  my $plate_names = $sqdb->find_finished_plate_names($begin, $end);
+  $log->debug("Found " . scalar @$plate_names . " finished plates");
+
+  foreach my $plate_name (@$plate_names) {
+    my $results = $sqdb->find_plate_results($plate_name);
+    export_sequenom_files($results, $export_dest);
+  }
+
+  return 0;
 }
 
 
@@ -123,7 +122,7 @@ __END__
 
 =head1 NAME
 
-update_sequenom_metadata
+export_sequenom_genotypes
 
 =head1 SYNOPSIS
 
@@ -132,27 +131,40 @@ Options:
 
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
-  --days-ago    The number of days ago that the Sequenom experiment window
-                ends.
+  --days-ago    The number of days ago that the export window ends.
                 Optional, defaults to zero (the current day).
-  --days        The number of days in the Sequenom experiment window,
-                ending at the day given by the --days-ago argument. Any
-                plates finished in the Sequenom LIMS during this period
-                will be considered. Optional, defaults to 4 days.
-  --dest        The data destination root collection in iRODS.
+  --days        The number of days in the export window, ending at
+                the day given by the --days-ago argument. Any sample data
+                modified during this period will be considered
+                for publication. Optional, defaults to 7 days.
+  --dest        The data destination directory. Files will be written here.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
   --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Searches for published Sequenom experimental data in iRODS, identifies
-the Sequenom plate from which it came by means of the sequenom_plate
-and sequenom_well metadata and adds relevant sample metadata taken
-from the Sequencescape warehouse. If the new metadata include study
-information, this is used to set access rights for the data in iRODS.
+Searches for finished Sequenom plates that have been modified within
+the n days prior to a specific time and creates a CSV file of results
+for each well. Any results identified are published to iRODS with
+metadata obtained from the Sequenom LIMS.
 
-This script requires access to the SNP database in order to function.
+The CSV files contain the following information as columns, identified
+by a header row:
+
+  ALLELE
+  ASSAY_ID
+  CHIP
+  CUSTOMER
+  EXPERIMENT
+  GENOTYPE_ID
+  HEIGHT
+  MASS
+  PLATE
+  PROJECT
+  SAMPLE_ID
+  STATUS
+  WELL_POSITION
 
 =head1 METHODS
 

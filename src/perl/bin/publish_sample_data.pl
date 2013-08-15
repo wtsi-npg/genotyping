@@ -35,7 +35,6 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
-
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
 
@@ -133,7 +132,8 @@ sub run {
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
      inifile => $config)->connect(RaiseError => 1,
-                                  mysql_enable_utf8 => 1);
+                                  mysql_enable_utf8 => 1,
+                                  mysql_auto_reconnect => 1);
   # $ssdb->log($log);
 
   my $uid = `whoami`;
