@@ -12,6 +12,7 @@ use File::Basename;
 use File::Find;
 use Getopt::Long;
 use Log::Log4perl;
+use Log::Log4perl::Level;
 use Net::LDAP;
 use Pod::Usage;
 use URI;
@@ -25,28 +26,13 @@ use WTSI::NPG::Genotyping::Publication qw(publish_analysis_directory);
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
-
 my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = DEBUG, A1
-   log4perl.logger.quiet             = DEBUG, A2
+   log4perl.logger.npg.irods.publish = ERROR, A1
 
-   log4perl.appender.A1          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8     = 1
-   log4perl.appender.A1.stderr   = 0
-   log4perl.appender.A1.layout   = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2          = Log::Log4perl::Appender::Screen
-   log4perl.appender.A2.utf8     = 1
-   log4perl.appender.A2.stderr   = 0
-   log4perl.appender.A2.layout   = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.Filter   = F2
-
-   log4perl.filter.F2               = Log::Log4perl::Filter::LevelRange
-   log4perl.filter.F2.LevelMin      = WARN
-   log4perl.filter.F2.LevelMax      = FATAL
-   log4perl.filter.F2.AcceptOnMatch = true
 );
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -57,6 +43,7 @@ sub run {
   my $archive_pattern;
   my $config;
   my $dbfile;
+  my $debug;
   my $log4perl_config;
   my $publish_dest;
   my $run_name;
@@ -66,6 +53,7 @@ sub run {
   GetOptions('archive=s' => \$archive_pattern,
              'config=s'  => \$config,
              'dbfile=s'  => \$dbfile,
+             'debug'     => \$debug,
              'dest=s'    => \$publish_dest,
              'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s' => \$log4perl_config,
@@ -105,11 +93,13 @@ sub run {
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
     if ($verbose) {
-      $log = Log::Log4perl->get_logger('npg.irods.publish');
+      $log->level($INFO);
     }
-    else {
-      $log = Log::Log4perl->get_logger('quiet');
+    elsif ($debug) {
+      $log->level($DEBUG);
     }
   }
 

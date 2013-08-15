@@ -11,10 +11,10 @@ use Net::LDAP;
 use Text::CSV;
 use URI;
 
-use WTSI::NPG::Genotyping::Metadata qw(
+use WTSI::NPG::Genotyping::Metadata qw($INFINIUM_PLATE_BARCODE_META_KEY
+                                       $INFINIUM_PLATE_WELL_META_KEY
                                        $SEQUENOM_PLATE_NAME_META_KEY
                                        $SEQUENOM_PLATE_WELL_META_KEY
-
                                        infinium_fingerprint
                                        make_analysis_metadata
                                        make_infinium_metadata
@@ -57,10 +57,12 @@ use WTSI::NPG::Publication qw(pair_rg_channel_files
 use base 'Exporter';
 our @EXPORT_OK = qw(
                     $DEFAULT_SAMPLE_ARCHIVE
+                    export_sequenom_files
                     publish_idat_files
                     publish_gtc_files
                     publish_sequenom_files
                     publish_analysis_directory
+                    update_infinium_metadata
                     update_sequenom_metadata
 );
 
@@ -115,39 +117,24 @@ sub publish_idat_files {
     my $if_sample = $ifdb->find_scanned_sample($basename);
 
     if ($if_sample) {
-      eval {
-        my $ss_sample =
-          $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
-                                               $if_sample->{'well'});
-        my @meta;
-        push(@meta, make_infinium_metadata($if_sample));
-
-        # TODO: decouple Sequencescape interaction from publication
-        push(@meta, make_sample_metadata($ss_sample, $ssdb));
-
-        my @fingerprint = infinium_fingerprint(@meta);
-        foreach my $file ($red, $grn) {
-          my $data_object = publish_file($file, \@fingerprint,
-                                         $creator_uri->as_string, $publish_dest,
-                                         $publisher_uri->as_string, $time);
-
-          # TODO: decouple access control from publication
-          my @groups = expected_irods_groups(@meta);
-          grant_group_access($data_object, 'read', @groups);
-
+      foreach my $file ($red, $grn) {
+        eval {
+          my $data_object =
+            publish_infinium_file($file, $creator_uri, $publish_dest,
+                                  $publisher_uri, $if_sample, $ssdb, $time);
           ++$published;
-        }
-      };
+        };
 
-      if ($@) {
-        $log->error("Failed to publish '$red' + '$grn': ", $@);
-      }
-      else {
-        $log->debug("Published '$red' + '$grn': $published of $total");
+        if ($@) {
+          $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
+        }
+        else {
+          $log->debug("Published '$file': $published of $total");
+        }
       }
     }
     else {
-     $log->warn("Failed to find the sample for '$red' in the Infinium LIMS");
+      $log->warn("Failed to find the sample for '$red' in the Infinium LIMS");
     }
   }
 
@@ -196,24 +183,9 @@ sub publish_gtc_files {
 
     if ($if_sample) {
       eval {
-        my $ss_sample =
-          $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
-                                               $if_sample->{'well'});
-        my @meta;
-        push(@meta, make_infinium_metadata($if_sample));
-
-        # TODO: decouple Sequencescape interaction from publication
-        push(@meta, make_sample_metadata($ss_sample, $ssdb));
-
-        my @fingerprint = infinium_fingerprint(@meta);
-        my $data_object = publish_file($file, \@fingerprint,
-                                       $creator_uri->as_string, $publish_dest,
-                                       $publisher_uri->as_string, $time);
-
-        # TODO: decouple access control from publication
-        my @groups = expected_irods_groups(@meta);
-        grant_group_access($data_object, 'read', @groups);
-
+        my $data_object =
+          publish_infinium_file($file, $creator_uri, $publish_dest,
+                                $publisher_uri, $if_sample, $ssdb, $time);
         ++$published;
       };
 
@@ -234,37 +206,57 @@ sub publish_gtc_files {
   return $published;
 }
 
-# TODO: refactor the above publish_idat_files and publish_tc_file to
-# use this method
 sub publish_infinium_file {
   my ($file, $creator_uri, $publish_dest, $publisher_uri,
       $if_sample, $ssdb, $time) = @_;
 
-  my $data_object;
+  my $ss_sample =
+    $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
+                                         $if_sample->{'well'});
+  my @meta;
+  push(@meta, make_infinium_metadata($if_sample));
 
-  eval {
-    my $ss_sample =
-      $ssdb->find_infinium_sample_by_plate($if_sample->{'plate'},
-                                           $if_sample->{'well'});
-    my @meta;
-    push(@meta, make_infinium_metadata($if_sample));
+  # TODO: decouple Sequencescape interaction from publication
+  push(@meta, make_sample_metadata($ss_sample, $ssdb));
 
-    # TODO: decouple Sequencescape interaction from publication
-    push(@meta, make_sample_metadata($ss_sample, $ssdb));
+  my @fingerprint = infinium_fingerprint(@meta);
+  my $data_object = publish_file($file, \@fingerprint,
+                                 $creator_uri->as_string, $publish_dest,
+                                 $publisher_uri->as_string, $time);
+  return $data_object;
+}
 
-    my @fingerprint = infinium_fingerprint(@meta);
-    $data_object = publish_file($file, \@fingerprint,
-                                $creator_uri->as_string, $publish_dest,
-                                $publisher_uri->as_string, $time);
+sub update_infinium_metadata {
+  my ($data_object, $ssdb) = @_;
 
-    # TODO: decouple access control from publication
-    my @groups = expected_irods_groups(@meta);
-    grant_group_access($data_object, 'read', @groups);
-  };
+  my %current_meta = get_object_meta($data_object);
+  my $infinium_barcode =
+    get_single_metadata_value($data_object,
+                              $INFINIUM_PLATE_BARCODE_META_KEY,
+                              %current_meta);
+  my $well = get_single_metadata_value($data_object,
+                                       $INFINIUM_PLATE_WELL_META_KEY,
+                                       %current_meta);
+  $log->debug("Found plate well '$infinium_barcode': '$well' in ",
+              "current metadata of '$data_object'");
 
-  if ($@) {
-    $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
+  my $ss_sample =
+    $ssdb->find_infinium_sample_by_plate($infinium_barcode, $well);
+
+  unless ($ss_sample) {
+    $log->logconfess("Failed to update metadata for '$data_object': ",
+                     "failed to find sample in '$infinium_barcode' ",
+                     "well '$well'");
   }
+
+  $log->debug("Updating metadata for '$data_object' from plate ",
+              "'$infinium_barcode' well '$well'");
+
+  my @meta = make_sample_metadata($ss_sample);
+  update_object_meta($data_object, \@meta);
+
+  my @groups = expected_irods_groups(@meta);
+  grant_group_access($data_object, 'read', @groups);
 
   return $data_object;
 }
@@ -339,6 +331,48 @@ sub publish_sequenom_files {
   return $published;
 }
 
+sub export_sequenom_files {
+  my ($plate, $export_dest) = @_;
+
+  my $total = scalar keys %$plate;
+  my $exported = 0;
+
+  $log->debug("Exporting $total CSV files");
+
+  my $current_file;
+  my $plate_name;
+
+  foreach my $key (sort keys %$plate) {
+    eval {
+      my @records = @{$plate->{$key}};
+      my $first = $records[0];
+      my @keys = sort keys %$first;
+
+      $plate_name = $first->{plate};
+      my $file = sprintf("%s/%s_%s.csv", $export_dest,
+                         $plate_name, $first->{well});
+      $current_file = $file;
+
+      my $record_count = write_sequenom_csv_file($file, \@keys, \@records);
+      $log->debug("Wrote $record_count records into $file");
+
+      ++$exported;
+    };
+
+    if ($@) {
+      $log->error("Failed to export '$current_file' to ",
+                  "'$export_dest': ", $@);
+    }
+    else {
+      $log->debug("Exported '$current_file': $exported of $total");
+    }
+  }
+
+  $log->info("Exported $exported/$total CSV files for '$plate_name' ",
+             "to '$export_dest'");
+
+  return $exported;
+}
 
 sub update_sequenom_metadata {
   my ($data_object, $snpdb, $ssdb) = @_;
@@ -353,27 +387,27 @@ sub update_sequenom_metadata {
   $log->debug("Found plate well '$plate_name': '$well' in ",
               "current metadata of '$data_object'");
 
+  # Identify the plate via the SNP database.  It would be preferable
+  # to look up directly in the warehouse.  However, the warehouse does
+  # not contain tracking information on Sequenom plates
   my $plate_id = $snpdb->find_sequenom_plate_id($plate_name);
   if (defined $plate_id) {
     $log->debug("Found Sequencescape plate identifier '$plate_id' for ",
                 "'$data_object'");
 
-    my $plate = $ssdb->find_plate($plate_id);
-    my $unpadded_map = $well;
-    $unpadded_map =~ s/0//;
-
-    unless (exists $plate->{$unpadded_map}) {
+    my $ss_sample = $ssdb->find_sample_by_plate($plate_id, $well);
+    unless ($ss_sample) {
       $log->logconfess("Failed to update metadata for '$data_object': ",
-                       "failed to find plate '$plate_name' well '$well'");
+                       "failed to find sample in '$plate_name' ",
+                       "well '$well'");
     }
 
     $log->debug("Updating metadata for '$data_object' from plate ",
                 "'$plate_name' well '$well'");
 
-    my @meta = make_sample_metadata($plate->{$unpadded_map});
+    my @meta = make_sample_metadata($ss_sample);
     update_object_meta($data_object, \@meta);
 
-    # TODO: decouple access control from publication
     my @groups = expected_irods_groups(@meta);
     grant_group_access($data_object, 'read', @groups);
   }
@@ -381,9 +415,9 @@ sub update_sequenom_metadata {
     $log->info("Skipping update of metadata for '$data_object': ",
                "plate name '$plate_name' is not present in SNP database");
   }
+
+  return $data_object;
 }
-
-
 
 =head2 publish_analysis_directory
 

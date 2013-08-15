@@ -13,8 +13,9 @@ use WTSI::NPG::iRODS qw(md5sum);
 use WTSI::NPG::Metadata qw(make_fingerprint);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(
-                    $GENOTYPING_ANALYSIS_UUID_META_KEY
+our @EXPORT_OK = qw($GENOTYPING_ANALYSIS_UUID_META_KEY
+                    $INFINIUM_PLATE_BARCODE_META_KEY
+                    $INFINIUM_PLATE_WELL_META_KEY
                     $INFINIUM_BEADCHIP_DESIGN_META_KEY
                     $INFINIUM_BEADCHIP_META_KEY
                     $INFINIUM_BEADCHIP_SECTION_META_KEY
@@ -34,6 +35,9 @@ our $INFINIUM_PROJECT_TITLE_META_KEY    = 'dcterms:title';
 our $INFINIUM_BEADCHIP_META_KEY         = 'beadchip';
 our $INFINIUM_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
 our $INFINIUM_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
+
+our $INFINIUM_PLATE_BARCODE_META_KEY = 'infinium_plate';
+our $INFINIUM_PLATE_WELL_META_KEY = 'infinium_well';
 
 our $SEQUENOM_PLATE_NAME_META_KEY = 'sequenom_plate';
 our $SEQUENOM_PLATE_WELL_META_KEY = 'sequenom_well';
@@ -56,6 +60,8 @@ sub make_infinium_metadata {
 
   return ([$INFINIUM_PROJECT_TITLE_META_KEY    => $if_sample->{project}],
           ['dcterms:identifier'                => $if_sample->{sample}],
+          [$INFINIUM_PLATE_BARCODE_META_KEY    => $if_sample->{plate}],
+          [$INFINIUM_PLATE_WELL_META_KEY       => $if_sample->{well}],
           [$INFINIUM_BEADCHIP_META_KEY         => $if_sample->{beadchip}],
           [$INFINIUM_BEADCHIP_SECTION_META_KEY => $if_sample->{beadchip_section}],
           [$INFINIUM_BEADCHIP_DESIGN_META_KEY  => $if_sample->{beadchip_design}]);
@@ -99,7 +105,9 @@ sub make_analysis_metadata {
 sub infinium_fingerprint {
   my @meta = @_;
 
-  return make_fingerprint([$INFINIUM_BEADCHIP_META_KEY,
+  return make_fingerprint([$INFINIUM_PLATE_BARCODE_META_KEY,
+                           $INFINIUM_PLATE_WELL_META_KEY,
+                           $INFINIUM_BEADCHIP_META_KEY,
                            $INFINIUM_BEADCHIP_DESIGN_META_KEY,
                            $INFINIUM_BEADCHIP_SECTION_META_KEY],
                           \@meta);
