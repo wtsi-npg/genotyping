@@ -12,7 +12,9 @@ use warnings;
 use Carp;
 use Exporter;
 use Inline (C => Config =>
-	    AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"stdlib.h\"\n#include\"math.h\"\n#include\"inttypes.h\"\n",
+	    AUTO_INCLUDE => "#include \"stdio.h\"\n#include \"stdlib.h\"\n".
+            "#include \"string.h\"\n#include \"math.h\"\n".
+            "#include \"inttypes.h\"\n",
             CCFLAGS => '-lm');
 use Inline C => 'DATA';
 
@@ -42,9 +44,12 @@ sub writeIntensityMetrics {
 __DATA__
 __C__
 
+/*********************************************************/
+
 # define _FILE_OFFSET_BITS 64 // enable handling of large .sim files
 
 # define HEADSIZE 16  // size in bytes of .sim file header
+# define MAX_ARG_LEN 1000 // maximum length of command-line argument
 
 typedef struct simhead simhead;
 struct simhead {
@@ -67,9 +72,9 @@ void metricsFromFile(char* inPath, float mags[], float xyds[], char* names[],
                      int *np, char verbose);
 void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
 		      float *signals, int *nans, char *name);
-void readHeader(FILE *in, struct simhead *h);
+struct simhead readHeader(FILE *in);
+struct simhead readHeaderFromPath(char* inPath);
 void printHeader(struct simhead *h);
-void readHeaderFromPath(char* inPath, struct simhead *hp);
 float sampleMag(int totalSamples, float signals[], float magByProbe[]);
 float sampleXYDiff(int totalSamples, float signals[]);
 void writeResults(char* outPath, int total, char* names[], float results[]);
@@ -112,10 +117,9 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
       fprintf(stderr, "ERROR: Could not open .sim file %s\n", inPath);
       exit(1);
   }
-  struct simhead header;
+  struct simhead header = readHeader(in);
   struct simhead *hp;
   hp = &header;
-  readHeader(in, hp);
   if (verbose) { 
       printf("###\nHeader data from .sim file:\n");
       printHeader(hp); 
@@ -129,7 +133,7 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   name = (char*) malloc(header.nameSize+1);
   total = header.probes * header.channels;
   signals = (float*) malloc(total*sizeof(float));
-  magByProbe = (float*) malloc(header.probes*sizeof(float));
+  magByProbe = (float*) calloc(header.probes, sizeof(float));
   // first pass -- find mean magnitude of intensity by probe
   findMagByProbe(in, header, magByProbe, verbose);
   // second pass -- find xydiff and normalized magnitude for each sample
@@ -198,10 +202,10 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
   }
 }
 
-void readHeader(FILE *in, struct simhead *hp) {
+struct simhead readHeader(FILE *in) {
   /* Reader header from a .sim file in standard format */
   rewind(in);
-  char *magic = malloc(4);
+  char *magic = calloc(4, sizeof(char));
   fread(magic, 1, 3, in);
   unsigned char version;
   fread(&version, 1, 1, in);
@@ -219,20 +223,32 @@ void readHeader(FILE *in, struct simhead *hp) {
       fprintf(stderr, "ERROR: Failed to read header from input .sim\n");
       exit(1);
   }
-  
-  (*hp).magic = magic;
-  (*hp).version = version;
-  (*hp).nameSize = nameSize;
-  (*hp).samples = samples;
-  (*hp).probes = probes;
-  (*hp).channels = channels;
-  (*hp).format = format;
-  int nb;
+  int nb, sampleUnitBytes;
   if (format == 0) { nb = 4; }
   else if (format == 1) { nb = 2; }
-  (*hp).numericBytes = nb;
-  (*hp).sampleUnitBytes = nameSize + (probes * channels * nb);
+  else { fprintf(stderr, "ERROR: Invalid header format code\n"); exit(1);  }
+  sampleUnitBytes = nameSize + (probes * channels * nb);
+  struct simhead header = { magic, version, nameSize, samples, probes, 
+                            channels, format, nb, sampleUnitBytes };
+  return header;
 }
+
+struct simhead readHeaderFromPath(char* inPath) {
+  FILE *in;
+  in = fopen(inPath, "r");
+  if (in==NULL) {
+    perror("ERROR: Could not open .sim file");
+    exit(1);
+  }
+  struct simhead header = readHeader(in);
+  int status = fclose(in);
+  if (status!=0) {
+    perror("ERROR: Could not close .sim file");
+    exit(1);
+  }
+  return header;
+}
+
 
 void printHeader(struct simhead *hp) {
   printf("MAGIC:%s\n", (*hp).magic);
@@ -246,20 +262,6 @@ void printHeader(struct simhead *hp) {
   printf("SAMPLE_UNIT_BYTES:%d\n", (*hp).sampleUnitBytes);
 }
 
-void readHeaderFromPath(char* inPath, struct simhead *hp) {
-  FILE *in;
-  in = fopen(inPath, "r");
-  if (in==NULL) {
-    perror("ERROR: Could not open .sim file");
-    exit(1);
-  }
-  readHeader(in, hp);
-  int status = fclose(in);
-  if (status!=0) {
-    perror("ERROR: Could not close .sim file");
-    exit(1);
-  }
-}
 
 float sampleMag(int totalSamples, float signals[], float magByProbe[]) {
   /* Find mean magnitude of intensity for given sample
@@ -303,7 +305,7 @@ void writeResults(char* outPath, int total, char* names[], float results[]) {
   }
   int i, status;
   for (i=0;i<total;i++) {
-    status = fprintf(out, "%s\t%f\n", names[i], results[i]);
+      status = fprintf(out, "%s\t%f\n", names[i], results[i]);
     if (status<=0) {
         fprintf(stderr, "ERROR: Failed to write output to %s\n", outPath);
         exit(1);
@@ -327,39 +329,46 @@ void FindMetrics(SV* args, ...) {
   if (verboseB) { verbose = 1; }
   else { verbose = 0; }
   if (verbose) { printf("Starting intensity metric calculation.\n"); }
-  // need header to find length of results arrays
-  struct simhead header;
-  struct simhead *hp;
-  hp = &header;
-  readHeaderFromPath(inPath, hp);
-  float mags[header.samples];
-  float xyds[header.samples];
-  // create array of char pointers with enough space for each name
-  char **names; 
-  names = malloc(header.samples*sizeof(char*));
-  int i;
-  for (i=0;i<header.samples;i++) {
-    names[i] = malloc(header.nameSize+1);
-  }
-  int nans = 0; // NaN counter
-  int *np;
-  np = &nans;
-  metricsFromFile(inPath, mags, xyds, names, np, verbose);
-  if (*np > 0) {
-    fprintf(stderr, "Warning: %d NaN values found in .sim file.\n", *np);
-  }
-  writeResults(magPath, header.samples, names, mags);
-  writeResults(xydPath, header.samples, names, xyds);
-  if (verbose) { printf("Finished.\n"); }
+ // need header to find length of results arrays
+    struct simhead header = readHeaderFromPath(inPath);
+    struct simhead *hp;
+    hp = &header;
+    float mags[header.samples];
+    float xyds[header.samples];
+    // create array of char pointers with enough space for each name
+    char **names; 
+    names = calloc(header.samples, sizeof(char*));
+    if (names==NULL) { 
+        fprintf(stderr, "ERROR: Could not allocate name array memory\n");
+    }
+    int i;
+    for (i=0;i<header.samples;i++) {
+        names[i] = calloc(header.nameSize+1, sizeof(char));
+        if (names[i]==NULL) {
+            fprintf(stderr, "ERROR: Could not allocate name memory\n");
+            exit(1);
+        }
+        mags[i] = 0.0;
+        xyds[i] = 0.0;
+    }
+    int nans = 0; // NaN counter
+    int *np;
+    np = &nans;
+    metricsFromFile(inPath, mags, xyds, names, np, verbose);
+    if (*np > 0) {
+        fprintf(stderr, "Warning: %d NaN values found in .sim file.\n", *np);
+    }
+    writeResults(magPath, header.samples, names, mags);
+    writeResults(xydPath, header.samples, names, xyds);
+    if (verbose) { printf("Finished.\n"); }
 }
 
 void PrintSimHeader(SV* args, ...) {
-  /* Read header from a .sim file and print to stdout  */
-  Inline_Stack_Vars;
-  char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
-  struct simhead header;
-  struct simhead *hp;
-  hp = &header;
-  readHeaderFromPath(inPath, hp);
-  printHeader(hp);
+    /* Read header from a .sim file and print to stdout  */
+    Inline_Stack_Vars;
+    char *inPath = SvPV(Inline_Stack_Item(0), PL_na);
+    struct simhead header = readHeaderFromPath(inPath);
+    struct simhead *hp;
+    hp = &header;
+    printHeader(hp);
 }
