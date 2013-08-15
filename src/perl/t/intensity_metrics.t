@@ -10,8 +10,9 @@ use File::Temp qw(tempdir);
 use Test::More tests => 5;
 
 my $simPath = "$Bin/qc_test_data/small_test.sim";
-
-my $temp = tempdir( CLEANUP => 1 );
+my $expectedMag = '96678657c0dcd5b14ef8c5ab8b7a8ab5';
+my $expectedXY = 'd839219a0be9a4f738885cd8a8f6b9a7';
+my $temp = tempdir("test_int_metric_XXXXXX", CLEANUP => 1 );
 # force inline C to recompile into empty directory
 my $inline = $temp."/inline_dir";
 mkdir($inline);
@@ -32,11 +33,9 @@ $cmd = "$bin/intensity_metrics.pl --input $simPath --magnitude $outPathMag ".
     "--xydiff $outPathXY";
 is(0, system($cmd), "Intensity metric script exit status");
 
-ok(md5match($outPathMag, 'f7a9a0c21b54e880213c0e8ce5fd928c'), 
-   "MD5 checksum for magnitude");
+ok(md5match($outPathMag, $expectedMag), "MD5 checksum for magnitude");
 
-ok(md5match($outPathXY, 'd839219a0be9a4f738885cd8a8f6b9a7'), 
-   "MD5 checksum for xydiff");
+ok(md5match($outPathXY, $expectedXY), "MD5 checksum for xydiff");
 
 $cmd = "$bin/intensity_metrics.pl --input $simNull --magnitude $magNull ".
     "--xydiff $xydNull &> /dev/null";
