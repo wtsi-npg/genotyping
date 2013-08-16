@@ -71,12 +71,12 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
 void metricsFromFile(char* inPath, float mags[], float xyds[], char* names[],
                      int *np, char verbose);
 void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
-		      float *signals, int *nans, char *name);
+		      float signals[], int *nans, char *name);
 struct simhead readHeader(FILE *in);
 struct simhead readHeaderFromPath(char* inPath);
 void printHeader(struct simhead *h);
-float sampleMag(int totalSamples, float signals[], float magByProbe[]);
-float sampleXYDiff(int totalSamples, float signals[]);
+float sampleMag(int totalProbes, float signals[], float magByProbe[]);
+float sampleXYDiff(int totalProbes, float signals[]);
 void writeResults(char* outPath, int total, char* names[], float results[]);
 void FindMetrics(SV* args, ...);
 void PrintSimHeader(SV* args, ...);
@@ -89,11 +89,11 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
    Name and NaN count required for readSampleProbes, but not used here */
   int i, j;
   char *name;
-  float *signals;
+  float signals[header.probes * header.channels];
   name = (char*) malloc(header.nameSize+1);
-  signals = (float*) malloc(header.probes * header.channels * sizeof(float));
   int nans = 0;
   int *np = &nans;
+  for (i=0;i<header.probes;i++) { magByProbe[i]=0.0; }
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
     for (j=0;j<header.probes*2;j+=2) {
@@ -128,12 +128,12 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   /* read intensities and compute metrics
    * need to normalize sample magnitude by mean magnitude for each probe */
   int total;
-  float *signals, *magByProbe;
+  float signals[header.probes*2];
+  float magByProbe[header.probes];
   char *name;
   name = (char*) malloc(header.nameSize+1);
   total = header.probes * header.channels;
-  signals = (float*) malloc(total*sizeof(float));
-  magByProbe = (float*) calloc(header.probes, sizeof(float));
+
   // first pass -- find mean magnitude of intensity by probe
   findMagByProbe(in, header, magByProbe, verbose);
   // second pass -- find xydiff and normalized magnitude for each sample
@@ -141,8 +141,8 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   for (i=0;i<header.samples;i++) {
     readSampleProbes(in, i, header, signals, np, name);
     strcpy(names[i], name); 
-    mags[i] = sampleMag(header.samples, signals, magByProbe);
-    xyds[i] = sampleXYDiff(header.samples, signals);
+    mags[i] = sampleMag(header.probes, signals, magByProbe);
+    xyds[i] = sampleXYDiff(header.probes, signals);
   }
   if (verbose) { printf("Found intensity metrics.\n"); }
   /* Check that end of .sim file has been reached */
@@ -157,11 +157,10 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
       fprintf(stderr, "ERROR: Could not close .sim file %s\n");
       exit(1);
   } else if (verbose) { printf("NaNs found:%d\n", *np); }
-  free(signals);
 }
 
 void readSampleProbes(FILE *in, int sampleOffset, struct simhead header, 
-		      float *signals, int *nans, char *name) {
+		      float signals[], int *nans, char *name) {
     /* Read intensities for the Nth sample in the file
        Record number of NaN intensites, and convert NaN values to 0 
 
@@ -195,10 +194,10 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
   int i;
   *nans = 0;
   for (i=0;i<signalTotal;i++) {
-    if (isnan(signals[i])) {
-      signals[i] = 0;
-      *nans++;
-    }
+      if (isnan(signals[i])) {
+          signals[i] = 0;
+          *nans++;
+      }
   }
 }
 
@@ -263,35 +262,35 @@ void printHeader(struct simhead *hp) {
 }
 
 
-float sampleMag(int totalSamples, float signals[], float magByProbe[]) {
+float sampleMag(int totalProbes, float signals[], float magByProbe[]) {
   /* Find mean magnitude of intensity for given sample
    * Normalize by mean magnitude for each probe 
    * Assumes data has exactly 2 intensity channels */
   int i = 0;
   float mag = 0.0;
-  int totalSignals = totalSamples*2;
+  int totalSignals = totalProbes*2;
   while (i<totalSignals) {
     float a = signals[i];
     float b = signals[i+1];
     mag += sqrt(a*a + b*b)/magByProbe[i/2]; 
     i+=2;
   }
-  mag = mag / totalSamples;
+  mag = mag / totalProbes;
   return(mag);
 }
 
-float sampleXYDiff(int totalSamples, float signals[]) {
+float sampleXYDiff(int totalProbes, float signals[]) {
   /* Find mean xydiff for given sample 
    * By definition, xydiff = (second intensity) - (first intensity )
    * Assumes data has exactly 2 intensity channels */
   int i = 0;
   float xyd = 0.0;
-  int totalSignals = totalSamples*2;
+  int totalSignals = totalProbes*2;
   while (i<totalSignals) {
-    xyd += signals[i+1] - signals[i];
-    i+=2;
+      xyd += signals[i+1] - signals[i];
+      i+=2;
   }
-  xyd = xyd / totalSamples;
+  xyd = xyd / totalProbes;
   return(xyd);
 }
 
