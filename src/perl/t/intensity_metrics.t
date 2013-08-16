@@ -10,8 +10,8 @@ use File::Temp qw(tempdir);
 use Test::More tests => 5;
 
 my $simPath = "$Bin/qc_test_data/small_test.sim";
-my $expectedMag = '96678657c0dcd5b14ef8c5ab8b7a8ab5';
-my $expectedXY = 'd839219a0be9a4f738885cd8a8f6b9a7';
+my $expectedMag = '1353405268f863b7f4eb691d1cca5c68';
+my $expectedXY = 'f439ac9d58104e243b1cb9602ab0933b';
 my $temp = tempdir("test_int_metric_XXXXXX", CLEANUP => 1 );
 # force inline C to recompile into empty directory
 my $inline = $temp."/inline_dir";
