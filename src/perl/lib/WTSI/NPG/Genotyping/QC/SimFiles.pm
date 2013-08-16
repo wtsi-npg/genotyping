@@ -89,18 +89,22 @@ void findMagByProbe(FILE *in, struct simhead header, float magByProbe[],
    Name and NaN count required for readSampleProbes, but not used here */
   int i, j;
   char *name;
-  float signals[header.probes * header.channels];
+  long totalSignals = header.probes * header.channels;
+  float *signals;
+  signals = calloc(totalSignals, sizeof(float));
   name = (char*) malloc(header.nameSize+1);
   int nans = 0;
   int *np = &nans;
-  for (i=0;i<header.probes;i++) { magByProbe[i]=0.0; }
+  for (i=0;i<header.probes;i++) { 
+      magByProbe[i]=0.0; 
+  }
   for (i=0;i<header.samples;i++) {
-    readSampleProbes(in, i, header, signals, np, name);
-    for (j=0;j<header.probes*2;j+=2) {
-       float a = signals[j];
-       float b = signals[j+1];
-       magByProbe[j/2] += sqrt(a*a + b*b);
-    }
+      readSampleProbes(in, i, header, signals, np, name);
+      for (j=0;j<totalSignals;j+=2) {
+          float a = signals[j];
+          float b = signals[j+1];
+          magByProbe[j/2] += sqrt(a*a + b*b);
+      }
   }
   for (i=0;i<header.probes;i++) {
     magByProbe[i] = magByProbe[i] / header.samples;
@@ -134,6 +138,7 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   name = (char*) malloc(header.nameSize+1);
   total = header.probes * header.channels;
 
+  if (verbose) { printf("First pass; about to find magnitude by probe.\n");  }
   // first pass -- find mean magnitude of intensity by probe
   findMagByProbe(in, header, magByProbe, verbose);
   // second pass -- find xydiff and normalized magnitude for each sample
@@ -268,7 +273,7 @@ float sampleMag(int totalProbes, float signals[], float magByProbe[]) {
    * Assumes data has exactly 2 intensity channels */
   int i = 0;
   float mag = 0.0;
-  int totalSignals = totalProbes*2;
+  long totalSignals = totalProbes*2;
   while (i<totalSignals) {
     float a = signals[i];
     float b = signals[i+1];
@@ -285,7 +290,7 @@ float sampleXYDiff(int totalProbes, float signals[]) {
    * Assumes data has exactly 2 intensity channels */
   int i = 0;
   float xyd = 0.0;
-  int totalSignals = totalProbes*2;
+  long totalSignals = totalProbes*2;
   while (i<totalSignals) {
       xyd += signals[i+1] - signals[i];
       i+=2;
