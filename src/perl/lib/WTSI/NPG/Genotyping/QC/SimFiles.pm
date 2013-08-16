@@ -162,7 +162,7 @@ void metricsFromFile(char* inPath, float mags[], float xyds[],
   } else if (nans>0) { 
       fprintf(stderr, "NaN and infinities found: %ld\nAll NaN and infinite intensities set to zero when computing metrics.\n", nans); 
   } else if (verbose) { 
-      printf("Finished; no NaN/infinity inputs found.\n");  
+      printf("No NaN/infinity inputs found.\n");  
   }
 }
 
