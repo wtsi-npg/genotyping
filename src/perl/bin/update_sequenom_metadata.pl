@@ -132,13 +132,6 @@ Options:
 
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
-  --days-ago    The number of days ago that the Sequenom experiment window
-                ends.
-                Optional, defaults to zero (the current day).
-  --days        The number of days in the Sequenom experiment window,
-                ending at the day given by the --days-ago argument. Any
-                plates finished in the Sequenom LIMS during this period
-                will be considered. Optional, defaults to 4 days.
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
