@@ -18,19 +18,9 @@ use Pod::Usage;
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
 
-use WTSI::NPG::iRODS qw(find_objects_by_meta
-                        get_object_meta);
-use WTSI::NPG::Metadata qw(make_sample_metadata
-                           make_md5_metadata
-                           make_type_metadata
-                           make_creation_metadata);
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
+use WTSI::NPG::iRODS qw(find_objects_by_meta);
 
-use WTSI::NPG::Genotyping::Metadata qw($SEQUENOM_PLATE_NAME_META_KEY
-                                       $SEQUENOM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Genotyping::Publication qw(update_sequenom_metadata);
+use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -51,18 +41,25 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
+  my $type;
   my $verbose;
 
-  GetOptions('config=s'    => \$config,
-             'debug'       => \$debug,
-             'dest=s'      => \$publish_dest,
-             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'   => \$log4perl_config,
-             'verbose'     => \$verbose);
+  GetOptions('config=s'  => \$config,
+             'debug'     => \$debug,
+             'dest=s'    => \$publish_dest,
+             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s' => \$log4perl_config,
+             'type=s'    => \$type,
+             'verbose'   => \$verbose);
   $config ||= $DEFAULT_INI;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
+              -exitval => 2);
+  }
+
+  unless ($type) {
+    pod2usage(-msg => "A --type argument is required\n",
               -exitval => 2);
   }
 
@@ -90,19 +87,15 @@ sub run {
                                    mysql_enable_utf8 => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-    (name   => 'snp',
-     inifile => $config)->connect(RaiseError => 1);
-
-  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv']);
-  my $total = scalar @sequenom_data;
+  my @infinium_data = find_objects_by_meta($publish_dest, [type => $type]);
+  my $total = scalar @infinium_data;
   my $updated = 0;
 
   $log->info("Updating metadata on $total data objects in '$publish_dest'");
 
-  foreach my $data_object (@sequenom_data) {
+  foreach my $data_object (@infinium_data) {
     eval {
-      update_sequenom_metadata($data_object, $snpdb, $ssdb);
+      update_infinium_metadata($data_object, $ssdb);
       ++$updated;
     };
 
@@ -123,7 +116,7 @@ __END__
 
 =head1 NAME
 
-update_sequenom_metadata
+update_infinium_metadata
 
 =head1 SYNOPSIS
 
@@ -135,17 +128,17 @@ Options:
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
+  --type        The data type to update. E.g. gtc, idat.
   --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Searches for published Sequenom experimental data in iRODS, identifies
-the Sequenom plate from which it came by means of the sequenom_plate
-and sequenom_well metadata and adds relevant sample metadata taken
-from the Sequencescape warehouse. If the new metadata include study
-information, this is used to set access rights for the data in iRODS.
-
-This script requires access to the SNP database in order to function.
+Searches for published Infinium genotyping experimental data in iRODS,
+identifies the Infinium plate from which it came by means of the
+infinium_plate and infinium_well metadata and adds relevant sample
+metadata taken from the Sequencescape warehouse. If the new metadata
+include study information, this is used to set access rights for the
+data in iRODS.
 
 =head1 METHODS
 
