@@ -49,7 +49,6 @@ __C__
 # define _FILE_OFFSET_BITS 64 // enable handling of large .sim files
 
 # define HEADSIZE 16  // size in bytes of .sim file header
-# define MAX_ARG_LEN 1000 // maximum length of command-line argument
 
 typedef struct simhead simhead;
 struct simhead {
