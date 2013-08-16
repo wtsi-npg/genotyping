@@ -200,7 +200,6 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
      Update a global count of nans/infinities, and local counts for sample
      Warn if sample nan/infinity count is greater than zero
    */
-  //printf("###%ld\n", *nans);
   int i;
   int nanCount = 0;
   int infCount = 0;
