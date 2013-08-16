@@ -17,7 +17,7 @@
 #
 
 module Genotyping
-  VERSION = '0.8.3'
+  VERSION = '0.8.4'
   YEAR = '2013'
   VERSION_LOG_NAME = 'version.log'
 
