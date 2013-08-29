@@ -89,6 +89,8 @@ Returns:
       args.delete(:queue)
       args.delete(:select)
 
+      ENV['PERL_INLINE_DIRECTORY'] = self.inline_dir
+
       work_dir = maybe_work_dir(work_dir)
       log_dir = File.join(work_dir, 'log')
       Dir.mkdir(log_dir) unless File.exist?(log_dir)
@@ -127,8 +129,11 @@ Returns:
       gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
                                  sjson, njson, args, async)
 
-      qcargs = {:run => run_name}.merge(args)
-      gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', qcargs, async)
+      if smfile
+        qcargs = {:run => run_name, :sim => smfile }.merge(args)
+        gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', 
+                                    qcargs, async)
+      end
 
       [gsfile, gsquality] if [gsfile, gsquality].all?
     end

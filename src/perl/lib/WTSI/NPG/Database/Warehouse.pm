@@ -8,6 +8,34 @@ use Carp;
 
 use base 'WTSI::NPG::Database';
 
+=head2 find_plate
+
+  Arg [1]    : string
+  Example    : $db->find_plate($plate_id)
+  Description: Return plate details for a plate identifier
+               as a hashref with plate addresses as keys and values being
+               a further hashref for each sample having the following keys
+               and values:
+               { internal_id,      => <SequenceScape plate id>,
+                 sanger_sample_id  => <WTSI sample name string>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 uuid              => <SequenceScape UUID blob as hexidecimal>,
+                 name              => <SequenceScape sample name>,
+                 common_name       => <SequenceScape sample common name>,
+                 supplier_name     => <Supplier provided name, may be undef>,
+                 gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
+                 barcode_prefix    => <SequenceScape barcode prefix string>,
+                 barcode           => <SequenceScape barcode integer>,
+                 map               => <SequenceScape well address string
+                                       without 0-pad e.g A1> }
+  Returntype : hashref
+  Caller     : general
+
+=cut
+
 sub find_plate {
   my ($self, $plate_id) = @_;
 
@@ -59,6 +87,70 @@ sub find_plate {
   return \%plate;
 }
 
+
+sub find_sample_by_plate {
+  my ($self, $plate_id, $map) = @_;
+
+  unless (defined $plate_id) {
+    confess "The plate_id argument was undefined\n";
+  }
+  unless (defined $map) {
+    confess "The map argument was undefined\n";
+  }
+
+  my $unpadded_map = $map;
+  $unpadded_map =~ s/0//;
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT
+         sm.internal_id,
+         sm.sanger_sample_id,
+         sm.consent_withdrawn,
+         HEX(sm.uuid),
+         sm.name,
+         sm.common_name,
+         sm.supplier_name,
+         sm.accession_number,
+         sm.gender,
+         sm.cohort,
+         sm.control,
+         aq.study_internal_id AS study_id,
+         pl.barcode_prefix,
+         pl.barcode,
+         pl.plate_purpose_name,
+         wl.map
+       FROM
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
+       WHERE
+         pl.internal_id = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.map = ?,
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
+
+  $self->log->trace("Executing: '$query' with args [$plate_id, $unpadded_map]");
+
+  my $sth = $dbh->prepare($query);
+  $sth->execute($plate_id, $unpadded_map);
+
+  my @samples;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@samples, $row);
+  }
+
+  my $n = scalar @samples;
+  if ($n > 1) {
+    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+  }
+
+  return shift @samples;
+}
+
 =head2 find_infinium_plate
 
   Arg [1]    : string
@@ -69,10 +161,15 @@ sub find_plate {
                and values:
                { internal_id,      => <SequenceScape plate id>,
                  sanger_sample_id  => <WTSI sample name string>,
-                 uuid              => <SequenceScape UUID blob as hexidecimal>,
                  consent_withdrawn => <boolean, true if now unconsented>,
+                 uuid              => <SequenceScape UUID blob as hexidecimal>,
+                 name              => <SequenceScape sample name>,
+                 common_name       => <SequenceScape sample common name>,
                  supplier_name     => <Supplier provided name, may be undef>,
                  gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
                  barcode_prefix    => <SequenceScape barcode prefix string>,
                  barcode           => <SequenceScape barcode integer>,
                  map               => <SequenceScape well address string

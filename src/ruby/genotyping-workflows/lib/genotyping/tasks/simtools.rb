@@ -19,9 +19,14 @@
 module Genotyping::Tasks
 
   SIMTOOLS = 'simtools'
+  G2I = 'g2i'
 
   def simtools_available?()
     system("which #{SIMTOOLS} >/dev/null 2>&1")
+  end
+
+  def g2i_available?()
+    system("which #{G2I} >/dev/null 2>&1")
   end
 
   module Simtools
@@ -43,9 +48,7 @@ module Genotyping::Tasks
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
-    # - An Array containing
     #   - The SIM file path.
-    #   - The JSON chromosome annotation path.
     def gtc_to_sim(input, manifest, output, args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
@@ -54,10 +57,9 @@ module Genotyping::Tasks
         expected = [output]
         
         cli_args = {:normalize => args[:normalize],
-          :infile => input,
-          :man_dir => manifest, # manifest path -- despite the name!
-          :outfile => output,
-        }
+                    :infile => input,
+                    :man_dir => manifest, # manifest path -- despite the name!
+                    :outfile => output}
 
         margs = [cli_args, input, work_dir]
         task_id = task_identity(:gtc_to_sim, *margs)
@@ -69,11 +71,50 @@ module Genotyping::Tasks
 
         async_task(margs, command, work_dir, log,
                    :post => lambda { ensure_files(expected, :error => false) },
-                   :result => lambda { expected },
+                   :result => lambda { output },
                    :async => async)
       end
     end
 
+    # Collates GenCall genotype call data from multiple GTC format files into a
+    # single Plink BED format file.
+    #
+    # Arguments:
+    # - input (String): A JSON file specifying sample URIs and GTC file paths.
+    # - manifest (String): The BeadPool manifest file name.
+    # - output (String): The BED file name.
+    # - args (Hash): Arguments for the operation.
+    #
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - An Array containing
+    #   - The BED file path.
+    def gtc_to_bed(input, manifest, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(input, manifest, output, work_dir)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
+        expected = [output]
+
+        cli_args = {:i => input,
+                    :b => true,
+                    :d => File.dirname(manifest),
+                    :o => File.basename(output, '.bed')}
+
+        margs = [cli_args, input, work_dir]
+        task_id = task_identity(:g2i, *margs)
+        log = File.join(log_dir, task_id + '.log')
+
+        command = [G2I, cli_arg_map(cli_args, :prefix => '-') { |key|
+          key.gsub(/_/, '-') }].flatten.join(' ')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false) },
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
 
   end # module Simtools
 end # module Genotyping::Tasks
