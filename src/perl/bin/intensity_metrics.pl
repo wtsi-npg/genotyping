@@ -30,6 +30,9 @@ Options:
 --help            Print this help text and exit
 ";
     exit(0);
+} elsif (!($inPath && $outPathXY && $outPathMag)) {
+    print STDERR "Incorrect arguments; run with --help for usage.\n";
+    exit(1);
 }
 
 $verbose||=0;
