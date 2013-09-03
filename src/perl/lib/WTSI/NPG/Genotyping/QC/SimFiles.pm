@@ -181,7 +181,9 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
   headSizeL = (unsigned long long) HEADSIZE;
   start = headSizeL + (offsetL * sampleUnitBytesL);
   int signalTotal = header.probes * header.channels;
+  uint16_t signalInts[signalTotal+1]; // integer signal values, if needed
   int result;
+  int i;
   result = fseeko(in, start, 0); 
   if (result!=0) {  
     fprintf(stderr, "ERROR: Seek failed in .sim file.\n");  
@@ -190,7 +192,18 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
     exit(1);
   }
   fgets(name, header.nameSize+1, in);
-  fread(signals, header.numericBytes, signalTotal, in);
+  switch (header.format) {
+  case 0:
+    fread(signals, header.numericBytes, signalTotal, in);
+    break;
+  case 1:
+    fread(signalInts, header.numericBytes, signalTotal, in);
+    for (i=0;i<signalTotal;i++) { signals[i] = (float) signalInts[i]; }
+    break;
+  default:
+    fprintf(stderr, "Unsupported .sim format: %d\n", header.format); 
+    exit(1);
+  }
   if (ferror(in)) {
       fprintf(stderr, "ERROR: Failed to read sample data from input .sim\n");
       exit(1);
@@ -199,7 +212,6 @@ void readSampleProbes(FILE *in, int sampleOffset, struct simhead header,
      Update a global count of nans/infinities, and local counts for sample
      Warn if sample nan/infinity count is greater than zero
    */
-  int i;
   int nanCount = 0;
   int infCount = 0;
   for (i=0;i<signalTotal;i++) {
@@ -242,7 +254,7 @@ struct simhead readHeader(FILE *in) {
   int nb, sampleUnitBytes;
   if (format == 0) { nb = 4; }
   else if (format == 1) { nb = 2; }
-  else { fprintf(stderr, "ERROR: Invalid header format code\n"); exit(1);  }
+  else { fprintf(stderr, "ERROR: Unsupported header format code: %d\n", format); exit(1);  }
   sampleUnitBytes = nameSize + (probes * channels * nb);
   struct simhead header = { magic, version, nameSize, samples, probes, 
                             channels, format, nb, sampleUnitBytes };
