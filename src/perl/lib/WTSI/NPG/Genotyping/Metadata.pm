@@ -105,7 +105,9 @@ sub make_analysis_metadata {
 sub infinium_fingerprint {
   my @meta = @_;
 
-  return make_fingerprint([$INFINIUM_PLATE_BARCODE_META_KEY,
+  return make_fingerprint([$INFINIUM_PROJECT_TITLE_META_KEY,
+                           'dcterms:identifier',
+                           $INFINIUM_PLATE_BARCODE_META_KEY,
                            $INFINIUM_PLATE_WELL_META_KEY,
                            $INFINIUM_BEADCHIP_META_KEY,
                            $INFINIUM_BEADCHIP_DESIGN_META_KEY,
