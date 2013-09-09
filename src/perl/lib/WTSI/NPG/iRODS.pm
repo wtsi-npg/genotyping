@@ -8,6 +8,7 @@ use Carp;
 use Cwd qw(abs_path);
 use File::Basename qw(basename fileparse);
 use File::Find;
+use File::stat;
 use Log::Log4perl;
 
 use base 'Exporter';
@@ -146,7 +147,7 @@ sub find_or_make_group {
   Arg [1]    : None
   Example    : list_groups()
   Description: Returns a list of iRODS groups
-  Returntype : arrayr
+  Returntype : array
   Caller     : general
 
 =cut
@@ -653,6 +654,7 @@ sub find_objects_by_meta {
   return grep { /^$root/ } @results;
 }
 
+
 =head2 list_collection
 
   Arg [1]    : iRODS collection name
@@ -1034,6 +1036,7 @@ sub hash_path {
   Arg [2]    : coderef of a function that accepts a single argument and
                returns true if that object is to be collected.
   Arg [3]    : Maximum depth to search below the starting directory.
+               Optional (undef for unlimited depth).
   Arg [4]    : A file matching regex that is applied in addition to to
                the test. Optional.
   Example    : @files = collect_files('/home', $modified, 3, qr/.txt$/i)
@@ -1054,27 +1057,33 @@ sub collect_files {
   my $collector = make_collector($test, \@files);
 
   my $start_depth = $root =~ tr[/][];
-  my $abs_depth = $start_depth + $depth;
+  my $stop_depth;
+  if (defined $depth) {
+    $stop_depth = $start_depth + $depth;
+  }
 
   find({preprocess => sub {
-          my $d = $File::Find::dir =~ tr[/][];
+          my $current_depth = $File::Find::dir =~ tr[/][];
 
           my @elts;
-          if ($d < $abs_depth) {
+          if (!defined $stop_depth || $current_depth < $stop_depth) {
+            # Remove any dirs except . and ..
             @elts = grep { ! /^\.+$/ } @_;
           }
 
           return @elts;
         },
         wanted => sub {
-          my $d = $File::Find::dir =~ tr[/][];
+          my $current_depth = $File::Find::dir =~ tr[/][];
 
-          if ($d < $abs_depth && -f) {
-            if ($regex) {
-              $collector->($File::Find::name) if $_ =~ $regex;
-            }
-            else {
-              $collector->($File::Find::name)
+          if (!defined $stop_depth || $current_depth < $stop_depth) {
+            if (-f) {
+              if ($regex) {
+                $collector->($File::Find::name) if $_ =~ $regex;
+              }
+              else {
+                $collector->($File::Find::name)
+              }
             }
           }
         }
@@ -1107,22 +1116,25 @@ sub collect_dirs {
   my $collector = make_collector($test, \@dirs);
 
   my $start_depth = $root =~ tr[/][];
-  my $abs_depth = $start_depth + $depth;
+  my $stop_depth;
+  if (defined $depth) {
+    $stop_depth = $start_depth + $depth;
+  }
 
   find({preprocess => sub {
-          my $d = $File::Find::name =~ tr[/][];
+          my $current_depth = $File::Find::name =~ tr[/][];
 
           my @dirs;
-          if ($d < $abs_depth) {
+          if (!defined $stop_depth || $current_depth < $stop_depth) {
             @dirs = grep { -d && ! /^\.+$/ } @_;
           }
 
           return @dirs;
         },
         wanted => sub {
-          my $d = $File::Find::name =~ tr[/][];
+          my $current_depth = $File::Find::name =~ tr[/][];
 
-          if ($d < $abs_depth) {
+          if (!defined $stop_depth || $current_depth < $stop_depth) {
             $collector->($File::Find::name);
           }
         }
@@ -1177,7 +1189,14 @@ sub modified_between {
 
   return sub {
     my ($file) = @_;
-    my $mtime = (stat $file)[9];
+
+    my $stat = stat($file);
+    unless (defined $stat) {
+      my $wd = `pwd`;
+      $log->logconfess("Failed to stat file '$file' in $wd: $!");
+    }
+
+    my $mtime = $stat->mtime;
 
     return ($start <= $mtime) && ($mtime <= $finish);
   }

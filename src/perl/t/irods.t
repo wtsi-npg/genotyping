@@ -10,7 +10,7 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 105;
+use Test::More tests => 107;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
@@ -294,6 +294,14 @@ is_deeply([collect_files($collect_path, $test, 3)],
            "$collect_path/c/30.txt",
            "$collect_path/c/z/3.txt"]);
 
+is_deeply([collect_files($collect_path, $test, undef)],
+          ["$collect_path/a/10.txt",
+           "$collect_path/a/x/1.txt",
+           "$collect_path/b/20.txt",
+           "$collect_path/b/y/2.txt",
+           "$collect_path/c/30.txt",
+           "$collect_path/c/z/3.txt"]);
+
 # collect_dirs
 is_deeply([collect_dirs($collect_path, $test, 1)],
           ["$collect_path"]);
@@ -305,6 +313,15 @@ is_deeply([collect_dirs($collect_path, $test, 2)],
            "$collect_path/c"]);
 
 is_deeply([collect_dirs($collect_path, $test, 3)],
+          ["$collect_path",
+           "$collect_path/a",
+           "$collect_path/a/x",
+           "$collect_path/b",
+           "$collect_path/b/y",
+           "$collect_path/c",
+           "$collect_path/c/z"]);
+
+is_deeply([collect_dirs($collect_path, $test, undef)],
           ["$collect_path",
            "$collect_path/a",
            "$collect_path/a/x",
