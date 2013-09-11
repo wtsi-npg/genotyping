@@ -357,32 +357,32 @@ void FindMetrics(SV* args, ...) {
   if (verboseB) { verbose = 1; }
   else { verbose = 0; }
   if (verbose) { printf("Starting intensity metric calculation.\n"); }
- // need header to find length of results arrays
-    struct simhead header = readHeaderFromPath(inPath);
-    struct simhead *hp;
-    hp = &header;
-    float mags[header.samples];
-    float xyds[header.samples];
-    // create array of char pointers with enough space for each name
-    char **names; 
-    names = calloc(header.samples, sizeof(char*));
-    if (names==NULL) { 
-        fprintf(stderr, "ERROR: Could not allocate name array memory\n");
+  // need header to find length of results arrays
+  struct simhead header = readHeaderFromPath(inPath);
+  struct simhead *hp;
+  hp = &header;
+  float mags[header.samples];
+  float xyds[header.samples];
+  // create array of char pointers with enough space for each name
+  char **names; 
+  names = calloc(header.samples, sizeof(char*));
+  if (names==NULL) { 
+    fprintf(stderr, "ERROR: Could not allocate name array memory\n");
+  }
+  int i;
+  for (i=0;i<header.samples;i++) {
+    names[i] = calloc(header.nameSize+1, sizeof(char));
+    if (names[i]==NULL) {
+      fprintf(stderr, "ERROR: Could not allocate name memory\n");
+      exit(1);
     }
-    int i;
-    for (i=0;i<header.samples;i++) {
-        names[i] = calloc(header.nameSize+1, sizeof(char));
-        if (names[i]==NULL) {
-            fprintf(stderr, "ERROR: Could not allocate name memory\n");
-            exit(1);
-        }
-        mags[i] = 0.0;
-        xyds[i] = 0.0;
-    }
-    metricsFromFile(inPath, mags, xyds, names, verbose);
-    writeResults(magPath, header.samples, names, mags);
-    writeResults(xydPath, header.samples, names, xyds);
-    if (verbose) { printf("Finished.\n"); }
+    mags[i] = 0.0;
+    xyds[i] = 0.0;
+  }
+  metricsFromFile(inPath, mags, xyds, names, verbose);
+  writeResults(magPath, header.samples, names, mags);
+  writeResults(xydPath, header.samples, names, xyds);
+  if (verbose) { printf("Finished.\n"); }
 }
 
 void PrintSimHeader(SV* args, ...) {
