@@ -52,18 +52,31 @@ sub run {
   my $log4perl_config;
   my $publish_dest;
   my $verbose;
+  my @filter_key;
+  my @filter_value;
 
-  GetOptions('config=s'    => \$config,
-             'debug'       => \$debug,
-             'dest=s'      => \$publish_dest,
-             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'   => \$log4perl_config,
-             'verbose'     => \$verbose);
+  GetOptions('config=s'       => \$config,
+             'debug'          => \$debug,
+             'dest=s'         => \$publish_dest,
+             'filter_key=s'   => \@filter_key,
+             'filter_value=s' => \@filter_value,
+             'help'           => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'      => \$log4perl_config,
+             'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
+  }
+
+  unless (scalar @filter_key == scalar @filter_value) {
+    pod2usage(-msg => "There emust be equal numbers of filter keys and values\n",
+              -exitval => 2);
+  }
+  my @filter;
+  while (@filter_key) {
+    push @filter, [pop @filter_key, pop @filter_value];
   }
 
   my $log;
@@ -94,7 +107,7 @@ sub run {
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv']);
+  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv'], @filter);
   my $total = scalar @sequenom_data;
   my $updated = 0;
 
@@ -133,6 +146,8 @@ Options:
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dest        The data destination root collection in iRODS.
+  --filter_key  Additional filter to limit set of dataObjs acted on.
+  --filter_value
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
   --verbose     Print messages while processing. Optional.
