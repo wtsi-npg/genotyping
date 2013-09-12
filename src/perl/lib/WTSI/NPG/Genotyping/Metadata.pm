@@ -20,6 +20,7 @@ our @EXPORT_OK = qw($GENOTYPING_ANALYSIS_UUID_META_KEY
                     $INFINIUM_BEADCHIP_META_KEY
                     $INFINIUM_BEADCHIP_SECTION_META_KEY
                     $INFINIUM_PROJECT_TITLE_META_KEY
+                    $INFINIUM_SAMPLE_NAME
                     $SEQUENOM_PLATE_NAME_META_KEY
                     $SEQUENOM_PLATE_WELL_META_KEY
 
@@ -32,6 +33,7 @@ our @EXPORT_OK = qw($GENOTYPING_ANALYSIS_UUID_META_KEY
 
 our $GENOTYPING_ANALYSIS_UUID_META_KEY  = 'analysis_uuid';
 our $INFINIUM_PROJECT_TITLE_META_KEY    = 'dcterms:title';
+our $INFINIUM_SAMPLE_NAME               = 'dcterms:identifier';
 our $INFINIUM_BEADCHIP_META_KEY         = 'beadchip';
 our $INFINIUM_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
 our $INFINIUM_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
@@ -59,7 +61,7 @@ sub make_infinium_metadata {
   my ($if_sample) = @_;
 
   return ([$INFINIUM_PROJECT_TITLE_META_KEY    => $if_sample->{project}],
-          ['dcterms:identifier'                => $if_sample->{sample}],
+          [$INFINIUM_SAMPLE_NAME               => $if_sample->{sample}],
           [$INFINIUM_PLATE_BARCODE_META_KEY    => $if_sample->{plate}],
           [$INFINIUM_PLATE_WELL_META_KEY       => $if_sample->{well}],
           [$INFINIUM_BEADCHIP_META_KEY         => $if_sample->{beadchip}],
@@ -106,7 +108,7 @@ sub infinium_fingerprint {
   my @meta = @_;
 
   return make_fingerprint([$INFINIUM_PROJECT_TITLE_META_KEY,
-                           'dcterms:identifier',
+                           $INFINIUM_SAMPLE_NAME,
                            $INFINIUM_PLATE_BARCODE_META_KEY,
                            $INFINIUM_PLATE_WELL_META_KEY,
                            $INFINIUM_BEADCHIP_META_KEY,
