@@ -129,7 +129,7 @@ sub find_sample_by_plate {
          pl.internal_id = ?
          AND wl.plate_barcode = pl.barcode
          AND wl.plate_barcode_prefix = pl.barcode_prefix
-         AND wl.map = ?,
+         AND wl.map = ?
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
@@ -380,6 +380,29 @@ sub find_sample_studies {
   }
 
   return \@studies;
+}
+
+sub find_study_title {
+  my ($self, $study_id) = @_;
+
+  my $dbh = $self->dbh;
+  my $query = qq(SELECT study_title
+                 FROM current_studies
+                 WHERE internal_id = ?);
+  my $sth = $dbh->prepare($query);
+  $sth->execute($study_id);
+
+  my @titles;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@titles, $row->{study_title});
+  }
+
+  my $n = scalar @titles;
+  if ($n > 1) {
+    $self->log->logconfess("$n records for study '$study_id' were returned where 1 was expected");
+  }
+
+  return shift @titles;
 }
 
 1;
