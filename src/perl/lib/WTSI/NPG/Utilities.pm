@@ -4,9 +4,13 @@ package WTSI::NPG::Utilities;
 
 use strict;
 use warnings;
+use Carp;
+use DateTime;
 
 use base 'Exporter';
-our @EXPORT_OK = qw(common_stem trim);
+our @EXPORT_OK = qw(common_stem trim user_session_log);
+
+our $USER_SESSION_LOG_DIR = '/nfs/srpipe_data/logs/user_session_logs/';
 
 =head2 common_stem
 
@@ -66,6 +70,39 @@ sub trim {
   $copy =~ s/\s*$//;
 
   return $copy;
+}
+
+=head2 user_session_log
+
+  Arg [1]    : UID string
+  Arg [2]    : Session name string
+
+  Example    : $log = user_session_log($uid, 'my_session');
+  Description: Return a log file path for a program user session.
+  Returntype : string
+  Caller     : general
+
+=cut
+
+sub user_session_log {
+  my ($uid, $session_name) = @_;
+
+  unless (defined $uid) {
+    croak "A defined uid argument is required\n";
+  }
+  unless (defined $session_name) {
+    croak "A defined session_name argument is required\n";
+  }
+  unless ($uid =~ /[A-Za-z0-9]+/) {
+    croak "The uid argument must match [A-Za-z0-9]+\n";
+  }
+  unless ($session_name =~ /[A-Za-z0-9]+/) {
+    croak "The session_name argument must match [A-Za-z0-9]+\n";
+  }
+
+  my $now = DateTime->now();
+  return sprintf("%s/%s.%s.%s.log", $USER_SESSION_LOG_DIR,
+                 $session_name, $uid, $now->strftime("%F"));
 }
 
 1;

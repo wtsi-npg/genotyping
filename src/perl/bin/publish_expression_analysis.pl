@@ -30,14 +30,25 @@ use WTSI::NPG::Expression::Publication qw(publish_expression_analysis);
 use WTSI::NPG::Utilities qw(trim);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_analysis_data');
+
+my $embedded_conf = "
+   log4perl.logger.npg.irods.publish = ERROR, A1, A2
 
    log4perl.appender.A1           = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.utf8      = 1
    log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+
+   log4perl.appender.A2           = Log::Log4perl::Appender::File
+   log4perl.appender.A2.filename  = $session_log
+   log4perl.appender.A2.utf8      = 1
+   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
+   log4perl.appender.A2.syswrite  = 1
+";
 
 my $log;
 
@@ -62,7 +73,8 @@ sub run {
   GetOptions('analysis-dest=s'   => \$publish_analysis_dest,
              'analysis-source=s' => \$analysis_source,
              'debug'             => \$debug,
-             'help'              => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'help'              => sub { pod2usage(-verbose => 2,
+                                                    -exitval => 0) },
              'logconf=s'         => \$log4perl_config,
              'manifest=s'        => \$manifest,
              'sample-dest=s'     => \$publish_sample_dest,
@@ -143,9 +155,6 @@ sub run {
 
   my @paths = collect_files($sample_dir, $file_test, $relative_depth);
   my $samples = add_paths(\@samples, \@paths);
-
-  my $uid = `whoami`;
-  chomp($uid);
 
   my $creator_uri = get_wtsi_uri();
   my $publisher_uri = get_publisher_uri($uid);
