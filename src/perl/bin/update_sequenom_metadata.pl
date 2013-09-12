@@ -58,9 +58,10 @@ sub run {
   GetOptions('config=s'       => \$config,
              'debug'          => \$debug,
              'dest=s'         => \$publish_dest,
-             'filter_key=s'   => \@filter_key,
-             'filter_value=s' => \@filter_value,
-             'help'           => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'filter-key=s'   => \@filter_key,
+             'filter-value=s' => \@filter_value,
+             'help'           => sub { pod2usage(-verbose => 2,
+                                                 -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
              'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
@@ -69,11 +70,11 @@ sub run {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
   }
-
   unless (scalar @filter_key == scalar @filter_value) {
-    pod2usage(-msg => "There emust be equal numbers of filter keys and values\n",
+    pod2usage(-msg => "There must be equal numbers of filter keys and values\n",
               -exitval => 2);
   }
+
   my @filter;
   while (@filter_key) {
     push @filter, [pop @filter_key, pop @filter_value];
@@ -107,7 +108,8 @@ sub run {
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv'], @filter);
+  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv'],
+                                           @filter);
   my $total = scalar @sequenom_data;
   my $updated = 0;
 
@@ -123,7 +125,7 @@ sub run {
       $log->error("Failed to update metadata for '$data_object': ", $@);
     }
     else {
-      $log->debug("Updated metadata for '$data_object': $updated of $total");
+      $log->info("Updated metadata for '$data_object': $updated of $total");
     }
   }
 
@@ -143,14 +145,14 @@ update_sequenom_metadata
 
 Options:
 
-  --config      Load database configuration from a user-defined .ini file.
-                Optional, defaults to $HOME/.npg/genotyping.ini
-  --dest        The data destination root collection in iRODS.
-  --filter_key  Additional filter to limit set of dataObjs acted on.
-  --filter_value
-  --help        Display help.
-  --logconf     A log4perl configuration file. Optional.
-  --verbose     Print messages while processing. Optional.
+  --config       Load database configuration from a user-defined
+                 .ini file. Optional, defaults to $HOME/.npg/genotyping.ini
+  --dest         The data destination root collection in iRODS.
+  --filter-key   Additional filter to limit set of dataObjs acted on.
+  --filter-value
+  --help         Display help.
+  --logconf      A log4perl configuration file. Optional.
+  --verbose      Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
