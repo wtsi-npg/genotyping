@@ -5,7 +5,6 @@ package WTSI::NPG::Utilities::IO;
 use strict;
 use warnings;
 use Carp;
-use JSON;
 
 use base 'Exporter';
 our @EXPORT_OK = qw(maybe_stdin maybe_stdout);
