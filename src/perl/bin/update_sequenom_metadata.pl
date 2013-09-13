@@ -11,26 +11,16 @@ use DateTime;
 use File::Basename;
 use File::Find;
 use Getopt::Long;
+use List::MoreUtils qw(natatime);
 use Log::Log4perl;
 use Log::Log4perl::Level;
+use Parallel::ForkManager;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
-
-use WTSI::NPG::iRODS qw(find_objects_by_meta
-                        get_object_meta);
-use WTSI::NPG::Metadata qw(make_sample_metadata
-                           make_md5_metadata
-                           make_type_metadata
-                           make_creation_metadata);
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
-
-use WTSI::NPG::Genotyping::Metadata qw($SEQUENOM_PLATE_NAME_META_KEY
-                                       $SEQUENOM_PLATE_WELL_META_KEY);
 use WTSI::NPG::Genotyping::Publication qw(update_sequenom_metadata);
+use WTSI::NPG::iRODS qw(find_objects_by_meta);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -43,6 +33,8 @@ my $embedded_conf = q(
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 4;
+our $DEFAULT_NUM_PROCESSES = 1;
+our $MAX_PROCESSES = 16;
 
 run() unless caller();
 
@@ -50,6 +42,7 @@ sub run {
   my $config;
   my $debug;
   my $log4perl_config;
+  my $num_processes;
   my $publish_dest;
   my $verbose;
   my @filter_key;
@@ -63,11 +56,17 @@ sub run {
              'help'           => sub { pod2usage(-verbose => 2,
                                                  -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
+             'num-processes'  => \$num_processes,
              'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
+  $num_processes ||= $DEFAULT_NUM_PROCESSES;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
+              -exitval => 2);
+  }
+  unless ($num_processes >= 1 && $num_processes <= $MAX_PROCESSES) {
+    pod2usage(-msg => "The --num-processes argument must be between 1 and $MAX_PROCESSES, inclusive\n",
               -exitval => 2);
   }
   unless (scalar @filter_key == scalar @filter_value) {
@@ -98,6 +97,50 @@ sub run {
     }
   }
 
+  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv'],
+                                           @filter);
+  my $total = scalar @sequenom_data;
+  $log->info("Updating metadata on $total data objects in '$publish_dest'");
+
+  if ($num_processes == 1) {
+    update_metadata(0, \@sequenom_data, $publish_dest, $config, $log);
+  }
+  else {
+    my $pm = Parallel::ForkManager->new($num_processes);
+    $pm->run_on_finish(sub {
+                         my ($pid, $exit_code, $name) = @_;
+                         $log->debug("Chunk $name (PID $pid) finished ",
+                                     "with code $exit_code");
+                         unless ($exit_code == 0) {
+                           $log->error("Chunk $name (PID $pid) exited ",
+                                       "with code $exit_code");
+                         }
+                       });
+
+    $pm->run_on_start(sub {
+                        my ($pid, $name) = @_;
+                        $log->debug("Chunk $name started with PID $pid");
+                      });
+
+    my $iter = natatime($total / $num_processes, @sequenom_data);
+    my $chunk_num = 0;
+    while (my @chunk = $iter->()){
+      ++$chunk_num;
+
+      $pm->start($chunk_num) and next;
+      update_metadata($chunk_num, \@chunk, $publish_dest, $config, $log);
+      $pm->finish;
+    }
+
+    $pm->wait_all_children;
+  }
+
+  return 0;
+}
+
+sub update_metadata {
+  my ($chunk_num, $chunk, $publish_dest, $config, $log) = @_;
+
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError => 1,
@@ -108,16 +151,14 @@ sub run {
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  my @sequenom_data = find_objects_by_meta($publish_dest, [type => 'csv'],
-                                           @filter);
-  my $total = scalar @sequenom_data;
+  my $total = scalar @$chunk;
+  $log->info("Chunk $chunk_num Updating metadata on $total ",
+             "data objects in '$publish_dest'");
+
   my $updated = 0;
-
-  $log->info("Updating metadata on $total data objects in '$publish_dest'");
-
-  foreach my $data_object (@sequenom_data) {
+  foreach my $data_object (@$chunk) {
     eval {
-      update_sequenom_metadata($data_object, $snpdb, $ssdb);
+       update_sequenom_metadata($data_object, $snpdb, $ssdb);
       ++$updated;
     };
 
@@ -129,8 +170,10 @@ sub run {
     }
   }
 
-  $log->info("Updated metadata on $updated/$total data objects in ",
-             "'$publish_dest'");
+  $ssdb->disconnect();
+  $snpdb->disconnect();
+
+  return $chunk_num;
 }
 
 
@@ -145,14 +188,17 @@ update_sequenom_metadata
 
 Options:
 
-  --config       Load database configuration from a user-defined
-                 .ini file. Optional, defaults to $HOME/.npg/genotyping.ini
-  --dest         The data destination root collection in iRODS.
-  --filter-key   Additional filter to limit set of dataObjs acted on.
+  --config        Load database configuration from a user-defined
+                  .ini file. Optional, defaults to
+                  $HOME/.npg/genotyping.ini
+  --dest          The data destination root collection in iRODS.
+  --filter-key    Additional filter to limit set of dataObjs acted on.
   --filter-value
-  --help         Display help.
-  --logconf      A log4perl configuration file. Optional.
-  --verbose      Print messages while processing. Optional.
+  --help          Display help.
+  --logconf       A log4perl configuration file. Optional.
+  --num-processes The number for forked processes to run. Optional,
+                  defaults to 1 (i.e. none forked).
+  --verbose       Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
