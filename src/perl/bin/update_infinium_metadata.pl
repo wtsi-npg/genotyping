@@ -17,10 +17,8 @@ use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
-
-use WTSI::NPG::iRODS qw(find_objects_by_meta);
-
 use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
+use WTSI::NPG::iRODS qw(find_objects_by_meta);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1

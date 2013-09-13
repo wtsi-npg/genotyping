@@ -138,7 +138,9 @@ sub run {
     print "New analysis UUID: ", $analysis_uuid, "\n";
   }
   else {
-    $log->error("No analysis UUID generated; upload aborted because of errors");
+    $log->error('No analysis UUID generated; upload aborted because of errors.',
+                ' Please raise an RT ticket or email ',
+                'new-seq-pipe@sanger.ac.uk');
   }
 }
 
@@ -158,7 +160,7 @@ publish_analysis_data [--config <database .ini file>] \
 Options:
 
   --archive     Search pattern matching root of samples archive.
-                Optional, defaults to '/archive/GAPI/gen/infinium%'
+                Optional, defaults to '/archive/GAPI/gen/infinium'
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile      The SQLite database file. If not supplied, defaults to the
