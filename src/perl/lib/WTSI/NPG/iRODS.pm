@@ -1299,12 +1299,21 @@ sub _make_imeta_query {
       $log->logconfess("The query_spec '$spec' was not an array reference");
     }
 
-    my ($key, $value, $unit) = @$spec;
-    if (defined $unit) {
-      $log->logwarn("Ignoring unit in query spec [$key, $value, $unit]");
+    my ($key, $value, $operator) = @$spec;
+    if (defined $operator) {
+      unless ($operator eq '=' ||
+              $operator eq 'like' ||
+              $operator eq '<' ||
+              $operator eq '>') {
+        $log->logconfess("Invalid query operator '$operator' in query spec ",
+                         "[$key, $value, $operator]");
+      }
+    }
+    else {
+      $operator = '=';
     }
 
-    push(@query_clauses, "$key = $value");
+    push(@query_clauses, "$key $operator $value");
   }
 
   return join(' and ', @query_clauses);
