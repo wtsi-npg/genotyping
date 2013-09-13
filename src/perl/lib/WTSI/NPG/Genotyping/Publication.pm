@@ -548,7 +548,7 @@ sub publish_analysis_directory {
           }
 
           # Xref samples to analysis UUID
-          # update_object_meta($sample_datum, \@uuid_meta);
+          update_object_meta($data_object, \@uuid_meta);
           ++$num_objects;
         }
 
@@ -571,7 +571,7 @@ sub publish_analysis_directory {
   else {
     $log->info("Published '$dir' to '$analysis_coll' and ",
                "cross-referenced $num_objects data objects in ",
-               "for $num_samples in $num_projects projects");
+               "for $num_samples samples in $num_projects projects");
   }
 
   return $analysis_uuid;
