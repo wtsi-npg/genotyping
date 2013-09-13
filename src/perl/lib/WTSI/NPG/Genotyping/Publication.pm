@@ -130,7 +130,7 @@ sub publish_idat_files {
           $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
         }
         else {
-          $log->debug("Published '$file': $published of $total");
+          $log->info("Published '$file': $published of $total");
         }
       }
     }
@@ -194,7 +194,7 @@ sub publish_gtc_files {
         $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
       }
       else {
-        $log->debug("Published '$file': $published of $total");
+        $log->info("Published '$file': $published of $total");
       }
     }
     else {
@@ -250,8 +250,8 @@ sub update_infinium_metadata {
                      "well '$well'");
   }
 
-  $log->debug("Updating metadata for '$data_object' from plate ",
-              "'$infinium_barcode' well '$well'");
+  $log->info("Updating metadata for '$data_object' from plate ",
+             "'$infinium_barcode' well '$well'");
 
   my @meta = make_sample_metadata($ss_sample);
   update_object_meta($data_object, \@meta);
@@ -403,8 +403,8 @@ sub update_sequenom_metadata {
                        "well '$well'");
     }
 
-    $log->debug("Updating metadata for '$data_object' from plate ",
-                "'$plate_name' well '$well'");
+    $log->info("Updating metadata for '$data_object' from plate ",
+               "'$plate_name' well '$well'");
 
     my @meta = make_sample_metadata($ss_sample);
     update_object_meta($data_object, \@meta);
