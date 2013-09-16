@@ -553,6 +553,9 @@ sub publish_analysis_directory {
         }
 
         ++$num_samples;
+
+        $log->info("Cross-referenced $num_samples/$num_included samples ",
+                   "in project '$project_title'")
       }
 
       ++$num_projects;
