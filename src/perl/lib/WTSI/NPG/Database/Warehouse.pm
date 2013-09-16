@@ -293,10 +293,24 @@ sub find_infinium_sample_by_plate {
 }
 
 sub find_infinium_gex_sample {
-  my ($self, $sanger_sample_id) = @_;
+  my ($self, $plate_barcode, $map) = @_;
 
-  unless (defined $sanger_sample_id) {
-    confess "The sanger_sample_id argument was undefined\n";
+  unless (defined $plate_barcode) {
+    confess "The plate_barcode argument was undefined\n";
+  }
+  unless (defined $map) {
+    confess "The map argument was undefined\n";
+  }
+
+  my ($barcode_prefix, $barcode) =
+    $plate_barcode =~ /^([A-Z]{2})([0-9]+)[A-Z]$/;
+  unless (defined $barcode_prefix) {
+     $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
+                            "failed to find the barcode prefix");
+  }
+  unless (defined $barcode) {
+    $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
+                           "failed to find the barcode");
   }
 
   my $dbh = $self->dbh;
@@ -324,7 +338,9 @@ sub find_infinium_gex_sample {
          current_aliquots aq,
          current_plates pl,
          current_plate_purposes pp
-       WHERE sm.sanger_sample_id = ?
+       WHERE pl.barcode = ?
+       AND pl.barcode_prefix = ?
+       AND wl.map = ?
        AND aq.sample_internal_id = sm.internal_id
        AND wl.internal_id = aq.receptacle_internal_id
        AND pl.barcode = wl.plate_barcode
@@ -334,8 +350,9 @@ sub find_infinium_gex_sample {
 
   my $sth = $dbh->prepare($query);
 
-  $self->log->trace("Executing: '$query' with arg [$sanger_sample_id]");
-  $sth->execute($sanger_sample_id);
+  $self->log->trace("Executing: '$query' with args [",
+                    "$barcode, $barcode_prefix, $map]");
+  $sth->execute($barcode, $barcode_prefix, $map);
 
   my @samples;
   while (my $row = $sth->fetchrow_hashref) {
@@ -344,7 +361,8 @@ sub find_infinium_gex_sample {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n records for sample '$sanger_sample_id' were returned where 1 was expected");
+    $self->log->logconfess("$n records for sample '$plate_barcode' $map ",
+                           "were returned where 1 was expected");
   }
 
   return shift @samples;

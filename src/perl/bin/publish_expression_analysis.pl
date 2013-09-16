@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/software/bin/perl
 
 use utf8;
 
@@ -12,7 +12,7 @@ use Cwd qw(abs_path);
 use DateTime;
 use File::Basename qw(basename);
 use Getopt::Long;
-use List::MoreUtils qw(firstidx uniq);
+use List::MoreUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Net::LDAP;
@@ -26,13 +26,14 @@ use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
                               get_publisher_name
                               pair_rg_channel_files);
-use WTSI::NPG::Expression::Publication qw(publish_expression_analysis);
-use WTSI::NPG::Utilities qw(trim);
+use WTSI::NPG::Expression::Publication qw(publish_expression_analysis
+                                          parse_beadchip_table);
+use WTSI::NPG::Utilities qw(trim user_session_log);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 my $uid = `whoami`;
 chomp($uid);
-my $session_log = user_session_log($uid, 'publish_analysis_data');
+my $session_log = user_session_log($uid, 'publish_expression_analysis');
 
 my $embedded_conf = "
    log4perl.logger.npg.irods.publish = ERROR, A1, A2
@@ -133,10 +134,22 @@ sub run {
     }
   }
 
+  # Hack to persuade the automounter to work
+  opendir(my $dir, $sample_source);
+  readdir($dir);
+  closedir($dir);
+
   my $config ||= $DEFAULT_INI;
   my $in = maybe_stdin($manifest);
 
-  my @samples = parse_beadchip_table($in);
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name    => 'sequencescape_warehouse',
+     inifile => $config)->connect(RaiseError => 1,
+                                  mysql_enable_utf8 => 1,
+                                  mysql_auto_reconnect => 1);
+  $ssdb->log($log);
+
+  my @samples = parse_beadchip_table($in, $ssdb);
   unless (@samples) {
     $log->logcroak("Found no sample rows in input: stopping\n");
   }
@@ -161,165 +174,25 @@ sub run {
   my $name = get_publisher_name($publisher_uri);
   my $now = DateTime->now();
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1,
-                                  mysql_enable_utf8 => 1);
-  $ssdb->log($log);
-
   $log->info("Publishing samples from '$sample_source' ",
              "to '$publish_sample_dest' as ", $name);
   $log->info("Publishing analysis from '$analysis_source' ",
              "to '$publish_analysis_dest' as ", $name);
 
-  publish_expression_analysis($analysis_source, $creator_uri,
-                              $publish_analysis_dest,
-                              $publish_sample_dest,
-                              $publisher_uri, $samples,
-                              $ssdb, $now);
-}
-
-# Expects a tab-delimited text file. Useful data start after line
-# containing column headers. This line is identified by the parser by
-# presence of the the string 'BEADCHIP'.
-#
-# Column header  Content
-# 'SAMPLE ID'    Sanger sample ID
-# 'BEADCHIP'     Infinium Beadchip number
-# 'ARRAY'        Infinium Beadchip section
-#
-# Data lines follow the header, the zeroth column of which contain an
-# arbitrary string. This string is the same on all data containing
-# lines.
-#
-# Data rows are terminated by a line containing the string
-# 'Kit Control' in the zeroth column. This line is ignored by the
-# parser.
-#
-# Any whitespace-only lines are ignored.
-sub parse_beadchip_table {
-  my ($fh) = @_;
-  binmode($fh, ':utf8');
-
-  # For error reporting
-  my $line_count = 0;
-
-  # Leftmost column; used only to determine which rows have sample data
-  my $sample_key_col = 0;
-  my $sample_key;
-
-  # Columns containing useful data
-  my $sample_id_col;
-  my $beadchip_col;
-  my $section_col;
-
-  # True if we are past the header and into a data block
-  my $in_sample_block = 0;
-
-  # Collected data
-  my @samples;
-
-  while (my $line = <$fh>) {
-    ++$line_count;
-    chomp($line);
-    next if $line =~ m/^\s*$/;
-
-    if ($in_sample_block) {
-      my @sample_row = map { trim($_) } split("\t", $line);
-      unless ($sample_row[$sample_key_col]) {
-        $log->logcroak("Premature end of sample data at line $line_count\n");
-      }
-
-      if (!defined $sample_key) {
-        $sample_key = $sample_row[$sample_key_col];
-      }
-
-      if ($sample_key eq $sample_row[$sample_key_col]) {
-        push(@samples,
-             {sanger_sample_id => validate_sample_id($sample_row[$sample_id_col],
-                                                     $line_count),
-              beadchip         => validate_beadchip($sample_row[$beadchip_col],
-                                                    $line_count),
-              beadchip_section => validate_section($sample_row[$section_col],
-                                                   $line_count)});
-      }
-      elsif ($sample_row[$sample_key_col] eq 'Kit Control') {
-        # This token is taken to mean the data block has ended
-        last;
-      }
-      else {
-        $log->logcroak("Premature end of sample data at line $line_count " .
-                       "(missing 'Kit Control')\n");
-      }
-    }
-    else {
-      if ($line =~ m/BEADCHIP/) {
-        $in_sample_block = 1;
-        my @header = map { trim($_) } split("\t", $line);
-        # Expected to be Sanger sample ID
-        $sample_id_col = firstidx { /SAMPLE ID/ } @header;
-        # Expected to be chip number
-        $beadchip_col  = firstidx { /BEADCHIP/ } @header;
-        # Expected to be chip section
-        $section_col = firstidx { /ARRAY/ } @header;
-      }
-    }
+  my $analysis_uuid =
+    publish_expression_analysis($analysis_source, $creator_uri,
+                                $publish_analysis_dest,
+                                $publish_sample_dest,
+                                $publisher_uri, $samples,
+                                $ssdb, $now);
+  if (defined $analysis_uuid) {
+    print "New analysis UUID: ", $analysis_uuid, "\n";
   }
-
-  my $channel = 'Grn';
-  foreach my $sample (@samples) {
-    my $basename = sprintf("%s_%s_%s",
-                           $sample->{beadchip},
-                           $sample->{beadchip_section},
-                           $channel);
-
-    $sample->{idat_file} = $basename . '.idat';
-    $sample->{xml_file}  = $basename . '.xml' ;
+  else {
+    $log->error('No analysis UUID generated; upload aborted because of errors.',
+                ' Please raise an RT ticket or email ',
+                'new-seq-pipe@sanger.ac.uk');
   }
-
-  return @samples;
-}
-
-sub validate_sample_id {
-  my ($sample_id, $line) = @_;
-
-  unless (defined $sample_id) {
-    $log->logcroak("Missing sample ID at line $line\n");
-  }
-
-  if ($sample_id !~ /^\S+$/) {
-    $log->logcroak("Invalid sample ID '$sample_id' at line $line\n");
-  }
-
-  return $sample_id;
-}
-
-sub validate_beadchip {
-  my ($chip, $line) = @_;
-
-  unless (defined $chip) {
-    $log->logcroak("Missing beadchip number at line $line\n");
-  }
-
-  if ($chip !~ /^\d{10}$/) {
-    $log->logcroak("Invalid beadchip number '$chip' at line $line\n");
-  }
-
-  return $chip;
-}
-
-sub validate_section {
-  my ($section, $line) = @_;
-
-  unless (defined $section) {
-    $log->logcroak("Missing beadchip section at line $line\n");
-  }
-
-  if ($section !~ /^[A-Z]$/) {
-    $log->logcroak("Invalid beadchip section '$section' at line $line\n");
-  }
-
-  return $section;
 }
 
 sub add_paths {
@@ -342,14 +215,15 @@ sub add_path {
 
   my $count = scalar @matches;
   if ($count == 0) {
-    $log->logcroak("Failed to find the $type file $pattern for sample '$id' under the sample-source directory");
+    $log->logcroak("Failed to find the $type file $pattern for sample ",
+                   "'$id' under the sample-source directory");
   }
   elsif (scalar @matches == 1) {
     $sample->{$type} = $matches[0];
   }
   else {
-    $log->logcroak("Found multiple $type files matching $pattern for sample '$id': [",
-                   join(', ', @matches), "]");
+    $log->logcroak("Found multiple $type files matching $pattern for sample ",
+                   "'$id': [", join(', ', @matches), "]");
   }
 
   return $sample;
@@ -369,15 +243,15 @@ publish_expression_data --analysis-source <directory> --analysis-dest <collectio
 
 Options:
 
-  --analysis-dest   The data destination root collection for the analysis data
-                    in iRODS. E.g. /archive/GAPI/exp/analysis
+  --analysis-dest   The data destination root collection for the analysis
+                    data in iRODS. E.g. /archive/GAPI/exp/analysis
   --analysis-source The root directory of the analysis.
   --help            Display help.
   --logconf         A log4perl configuration file. Optional.
-  --manifest        Tab-delimted chip loading manifest. Optional, defaults to
-                    STDIN.
-  --sample-dest     The data destination root collection for the sample data
-                    in iRODS. E.g. /archive/GAPI/exp/infinium
+  --manifest        Tab-delimited chip loading manifest. Optional,
+                    defaults to STDIN.
+  --sample-dest     The data destination root collection for the sample
+                    data in iRODS. E.g. /archive/GAPI/exp/infinium
   --sample-source   The root directory of all samples.
   --verbose         Print messages while processing. Optional.
 
