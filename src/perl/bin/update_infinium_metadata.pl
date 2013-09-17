@@ -17,10 +17,8 @@ use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
-
-use WTSI::NPG::iRODS qw(find_objects_by_meta);
-
 use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
+use WTSI::NPG::iRODS qw(find_objects_by_meta);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -43,24 +41,37 @@ sub run {
   my $publish_dest;
   my $type;
   my $verbose;
+  my @filter_key;
+  my @filter_value;
 
-  GetOptions('config=s'  => \$config,
-             'debug'     => \$debug,
-             'dest=s'    => \$publish_dest,
-             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s' => \$log4perl_config,
-             'type=s'    => \$type,
-             'verbose'   => \$verbose);
+  GetOptions('config=s'       => \$config,
+             'debug'          => \$debug,
+             'dest=s'         => \$publish_dest,
+             'filter-key=s'   => \@filter_key,
+             'filter-value=s' => \@filter_value,
+             'help'           => sub { pod2usage(-verbose => 2,
+                                                 -exitval => 0) },
+             'logconf=s'      => \$log4perl_config,
+             'type=s'         => \$type,
+             'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
   }
-
   unless ($type) {
     pod2usage(-msg => "A --type argument is required\n",
               -exitval => 2);
+  }
+  unless (scalar @filter_key == scalar @filter_value) {
+    pod2usage(-msg => "There must be equal numbers of filter keys and values\n",
+              -exitval => 2);
+  }
+
+  my @filter;
+  while (@filter_key) {
+    push @filter, [pop @filter_key, pop @filter_value];
   }
 
   my $log;
@@ -87,7 +98,8 @@ sub run {
                                    mysql_enable_utf8 => 1,
                                    mysql_auto_reconnect => 1);
 
-  my @infinium_data = find_objects_by_meta($publish_dest, [type => $type]);
+  my @infinium_data = find_objects_by_meta($publish_dest, [type => $type],
+                                           @filter);
   my $total = scalar @infinium_data;
   my $updated = 0;
 
@@ -103,7 +115,7 @@ sub run {
       $log->error("Failed to update metadata for '$data_object': ", $@);
     }
     else {
-      $log->debug("Updated metadata for '$data_object': $updated of $total");
+      $log->info("Updated metadata for '$data_object': $updated of $total");
     }
   }
 
@@ -123,13 +135,15 @@ update_infinium_metadata
 
 Options:
 
-  --config      Load database configuration from a user-defined .ini file.
-                Optional, defaults to $HOME/.npg/genotyping.ini
-  --dest        The data destination root collection in iRODS.
-  --help        Display help.
-  --logconf     A log4perl configuration file. Optional.
-  --type        The data type to update. E.g. gtc, idat.
-  --verbose     Print messages while processing. Optional.
+  --config       Load database configuration from a user-defined .ini file.
+                 Optional, defaults to $HOME/.npg/genotyping.ini
+  --dest         The data destination root collection in iRODS.
+  --filter-key   Additional filter to limit set of dataObjs acted on.
+  --filter-value
+  --help         Display help.
+  --logconf      A log4perl configuration file. Optional.
+  --type         The data type to update. E.g. gtc, idat.
+  --verbose      Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 

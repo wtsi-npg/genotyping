@@ -8,17 +8,12 @@ use strict;
 use warnings;
 use Cwd qw(abs_path);
 use DateTime;
-use File::Basename;
-use File::Find;
 use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
-use Net::LDAP;
 use Pod::Usage;
-use URI;
-use UUID;
 
-
+use WTSI::NPG::Utilities qw(user_session_log);
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
                               get_publisher_name);
@@ -26,14 +21,25 @@ use WTSI::NPG::Genotyping::Publication qw(publish_analysis_directory);
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_analysis_data');
+
+my $embedded_conf = "
+   log4perl.logger.npg.irods.publish = ERROR, A1, A2
 
    log4perl.appender.A1           = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.utf8      = 1
    log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+
+   log4perl.appender.A2           = Log::Log4perl::Appender::File
+   log4perl.appender.A2.filename  = $session_log
+   log4perl.appender.A2.utf8      = 1
+   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
+   log4perl.appender.A2.syswrite  = 1
+";
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -103,8 +109,6 @@ sub run {
     }
   }
 
-  my $now = DateTime->now();
-
   my $db = $dbfile;
   $db ||= 'configured database';
   $log->debug("Using $db using config from $config");
@@ -117,21 +121,27 @@ sub run {
         sqlite_unicode => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
-  my $uid = `whoami`;
-  chomp($uid);
-
+  my $now = DateTime->now();
   my $creator_uri = get_wtsi_uri();
   my $publisher_uri = get_publisher_uri($uid);
   my $name = get_publisher_name($publisher_uri);
 
-  $log->info("Publishing from '$source' to '$publish_dest' using sample archive '$archive_pattern'");
+  $log->info("Publishing from '$source' to '$publish_dest' using ",
+             "sample archive '$archive_pattern'");
 
-  print publish_analysis_directory($source, $creator_uri,
-                                   $publish_dest, $publisher_uri,
-                                   $pipedb, $run_name,
-                                   $archive_pattern,
-                                   $now);
-  print "\n";
+  my $analysis_uuid = publish_analysis_directory($source, $creator_uri,
+                                                 $publish_dest, $publisher_uri,
+                                                 $pipedb, $run_name,
+                                                 $archive_pattern,
+                                                 $now);
+  if (defined $analysis_uuid) {
+    print "New analysis UUID: ", $analysis_uuid, "\n";
+  }
+  else {
+    $log->error('No analysis UUID generated; upload aborted because of errors.',
+                ' Please raise an RT ticket or email ',
+                'new-seq-pipe@sanger.ac.uk');
+  }
 }
 
 
@@ -150,7 +160,7 @@ publish_analysis_data [--config <database .ini file>] \
 Options:
 
   --archive     Search pattern matching root of samples archive.
-                Optional, defaults to '/archive/GAPI/gen/infinium%'
+                Optional, defaults to '/archive/GAPI/gen/infinium'
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile      The SQLite database file. If not supplied, defaults to the

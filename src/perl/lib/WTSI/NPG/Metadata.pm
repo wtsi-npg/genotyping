@@ -22,6 +22,7 @@ our @EXPORT_OK = qw(
                     $SAMPLE_SUPPLIER_NAME_META_KEY
                     $STUDY_ID_META_KEY
                     $STUDY_TITLE_META_KEY
+                    $TICKET_META_KEY
 
                     has_consent
                     make_creation_metadata
@@ -43,6 +44,8 @@ our $SAMPLE_CONSENT_META_KEY          = 'sample_consent';
 
 our $STUDY_ID_META_KEY                = 'study_id';
 our $STUDY_TITLE_META_KEY             = 'study_title';
+
+our $TICKET_META_KEY                  = 'rt_ticket';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -174,7 +177,7 @@ sub make_type_metadata {
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
   $suffix =~ s{^\.?}{}msxi;
 
-  return (['type' => $suffix]);
+  return ([type => $suffix]);
 }
 
 =head2 make_md5_metadata
@@ -192,6 +195,23 @@ sub make_md5_metadata {
   my ($file) = @_;
 
   return ([md5 => md5sum($file)]);
+}
+
+=head2 make_ticket_metadata
+
+  Arg [1]    : string filename
+  Example    : my @meta = make_ticket_metadata($ticket_number)
+  Description: Return a list of metadata key/value pairs describing a
+               ticket relating to the file
+  Returntype : array of arrayrefs
+  Caller     : general
+
+=cut
+
+sub make_ticket_metadata {
+  my ($ticket_number) = @_;
+
+  return ([$TICKET_META_KEY => $ticket_number]);
 }
 
 =head2 has_consent
