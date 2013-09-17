@@ -27,7 +27,8 @@ use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_name
                               pair_rg_channel_files);
 use WTSI::NPG::Expression::Publication qw(publish_expression_analysis
-                                          parse_beadchip_table);
+                                          parse_beadchip_table_v1
+                                          parse_beadchip_table_v2);
 use WTSI::NPG::Utilities qw(trim user_session_log);
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
@@ -66,21 +67,25 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $manifest;
+  my $manifest_version;
   my $publish_analysis_dest;
   my $publish_sample_dest;
   my $sample_source;
+  my $uuid;
   my $verbose;
 
-  GetOptions('analysis-dest=s'   => \$publish_analysis_dest,
-             'analysis-source=s' => \$analysis_source,
-             'debug'             => \$debug,
-             'help'              => sub { pod2usage(-verbose => 2,
-                                                    -exitval => 0) },
-             'logconf=s'         => \$log4perl_config,
-             'manifest=s'        => \$manifest,
-             'sample-dest=s'     => \$publish_sample_dest,
-             'sample-source=s'   => \$sample_source,
-             'verbose'           => \$verbose);
+  GetOptions('analysis-dest=s'    => \$publish_analysis_dest,
+             'analysis-source=s'  => \$analysis_source,
+             'debug'              => \$debug,
+             'help'               => sub { pod2usage(-verbose => 2,
+                                                     -exitval => 0) },
+             'logconf=s'          => \$log4perl_config,
+             'manifest=s'         => \$manifest,
+             'manifest-version=s' => \$manifest_version,
+             'sample-dest=s'      => \$publish_sample_dest,
+             'sample-source=s'    => \$sample_source,
+             'uuid=s'             => \$uuid,
+             'verbose'            => \$verbose);
 
   unless ($analysis_source) {
     pod2usage(-msg => "An --analysis-source argument is required\n",
@@ -139,6 +144,7 @@ sub run {
   readdir($dir);
   closedir($dir);
 
+  $manifest_version ||= '2';
   my $config ||= $DEFAULT_INI;
   my $in = maybe_stdin($manifest);
 
@@ -149,7 +155,18 @@ sub run {
                                   mysql_auto_reconnect => 1);
   $ssdb->log($log);
 
-  my @samples = parse_beadchip_table($in, $ssdb);
+  my @samples;
+
+  if ($manifest_version eq '1') {
+    @samples = parse_beadchip_table_v1($in, $ssdb);
+  }
+  elsif ($manifest_version eq '2') {
+    @samples = parse_beadchip_table_v2($in, $ssdb);
+  }
+  else {
+    pod2usage(-msg => "Invalid --manifest-version, expected one of [1, 2]\n",
+              -exitval => 4);
+  }
   unless (@samples) {
     $log->logcroak("Found no sample rows in input: stopping\n");
   }
@@ -184,12 +201,15 @@ sub run {
                                 $publish_analysis_dest,
                                 $publish_sample_dest,
                                 $publisher_uri, $samples,
-                                $ssdb, $now);
-  if (defined $analysis_uuid) {
+                                $ssdb, $now, $uuid);
+  if (defined $uuid && defined $analysis_uuid)  {
+    print "Used analysis UUID: ", $analysis_uuid, "\n";
+  }
+  elsif (defined $analysis_uuid) {
     print "New analysis UUID: ", $analysis_uuid, "\n";
   }
   else {
-    $log->error('No analysis UUID generated; upload aborted because of errors.',
+    $log->error('No analysis UUID; upload aborted because of errors.',
                 ' Please raise an RT ticket or email ',
                 'new-seq-pipe@sanger.ac.uk');
   }

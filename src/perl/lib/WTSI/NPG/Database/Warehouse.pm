@@ -87,7 +87,6 @@ sub find_plate {
   return \%plate;
 }
 
-
 sub find_sample_by_plate {
   my ($self, $plate_id, $map) = @_;
 
@@ -367,6 +366,65 @@ sub find_infinium_gex_sample {
 
   return shift @samples;
 }
+
+sub find_infinium_gex_sample_by_sanger_id {
+  my ($self, $sanger_sample_id) = @_;
+
+  unless (defined $sanger_sample_id) {
+    confess "The sanger_sample_id argument was undefined\n";
+  }
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT DISTINCT
+          sm.internal_id,
+          sm.sanger_sample_id,
+          sm.consent_withdrawn,
+          HEX(sm.uuid),
+          sm.name,
+          sm.common_name,
+          sm.supplier_name,
+          sm.accession_number,
+          sm.gender,
+          sm.cohort,
+          sm.control,
+          aq.study_internal_id AS study_id,
+          pl.barcode_prefix,
+          pl.barcode,
+          pl.plate_purpose_name,
+          wl.map
+       FROM
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq,
+         current_plates pl,
+         current_plate_purposes pp
+       WHERE sm.sanger_sample_id = ?
+       AND aq.sample_internal_id = sm.internal_id
+       AND wl.internal_id = aq.receptacle_internal_id
+       AND pl.barcode = wl.plate_barcode
+       AND pl.barcode_prefix = wl.plate_barcode_prefix
+       AND pl.plate_purpose_internal_id = pp.internal_id
+       AND pp.name like '%GEX%');
+
+  my $sth = $dbh->prepare($query);
+
+  $self->log->trace("Executing: '$query' with arg [$sanger_sample_id]");
+  $sth->execute($sanger_sample_id);
+
+  my @samples;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@samples, $row);
+  }
+
+  my $n = scalar @samples;
+  if ($n > 1) {
+    $self->log->logconfess("$n records for sample '$sanger_sample_id' were returned where 1 was expected");
+  }
+
+  return shift @samples;
+}
+
 
 sub find_sample_studies {
   my ($self, $sample_id) = @_;
