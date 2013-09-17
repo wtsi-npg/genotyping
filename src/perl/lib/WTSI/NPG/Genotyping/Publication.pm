@@ -15,6 +15,7 @@ use WTSI::NPG::Genotyping::Metadata qw($INFINIUM_PLATE_BARCODE_META_KEY
                                        $INFINIUM_PLATE_WELL_META_KEY
                                        $SEQUENOM_PLATE_NAME_META_KEY
                                        $SEQUENOM_PLATE_WELL_META_KEY
+                                       $INFINIUM_SAMPLE_NAME
                                        infinium_fingerprint
                                        make_analysis_metadata
                                        make_infinium_metadata
@@ -129,7 +130,7 @@ sub publish_idat_files {
           $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
         }
         else {
-          $log->debug("Published '$file': $published of $total");
+          $log->info("Published '$file': $published of $total");
         }
       }
     }
@@ -193,7 +194,7 @@ sub publish_gtc_files {
         $log->error("Failed to publish '$file' to '$publish_dest': ", $@);
       }
       else {
-        $log->debug("Published '$file': $published of $total");
+        $log->info("Published '$file': $published of $total");
       }
     }
     else {
@@ -249,8 +250,8 @@ sub update_infinium_metadata {
                      "well '$well'");
   }
 
-  $log->debug("Updating metadata for '$data_object' from plate ",
-              "'$infinium_barcode' well '$well'");
+  $log->info("Updating metadata for '$data_object' from plate ",
+             "'$infinium_barcode' well '$well'");
 
   my @meta = make_sample_metadata($ss_sample);
   update_object_meta($data_object, \@meta);
@@ -287,7 +288,7 @@ sub publish_sequenom_files {
   my $total = scalar keys %$plate;
   my $published = 0;
 
-  $log->debug("Publishing $total CSV files");
+  $log->debug("Publishing $total Sequenom CSV data files");
 
   my $tmpdir = tempdir(CLEANUP => 1);
   my $current_file;
@@ -337,7 +338,7 @@ sub export_sequenom_files {
   my $total = scalar keys %$plate;
   my $exported = 0;
 
-  $log->debug("Exporting $total CSV files");
+  $log->debug("Exporting $total Sequenom CSV data files");
 
   my $current_file;
   my $plate_name;
@@ -402,8 +403,8 @@ sub update_sequenom_metadata {
                        "well '$well'");
     }
 
-    $log->debug("Updating metadata for '$data_object' from plate ",
-                "'$plate_name' well '$well'");
+    $log->info("Updating metadata for '$data_object' from plate ",
+               "'$plate_name' well '$well'");
 
     my @meta = make_sample_metadata($ss_sample);
     update_object_meta($data_object, \@meta);
@@ -444,7 +445,7 @@ sub update_sequenom_metadata {
                the analysis by adding the UUID to the sample metadata. It also
                adds the sample study/studies of the samples to the analysis
                collection metadata.
-  Returntype : a new UUID for the analysis
+  Returntype : a new UUID for the analysis or undef on failure
   Caller     : general
 
 =cut
@@ -480,16 +481,16 @@ sub publish_analysis_directory {
   }
 
   my $analysis_coll;
-  my $uuid;
+  my $analysis_uuid;
   my $num_projects = 0;
   my $num_samples = 0;
+  my $num_objects = 0;
 
   eval {
     my @analysis_meta;
     push(@analysis_meta, make_analysis_metadata(\@project_titles));
     push(@analysis_meta, make_creation_metadata($creator_uri, $time,
                                                 $publisher_uri));
-
     unless (list_collection($target)) {
       add_collection($target);
     }
@@ -498,42 +499,40 @@ sub publish_analysis_directory {
     $log->info("Created new collection $analysis_coll");
 
     my @uuid_meta = grep { $_->[0] =~ /uuid/ } @analysis_meta;
-    $uuid = $uuid_meta[0]->[1];
+    $analysis_uuid = $uuid_meta[0]->[1];
 
     foreach my $title (@project_titles) {
-      # Find the sample-level data for this genotyping project
-      my @sample_data =  find_objects_by_meta($sample_archive,
-                                              ['dcterms:title' => $title]);
       # Find the samples included at the analysis stage
       my %included_samples =
         make_included_sample_table($title, $pipedb, $run_name);
+      my $num_included = scalar keys %included_samples;
 
-      if (@sample_data) {
-        $log->info("Adding cross-reference metadata to ", scalar @sample_data,
-                   " data objects in genotyping project '$title'");
+      if ($num_included == 0) {
+        $log->logcroak("There were no samples marked for inclusion in the ",
+                       "pipeline database. Aborting.");
+      }
 
-        my %studies_seen;
+      my %studies_seen;
 
-      DATUM:
-        foreach my $sample_datum (@sample_data) {
+      foreach my $included_sample_name (sort keys %included_samples) {
+        my @conds = (['dcterms:title' => $title],
+                     [$INFINIUM_SAMPLE_NAME => $included_sample_name]);
+
+        my @data_objects = find_objects_by_meta($sample_archive, @conds);
+        unless (@data_objects) {
+          $log->logconfess("Failed to find data in iRODS for sample ",
+                           "'$included_sample_name' in project '$title'");
+        }
+
+        # Should be triplets of 1x gtc plus 2x idat files for each sample
+        foreach my $data_object (@data_objects) {
           # Xref analysis to sample studies
-          my %sample_meta = get_object_meta($sample_datum);
+          my %sample_meta = get_object_meta($data_object);
 
-          my @sanger_sample_id = @{$sample_meta{$SAMPLE_NAME_META_KEY}};
-          unless (@sanger_sample_id) {
-            $log->warn("Found no Sanger sample ID for '$sample_datum'");
-            next DATUM;
-          }
-          unless (scalar @sanger_sample_id == 1) {
-            $log->warn("Found multiple Sanger sample IDs for ",
-                       "'$sample_datum': [", join(",", @sanger_sample_id), "]");
-            next DATUM;
-          }
-
-          # Only Xref the sample is it was not excluded at the
-          # analysis stage
-          if (exists $included_samples{$sanger_sample_id[0]}) {
+          if (exists $sample_meta{$STUDY_ID_META_KEY}) {
             my @sample_studies = @{$sample_meta{$STUDY_ID_META_KEY}};
+            $log->debug("Sample '$included_sample_name' has metadata for ",
+                        "studies [", join(", ", @sample_studies), "]");
 
             foreach my $sample_study (@sample_studies) {
               unless (exists $studies_seen{$sample_study}) {
@@ -541,22 +540,25 @@ sub publish_analysis_directory {
                 $studies_seen{$sample_study}++;
               }
             }
-
-            # Xref samples to analysis UUID
-            update_object_meta($sample_datum, \@uuid_meta);
-            ++$num_samples;
           }
           else {
-            $log->info("Excluding sample '", $sanger_sample_id[0],
-                       "' from this analysis");
+            $log->logconfess("Failed to find a study_id in iRODS for sample ",
+                             "'$included_sample_name' data object ",
+                             "'$data_object' in project '$title'");
           }
+
+          # Xref samples to analysis UUID
+          update_object_meta($data_object, \@uuid_meta);
+          ++$num_objects;
         }
 
-        ++$num_projects;
+        ++$num_samples;
+
+        $log->info("Cross-referenced $num_samples/$num_included samples ",
+                   "in project '$project_title'")
       }
-      else {
-        $log->warn("Found no sample data objects in iRODS for '$title'");
-      }
+
+      ++$num_projects;
     }
 
     update_collection_meta($analysis_coll, \@analysis_meta);
@@ -567,17 +569,19 @@ sub publish_analysis_directory {
 
   if ($@) {
     $log->error("Failed to publish: ", $@);
+    undef $analysis_uuid;
   }
   else {
     $log->info("Published '$dir' to '$analysis_coll' and ",
-               "cross-referenced $num_samples data objects in ",
-               "$num_projects projects");
+               "cross-referenced $num_objects data objects in ",
+               "for $num_samples samples in $num_projects projects");
   }
 
-  return $uuid;
+  return $analysis_uuid;
 }
 
-# Find samples marked as excluded during the analysis
+# Find samples marked as excluded during the analysis, keyed by their
+# name in the Infinium LIMS
 sub make_included_sample_table {
   my ($project_title, $pipedb, $run_name) = @_;
 
@@ -590,7 +594,7 @@ sub make_included_sample_table {
      {join => {dataset => 'piperun'}});
 
   foreach my $sample (@samples) {
-    $sample_table{$sample->sanger_sample_id} = $sample;
+    $sample_table{$sample->name} = $sample;
   }
 
   return %sample_table;

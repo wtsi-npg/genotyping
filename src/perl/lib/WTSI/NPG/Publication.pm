@@ -52,6 +52,7 @@ our @EXPORT_OK = qw(expected_irods_groups
                     grant_study_access
                     pair_rg_channel_files
                     publish_file
+                    supersede_object_meta
                     update_collection_meta
                     update_object_meta);
 
@@ -133,10 +134,11 @@ sub get_publisher_name {
 
   Arg [1]    : arrayref of file names of a type, paired for Reg and Grn channels
   Example    : @paired = pair_rg_channel_files(['x_Red.idat', 'y_Red.idat',
-                                                'y_Grn.idat', 'x_Grn.idat'], 'idat')
-  Description: Return file names such that Red and Grn channels are paired. Pairing
-               is determined by the file name and channel token (Red/Grn). Files
-               not of the expected type are ignored.
+                                                'y_Grn.idat', 'x_Grn.idat'],
+                                               'idat')
+  Description: Return file names such that Red and Grn channels are paired.
+               Pairing is determined by the file name and channel token
+               (Red/Grn). Files not of the expected type are ignored.
   Returntype : array of arrayrefs
   Caller     : general
 
@@ -315,6 +317,53 @@ sub publish_file {
   return $target;
 }
 
+# sub redact_file {
+#   my ($file, $sample_meta, $publish_dest, $publisher_uri, $ticket_number,
+#       $time) = @_;
+
+#   my $basename = fileparse($file);
+#   my $md5 = md5sum($file);
+
+#   my $target = list_object($publish_dest);
+#   unless ($target) {
+#     $log->logconfess("Failed to redact '$publish_dest': no such data object ",
+#                      "exists");
+#   }
+
+#   my $meta_str = join(', ', map { join ' => ', @$_ } @$sample_meta);
+#   if has_consent($sample_meta) {
+#     $log->logconfess("Failed to redact '$publish_dest': it has consent");
+#   }
+
+#   my %existing_meta = get_object_meta($target);
+#   if (exists $existing_meta{'md5'}) {
+#     $log->info("Removing exisiting checksum metadata from '$target'");
+#     purge_object_meta($target, 'md5', \%existing_meta);
+#   }
+#   else {
+#     $log->logwarn("Checksum metadata for existing sample data ",
+#                   "'$target' is missing");
+#   }
+
+#   my @meta;
+#   push(@meta, [make_md5_metadata($file)]);
+#   push(@meta, [make_modification_metadata($time)]);
+#   push(@meta, [make_ticket_metadata($ticket_number)]);
+#   push(@meta, @$sample_meta);
+
+#   foreach my $meta (@$sample_meta) {
+#     my ($key, $value, $unit) = @$meta;
+#     my @purged = purge_object_meta($target, $key, \%existing_meta);
+#     $log->debug("Purged values from of key '$key' from '$target': [",
+#                 join(', ', @purged), "]");
+#   }
+
+#   update_object_meta($target, \@meta);
+
+#   return $target;
+# }
+
+
 =head2 update_object_meta
 
   Arg [1]    : iRODS data object
@@ -329,6 +378,10 @@ sub publish_file {
 
 sub update_object_meta {
   my ($target, $meta) = @_;
+
+  unless (ref $meta eq 'ARRAY') {
+    confess "meta argument must be an array reference\n";
+  }
 
   my $unique_meta = _remove_meta_duplicates($meta);
   my %current_meta = get_object_meta($target);
@@ -345,6 +398,37 @@ sub update_object_meta {
     }
   }
 }
+
+
+# sub supersede_object_meta {
+#   my ($target, $meta) = @_;
+
+#   my $unique_meta = _remove_meta_duplicates($meta);
+#   my %current_meta = get_object_meta($target);
+
+#   $log->debug("Superseding metadata on '$target'");
+
+#   foreach my $elt (@$unique_meta) {
+#     my ($key, $value, $units) = @$elt;
+
+#     my $history_key = $key . '.history'
+
+#     my @purged = purge_object_meta($target, $key, $unique_meta);
+#     my @history;
+
+#     if (exists $current_meta{$history_key}) {
+#       @history = purge_object_meta($target, $history_key, $unique_meta);
+#     }
+
+
+
+#     my @new_history;
+#     push(@new_history, @history, @purged);
+#     add_object_meta($target, $history_key, join());
+
+#     add_object_meta($target, $key, $value, $units);
+#   }
+# }
 
 =head2 update_collection_meta
 
