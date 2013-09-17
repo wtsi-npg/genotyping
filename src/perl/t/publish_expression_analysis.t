@@ -8,7 +8,7 @@ use warnings;
 
 use Test::More tests => 106;
 
-use WTSI::NPG::Expression::Publication qw(parse_beadchip_table);
+use WTSI::NPG::Expression::Publication qw(parse_beadchip_table_v2);
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
@@ -18,7 +18,7 @@ my $beadchip_table = "$data_path/beadchip_table_example.txt";
 my @samples;
 open(my $in, '<', $beadchip_table)
   or die "Failed to open $beadchip_table; $!\n";
-@samples = parse_beadchip_table($in);
+@samples = parse_beadchip_table_v2($in);
 close($in);
 
 my $num_samples = 21;

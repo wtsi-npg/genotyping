@@ -62,7 +62,8 @@ my $test_collection = 'test_ _collection.' . $$;
 my $test_object = 'test_ _object.' . $$;
 
 my $num_attrs = 8;
-my %meta = map { 'attribute' . $_ . $$ => 'value' . $_ .$$ } 0..$num_attrs;
+my %meta = map { 'attribute' . $_ . '_' . $$ =>
+                     'value' . $_ . '_' . $$ } 0..$num_attrs;
 my %expected = map { $_ => [$meta{$_}] } keys %meta;
 
 # list_collection
@@ -123,7 +124,7 @@ foreach my $attr (keys %meta) {
 
 # multiple specs
 my @collection_specs1;
-foreach my $attr (keys %meta) {
+foreach my $attr (sort keys %meta) {
   my $value = $meta{$attr};
   push(@collection_specs1, [$attr, $value]);
 }
@@ -133,7 +134,7 @@ ok(scalar @found == 1);
 
 # find with explict operator
 my @collection_specs2;
-foreach my $attr (keys %meta) {
+foreach my $attr (sort keys %meta) {
   my $value = $meta{$attr};
   push(@collection_specs2, [$attr, $value, '=']);
 }
@@ -143,7 +144,7 @@ ok(scalar @found == 1);
 
 # like operator
 my @collection_specs3;
-foreach my $attr (keys %meta) {
+foreach my $attr (sort keys %meta) {
   my $value = $meta{$attr};
   push(@collection_specs3, [$attr, '%', 'like']);
 }
