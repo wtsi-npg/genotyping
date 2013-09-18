@@ -11,7 +11,7 @@ use Cwd qw/abs_path/;
 use Digest::MD5;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 52;
+use Test::More tests => 51;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
@@ -66,11 +66,11 @@ is($status, 0, "check_duplicates_bed.pl exit status");
 $status = system("$bin/check_xhet_gender.pl --input=$plink");
 is($status, 0, "check_xhet_gender.pl exit status");
 
-## test xydiff computation
-$status = system("$bin/intensity_metrics.pl --input=$sim --magnitude=magnitude.txt --xydiff=xydiff.txt");
-is($status, 0, "intensity_metrics.pl exit status");
-
 ## test collation into summary
+## first, generate intensity metrics using simtools
+$cmd = "simtools qc --infile $sim --magnitude magnitude.txt ".
+    "--xydiff xydiff.txt";
+system($cmd);
 $status = system("$bin/write_qc_status.pl --dbpath=$dbfile --inipath=$iniPath");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
@@ -138,7 +138,7 @@ open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
 binmode($fh);
 while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close pipeline DB $dbfile";
-is($md5->hexdigest, '563039775c9c104fc725d924aa073e9e', 
+is($md5->hexdigest, 'ad864f6c4a426ac69f9d9f3d5f66101d', 
    "MD5 checksum of database after filtering");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
