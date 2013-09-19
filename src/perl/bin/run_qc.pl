@@ -175,7 +175,7 @@ sub run {
     my $xydPath = 'xydiff.txt';
     if ($simPath) {
         push(@cmds, "simtools qc --infile=$simPath ".
-             "--magnitude=$magPath --xydiff=xydPath");
+             "--magnitude=$magPath --xydiff=$xydPath");
         $intensityPlots = 1;
     } elsif (-e $magPath && -e $xydPath) {
 	# using previously calculated metric values
