@@ -131,6 +131,13 @@ Returns:
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
+      ## create .sim intensity file, if needed
+      smfile = nil
+      unless nosim
+        smargs = {:normalize => true }.merge(args)
+        smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
+      end
+
       ## prefilter on QC metrics and thresholds to exclude bad samples
       filtered = nil
       if nofilter # prefilter cancellation in effect
@@ -142,13 +149,8 @@ Returns:
         gcqcargs = nil
         if nosim
           gcqcargs = {:run => run_name}.merge(args)
-        else
-          ## get .sim file from GTC files for intensity metrics
-          smargs = {:normalize => true }.merge(args)
-          smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
-          if smfile
-            gcqcargs = {:run => run_name, :sim => smfile}.merge(args)
-          end
+        elsif smfile
+          gcqcargs = {:run => run_name, :sim => smfile}.merge(args)
         end
         ## run gencall QC to get metrics for prefiltering
         gcquality = nil
@@ -181,13 +183,12 @@ Returns:
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       end
 
-      num_samples = count_samples(sjson)
-
       tresult = nil
       if sjson
         tresult = prepare_thresholds(egt_file, zstart, ztotal, args, async)
       end
 
+      num_samples = count_samples(sjson)
       best_t = nil
       if tresult
         if ztotal == 1  # skip evaluation if only one Z value given
@@ -227,8 +228,19 @@ Returns:
 
       zfile = update_annotation(merge_bed(zchunks_t, zname, args, async),
                                  sjson, njson, args, async)
+
       qcargs = {:run => run_name}.merge(args)
-      zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+      if nosim
+        zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+      elsif gcquality
+        # copy magnitude/xydiff output from GenCall QC
+        output = 'zcall_qc'
+        Dir.mkdir(output) unless File.exist?(output)
+        oldmag = File.join(gcqcdir, 'supplementary', 'magnitude.txt')
+        oldxyd = File.join(gcqcdir, 'supplementary', 'xydiff.txt')
+        system("cp %s %s %s" % [oldmag, oldxyd, output])
+        zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+      end
 
       [zfile, zquality] if [zfile, zquality].all?
     end
