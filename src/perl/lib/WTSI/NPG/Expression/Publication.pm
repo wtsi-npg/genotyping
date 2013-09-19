@@ -157,6 +157,10 @@ sub publish_expression_analysis{
         publish_file($sample->{idat_path}, \@fingerprint,
                      $creator_uri->as_string,
                      $publish_samples_dest, $publisher_uri->as_string, $time);
+      # The following 'update_object_meta' calls emulate the strategy
+      # used for genotyping data; a file annotated with only the
+      # fingerprint metadata is published and then updated with
+      # additional metadata
       update_object_meta($idat_object, \@sample_meta);
 
       my $xml_object =

@@ -555,7 +555,7 @@ sub publish_analysis_directory {
         ++$num_samples;
 
         $log->info("Cross-referenced $num_samples/$num_included samples ",
-                   "in project '$project_title'")
+                   "in project '$title'")
       }
 
       ++$num_projects;
@@ -579,6 +579,7 @@ sub publish_analysis_directory {
 
   return $analysis_uuid;
 }
+
 
 # Find samples marked as excluded during the analysis, keyed by their
 # name in the Infinium LIMS
