@@ -21,8 +21,9 @@ Pipeline:
 
 QC scripts:
 
+ Simtools >= 1.5	https://github.com/wtsi-npg/simtools
  R >= 2.11.1
- R mixtools library	 http://cran.r-project.org/web/packages/mixtools/index.html
+ R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
 
 
 Pipeline metadata management:
