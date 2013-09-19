@@ -6,7 +6,6 @@ bin/filter_illuminus_output.pl
 bin/gendermix_standalone.pl
 bin/genosnp.pl
 bin/illuminus.pl
-bin/intensity_metrics.pl
 bin/make_irods_study_group.pl
 bin/plate_heatmap_index.pl
 bin/plate_heatmap_plots.pl
@@ -67,7 +66,6 @@ lib/WTSI/NPG/Genotyping/QC/PlinkIO.pm
 lib/WTSI/NPG/Genotyping/QC/QCPlotShared.pm
 lib/WTSI/NPG/Genotyping/QC/QCPlotTests.pm
 lib/WTSI/NPG/Genotyping/QC/Reports.pm
-lib/WTSI/NPG/Genotyping/QC/SimFiles.pm
 lib/WTSI/NPG/Genotyping/QC/SnpID.pm
 lib/WTSI/NPG/Genotyping/Schema.pm
 lib/WTSI/NPG/Genotyping/Schema/Result/Address.pm
@@ -119,7 +117,6 @@ t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
 t/gender_standalone.t
 t/identity.t
-t/intensity_metrics.t
 t/irods.t
 t/irods/collect_files/a/10.txt
 t/irods/collect_files/a/x/1.txt
