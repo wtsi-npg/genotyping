@@ -1,0 +1,37 @@
+
+# Tests write_snp_metadata.pl
+
+use strict;
+use warnings;
+use Carp;
+use Cwd qw/abs_path/;
+use Digest::MD5;
+use File::Temp qw/tempdir/;
+use Test::More tests => 3;
+
+$ENV{PATH} = join(':', abs_path('../bin'), $ENV{PATH});
+my $manifest = "/nfs/gapi/data/genotype/qc_test/manifests/".
+    "Human670-QuadCustom_v1_A_TRUNCATED.bpm.csv";
+my $temp = tempdir("snp_meta_test_XXXXXX", CLEANUP => 1);
+my $chr = $temp."/chr.json";
+my $snp = $temp."/snp.json";
+
+my $cmd = "write_snp_metadata.pl --manifest $manifest --chromosomes $chr ".
+    "--snp $snp";
+is(0, system($cmd), "write_snp_metadata.pl exit status");
+
+my ($md5, $fh);
+$md5 = Digest::MD5->new;
+open $fh, "<", $snp || croak "Cannot open SNP JSON $snp";
+binmode($fh);
+while (<$fh>) { $md5->add($_); }
+close $fh || croak "Cannot close SNP JSON $snp";
+is($md5->hexdigest, '61a37f4daaa53e8dc3cc9a912030f51a', 
+   "MD5 checksum of SNP JSON");
+$md5 = Digest::MD5->new;
+open $fh, "<", $chr || croak "Cannot open chromosome JSON $chr";
+binmode($fh);
+while (<$fh>) { $md5->add($_); }
+close $fh || croak "Cannot close chromosome JSON $chr";
+is($md5->hexdigest, '60be79bee72459670a5ab33419533546', 
+   "MD5 checksum of chromosome JSON");
