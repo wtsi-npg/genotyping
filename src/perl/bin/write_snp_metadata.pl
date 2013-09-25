@@ -46,12 +46,14 @@ sub getIndices {
     return %indices;
 }
 
-sub readManifest {
+sub readWriteManifest {
     # read required manifest fields into array; also find allele values
-    my ($inPath, $verbose) = @_;
+    # write piecewise to given JSON path
+    my ($inPath, $outPath, $verbose) = @_;
     $verbose ||= 0;
-    my @manifest;
-    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
+    open my $out, ">", $outPath || croak "Cannot open output path $outPath";
+    print $out "["; # beginning of JSON list structure
     my $i = 0;
     my %indices = getIndices();
     if ($verbose) { print "Reading manifest from $inPath\n"; }
@@ -78,9 +80,12 @@ sub readManifest {
         }
         $snp{'allele_a'} = $alleles[0];
         $snp{'allele_b'} = $alleles[1];
-	push(@manifest, \%snp);
+	print $out to_json(\%snp);
+	if (!eof($in)) { print $out ","; }
     }
-    return @manifest;
+    print $out "]\n"; # end of JSON list structure
+    close $in || croak "Cannot close input path $inPath";
+    close $out || croak "Cannot close output path $outPath";
 }
 
 sub splitManifest {
@@ -190,10 +195,7 @@ sub run {
 	my $sortedAll = $temp."/sorted.all.csv";
 	system("cat ".join(" ", @sortedPaths)." > ".$sortedAll);
 	# read into array and write as JSON
-	my @manifest = readManifest($sortedAll, $verbose);	
-        open $out, ">", $snpJson || croak "Cannot open output $snpJson";
-        print $out to_json(\@manifest);
-        close $out || croak "Cannot close output $snpJson";
+	readWriteManifest($sortedAll, $snpJson, $verbose);
     }   
 }
 
