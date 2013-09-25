@@ -191,10 +191,8 @@ sub run {
         close $out || croak "Cannot close output $chrJson";
     }
     if ($snpJson) {
-	# concatenate sorted .csv files
 	my $sortedAll = $temp."/sorted.all.csv";
 	system("cat ".join(" ", @sortedPaths)." > ".$sortedAll);
-	# read into array and write as JSON
 	readWriteManifest($sortedAll, $snpJson, $verbose);
     }   
 }
