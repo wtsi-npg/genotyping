@@ -7,7 +7,8 @@ use Carp;
 use Cwd qw/abs_path/;
 use Digest::MD5;
 use File::Temp qw/tempdir/;
-use Test::More tests => 3;
+use JSON;
+use Test::More tests => 5;
 
 $ENV{PATH} = join(':', abs_path('../bin'), $ENV{PATH});
 my $manifest = "/nfs/gapi/data/genotype/qc_test/manifests/".
@@ -26,8 +27,15 @@ open $fh, "<", $snp || croak "Cannot open SNP JSON $snp";
 binmode($fh);
 while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close SNP JSON $snp";
-is($md5->hexdigest, '61a37f4daaa53e8dc3cc9a912030f51a', 
+is($md5->hexdigest, '1e966c044e633f6259181ca5e54c57b3', 
    "MD5 checksum of SNP JSON");
+
+my ($json, $in);
+open $in, "<", $snp || croak "Cannot open SNP JSON $snp for reading";
+while (<$in>) { $json .= $_; }
+close $in || croak "Cannot close SNP JSON $snp after reading";
+ok(decode_json($json), "Parse SNP JSON output");
+
 $md5 = Digest::MD5->new;
 open $fh, "<", $chr || croak "Cannot open chromosome JSON $chr";
 binmode($fh);
@@ -35,3 +43,9 @@ while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close chromosome JSON $chr";
 is($md5->hexdigest, '60be79bee72459670a5ab33419533546', 
    "MD5 checksum of chromosome JSON");
+
+$json="";
+open $in, "<", $chr || croak "Cannot open chromosome JSON $chr for reading";
+while (<$in>) { $json .= $_; }
+close $in || croak "Cannot close chromosome JSON $chr after reading";
+ok(decode_json($json), "Parse chromsome JSON output");
