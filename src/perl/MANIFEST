@@ -154,6 +154,7 @@ t/reports/scatter_heterozygosity_000.pdf
 t/reports/scatter_magnitude_000.pdf
 t/reports/scatter_xydiff_000.pdf
 t/reports/test_pipeline.db
+t/snp_meta.t
 t/update_illuminus_input.t
 t/update_illuminus_input/columns.json
 t/update_illuminus_input/illuminus_intensities.txt
