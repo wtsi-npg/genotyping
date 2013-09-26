@@ -27,7 +27,7 @@ open $fh, "<", $snp || croak "Cannot open SNP JSON $snp";
 binmode($fh);
 while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close SNP JSON $snp";
-is($md5->hexdigest, '1e966c044e633f6259181ca5e54c57b3', 
+is($md5->hexdigest, 'fb7ee3090f5c28315af02a7b52887749', 
    "MD5 checksum of SNP JSON");
 
 my ($json, $in);

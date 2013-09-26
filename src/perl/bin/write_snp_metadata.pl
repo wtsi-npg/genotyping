@@ -35,6 +35,18 @@ use JSON;
 
 Log::Log4perl->easy_init($ERROR);
 
+
+sub byPositionName {
+    # use to sort manifest into (position, name) order
+    # sort names by string order, positions by numeric order
+    # $a, $b are global variables used by Perl sort
+    my %snpA = %$a;
+    my %snpB = %$b;
+    my $result = $snpA{'position'} <=> $snpB{'position'} ||
+	$snpA{'name'} cmp $snpB{'name'} ;
+    return $result;
+}
+
 sub getIndices {
     # indices of fields in original .csv file
     my %indices = (name => 1,
@@ -47,8 +59,9 @@ sub getIndices {
 }
 
 sub readWriteManifest {
-    # read required manifest fields into array; also find allele values
+    # read manifest fields from tempfile into array; also find allele values
     # write piecewise to given JSON path
+    # note that tempfile does *not* have a header line
     my ($inPath, $outPath, $verbose) = @_;
     $verbose ||= 0;
     open my $in, "<", $inPath || croak "Cannot open input path $inPath";
@@ -59,8 +72,7 @@ sub readWriteManifest {
     if ($verbose) { print "Reading manifest from $inPath\n"; }
     while (<$in>) {
 	$i++;
-	if ($i == 1) { next; } # first line is header
-	elsif ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
+	if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
 	chomp;
 	my %snp;
         my @fields = split /,/;
@@ -130,29 +142,37 @@ sub splitManifest {
 }
 
 sub writeSortedByPosition {
-    # read unsorted input; sort by position; write to output
+    # read unsorted input; sort by position and name; write to output
+    # two probes may share chromosome and position, eg. regular and cnv
     # return total number of inputs
     my ($inPath, $outPath) = @_;
-    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
-    my %input;
     my %indices = getIndices();
-    my $pindex = $indices{'position'};
+    my $nameIndex = $indices{'name'};
+    my $posIndex = $indices{'position'};
+    my @input;
+    my @sortFields;
+    my $i = 0;
+    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
     while (<$in>) {
-	 my @fields = split /,/;
-	 $input{$fields[$pindex]} = $_;
+	push @input, $_;
+	my @fields = split /,/;
+	my %snp;
+	$snp{'name'} = $fields[$nameIndex];
+	$snp{'position'} = $fields[$posIndex];
+	$snp{'original_order'} = $i;
+	push(@sortFields, \%snp);
+	$i++;
     }
     close $in || croak "Cannot close input $inPath";
-    my @positions = keys(%input);
-    my @sorted = sort {$a <=> $b} @positions;
+    my @sorted = sort byPositionName @sortFields;
     open my $out, ">", $outPath ||  croak "Cannot open output $outPath";
-    foreach my $pos (@sorted) {
-	print $out $input{$pos};
+    foreach my $snpRef (@sorted) {
+	my %snp = %{$snpRef};
+	print $out $input[$snp{'original_order'}];
     }
     close $out || croak "Cannot close output $outPath";
-    my $total = @sorted;
-    return $total;
+    return $i;
 }
-
 
 sub run {
     # sort manifest by (chromosome, position) and write as .json
