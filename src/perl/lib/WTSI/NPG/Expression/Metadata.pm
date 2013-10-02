@@ -55,7 +55,7 @@ sub make_infinium_metadata {
 
 =head2 make_analysis_metadata
 
-  Arg [1]    : 
+  Arg [1]    : UUID to use instead of gereating a new one. Optional.
   Example    : my @meta = make_analysis_metadata()
   Description: Return a list of metadata key/value pairs describing an analysis.
   Returntype : array of arrayrefs
@@ -64,10 +64,17 @@ sub make_infinium_metadata {
 =cut
 
 sub make_analysis_metadata {
-  my $uuid_bin;
+  my ($supplied_uuid) = @_;
+
   my $uuid_str;
-  UUID::generate($uuid_bin);
-  UUID::unparse($uuid_bin, $uuid_str);
+  if (defined $supplied_uuid) {
+    $uuid_str = $supplied_uuid;
+  }
+  else {
+    my $uuid_bin;
+    UUID::generate($uuid_bin);
+    UUID::unparse($uuid_bin, $uuid_str);
+  }
 
   my @meta = ([$EXPRESSION_ANALYSIS_UUID_META_KEY => $uuid_str]);
 

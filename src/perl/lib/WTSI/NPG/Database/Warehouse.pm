@@ -87,7 +87,6 @@ sub find_plate {
   return \%plate;
 }
 
-
 sub find_sample_by_plate {
   my ($self, $plate_id, $map) = @_;
 
@@ -129,7 +128,7 @@ sub find_sample_by_plate {
          pl.internal_id = ?
          AND wl.plate_barcode = pl.barcode
          AND wl.plate_barcode_prefix = pl.barcode_prefix
-         AND wl.map = ?,
+         AND wl.map = ?
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
@@ -293,6 +292,82 @@ sub find_infinium_sample_by_plate {
 }
 
 sub find_infinium_gex_sample {
+  my ($self, $plate_barcode, $map) = @_;
+
+  unless (defined $plate_barcode) {
+    confess "The plate_barcode argument was undefined\n";
+  }
+  unless (defined $map) {
+    confess "The map argument was undefined\n";
+  }
+
+  my ($barcode_prefix, $barcode) =
+    $plate_barcode =~ /^([A-Z]{2})([0-9]+)[A-Z]$/;
+  unless (defined $barcode_prefix) {
+     $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
+                            "failed to find the barcode prefix");
+  }
+  unless (defined $barcode) {
+    $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
+                           "failed to find the barcode");
+  }
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT DISTINCT
+          sm.internal_id,
+          sm.sanger_sample_id,
+          sm.consent_withdrawn,
+          HEX(sm.uuid),
+          sm.name,
+          sm.common_name,
+          sm.supplier_name,
+          sm.accession_number,
+          sm.gender,
+          sm.cohort,
+          sm.control,
+          aq.study_internal_id AS study_id,
+          pl.barcode_prefix,
+          pl.barcode,
+          pl.plate_purpose_name,
+          wl.map
+       FROM
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq,
+         current_plates pl,
+         current_plate_purposes pp
+       WHERE pl.barcode = ?
+       AND pl.barcode_prefix = ?
+       AND wl.map = ?
+       AND aq.sample_internal_id = sm.internal_id
+       AND wl.internal_id = aq.receptacle_internal_id
+       AND pl.barcode = wl.plate_barcode
+       AND pl.barcode_prefix = wl.plate_barcode_prefix
+       AND pl.plate_purpose_internal_id = pp.internal_id
+       AND pp.name like '%GEX%');
+
+  my $sth = $dbh->prepare($query);
+
+  $self->log->trace("Executing: '$query' with args [",
+                    "$barcode, $barcode_prefix, $map]");
+  $sth->execute($barcode, $barcode_prefix, $map);
+
+  my @samples;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@samples, $row);
+  }
+
+  my $n = scalar @samples;
+  if ($n > 1) {
+    $self->log->logconfess("$n records for sample '$plate_barcode' $map ",
+                           "were returned where 1 was expected");
+  }
+
+  return shift @samples;
+}
+
+sub find_infinium_gex_sample_by_sanger_id {
   my ($self, $sanger_sample_id) = @_;
 
   unless (defined $sanger_sample_id) {
@@ -350,6 +425,7 @@ sub find_infinium_gex_sample {
   return shift @samples;
 }
 
+
 sub find_sample_studies {
   my ($self, $sample_id) = @_;
 
@@ -380,6 +456,29 @@ sub find_sample_studies {
   }
 
   return \@studies;
+}
+
+sub find_study_title {
+  my ($self, $study_id) = @_;
+
+  my $dbh = $self->dbh;
+  my $query = qq(SELECT study_title
+                 FROM current_studies
+                 WHERE internal_id = ?);
+  my $sth = $dbh->prepare($query);
+  $sth->execute($study_id);
+
+  my @titles;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@titles, $row->{study_title});
+  }
+
+  my $n = scalar @titles;
+  if ($n > 1) {
+    $self->log->logconfess("$n records for study '$study_id' were returned where 1 was expected");
+  }
+
+  return shift @titles;
 }
 
 1;

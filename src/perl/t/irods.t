@@ -10,7 +10,7 @@ use DateTime;
 use File::Temp qw(tempfile);
 use JSON;
 
-use Test::More tests => 105;
+use Test::More tests => 110;
 use Test::Exception;
 
 BEGIN { use_ok('WTSI::NPG::iRODS'); }
@@ -61,7 +61,9 @@ my $irods_test_collection = "irods_test" . $$;
 my $test_collection = 'test_ _collection.' . $$;
 my $test_object = 'test_ _object.' . $$;
 
-my %meta = map { 'attribute' . $_ . $$ => 'value' . $_ .$$ } 0..8;
+my $num_attrs = 8;
+my %meta = map { 'attribute' . $_ . '_' . $$ =>
+                     'value' . $_ . '_' . $$ } 0..$num_attrs;
 my %expected = map { $_ => [$meta{$_}] } keys %meta;
 
 # list_collection
@@ -120,14 +122,40 @@ foreach my $attr (keys %meta) {
   ok(scalar @found == 1);
 }
 
-my @collection_specs;
-foreach my $attr (keys %meta) {
+# multiple specs
+my @collection_specs1;
+foreach my $attr (sort keys %meta) {
   my $value = $meta{$attr};
-  push(@collection_specs, [$attr, $value]);
+  push(@collection_specs1, [$attr, $value]);
 }
 
-my @found = find_collections_by_meta($wd, @collection_specs);
+my @found = find_collections_by_meta($wd, @collection_specs1);
 ok(scalar @found == 1);
+
+# find with explict operator
+my @collection_specs2;
+foreach my $attr (sort keys %meta) {
+  my $value = $meta{$attr};
+  push(@collection_specs2, [$attr, $value, '=']);
+}
+
+@found = find_collections_by_meta($wd, @collection_specs2);
+ok(scalar @found == 1);
+
+# like operator
+my @collection_specs3;
+foreach my $attr (sort keys %meta) {
+  my $value = $meta{$attr};
+  push(@collection_specs3, [$attr, '%', 'like']);
+}
+
+@found = find_collections_by_meta($wd, @collection_specs3);
+ok(scalar @found == 1);
+
+
+# invalid operator
+dies_ok { find_collections_by_meta($wd, ["x", "y", 'invalid_operator']) }
+  'Expected to fail using an invalid query operator';
 
 # add_object
 dies_ok { add_object(undef, $test_object) }
@@ -294,6 +322,14 @@ is_deeply([collect_files($collect_path, $test, 3)],
            "$collect_path/c/30.txt",
            "$collect_path/c/z/3.txt"]);
 
+is_deeply([collect_files($collect_path, $test, undef)],
+          ["$collect_path/a/10.txt",
+           "$collect_path/a/x/1.txt",
+           "$collect_path/b/20.txt",
+           "$collect_path/b/y/2.txt",
+           "$collect_path/c/30.txt",
+           "$collect_path/c/z/3.txt"]);
+
 # collect_dirs
 is_deeply([collect_dirs($collect_path, $test, 1)],
           ["$collect_path"]);
@@ -305,6 +341,15 @@ is_deeply([collect_dirs($collect_path, $test, 2)],
            "$collect_path/c"]);
 
 is_deeply([collect_dirs($collect_path, $test, 3)],
+          ["$collect_path",
+           "$collect_path/a",
+           "$collect_path/a/x",
+           "$collect_path/b",
+           "$collect_path/b/y",
+           "$collect_path/c",
+           "$collect_path/c/z"]);
+
+is_deeply([collect_dirs($collect_path, $test, undef)],
           ["$collect_path",
            "$collect_path/a",
            "$collect_path/a/x",
