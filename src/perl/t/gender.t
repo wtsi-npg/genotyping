@@ -41,7 +41,7 @@ $ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 my %refGenders = readBenchmark($refFile);
 my @names = keys(%refGenders);
 
-foreach my $format qw(plink json text) {
+foreach my $format qw/plink json text/ {
     foreach my $jsonOut ((0,1)) {
         system('rm -f $outDir/*.png $outDir/*.log $outDir/sample_*.txt');
         my ($input, $outPath, $outType);

@@ -39,11 +39,14 @@ PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam exte
 Options:
 --output-dir=PATH Directory for QC output
 --sim=PATH        Path to SIM intensity file for xydiff calculation
+                  See note [1] below
 --dbpath=PATH     Path to pipeline database .db file
 --inipath=PATH    Path to .ini file containing general pipeline and database configuration; local default is $DEFAULT_INI
 --run=NAME        Name of run in pipeline database (needed for database update from gender check)
 --config=PATH     Path to .json file with QC thresholds; default is taken from inipath
 --title           Title for this analysis; will appear in plots
+
+[1] If --sim is not specified, but the intensity files magnitude.txt and xydiff.txt are present in the pipeline output directory, intensity metrics will be read from the files. This allows intensity metrics to be computed only once when multiple callers are used on the same dataset.
 ";
     exit(0);
 }
@@ -167,11 +170,16 @@ sub run {
         $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     }
     push(@cmds, $genderCmd);
-    my $simPathGiven = 0;
+    my $intensityPlots = 0;
+    my $magPath = 'magnitude.txt';
+    my $xydPath = 'xydiff.txt';
     if ($simPath) {
-        push(@cmds, "$Bin/intensity_metrics.pl --input=$simPath ".
-             "--magnitude=magnitude.txt --xydiff=xydiff.txt");
-        $simPathGiven = 1;
+        push(@cmds, "simtools qc --infile=$simPath ".
+             "--magnitude=$magPath --xydiff=$xydPath");
+        $intensityPlots = 1;
+    } elsif (-e $magPath && -e $xydPath) {
+	# using previously calculated metric values
+	$intensityPlots = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
@@ -185,7 +193,7 @@ sub run {
         push(@cmds, $cmd); 
     }
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
-                                        $simPathGiven, \%fileNames));
+                                        $intensityPlots, \%fileNames));
     my @densityTerms = ('cat', $fileNames{'sample_cr_het'}, '|', 
                         "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
                         "--out_dir=".$outDir);

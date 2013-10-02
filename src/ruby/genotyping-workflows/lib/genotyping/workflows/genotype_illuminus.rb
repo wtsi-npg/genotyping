@@ -152,15 +152,6 @@ Returns:
         end
       end
 
-      smfile = nil
-      if filtered
-        siargs = {:config => gtconfig,
-                  :gender_method => gender_method}.merge(args)
-        sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-        smargs = {:normalize => true }.merge(args)
-        smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      end
-
       cjson = nil
       if filtered
         njson, cjson = parse_manifest(manifest, njname, cjname, args)
@@ -192,10 +183,20 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      qcargs = {:run => run_name,
-                :sim => smfile}.merge(args)
 
-      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
+      output = 'illuminus_qc'
+      ilquality = nil
+      if (nofilter and smfile)
+        qcargs = {:run => run_name, :sim => smfile}.merge(args)
+        ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
+      elsif gcquality
+        Dir.mkdir(output) unless File.exist?(output)
+        oldmag = File.join(gcqcdir, 'supplementary', 'magnitude.txt')
+        oldxyd = File.join(gcqcdir, 'supplementary', 'xydiff.txt')
+        system("cp %s %s %s" % [oldmag, oldxyd, output])
+        qcargs = {:run => run_name}.merge(args)
+        ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
+      end
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]
