@@ -1098,6 +1098,9 @@ sub collect_files {
   Arg [2]    : coderef of a function that accepts a single argument and
                returns true if that object is to be collected.
   Arg [3]    : Maximum depth to search below the starting directory.
+  Arg [4]    : A file matching regex that is applied in addition to to
+               the test. Optional.
+
   Example    : @dirs = collect_dirs('/home', $modified, 2)
   Description: Return an array of directory names present under the specified
                root, for which the test predicate returns true, up to the
@@ -1108,7 +1111,7 @@ sub collect_files {
 =cut
 
 sub collect_dirs {
-  my ($root, $test, $depth) = @_;
+  my ($root, $test, $depth, $regex) = @_;
 
   $root eq '' and $log->logconfess('A non-empty root argument is required');
 
@@ -1135,7 +1138,13 @@ sub collect_dirs {
           my $current_depth = $File::Find::name =~ tr[/][];
 
           if (!defined $stop_depth || $current_depth < $stop_depth) {
-            $collector->($File::Find::name);
+
+            if ($regex) {
+              $collector->($File::Find::name) if $_ =~ $regex;
+            }
+            else {
+              $collector->($File::Find::name);
+            }
           }
         }
        }, $root);
