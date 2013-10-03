@@ -42,7 +42,8 @@ class simGenerator:
     XY_CALL = 2
     YY_CALL = 3
 
-    def __init__(self, signalMean=1, signalSD=0.25, noiseMean=0, noiseSD=0.1, bases=['A','C']):
+    def __init__(self, signalMean=1, signalSD=0.25, noiseMean=0, noiseSD=0.1, 
+                 nanRate=0.01, infRate=0.01, bases=['A','C']):
         self.channels = 2
         bases.sort()
         (self.baseX, self.baseY) = bases
@@ -50,9 +51,14 @@ class simGenerator:
         self.signalSD = signalSD
         self.noiseMean = noiseMean
         self.noiseSD = noiseSD
+        self.nanRate = nanRate
+        self.infRate = infRate
+        self.nanTotal = 0
+        self.infTotal = 0
         self.noCallNoise = 0.2
         self.root2 = math.sqrt(2)
         self.nameSize = 40
+    
 
     def generateIntensity(self, genotype):
         # generate (x,y) intensities for given genotype, sampled from signal/noise distributions
@@ -88,6 +94,14 @@ class simGenerator:
         items.append(struct.pack(str(nameSize)+'s', sample))
         for sig in signals:
             if numberF==0: 
+                # may convert float to NaN or +/- infinity
+                if random.random() < self.nanRate:
+                    sig = float('nan')
+                    self.nanTotal += 1
+                if random.random() < self.infRate:
+                    if random.random() < 0.5: sig = float('+inf')
+                    else: sig = float('-inf')
+                    self.infTotal += 1
                 packed = struct.pack('f', sig) # IEEE 754 32-bit float
             elif numberF==1: 
                 packed = struct.pack('H', int(sig*1000)) # 16-bit unsigned scaled integer
@@ -138,6 +152,10 @@ class simGenerator:
         probes = callTotal / 2
         return (results, samples, probes)
 
+    def printNanInf(self):
+        print "Total NaN:", self.nanTotal
+        print "Total inf:", self.infTotal
+
     def writeSim(self, outPath, results, samples, probes):
         # write .sim format file
         out = open(outPath, 'w')
@@ -158,6 +176,7 @@ inPath = sys.argv[1]
 outPath = sys.argv[2]
 (results, samples, probes) = gen.readPed(inPath)
 gen.writeSim(outPath, results, samples, probes)
+gen.printNanInf()
 
 #for sample in samples:
 #    for gt in results[sample]:

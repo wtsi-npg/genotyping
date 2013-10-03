@@ -23,77 +23,58 @@
 # 1. SNP manifest, converted to .json format
 # 2. Chromosome boundaries with respect to position in SNP manifest
 
+# Revised version reads and sorts the manifest in a memory-efficient fashion
+
 use strict;
 use warnings;
 use Carp;
+use File::Temp qw/tempdir/;
 use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use JSON;
 
 Log::Log4perl->easy_init($ERROR);
 
-sub byChromosomePosition {
-    # use to sort manifest into (chromosome, position) order
-    # sort chromosomes by string order, positions by numeric order
+
+sub byPositionName {
+    # use to sort manifest into (position, name) order
+    # sort names by string order, positions by numeric order
     # $a, $b are global variables used by Perl sort
     my %snpA = %$a;
     my %snpB = %$b;
-    my $result = $snpA{'chromosome'} cmp $snpB{'chromosome'} 
-                 || $snpA{'position'} <=> $snpB{'position'};
+    my $result = $snpA{'position'} <=> $snpB{'position'} ||
+	$snpA{'name'} cmp $snpB{'name'} ;
     return $result;
 }
 
-sub findChromosomeBounds {
-    # find boundaries (start/finish indices) of chromosomes wrt sorted manifest
-    my @manifest = @_;
-    my %chromosomes = ();
-    my @bounds = ();
-    my $start = 0;
-    my $lastChr = 'NULL';
-    for (my $i=0; $i<@manifest; $i++) {
-        my $chr = $manifest[$i]{'chromosome'};
-        if ($lastChr ne 'NULL' && $chr ne $lastChr) { # end previous chromosome
-            push (@bounds, { 'chromosome' => $lastChr,
-                             'start' => $start,
-                             'end' => $i });
-            $start = $i;
-            if ($chromosomes{$chr}) {
-                croak("Inconsistent chromosome name at position $i: $chr\n");
-            } else {
-                $chromosomes{$chr} = 1;
-            }
-        }
-        if ($i+1==@manifest) { # end of final chromosome
-            push (@bounds, { 'chromosome' => $chr,
-                             'start' => $start,
-                             'end' => $i+1 });
-        }
-        $lastChr = $chr;
-    }
-    return @bounds;
-}
-
-sub readManifest {
-    # read manifest bpm.csv
-    # .csv fields: Index,Name,Chromosome,Position,GenTrain Score,SNP,ILMN Strand,Customer Strand,NormID
-    # for each SNP, parse: Name,Chromosome,Position,AlleleA,AlleleB,NormID
-    my $inPath = shift;
-    my $verbose = shift;
-    my @manifest;
+sub getIndices {
+    # indices of fields in original .csv file
     my %indices = (name => 1,
                    chromosome => 2,
                    position => 3,
                    snp => 5,
                    norm_id => 8
         );
+    return %indices;
+}
+
+sub readWriteManifest {
+    # read manifest fields from tempfile into array; also find allele values
+    # write piecewise to given JSON path
+    # note that tempfile does *not* have a header line
+    my ($inPath, $outPath, $verbose) = @_;
+    $verbose ||= 0;
+    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
+    open my $out, ">", $outPath || croak "Cannot open output path $outPath";
+    print $out "["; # beginning of JSON list structure
     my $i = 0;
-    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    my %indices = getIndices();
+    if ($verbose) { print "Reading manifest from $inPath\n"; }
     while (<$in>) {
-        $i++;
-        if ($verbose && $i % 10000 == 0) { print "$i lines read.\n"; }
-        if ($i == 1) { next; } # first line is header
-        $_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
-        my %snp;
+	$i++;
+	if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
+	chomp;
+	my %snp;
         my @fields = split /,/;
         foreach my $key (qw/name chromosome position norm_id/) {
             $snp{$key} = $fields[$indices{$key}];
@@ -111,48 +92,130 @@ sub readManifest {
         }
         $snp{'allele_a'} = $alleles[0];
         $snp{'allele_b'} = $alleles[1];
-        # change chromosome ID to satisfy plink convention
-        my $key = 'chromosome';
-        if ($snp{$key} eq 'X') { $snp{$key}=23; }
-        elsif ($snp{$key} eq 'Y') { $snp{$key}=24; }
-        elsif ($snp{$key} eq 'XY') { $snp{$key}=25; }
-        elsif ($snp{$key} eq 'MT') { $snp{$key}=26; }
-        push(@manifest, \%snp);
+	print $out to_json(\%snp);
+	if (!eof($in)) { print $out ","; }
     }
+    print $out "]\n"; # end of JSON list structure
     close $in || croak "Cannot close input path $inPath";
-    return @manifest;
+    close $out || croak "Cannot close output path $outPath";
 }
 
-sub sortManifest {
-    # must be done before finding chromosome boundaries
-    return sort byChromosomePosition @_;
+sub splitManifest {
+    # read manifest bpm.csv and split into separate files for each chromosome
+    # also remove extra whitespace and convert to numeric chromosome IDs
+    my $inPath = shift;
+    my $outDir = shift;
+    my $verbose = shift;
+    my (%outPaths, %outFiles);
+    my %indices = getIndices();
+    my $cindex = $indices{'chromosome'};
+    my $i = 0;
+    if ($verbose) { print "Reading manifest $inPath for split\n"; }
+    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    while (<$in>) {
+        $i++;
+        if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
+	if ($i == 1) { next; } # first line is header
+	$_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
+	my @fields = split /,/;
+	my $chrom = $fields[$cindex];
+	# ensure chromosome ID is in numeric format
+	if ($chrom eq 'X') { $chrom = 23; }
+	elsif ($chrom eq 'Y') { $chrom = 24; }
+	elsif ($chrom eq 'XY') { $chrom = 25; }
+	elsif ($chrom eq 'MT') { $chrom = 26; }
+	$fields[$cindex] = $chrom;
+	if (!$outPaths{$chrom}) {
+	    my $outPath = $outDir."/unsorted.".$chrom.".csv";
+	    $outPaths{$chrom} = $outPath;
+	    open my $out, '>', $outPath || croak "Cannot open output $outPath";
+	    $outFiles{$chrom} = $out;
+	}
+	print { $outFiles{$chrom} } join(',', @fields)."\n";
+    }
+    close $in || croak "Cannot close input $inPath";
+    foreach my $chrom (keys(%outFiles)) {
+	my $outPath = $outPaths{$chrom};
+	close $outFiles{$chrom} || croak "Cannot close output $outPath";
+    }
+    return %outPaths;
+}
+
+sub writeSortedByPosition {
+    # read unsorted input; sort by position and name; write to output
+    # two probes may share chromosome and position, eg. regular and cnv
+    # return total number of inputs
+    my ($inPath, $outPath) = @_;
+    my %indices = getIndices();
+    my $nameIndex = $indices{'name'};
+    my $posIndex = $indices{'position'};
+    my @input;
+    my @sortFields;
+    my $i = 0;
+    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    while (<$in>) {
+	push @input, $_;
+	my @fields = split /,/;
+	my %snp;
+	$snp{'name'} = $fields[$nameIndex];
+	$snp{'position'} = $fields[$posIndex];
+	$snp{'original_order'} = $i;
+	push(@sortFields, \%snp);
+	$i++;
+    }
+    close $in || croak "Cannot close input $inPath";
+    my @sorted = sort byPositionName @sortFields;
+    open my $out, ">", $outPath ||  croak "Cannot open output $outPath";
+    foreach my $snpRef (@sorted) {
+	my %snp = %{$snpRef};
+	print $out $input[$snp{'original_order'}];
+    }
+    close $out || croak "Cannot close output $outPath";
+    return $i;
 }
 
 sub run {
-    my ($manifest, $chrJson, $snpJson, $verbose, $out, $start);
-    $start = time();
+    # sort manifest by (chromosome, position) and write as .json
+    # also find chromosome boundaries wrt sorted manifest
+    my ($manifest, $chrJson, $snpJson, $out, $verbose);
     GetOptions('manifest=s' => \$manifest,
-               'chromosomes=s' => \$chrJson,
+	       'chromosomes=s' => \$chrJson,
                'snp=s'=> \$snpJson,
-               'verbose' => \$verbose,
-        );
+               'verbose' => \$verbose);
+    $verbose ||= 0;
     unless (-e $manifest) {
         croak("Manifest file \"$manifest\" does not exist");
     }
-    my @manifest = sortManifest(readManifest($manifest, $verbose));
-    if ($snpJson) {
-        open $out, ">", $snpJson || croak "Cannot open output $snpJson";
-        print $out to_json(\@manifest);
-        close $out || croak "Cannot close output $snpJson";
+    my $temp = tempdir( "temp_snp_manifest_XXXXXX", CLEANUP => 1 );
+    my %unsortedPaths = splitManifest($manifest, $temp, $verbose);
+    my @chromosomes = keys(%unsortedPaths);
+    @chromosomes = sort {$a <=> $b} @chromosomes; # ascending numeric sort
+    my @bounds;
+    my $start = 0;
+    my $end = 0;
+    my @sortedPaths;
+    foreach my $chr (@chromosomes) {
+	# write sorted .csv files and record chromosome boundaries 
+	my $sortedPath = $temp."/sorted.".$chr.".csv";
+	push @sortedPaths, $sortedPath;
+	my $total = writeSortedByPosition($unsortedPaths{$chr}, $sortedPath);
+	$end += $total;
+	push (@bounds, { 'chromosome' => $chr,
+			 'start' => $start,
+			 'end' => $end });
+	$start = $end;
     }
     if ($chrJson) {
-        my @bounds = findChromosomeBounds(@manifest);
-        open $out, ">", $chrJson || croak "Cannot open output $chrJson";
+	open $out, ">", $chrJson || croak "Cannot open output $chrJson";
         print $out to_json(\@bounds);
         close $out || croak "Cannot close output $chrJson";
     }
-    my $duration = time() - $start;
-    if ($verbose) { print "Finished. Duration: $duration s.\n"; }
+    if ($snpJson) {
+	my $sortedAll = $temp."/sorted.all.csv";
+	system("cat ".join(" ", @sortedPaths)." > ".$sortedAll);
+	readWriteManifest($sortedAll, $snpJson, $verbose);
+    }   
 }
+
 
 run();
