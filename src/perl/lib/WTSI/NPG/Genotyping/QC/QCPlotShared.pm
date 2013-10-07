@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/decode_json defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/decode_json defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleInclusion readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 use vars qw/$UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
@@ -388,6 +388,22 @@ sub readSampleData {
     }
     close $in;
     return @data;    
+}
+
+sub readSampleInclusion {
+    # get inclusion/exclusion status of each sample in pipeline DB
+    # returns a hash reference
+    my $dbfile = shift;
+    my $result = `echo 'select name,include from sample;' | sqlite3 $dbfile`;
+    my @lines = split("\n", $result);
+    my %inclusion;
+    foreach my $line (@lines) {
+	my @fields = split('\|', $line); 
+	my $status = pop @fields;
+	my $name = join("|", @fields); # OK even if name includes | characters
+	$inclusion{$name} = $status;
+    }
+    return \%inclusion;
 }
 
 sub readThresholds {
