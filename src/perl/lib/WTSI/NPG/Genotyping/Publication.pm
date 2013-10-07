@@ -669,6 +669,7 @@ sub parse_fluidigm_table {
   # For error reporting
   my $line_num = 0;
   my $expected_num_columns = 12;
+  my $num_sample_rows = 0;
 
   my @header;
   my @column_names;
@@ -725,12 +726,33 @@ sub parse_fluidigm_table {
       }
 
       push(@{$sample_data{$sample_address}}, $line);
+      $num_sample_rows++;
       next;
     }
   }
 
-  foreach my $address (sort keys %sample_data) {
-    print "$address: ", scalar @{$sample_data{$address}}, "\n";
+  unless (@header) {
+    $log->logconfess("Parse error: no header rows found");
+  }
+  unless (@column_names) {
+    $log->logconfess("Parse error: no column names found");
+  }
+
+  if ($num_sample_rows == (96 * 96)) {
+    unless (scalar keys %sample_data == 96) {
+      $log->logconfess("Parse error: expected data for 96 samples, found ",
+                       scalar keys %sample_data);
+    }
+  }
+  elsif ($num_sample_rows == (192 * 24)) {
+    unless (scalar keys %sample_data == 192) {
+      $log->logconfess("Parse error: expected data for 192 samples, found ",
+                       scalar keys %sample_data);
+    }
+  }
+  else {
+    $log->logconfess("Parse error: expected ", 96 * 96, " or ", 192 * 24,
+                     " sample data rows, found $num_sample_rows");
   }
 
   return (\@header, \@column_names, \%sample_data);
