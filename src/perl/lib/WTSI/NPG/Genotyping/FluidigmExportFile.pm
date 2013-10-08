@@ -102,9 +102,9 @@ sub _sample_addresses {
 =head2 sample_assays
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
-  Example    : my @assays = $export->sample_assays('S01')
+  Example    : my $assays = $export->sample_assays('S01')
   Description: Return a copy of the assay results for this sample
-  Returntype : Array
+  Returntype : ArrayRef
   Caller     : general
 
 =cut
@@ -112,12 +112,57 @@ sub _sample_addresses {
 sub sample_assays {
   my ($self, $sample_address) = @_;
 
+  defined $sample_address or
+    logconfess("A defined sample_address argument is required");
+
   unless(exists $self->sample_data->{$sample_address}) {
     $self->logcroak("FluidigmExportFile '", $self->fluidigm_barcode,
                     "' has no sample address '$sample_address'");
   }
 
-  return @{$self->sample_data->{$sample_address}};
+  return [@{$self->sample_data->{$sample_address}}];
+}
+
+=head2 write_sample_assays
+
+  Arg [1]    : Sample address i.e. S01, S02 etc.
+  Arg [2]    : File name
+  Example    : $export->write_sample_assays('S01', $file)
+  Description: Writes a tab-delimited CSV file containing the assay results
+               for one sample. Returns the name of the written file.
+  Returntype : Str
+  Caller     : general
+
+=cut
+
+sub write_sample_assays {
+  my ($self, $sample_address, $file_name) = @_;
+
+  defined $sample_address or
+    logconfess("A defined sample_address argument is required");
+  defined $file_name or logconfess("A defined file_name argument is required");
+
+  my $csv = Text::CSV->new({eol              => "\n",
+                            sep_char         => "\t",
+                            allow_whitespace => undef,
+                            quote_char       => undef});
+
+  $csv->column_names($self->column_names);
+
+  open(my $out, '>:encoding(utf8)', $file_name)
+    or $self->logcroak("Failed to open Fluidigm CSV file '$file_name'",
+                       " for writing: $!");
+
+  my @assays = @{$self->sample_assays($sample_address)};
+  foreach my $assay (@assays) {
+    $csv->print($out, $assay)
+      or $self->logcroak("Failed to write record [", join(", ", @$assay),
+                         "] to '$file_name': ", $csv->error_diag);
+  }
+
+  close($out);
+
+  return $file_name;
 }
 
 __PACKAGE__->meta->make_immutable;

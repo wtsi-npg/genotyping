@@ -725,7 +725,7 @@ sub parse_fluidigm_table {
         $sample_data{$sample_address} = [];
       }
 
-      push(@{$sample_data{$sample_address}}, $line);
+      push(@{$sample_data{$sample_address}}, \@columns);
       $num_sample_rows++;
       next;
     }
