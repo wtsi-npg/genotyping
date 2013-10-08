@@ -31,10 +31,9 @@ dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new($body) }
   "Expected to fail parsing when header is missing";
 
 my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new($complete_file);
-is($export->fluidigm_barcode, '1381735059');
+is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode differs');
 ok($export->confidence_threshold == 65, 'Confidence threshold differs');
 ok($export->num_samples == 96, 'Number of samples differs');
-
 
 # Each sample should have 96 assay results
 my @sample_addresses;
@@ -46,7 +45,7 @@ is_deeply($export->sample_addresses, \@sample_addresses,
 
 foreach my $address (@sample_addresses) {
   ok(@{$export->sample_assays($address)} == 96,
-     "Sample assays differ for sample at $address");
+     "Sample assay counts differ for sample at $address");
 }
 
 my $tmpdir = tempdir(CLEANUP => 1);
@@ -56,7 +55,7 @@ foreach my $address (@sample_addresses) {
   my $test_file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
                           $export->fluidigm_barcode);
 
-  ok($export->write_sample_assays($address, $test_file),
+  ok($export->write_sample_assays($address, $test_file) == 96,
      "Failed to write $test_file");
 
   ok(compare($test_file, $expected_file) == 0,

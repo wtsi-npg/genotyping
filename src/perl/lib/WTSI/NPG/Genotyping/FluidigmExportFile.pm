@@ -129,7 +129,7 @@ sub sample_assays {
   Arg [2]    : File name
   Example    : $export->write_sample_assays('S01', $file)
   Description: Writes a tab-delimited CSV file containing the assay results
-               for one sample. Returns the name of the written file.
+               for one sample. Returns the number of records written.
   Returntype : Str
   Caller     : general
 
@@ -142,6 +142,7 @@ sub write_sample_assays {
     logconfess("A defined sample_address argument is required");
   defined $file_name or logconfess("A defined file_name argument is required");
 
+  my $records_written = 0;
   my $csv = Text::CSV->new({eol              => "\n",
                             sep_char         => "\t",
                             allow_whitespace => undef,
@@ -150,19 +151,20 @@ sub write_sample_assays {
   $csv->column_names($self->column_names);
 
   open(my $out, '>:encoding(utf8)', $file_name)
-    or $self->logcroak("Failed to open Fluidigm CSV file '$file_name'",
-                       " for writing: $!");
+    or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
+                       "for writing: $!");
 
   my @assays = @{$self->sample_assays($sample_address)};
   foreach my $assay (@assays) {
     $csv->print($out, $assay)
       or $self->logcroak("Failed to write record [", join(", ", @$assay),
                          "] to '$file_name': ", $csv->error_diag);
+    ++$records_written;
   }
 
   close($out);
 
-  return $file_name;
+  return $records_written;
 }
 
 __PACKAGE__->meta->make_immutable;
