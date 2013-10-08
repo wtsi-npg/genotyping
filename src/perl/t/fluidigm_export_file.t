@@ -6,7 +6,7 @@ use utf8;
 use strict;
 use warnings;
 
-use Test::More tests => 105;
+use Test::More tests => 106;
 use Test::Exception;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
@@ -31,8 +31,14 @@ is($export->fluidigm_barcode, '1381735059');
 ok($export->confidence_threshold == 65);
 ok($export->num_samples == 96);
 
+
 # Each sample should have 96 assay results
+my @sample_addresses;
 for (my $i = 1; $i <= 96; $i++) {
-  my $address = sprintf("S%02d", $i);
+  push(@sample_addresses, sprintf("S%02d", $i));
+}
+is_deeply($export->sample_addresses, \@sample_addresses);
+
+foreach my $address (@sample_addresses) {
   ok($export->sample_assays($address) == 96);
 }

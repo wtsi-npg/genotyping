@@ -17,10 +17,10 @@ with 'WTSI::NPG::Loggable';
 has 'file_name' => (is  => 'ro', isa => 'Str', required => 1,
                     writer => '_file_name');
 
-has 'header' => (is  => 'ro', isa => 'ArrayRef',
+has 'header' => (is  => 'ro', isa => 'ArrayRef[Str]',
                  writer => '_header');
 
-has 'column_names' => (is => 'ro', isa => 'ArrayRef',
+has 'column_names' => (is => 'ro', isa => 'ArrayRef[Str]',
                        writer => '_column_names');
 
 has 'fluidigm_barcode' => (is => 'ro', isa => 'Str',
@@ -31,6 +31,9 @@ has 'confidence_threshold' => (is => 'ro', isa => 'Str',
 
 has 'num_samples' => (is => 'ro', isa => 'Int',
                       builder => '_num_samples', lazy => 1);
+
+has 'sample_addresses' => (is => 'ro', isa => 'ArrayRef[Str]',
+                           builder => '_sample_addresses', lazy => 1);
 
 has 'sample_data' => (is => 'ro', isa => 'HashRef[ArrayRef]',
                       writer => '_sample_data');
@@ -90,6 +93,12 @@ sub _num_samples {
   return scalar keys %{$self->sample_data};
 }
 
+sub _sample_addresses {
+  my ($self) = @_;
+
+  return [sort keys %{$self->sample_data}];
+}
+
 =head2 sample_assays
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
@@ -112,7 +121,6 @@ sub sample_assays {
 }
 
 __PACKAGE__->meta->make_immutable;
-
 
 no Moose;
 
