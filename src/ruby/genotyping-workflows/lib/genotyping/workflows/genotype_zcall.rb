@@ -229,19 +229,22 @@ Returns:
       zfile = update_annotation(merge_bed(zchunks_t, zname, args, async),
                                  sjson, njson, args, async)
 
-      qcargs = {:run => run_name}.merge(args)
+      zqc = 'zcall_qc'
       if nosim
-        zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+        # no sim file, therefore no intensity metrics
+        qcargs = {:run => run_name}.merge(args)
       elsif gcquality
-        # copy magnitude/xydiff output from GenCall QC
-        output = 'zcall_qc'
-        Dir.mkdir(output) unless File.exist?(output)
+        # copy intensity metric results from GenCall QC
+        Dir.mkdir(zqc) unless File.exist?(zqc)
         oldmag = File.join(gcqcdir, 'supplementary', 'magnitude.txt')
         oldxyd = File.join(gcqcdir, 'supplementary', 'xydiff.txt')
-        system("cp %s %s %s" % [oldmag, oldxyd, output])
-        zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
+        system("cp %s %s %s" % [oldmag, oldxyd, zqc])
+        qcargs = {:run => run_name}.merge(args)
+      else
+        # no GenCall QC, need to calculate intensity metrics from sim file
+        qcargs = {:run => run_name, :sim => smfile}.merge(args)
       end
-
+      zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       [zfile, zquality] if [zfile, zquality].all?
     end
 
