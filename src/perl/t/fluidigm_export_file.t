@@ -33,15 +33,14 @@ dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new($body) }
 my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new($complete_file);
 is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode differs');
 ok($export->confidence_threshold == 65, 'Confidence threshold differs');
-ok($export->num_samples == 96, 'Number of samples differs');
+ok($export->size == 96, 'Number of samples differs');
 
 # Each sample should have 96 assay results
 my @sample_addresses;
 for (my $i = 1; $i <= 96; $i++) {
   push(@sample_addresses, sprintf("S%02d", $i));
 }
-is_deeply($export->sample_addresses, \@sample_addresses,
-          'Sample addresses differ');
+is_deeply($export->addresses, \@sample_addresses, 'Sample addresses differ');
 
 foreach my $address (@sample_addresses) {
   ok(@{$export->sample_assays($address)} == 96,

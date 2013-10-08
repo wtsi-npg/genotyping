@@ -12,7 +12,7 @@ our $HEADER_BARCODE_COL = 2;
 our $HEADER_CONF_THRESHOLD_ROW = 5;
 our $HEADER_CONF_THRESHOLD_COL = 1;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Addressable';
 
 has 'file_name' => (is  => 'ro', isa => 'Str', required => 1,
                     writer => '_file_name');
@@ -23,20 +23,15 @@ has 'header' => (is  => 'ro', isa => 'ArrayRef[Str]',
 has 'column_names' => (is => 'ro', isa => 'ArrayRef[Str]',
                        writer => '_column_names');
 
-has 'fluidigm_barcode' => (is => 'ro', isa => 'Str',
-                           builder => '_fluidigm_barcode', lazy => 1);
-
-has 'confidence_threshold' => (is => 'ro', isa => 'Str',
-                               builder => '_confidence_threshold', lazy => 1);
-
-has 'num_samples' => (is => 'ro', isa => 'Int',
-                      builder => '_num_samples', lazy => 1);
-
-has 'sample_addresses' => (is => 'ro', isa => 'ArrayRef[Str]',
-                           builder => '_sample_addresses', lazy => 1);
-
 has 'sample_data' => (is => 'ro', isa => 'HashRef[ArrayRef]',
                       writer => '_sample_data');
+
+has 'fluidigm_barcode' => (is => 'ro', isa => 'Str', required => 1,
+                           builder => '_fluidigm_barcode', lazy => 1);
+
+has 'confidence_threshold' => (is => 'ro', isa => 'Str', required => 1,
+                               builder => '_confidence_threshold', lazy => 1);
+
 
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
@@ -87,13 +82,13 @@ sub _confidence_threshold {
   return $fields[$HEADER_CONF_THRESHOLD_COL];
 }
 
-sub _num_samples {
+sub _size {
   my ($self) = @_;
 
   return scalar keys %{$self->sample_data};
 }
 
-sub _sample_addresses {
+sub _addresses {
   my ($self) = @_;
 
   return [sort keys %{$self->sample_data}];
@@ -150,7 +145,7 @@ sub write_sample_assays {
 
   $csv->column_names($self->column_names);
 
-  open(my $out, '>:encoding(utf8)', $file_name)
+  open my $out, '>:encoding(utf8)', $file_name
     or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
                        "for writing: $!");
 
@@ -162,7 +157,7 @@ sub write_sample_assays {
     ++$records_written;
   }
 
-  close($out);
+  close $out;
 
   return $records_written;
 }
