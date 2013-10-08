@@ -14,24 +14,25 @@ our $HEADER_CONF_THRESHOLD_COL = 1;
 
 with 'WTSI::NPG::Loggable';
 
-has 'file_name' => (is  => 'ro',
-                    isa => 'Str',
-                    required => 1,
+has 'file_name' => (is  => 'ro', isa => 'Str', required => 1,
                     writer => '_file_name');
 
-has 'header' => (is  => 'ro',
-                 isa => 'ArrayRef',
-                 required => 0,
+has 'header' => (is  => 'ro', isa => 'ArrayRef',
                  writer => '_header');
 
-has 'column_names' => (is => 'ro',
-                       isa => 'ArrayRef',
-                       required => 0,
+has 'column_names' => (is => 'ro', isa => 'ArrayRef',
                        writer => '_column_names');
 
-has 'sample_data' => (is => 'ro',
-                      isa => 'HashRef[ArrayRef]',
-                      required => 0,
+has 'fluidigm_barcode' => (is => 'ro', isa => 'Str',
+                           builder => '_fluidigm_barcode', lazy => 1);
+
+has 'confidence_threshold' => (is => 'ro', isa => 'Str',
+                               builder => '_confidence_threshold', lazy => 1);
+
+has 'num_samples' => (is => 'ro', isa => 'Int',
+                      builder => '_num_samples', lazy => 1);
+
+has 'sample_data' => (is => 'ro', isa => 'HashRef[ArrayRef]',
                       writer => '_sample_data');
 
 around BUILDARGS => sub {
@@ -65,7 +66,7 @@ sub BUILD {
   $self->_sample_data($sample_data);
 }
 
-sub fluidigm_barcode {
+sub _fluidigm_barcode {
   my ($self) = @_;
 
   my @header = @{$self->header};
@@ -74,7 +75,7 @@ sub fluidigm_barcode {
   return $fields[$HEADER_BARCODE_COL];
 }
 
-sub confidence_threshold {
+sub _confidence_threshold {
   my ($self) = @_;
 
   my @header = @{$self->header};
@@ -83,13 +84,35 @@ sub confidence_threshold {
   return $fields[$HEADER_CONF_THRESHOLD_COL];
 }
 
-sub num_samples {
+sub _num_samples {
   my ($self) = @_;
 
   return scalar keys %{$self->sample_data};
 }
 
+=head2 sample_assays
+
+  Arg [1]    : Sample address i.e. S01, S02 etc.
+  Example    : my @assays = $export->sample_assays('S01')
+  Description: Return a copy of the assay results for this sample
+  Returntype : Array
+  Caller     : general
+
+=cut
+
+sub sample_assays {
+  my ($self, $sample_address) = @_;
+
+  unless(exists $self->sample_data->{$sample_address}) {
+    $self->logcroak("FluidigmExportFile '", $self->fluidigm_barcode,
+                    "' has no sample address '$sample_address'");
+  }
+
+  return @{$self->sample_data->{$sample_address}};
+}
+
 __PACKAGE__->meta->make_immutable;
+
 
 no Moose;
 
