@@ -3,7 +3,7 @@ use utf8;
 
 use strict;
 use warnings;
-use lib qw(. lib);
+use lib qw(.);
 
 use Module::Build;
 use Build;
@@ -15,7 +15,10 @@ my $build = Build->new
    dist_abstract => 'WTSI genotyping data management tools',
    dist_version => '0.9.0',
    license  => 'gpl',
+   use_tap_harness => 1,
+   tap_harness_args => {lib => ['./blib/lib', './blib/arch', './t']},
    requires => {'Carp' => 0,
+                'Test::Class' => 0,
                 'Test::More' => 0,
                 'Test::Exception' => 0,
                 'DBIx::Class' => 0,
