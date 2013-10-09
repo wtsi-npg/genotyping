@@ -9,7 +9,7 @@ use warnings;
 use File::Compare;
 use File::Temp qw(tempdir);
 
-use Test::More tests => 298;
+use Test::More tests => 299;
 use Test::Exception;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
@@ -22,15 +22,21 @@ my $complete_file = "$data_path/complete.csv";
 my $header = "$data_path/header.txt";
 my $body = "$data_path/body.txt";
 
-ok(WTSI::NPG::Genotyping::FluidigmExportFile->new(file_name => $complete_file));
-ok(WTSI::NPG::Genotyping::FluidigmExportFile->new($complete_file));
-
+ok(WTSI::NPG::Genotyping::FluidigmExportFile->new
+   ({file_name => $complete_file}));
+dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new
+  ({file_name => 'no_such_file_exists'}) }
+  "Expected to fail constructing with missing file";
+dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new() }
+  "Expected to fail constructing with no arguments";
 dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new($header) }
   "Expected to fail parsing when body is missing";
 dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new($body) }
   "Expected to fail parsing when header is missing";
 
-my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new($complete_file);
+
+my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  ({file_name => $complete_file});
 is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode differs');
 ok($export->confidence_threshold == 65, 'Confidence threshold differs');
 ok($export->size == 96, 'Number of samples differs');

@@ -2,9 +2,11 @@
 package WTSI::NPG::Genotyping::FluidigmExportFile;
 
 use Moose;
-use namespace::autoclean;
 
 use WTSI::NPG::Genotyping::Publication qw(parse_fluidigm_table);
+
+use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
+                                       $FLUIDIGM_PLATE_WELL_META_KEY);
 
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
@@ -14,43 +16,28 @@ our $HEADER_CONF_THRESHOLD_COL = 1;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Addressable';
 
-has 'file_name' => (is  => 'ro', isa => 'Str', required => 1,
-                    writer => '_file_name');
+has 'file_name' => (is  => 'ro', isa => 'Str', required => 1);
 
 has 'header' => (is  => 'ro', isa => 'ArrayRef[Str]',
-                 writer => '_header');
+                 writer => '_write_header');
 
 has 'column_names' => (is => 'ro', isa => 'ArrayRef[Str]',
-                       writer => '_column_names');
-
-has 'sample_data' => (is => 'ro', isa => 'HashRef[ArrayRef]',
-                      writer => '_sample_data');
+                       writer => '_write_column_names');
 
 has 'fluidigm_barcode' => (is => 'ro', isa => 'Str', required => 1,
-                           builder => '_fluidigm_barcode', lazy => 1);
+                           builder => '_build_fluidigm_barcode',
+                           lazy => 1);
 
 has 'confidence_threshold' => (is => 'ro', isa => 'Str', required => 1,
-                               builder => '_confidence_threshold', lazy => 1);
-
-
-around BUILDARGS => sub {
-  my ($orig, $class, @args) = @_;
-
-  if (@args == 1 && !ref $args[0]) {
-    return $class->$orig(file_name => $args[0]);
-  }
-  else {
-    return $class->$orig(@args);
-  }
-};
+                               builder => '_build_confidence_threshold',
+                               lazy => 1);
 
 sub BUILD {
   my ($self) = @_;
 
-  unless (-e $self->file_name) {
-   $self->logdie("Fluidigm export file '", $self->file_name,
-                 "' does not exist");
-  }
+  -e $self->file_name or
+    $self->logdie("Fluidigm export file '", $self->file_name,
+                  "' does not exist");
 
   open my $in, '<:encoding(utf8)', $self->file_name
     or $self->logdie("Failed to open Fluidigm export file '",
@@ -59,12 +46,12 @@ sub BUILD {
   my ($header, $column_names, $sample_data) = parse_fluidigm_table($in);
   close $in;
 
-  $self->_header($header);
-  $self->_column_names($column_names);
-  $self->_sample_data($sample_data);
+  $self->_write_header($header);
+  $self->_write_column_names($column_names);
+  $self->_write_content($sample_data);
 }
 
-sub _fluidigm_barcode {
+sub _build_fluidigm_barcode {
   my ($self) = @_;
 
   my @header = @{$self->header};
@@ -73,25 +60,13 @@ sub _fluidigm_barcode {
   return $fields[$HEADER_BARCODE_COL];
 }
 
-sub _confidence_threshold {
+sub _build_confidence_threshold {
   my ($self) = @_;
 
   my @header = @{$self->header};
   my @fields = split ',', $header[$HEADER_CONF_THRESHOLD_ROW];
 
   return $fields[$HEADER_CONF_THRESHOLD_COL];
-}
-
-sub _size {
-  my ($self) = @_;
-
-  return scalar keys %{$self->sample_data};
-}
-
-sub _addresses {
-  my ($self) = @_;
-
-  return [sort keys %{$self->sample_data}];
 }
 
 =head2 sample_assays
@@ -105,17 +80,9 @@ sub _addresses {
 =cut
 
 sub sample_assays {
-  my ($self, $sample_address) = @_;
+  my ($self, $address) = @_;
 
-  defined $sample_address or
-    logconfess("A defined sample_address argument is required");
-
-  unless(exists $self->sample_data->{$sample_address}) {
-    $self->logcroak("FluidigmExportFile '", $self->fluidigm_barcode,
-                    "' has no sample address '$sample_address'");
-  }
-
-  return [@{$self->sample_data->{$sample_address}}];
+  return [@{$self->lookup($address)}];
 }
 
 =head2 write_sample_assays
@@ -131,11 +98,12 @@ sub sample_assays {
 =cut
 
 sub write_sample_assays {
-  my ($self, $sample_address, $file_name) = @_;
+  my ($self, $address, $file_name) = @_;
 
-  defined $sample_address or
-    logconfess("A defined sample_address argument is required");
-  defined $file_name or logconfess("A defined file_name argument is required");
+  defined $address or
+    $self->logconfess("A defined address argument is required");
+  defined $file_name or
+    $self->logconfess("A defined file_name argument is required");
 
   my $records_written = 0;
   my $csv = Text::CSV->new({eol              => "\n",
@@ -149,7 +117,7 @@ sub write_sample_assays {
     or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
                        "for writing: $!");
 
-  my @assays = @{$self->sample_assays($sample_address)};
+  my @assays = @{$self->sample_assays($address)};
   foreach my $assay (@assays) {
     $csv->print($out, $assay)
       or $self->logcroak("Failed to write record [", join(", ", @$assay),
@@ -162,6 +130,23 @@ sub write_sample_assays {
   return $records_written;
 }
 
+sub fluidigm_metadata {
+  my ($self, $address) = @_;
+
+  exists $self->content->{$address} or
+    $self->logcroak("FluidigmExportFile '", $self->fluidigm_barcode,
+                    "' has no sample address '$address'");
+
+  return ([$FLUIDIGM_PLATE_NAME_META_KEY => $self->fluidigm_barcode],
+          [$FLUIDIGM_PLATE_WELL_META_KEY => $address]);
+}
+
+sub fluidigm_fingerprint {
+  my ($self, $address) = @_;
+
+  return $self->fluidigm_metadata($address);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -169,6 +154,28 @@ no Moose;
 1;
 
 __END__
+
+=head1 NAME
+
+FluidigmExportFile - A structured CSV data file exported by Fluidigm
+instrument software.
+
+=head1 SYNOPSIS
+
+  my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+    ({file_name => 'results.csv'});
+
+  print $export->fluidigm_barcode, "\n";
+  print $export->confidence_threshold, "\n";
+  print $export->size, "\n";
+
+=head1 DESCRIPTION
+
+A wrapper for the structured CSV data file exported by Fluidigm
+instrument software. It performs an eager parse of the file and
+provides methods to access and manipulate the data.
+
+FluidigmExportFile consumes the WTSI::NPG::Addressable role.
 
 =head1 AUTHOR
 
