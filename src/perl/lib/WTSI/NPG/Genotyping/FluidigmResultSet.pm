@@ -6,19 +6,6 @@ use namespace::autoclean;
 
 with 'WTSI::NPG::Loggable';
 
-# class to represent Fluidigm result set
-# a result set consists of a directory and set of files
-# files include: 
-## .csv export file
-## .tif files (3 different files in Data subdirectory)
-## ChipRun files (various) 
-
-
-
-# attributes for paths/filenames
-# sanity checking that required files are present
-
-
 our $DATA_DIRECTORY_NAME = 'Data';
 our $EXPECTED_TIF_TOTAL = 3;
 
@@ -26,20 +13,16 @@ has 'directory' => (is  => 'ro', isa => 'Str', required => 1,
                     writer => '_directory');
 has 'data_directory' => (is  => 'ro', isa => 'Str',
 			 writer => '_data_directory');
-has 'export_path' => (is  => 'ro', isa => 'Str',
-		      writer => '_export_path');
-has 'tif_paths' => (is => 'ro', isa => 'ArrayRef[Str]',
-			writer => '_tif_paths');
-#has 'misc_filenames' => (is => 'ro', isa => 'ArrayRef[Str]',
-#			 writer => '_misc_filenames');
+has 'export_file' => (is  => 'ro', isa => 'Str',
+		      writer => '_export_file');
+has 'tif_files' => (is => 'ro', isa => 'ArrayRef[Str]',
+		    writer => '_tif_files');
 has 'fluidigm_barcode' =>(is  => 'ro', isa => 'Str',
 			  writer => '_fluidigm_barcode');
 
-# constructor: give a directory path, check for appropriate files
-
 sub BUILD {
     my ($self) = @_;
-
+    # validate main directory
     if (!(-e $self->directory)) {
 	 $self->logdie("Fluidigm directory path '", $self->directory,
 		       "' does not exist");
@@ -47,38 +30,37 @@ sub BUILD {
 	$self->logdie("Fluidigm directory path '", $self->directory,
 		      "' is not a directory");
     }
+    # find barcode (identical to directory name, by definition)
+    my @terms = split(/\//, $self->directory);
+    if ($terms[-1] eq '') { pop @terms; } # in case of trailing / in path
+    $self->_fluidigm_barcode(pop(@terms));
+    # validate data subdirectory
     $self->_data_directory($self->directory .'/'. $DATA_DIRECTORY_NAME);
     if (!(-e $self->data_directory)) {
-	$self->logdie("Fluidigm data subdirectory '", $self->data_directory,
+	$self->logdie("Fluidigm data path '", $self->data_directory,
 		       "' does not exist");
     } elsif (!(-d $self->data_directory)) {
-	$self->logdie("Fluidigm data subdirectory '", $self->data_directory,
+	$self->logdie("Fluidigm data path '", $self->data_directory,
 		      "' is not a directory");
     }
+    # find .tif files
     my @tif = glob($self->data_directory.'/*\.{tif,tiff}');
     if (@tif!=$EXPECTED_TIF_TOTAL) {
 	$self->logdie("Should have exactly $EXPECTED_TIF_TOTAL .tif files in ".$self->data_directory);
     } else {
-	$self->_tif_paths(\@tif);
+	$self->_tif_files(\@tif);
     }
-    # TODO Validate headers of .tif files ?
-    my @export = glob($self->directory.'/*\.csv');
-    if (@export!=1) {
-	$self->logdie("Should have exactly 1 .csv export file in ".$self->directory);
-    } else {
-	$self->_export_path((shift(@export)));
+    # look for export .csv file
+    $self->_export_file($self->directory.'/'.$self->fluidigm_barcode.'.csv');
+    if (!(-e $self->export_file)) {
+	 $self->logdie("Fluidigm export .csv '", $self->export_file,
+		       "' does not exist");
     }
-    # TODO if multiple .csv files are present, look for one with a valid export header !
-
-
 }
-
-
 
 no Moose;
 
 1;
-
 
 
 =head1 AUTHOR
@@ -98,5 +80,11 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
+
+=head1 DESCRIPTION
+
+Class to represent a Fluidigm result set. The result set is a directory 
+which must contain an export .csv file, and a data subdirectory with .tif 
+files. The directory may also contain other files and subdirectories.
 
 =cut
