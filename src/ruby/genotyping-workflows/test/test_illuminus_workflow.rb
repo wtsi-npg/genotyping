@@ -57,8 +57,10 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       pipe_ini = File.join(data_path, 'genotyping.ini')
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :config => pipe_ini,
+                                           :filterconfig => fconfig,
                                            :gender_method => 'Supplied',
                                            :chunk_size => 10000,
                                            :memory => 2048,
