@@ -42,6 +42,7 @@ our @EXPORT_OK = qw(publish_expression_analysis
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
+
 =head2 publish_expression_analysis
 
   Arg [1]    : Directory containing the Genome Studio export file name
@@ -157,10 +158,6 @@ sub publish_expression_analysis{
         publish_file($sample->{idat_path}, \@fingerprint,
                      $creator_uri->as_string,
                      $publish_samples_dest, $publisher_uri->as_string, $time);
-      # The following 'update_object_meta' calls emulate the strategy
-      # used for genotyping data; a file annotated with only the
-      # fingerprint metadata is published and then updated with
-      # additional metadata
       update_object_meta($idat_object, \@sample_meta);
 
       my $xml_object =
@@ -429,7 +426,11 @@ sub validate_well_id {
     $log->logcroak("Missing Supplier well ID at line $line\n");
   }
 
-  if ($well_id !~ /^[A-H][1-12]$/) {
+  my ($row, $column) = $well_id =~ /^([A-H])([1-9]+[0-2]?)$/;
+  unless ($row && $column) {
+    $log->logcroak("Invalid Supplier well ID '$well_id' at line $line\n");
+  }
+  unless ($column >= 1 && $column <= 12) {
     $log->logcroak("Invalid Supplier well ID '$well_id' at line $line\n");
   }
 
