@@ -38,7 +38,7 @@ my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
   ({file_name => $complete_file});
 is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode is 1381735059');
 cmp_ok($export->confidence_threshold, '==', 65, 'Confidence threshold == 65');
-cmp_ok($export->size, '==', 96, 'Number of samples differs == 96');
+cmp_ok($export->size, '==', 96, 'Number of samples == 96');
 
 # Each sample should have 96 assay results
 my @sample_addresses;

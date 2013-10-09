@@ -20,18 +20,22 @@ has 'fluidigm_export' => (is => 'ro',
                           required => 1);
 
 sub publish {
-  my ($self, $publish_dest) = @_;
+  my ($self, $publish_dest, @addresses) = @_;
 
-  my $total = $self->fluidigm_export->size;
   my $published = 0;
-
   my $tmpdir = tempdir(CLEANUP => 1);
   my $current_file;
 
-  $self->debug("Publishing $total Fluidigm CSV data files");
-
   my $export = $self->fluidigm_export;
-  my @addresses = @{$export->addresses};
+  unless (@addresses) {
+    @addresses = @{$export->addresses};
+  }
+
+  my $total = scalar @addresses;
+  my $possible = $export->size;
+  $self->debug("Publishing $total Fluidigm CSV data files ",
+               "from a possible $possible");
+
   foreach my $address (@addresses) {
     eval {
       my $file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
@@ -55,7 +59,8 @@ sub publish {
                    "'$publish_dest': ", $@);
     }
     else {
-      $self->debug("Published '$current_file': $published of $total");
+      $self->debug("Published '$current_file': $published of $total ",
+                   "from a possible $possible");
     }
   }
 
