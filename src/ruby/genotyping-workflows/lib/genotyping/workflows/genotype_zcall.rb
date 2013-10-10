@@ -116,8 +116,6 @@ Returns:
 
       run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
-      gciname = run_name + '.gencall.imajor.bed'
-      gcsname = run_name + '.gencall.smajor.bed'
       gcsimname = run_name + '.gencall.sim'
       ilsimname = run_name + '.illuminus.sim'
       sjname = run_name + '.sample.json'
@@ -128,8 +126,6 @@ Returns:
       njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
-      gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
       ## create GenCall .sim intensity file, if needed
       gcsimfile = nil
@@ -143,9 +139,8 @@ Returns:
       if nofilter
         filtered = true
       else
-        filtered = prefilter(dbfile, run_name, work_dir, fconfig, 
-                             gcsjname, gciname, gcsname, gcsimfile, 
-                             manifest, args, async)
+        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
+                             gcsimfile, manifest, args, async)
       end
 
       ## find sample intensity data
@@ -231,13 +226,14 @@ Returns:
       return metrics['BEST_THRESHOLDS']
     end
     
-    def prefilter(dbfile, run_name, work_dir, fconfig, gcsjname, 
-                  gciname, gcsname, gcsimfile, manifest, args, async)
+    def prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
+                  gcsimfile, manifest, args, async)
       # Run GenCall QC and apply prefilter to remove failing samples
       filtered = nil
       fname = run_name + '.prefilter_results.json'
+      gciname = run_name + '.gencall.imajor.bed'
+      gcsname = run_name + '.gencall.smajor.bed'
 
-      gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
