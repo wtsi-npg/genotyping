@@ -106,9 +106,9 @@
 23	t/qc_test_data/small_test_fakeSNP000106	0	50001	C	A
 23	t/qc_test_data/small_test_fakeSNP000107	0	60001	C	A
 23	t/qc_test_data/small_test_fakeSNP000201	0	60002	C	A
-23	t/qc_test_data/small_test_fakeSNP000202	0	60003	C	A
+23	t/qc_test_data/small_test_fakeSNP000202	0	60003	A	C
 23	t/qc_test_data/small_test_fakeSNP000203	0	60004	C	A
-23	t/qc_test_data/small_test_fakeSNP000204	0	60005	A	C
+23	t/qc_test_data/small_test_fakeSNP000204	0	60005	C	A
 23	t/qc_test_data/small_test_fakeSNP000205	0	60006	A	C
 23	t/qc_test_data/small_test_fakeSNP000206	0	60007	C	A
 23	t/qc_test_data/small_test_fakeSNP000207	0	60008	C	A
@@ -124,7 +124,7 @@
 23	t/qc_test_data/small_test_fakeSNP000114	0	130001	C	A
 23	t/qc_test_data/small_test_fakeSNP000115	0	140001	C	A
 23	t/qc_test_data/small_test_fakeSNP000116	0	150001	C	A
-23	t/qc_test_data/small_test_fakeSNP000117	0	160001	A	C
+23	t/qc_test_data/small_test_fakeSNP000117	0	160001	C	A
 23	t/qc_test_data/small_test_fakeSNP000118	0	170001	C	A
 23	t/qc_test_data/small_test_fakeSNP000119	0	180001	C	A
 23	t/qc_test_data/small_test_fakeSNP000120	0	190001	C	A
@@ -197,7 +197,7 @@
 23	t/qc_test_data/small_test_fakeSNP000187	0	860001	C	A
 23	t/qc_test_data/small_test_fakeSNP000188	0	870001	C	A
 23	t/qc_test_data/small_test_fakeSNP000189	0	880001	C	A
-23	t/qc_test_data/small_test_fakeSNP000190	0	890001	C	A
+23	t/qc_test_data/small_test_fakeSNP000190	0	890001	A	C
 23	t/qc_test_data/small_test_fakeSNP000191	0	900001	C	A
 23	t/qc_test_data/small_test_fakeSNP000192	0	910001	C	A
 23	t/qc_test_data/small_test_fakeSNP000193	0	920001	C	A
