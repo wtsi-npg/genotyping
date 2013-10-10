@@ -29,21 +29,32 @@ my $config = $Bin."/../etc/qc_config.json";
 # see gapi/genotype_identity_test.git on http://git.internal.sanger.ac.uk
 # data contains some "real" samples and calls, so not made public on github
 
-my $dataDir = "/nfs/gapi/data/genotype/qc_test/identity_check/";
+my $dataDir = "/nfs/gapi/data/genotype/qc_test/identity_check";
 my @plink = qw/identity_test identity_test_not_exome/;
-my @outputs = qw/identity_check_results.txt identity_check_failed_pairs.txt 
-  identity_check_failed_pairs_match.txt/;
-my $workdir = "$Bin/identity/";
+my @outputs = qw/identity_check_results.txt
+                 identity_check_failed_pairs.txt
+                 identity_check_failed_pairs_match.txt/;
+my $workdir = "$Bin/identity";
 my $cmd;
-chdir($workdir);
+
 foreach my $plink (@plink) {
     my $input = $dataDir."/".$plink;
-    $cmd = "$bin/check_identity_bed.pl --config $config $input";
+    $cmd = "$bin/check_identity_bed.pl --config $config " .
+      "--results $workdir/identity_check_results.txt " .
+      "--fail $workdir/identity_check_fail.txt " .
+      "--fail_pairs $workdir/identity_check_failed_pairs.txt " .
+      "--fail_match $workdir/identity_check_failed_pairs_match.txt " .
+      "--gt $workdir/identity_check_gt.txt " .
+      "--log $workdir/identity_check.log" .
+      " $input ";
+
     is(system($cmd), 0, "$bin/check_identity_bed.pl exit status, input $plink");
     foreach my $output (@outputs) {
         my $ref = $dataDir."/".$output;
-        my $status = system("diff $ref $output >& /dev/null");
-        is($status, 0, "Diff result: Input $plink, output $output");
+        my $check = "$workdir/$output";
+        my $status = system("diff $ref $check >& /dev/null");
+        is($status, 0, "Diff result: Input $plink, output $check");
+        unlink $check;
     }
 }
 

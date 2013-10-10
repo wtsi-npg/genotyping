@@ -12,6 +12,7 @@ use Digest::MD5;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use JSON;
+
 use Test::More tests => 51;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults 
   readFileToString readSampleInclusion/;
@@ -36,6 +37,10 @@ my ($cmd, $status);
 
 # The directories contains the R scripts and Perl scripts
 $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
+
+# FIXME - hacked this in because scripts are calling scripts here
+# The code being reused this way should be factored out into modules.
+$ENV{PERL5LIB} = join(':', "$Bin/../blib/lib", $ENV{PERL5LIB});
 
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);
