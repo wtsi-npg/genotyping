@@ -33,17 +33,19 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $help;
 my ($outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
     $outputFailedPairsMatch, $configPath, $iniPath,
-    $minCheckedSNPs, $minIdent, $log);
+    $minCheckedSNPs, $minIdent, $output, $log);
 
-GetOptions("results=s"   => \$outputResults,
-           "config=s"    => \$configPath,
-           "ini=s"       => \$iniPath,
-           "fail=s"      => \$outputFail,
-           "gt=s"        => \$outputGT,
-           "min_snps=i"  => \$minCheckedSNPs,
-           "min_ident=f" => \$minIdent,
-           "h|help"      => \$help,
-           "log=s"       => \$log);
+GetOptions("results=s"    => \$outputResults,
+           "config=s"     => \$configPath,
+           "ini=s"        => \$iniPath,
+           "fail=s"       => \$outputFail,
+           "fail_pairs=s" => \$outputFailedPairs,
+           "fail_match=s" => \$outputFailedPairsMatch,
+           "gt=s"         => \$outputGT,
+           "min_snps=i"   => \$minCheckedSNPs,
+           "min_ident=f"  => \$minIdent,
+           "h|help"       => \$help,
+           "log=s"        => \$log);
 
 if ($help) {
     print STDERR "Usage: $0 [ output file options ] PLINK_GTFILE

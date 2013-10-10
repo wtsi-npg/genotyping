@@ -7,19 +7,20 @@ use Carp;
 use Cwd qw/abs_path/;
 use Digest::MD5;
 use File::Temp qw/tempdir/;
+use FindBin qw($Bin);
 use JSON;
 use Test::More tests => 5;
 
-$ENV{PATH} = join(':', abs_path('../bin'), $ENV{PATH});
+my $bin = "$Bin/../bin/";
 my $manifest = "/nfs/gapi/data/genotype/qc_test/manifests/".
     "Human670-QuadCustom_v1_A_TRUNCATED.bpm.csv";
 my $temp = tempdir("snp_meta_test_XXXXXX", CLEANUP => 1);
 my $chr = $temp."/chr.json";
 my $snp = $temp."/snp.json";
 
-my $cmd = "write_snp_metadata.pl --manifest $manifest --chromosomes $chr ".
+my $cmd = "$bin/write_snp_metadata.pl --manifest $manifest --chromosomes $chr ".
     "--snp $snp";
-is(0, system($cmd), "write_snp_metadata.pl exit status");
+is(0, system($cmd), "$bin/write_snp_metadata.pl exit status");
 
 my ($md5, $fh);
 $md5 = Digest::MD5->new;
