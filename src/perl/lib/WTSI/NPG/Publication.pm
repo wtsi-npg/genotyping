@@ -52,6 +52,7 @@ our @EXPORT_OK = qw(expected_irods_groups
                     grant_study_access
                     pair_rg_channel_files
                     publish_file
+                    publish_file_simply
                     supersede_object_meta
                     update_collection_meta
                     update_object_meta);
@@ -74,7 +75,6 @@ sub get_wtsi_uri {
 
   return $uri;
 }
-
 
 =head2 get_publisher_uri
 
@@ -180,6 +180,79 @@ sub pair_rg_channel_files {
   return @paired;
 }
 
+=head2 publish_file_simply
+
+  Arg [1]    : file name
+  Arg [2]    : Sample metadata
+  Arg [3]    : URI object of creator
+  Arg [4]    : Publication path in iRODS
+  Arg [5]    : URI object of publisher (typically an LDAP URI)
+  Arg [6]    : DateTime object of publication
+
+  Example    : my $data_obj = publish_file_simply($file, \@metadata,
+                                           $creator_uri, '/my/file',
+                                           $publisher_uri, $now);
+  Description: Publish a file to iRODS with attendant metadata. Republish any
+               file that is already published, but whose checksum has
+               changed. This method does not look for other instances of
+               the same data that may already be in another location in iRODS.
+               It uses absolute data object paths to determine identity.
+  Returntype : path to new iRODS data object
+  Caller     : general
+
+=cut
+
+sub publish_file_simply {
+  my ($file, $sample_meta, $creator_uri, $publish_dest, $publisher_uri,
+      $time) = @_;
+
+  my $basename = fileparse($file);
+  my $md5 = md5sum($file);
+  $log->debug("Checksum of file '$file' to be published is '$md5'");
+
+  my $dest_collection = $publish_dest;
+  $dest_collection =~ s!/$!//!;
+  unless (list_collection($dest_collection)) {
+    add_collection($dest_collection);
+  }
+
+  my $target = $dest_collection. '/' . $basename;
+  my $zone = find_zone_name($target);
+
+  my @meta = @$sample_meta;
+  my $meta_str = join(', ', map { join ' => ', @$_ } @meta);
+
+  if (list_object($target)) {
+    my %existing_meta = get_object_meta($target);
+
+    my $target_md5 = calculate_checksum($target);
+    $log->debug("Checksum of existing target '$target' is '$target_md5'");
+    if ($md5 eq $target_md5) {
+      $log->info("Skipping publication of '$target' because the checksum ",
+                 "is unchanged");
+    }
+    else {
+      $log->info("Republishing '$target' in situ because the checksum ",
+                 "is changed");
+      $target = replace_object($file, $target);
+      purge_object_meta($target, 'md5', \%existing_meta);
+      push(@meta, make_md5_metadata($file));
+      push(@meta, make_modification_metadata($time));
+    }
+  }
+  else {
+    $log->info("Publishing new object '$target'");
+    $target = add_object($file, $target);
+    push(@meta, make_type_metadata($file));
+    push(@meta, make_md5_metadata($file));
+    push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
+  }
+
+  update_object_meta($target, \@meta);
+
+  return $target;
+}
+
 =head2 publish_file
 
   Arg [1]    : file name
@@ -188,13 +261,16 @@ sub pair_rg_channel_files {
   Arg [4]    : Publication path in iRODS
   Arg [5]    : URI object of publisher (typically an LDAP URI)
   Arg [6]    : DateTime object of publication
-  Arg [7]    : Log4perl logger
 
   Example    : my $data_obj = publish_file($file, \@metadata, $creator_uri,
                                           '/my/file', $publisher_uri, $now);
   Description: Publish a file to iRODS with attendant metadata. Republish any
                file that is already published, but whose checksum has
-               changed.
+               changed. This method distributes files into paths based on
+               the file checksum. It attempts to identify, using metadata,
+               any existing files in iRODS that represent the same
+               experimental result, possibly having different checksums.
+               It uses data object basename and metadata to define identity.
   Returntype : path to new iRODS data object
   Caller     : general
 
@@ -308,7 +384,7 @@ sub publish_file {
     $log->info("Publishing new object '$target'");
     $target = add_object($file, $target);
     push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
-    push(@meta, make_type_metadata($file, '.idat', '.gtc', '.xml', '.txt', '.csv'));
+    push(@meta, make_type_metadata($file));
     push(@meta, make_md5_metadata($file));
   }
 

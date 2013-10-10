@@ -18,7 +18,7 @@ my $default_conf = q(
 # These methods are autodelegated to instances with this role.
 our @HANDLED_LOG_METHODS = qw(trace debug info warn error fatal
                               logwarn logdie
-                              logcarp logcluck logcluck logcroak);
+                              logcarp logcluck logconfess logcroak);
 
 has 'logger' => (is => 'rw',
                  isa => 'Log::Log4perl::Logger',

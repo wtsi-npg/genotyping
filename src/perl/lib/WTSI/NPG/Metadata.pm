@@ -33,6 +33,10 @@ our @EXPORT_OK = qw(
                     make_sample_metadata
 );
 
+our @DEFAULT_FILE_SUFFIXES = qw(
+ .idat .gtc .xml .txt .csv .tif
+);
+
 our $SAMPLE_NAME_META_KEY             = 'sample';
 our $SAMPLE_ID_META_KEY               = 'sample_id';
 our $SAMPLE_SUPPLIER_NAME_META_KEY    = 'sample_supplier_name';
@@ -173,6 +177,10 @@ sub make_sample_metadata {
 
 sub make_type_metadata {
   my ($file, @suffixes) = @_;
+
+  unless (@suffixes) {
+    @suffixes = @DEFAULT_FILE_SUFFIXES;
+  }
 
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
   $suffix =~ s{^\.?}{}msxi;

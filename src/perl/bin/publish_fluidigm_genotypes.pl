@@ -13,7 +13,9 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-# use WTSI::NPG::Genotyping::Publication qw(publish_fluidigm_files);
+use WTSI::NPG::Genotyping::FluidigmResultSet;
+use WTSI::NPG::Genotyping::FluidigmExportFile;
+use WTSI::NPG::Genotyping::FluidigmPublisher;
 
 use WTSI::NPG::iRODS qw(collect_files
                         collect_dirs
@@ -117,6 +119,16 @@ sub run {
 
   foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
                                 $dir_regex)) {
-    print $dir, "\n";
+
+    my $resultset = WTSI::NPG::Genotyping::FluidigmResultSet->new
+      (directory => $dir);
+
+    my $publisher = WTSI::NPG::Genotyping::FluidigmPublisher->new
+      (creator_uri => $creator_uri,
+       publisher_uri => $publisher_uri,
+       publication_time => $now,
+       resultset => $resultset);
+
+    $publisher->publish($publish_dest);
   }
 }

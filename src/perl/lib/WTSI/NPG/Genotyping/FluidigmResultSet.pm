@@ -2,7 +2,6 @@
 package WTSI::NPG::Genotyping::FluidigmResultSet;
 
 use Moose;
-use namespace::autoclean;
 
 with 'WTSI::NPG::Loggable';
 
@@ -57,6 +56,8 @@ sub BUILD {
 		       "' does not exist");
     }
 }
+
+__PACKAGE__->meta->make_immutable;
 
 no Moose;
 

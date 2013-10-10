@@ -90,7 +90,7 @@ sub sample_assays {
   Arg [1]    : Sample address i.e. S01, S02 etc.
   Arg [2]    : File name
   Example    : $export->write_sample_assays('S01', $file)
-  Description: Writes a tab-delimited CSV file containing the assay results
+  Description: Write a tab-delimited CSV file containing the assay results
                for one sample. Returns the number of records written.
   Returntype : Str
   Caller     : general
@@ -130,19 +130,45 @@ sub write_sample_assays {
   return $records_written;
 }
 
+=head2 fluidigm_metadata
+
+  Arg [1]    : Sample address i.e. S01, S02 etc.
+  Example    : $export->fluidigm_metadata('S01')
+  Description: Return the metadata for the sample assayed at the address.
+  Returntype : ArrayRef
+  Caller     : general
+
+=cut
+
 sub fluidigm_metadata {
   my ($self, $address) = @_;
 
+  defined $address or
+    $self->logconfess("A defined address argument is required");
   exists $self->content->{$address} or
-    $self->logcroak("FluidigmExportFile '", $self->fluidigm_barcode,
-                    "' has no sample address '$address'");
+    $self->logconfess("FluidigmExportFile '", $self->fluidigm_barcode,
+                      "' has no sample address '$address'");
 
   return ([$FLUIDIGM_PLATE_NAME_META_KEY => $self->fluidigm_barcode],
           [$FLUIDIGM_PLATE_WELL_META_KEY => $address]);
 }
 
+=head2 fluidigm_fingerprint
+
+  Arg [1]    : Sample address i.e. S01, S02 etc.
+  Example    : $export->fluidigm_metadata('S01')
+  Description: Return the metadata fingerprint for the sample assayed at
+               the address.
+  Returntype : ArrayRef
+  Caller     : general
+
+=cut
+
 sub fluidigm_fingerprint {
   my ($self, $address) = @_;
+
+  defined $address or
+    $self->logconfess("A defined address argument is required");
 
   return $self->fluidigm_metadata($address);
 }
