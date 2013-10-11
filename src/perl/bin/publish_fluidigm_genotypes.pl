@@ -132,3 +132,58 @@ sub run {
     $publisher->publish($publish_dest);
   }
 }
+
+__END__
+
+=head1 NAME
+
+publish_fluidigm_genotypes
+
+=head1 SYNOPSIS
+
+
+Options:
+
+  --days-ago    The number of days ago that the publication window ends.
+                Optional, defaults to zero (the current day).
+  --days        The number of days in the publication window, ending at
+                the day given by the --days-ago argument. Any sample data
+                modified during this period will be considered
+                for publication. Optional, defaults to 7 days.
+  --dest        The data destination root collection in iRODS.
+  --help        Display help.
+  --logconf     A log4perl configuration file. Optional.
+  --source      The root directory to search for sample data.
+  --verbose     Print messages while processing. Optional.
+
+=head1 DESCRIPTION
+
+Searches a directory recursively for Fluidigm result directories that
+have been modified within the n days prior to a specific time.
+(N.B. limits search to 1 level of directories.) Any files identified
+are published to iRODS with metadata obtained from the exported CSV
+file contained in each directory.
+
+=head1 METHODS
+
+None
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
