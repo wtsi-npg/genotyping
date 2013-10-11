@@ -321,17 +321,24 @@ sub writeResults {
                                         $inputNames{$metric});
         $metricResults{$metric} = \%results;
     }
-    # change from metric-major to sample-major ordering; simplifies later data processing
+    # change from metric-major to sample-major ordering
+    # if excluded samples are found, raise warning and remove from JSON output
     my %sampleResults = convertResults(\%metricResults);
     my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
     foreach my $sample (keys(%sampleResults)) {
         my %results = %{$sampleResults{$sample}};
-        my ($plate, $addressLabel) = ($UNKNOWN_PLATE, $UNKNOWN_ADDRESS);
         my $locsRef = $plateLocs{$sample};
-        if ($locsRef) { ($plate, $addressLabel) = @$locsRef; }
-        $results{'plate'} = $plate;
-        $results{'address'} = $addressLabel;
-        $sampleResults{$sample} = \%results;
+	if (defined($locsRef)) { 
+	    # samples with unknown location will have dummy values in hash
+	    my ($plate, $addressLabel) = @$locsRef; 
+	    $results{'plate'} = $plate;
+	    $results{'address'} = $addressLabel;
+	    $sampleResults{$sample} = \%results;
+	} else { 
+            # excluded sample has *no* location value
+	    carp("Excluded sample $sample appears in QC metric data\n");
+	    delete $sampleResults{$sample}; 
+	}
     }
     my $resultString = encode_json(\%sampleResults);
     print $out $resultString;

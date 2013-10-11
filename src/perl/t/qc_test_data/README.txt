@@ -7,7 +7,7 @@ Artificial test data in PLINK and SIM formats, created for tests of genotyping Q
 1) Dataset small_test
 
 Plink data:
-* Contains 100 samples and 210 SNPs.
+* Contains 96 samples and 210 SNPs.
 * 100 SNPs are annotated as chromosome 1, and 110 from chromosome 23 (X).  Of the X chromosomes, 10 are from pseudoautosomal regions or PARs; these are annotated as X, but heterozygous on male samples.  The X and PAR SNPs allow gender testing.
 * Genotype calls are randomly generated for each sample.  Probability of "no call" events is 5%.  Heterozygosity is 2% for male X sites (excluding PARs) and 25% otherwise.
 * 5 duplicates have been deliberately inserted; the first 10 samples are actually 5 duplicate pairs.
@@ -20,6 +20,9 @@ SIM data:
 
 SQLite database:
 * small_test.db is an appropriate SQLite database containing metadata for the above PLINK and .sim files.  Note that QC tests write to a temporary copy of the database, so that the "master" copy in qc_test_data is unaffected.
+
+Expanded Plink dataset:
+* 4 samples in small_test.db are flagged for exclusion. These samples are omitted from the small_test plink dataset. This reflects the expected behaviour of the pipeline, as excluded samples should not undergo genotyping. For reference, a full set of 100 samples is contained in the small_text_no_exclusion dataset.
 
 2) Generating new datasets
 
