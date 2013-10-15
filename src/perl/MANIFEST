@@ -32,6 +32,7 @@ Build.PL
 Build.pm
 etc/gendermix_manifest.txt
 etc/genders.ini
+etc/illuminus_prefilter.json
 etc/log4perl.conf
 etc/log4perl_tests.conf
 etc/methods.ini
@@ -44,6 +45,7 @@ etc/reportIntro.tex
 etc/snpsets.ini
 etc/states.ini
 etc/x_pseudoautosomal.txt
+etc/zcall_prefilter.json
 genotyping.db
 lib/WTSI/NPG/Database.pm
 lib/WTSI/NPG/Database/Warehouse.pm
@@ -133,11 +135,16 @@ t/perlcriticrc
 t/qc/.gitattributes
 t/qc_small.t
 t/qc_test_data/README.txt
+t/qc_test_data/sample_inclusion.json
 t/qc_test_data/small_test.bed
 t/qc_test_data/small_test.bim
 t/qc_test_data/small_test.db
 t/qc_test_data/small_test.fam
 t/qc_test_data/small_test.sim
+t/qc_test_data/small_test_no_exclusion.bed
+t/qc_test_data/small_test_no_exclusion.bim
+t/qc_test_data/small_test_no_exclusion.fam
+t/qc_test_data/zcall_prefilter_test.json
 t/reports.t
 t/reports/crHetDensityHeatmap.pdf
 t/reports/crHetDensityScatter.pdf
