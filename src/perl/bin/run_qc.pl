@@ -146,8 +146,12 @@ sub processPlinkPrefix {
 
 sub verifyAbsPath {
     my $path = shift;
+    my $cwd = getcwd();
+    unless (-e $path) { 
+	croak "Path '$path' does not exist relative to current ".
+	    "directory '$cwd'"; 
+    }
     $path = abs_path($path);
-    unless (-r $path) { croak "Cannot read path $path"; }
     return $path;
 }
 
