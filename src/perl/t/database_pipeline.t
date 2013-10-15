@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Log::Log4perl;
 
-use Test::More tests => 47;
+use Test::More tests => 50;
 use Test::Exception;
 
 use Data::Dumper;
@@ -157,8 +157,9 @@ ok(!$failed_sample1->include, "Sample excluded after autocall_fail");
 
 # Test that pi_approved state overrides exclusion
 $failed_sample1->add_to_states($pi_approved);
+is(scalar $failed_sample1->states, 2, "pi_approved state added 1");
 ok((grep { $_->name eq 'pi_approved' } $failed_sample1->states),
-    "pi_approved state added");
+    "pi_approved state added 2");
 $failed_sample1->include_from_state;
 $failed_sample1->update;
 
@@ -167,8 +168,9 @@ ok($failed_sample1->include, "Sample included after pi_approved");
 
 # Test that consent_withdrawn overrides everything
 $failed_sample1->add_to_states($consent_withdrawn);
+is(scalar $failed_sample1->states, 3, "consent-withdrawn state added 1");
 ok((grep { $_->name eq 'consent_withdrawn' } $failed_sample1->states),
-   "consent_withdrawn state added");
+   "consent_withdrawn state added 2");
 $failed_sample1->include_from_state;
 $failed_sample1->update;
 
@@ -195,14 +197,14 @@ ok(!$withdrawn_sample2->include, "Sample excluded after withdrawn");
 
 # Test that pi_approved state overrides exclusion
 $withdrawn_sample2->add_to_states($pi_approved);
+is(scalar $passed_sample2->states, 3, "pi_approved state added 1");
 ok((grep { $_->name eq 'pi_approved' } $withdrawn_sample2->states),
-    "pi_approved state added");
+    "pi_approved state added 2");
 $withdrawn_sample2->include_from_state;
 $withdrawn_sample2->update;
 
 $withdrawn_sample2 = $db->sample->find({id_sample => $sample_id2});
 ok($withdrawn_sample2->include, "withdrawn sample included after pi_approved");
 
-
 # Clean up
-#unlink($dbfile);
+unlink($dbfile);
