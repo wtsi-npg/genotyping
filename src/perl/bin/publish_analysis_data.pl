@@ -46,7 +46,7 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 run() unless caller();
 
 sub run {
-  my $archive_pattern;
+  my $archive_root;
   my $config;
   my $dbfile;
   my $debug;
@@ -56,7 +56,7 @@ sub run {
   my $source;
   my $verbose;
 
-  GetOptions('archive=s' => \$archive_pattern,
+  GetOptions('archive=s' => \$archive_root,
              'config=s'  => \$config,
              'dbfile=s'  => \$dbfile,
              'debug'     => \$debug,
@@ -79,6 +79,14 @@ sub run {
               -exitval => 3);
   }
 
+  if ($config && ! -e $config) {
+    pod2usage(-msg => "The config file '$config' does not exist\n",
+              -exitval => 4);
+  }
+  if ($dbfile && ! -e $dbfile) {
+    pod2usage(-msg => "The database file '$dbfile' does not exist\n",
+              -exitval => 4);
+  }
   unless (-e $source) {
     pod2usage(-msg => "No such source as '$source'\n",
               -exitval => 4);
@@ -88,7 +96,7 @@ sub run {
               -exitval => 4);
   }
 
-  $archive_pattern ||= $WTSI::NPG::Genotyping::Publication::DEFAULT_SAMPLE_ARCHIVE;
+  $archive_root ||= $WTSI::NPG::Genotyping::Publication::DEFAULT_SAMPLE_ARCHIVE;
   $config ||= $DEFAULT_INI;
 
   my $log;
@@ -127,12 +135,12 @@ sub run {
   my $name = get_publisher_name($publisher_uri);
 
   $log->info("Publishing from '$source' to '$publish_dest' using ",
-             "sample archive '$archive_pattern'");
+             "sample archive '$archive_root'");
 
   my $analysis_uuid = publish_analysis_directory($source, $creator_uri,
                                                  $publish_dest, $publisher_uri,
                                                  $pipedb, $run_name,
-                                                 $archive_pattern,
+                                                 $archive_root,
                                                  $now);
   if (defined $analysis_uuid) {
     print "New analysis UUID: ", $analysis_uuid, "\n";
