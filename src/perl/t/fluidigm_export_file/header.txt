@@ -1,0 +1,16 @@
+Chip Run Info,C:\Demonstration\TK2 Testing\0123456789\ChipRun.bml,1381735059,96.96 (138x),,ROX,SNPtype-FAM : SNPtype-HEX,9/11/2013 7:34:53 AM,00:01:02,EP1-50105
+Application Version,3.1.3
+Application Build,20120816.1511
+Export Type,Detailed Table Results,Standard
+Number of Combined Chip Runs,1,9216
+Confidence Threshold,65.00
+Normalization Method,NTC Normalization
+Allele Probe Type Mapping,Allele X,SNPtype-FAM
+Allele Probe Type Mapping,Allele Y,SNPtype-HEX
+Allele Axis Mapping,Allele X,X
+Allele Axis Mapping,Allele Y,Y
+
+
+Experiment Information,Experiment Information,Experiment Information,Experiment Information,Experiment Information,Experiment Information,Results,Results,Results,Results,Results,Results
+Chamber,SNP Assay and Allele Names,SNP Assay and Allele Names,SNP Assay and Allele Names,Sample,Sample,Call Information,Call Information,Call Information,Call Information,Intensity,Intensity
+ID,Assay,Allele X,Allele Y,Name,Type,Auto,Confidence,Final,Converted,Allele X,Allele Y

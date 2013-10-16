@@ -20,8 +20,7 @@ use WTSI::NPG::Genotyping::Metadata qw($INFINIUM_PLATE_BARCODE_META_KEY
                                        make_analysis_metadata
                                        make_infinium_metadata
                                        make_sequenom_metadata
-                                       sequenom_fingerprint
-);
+                                       sequenom_fingerprint);
 
 use WTSI::NPG::iRODS qw(
                         add_collection
@@ -40,8 +39,7 @@ use WTSI::NPG::iRODS qw(
                         meta_exists
                         put_collection
                         set_group_access
-                        validate_checksum_metadata
-);
+                        validate_checksum_metadata);
 
 use WTSI::NPG::Metadata qw($SAMPLE_NAME_META_KEY
                            $STUDY_ID_META_KEY
@@ -55,10 +53,13 @@ use WTSI::NPG::Publication qw(pair_rg_channel_files
                               expected_irods_groups
                               grant_group_access);
 
+use WTSI::NPG::Utilities qw(trim);
+
 use base 'Exporter';
 our @EXPORT_OK = qw(
                     $DEFAULT_SAMPLE_ARCHIVE
                     export_sequenom_files
+                    parse_fluidigm_table
                     publish_idat_files
                     publish_gtc_files
                     publish_sequenom_files
@@ -264,19 +265,20 @@ sub update_infinium_metadata {
 
 =head2 publish_sequenom_files
 
-  Arg [1]    : Sequenom plate name
+  Arg [1]    : Sequenom plate hashref
   Arg [2]    : URI object of creator
   Arg [3]    : string publication destination in iRODS
   Arg [4]    : URI object of publisher (typically an LDAP URI)
   Arg [5]    : DateTime object of publication
 
-  Example    : my $n = publish_sequenom_files('plate1', $creator_uri,
+  Example    : my $n = publish_sequenom_files($plate1, $creator_uri,
                                               '/my/project', $publisher_uri,
                                               $now);
   Description: Publishes Sequenom CSV files to iRODS with attendant metadata.
                Republishes any file that is already published, but whose
                checksum has changed. One file is created for each well that
-               has been analysed.
+               has been analysed. The plate hashref is created by
+               WTSI::NPG::Genotyping::Database::Sequenom::find_plate_results
   Returntype : integer number of files published
   Caller     : general
 
@@ -647,6 +649,115 @@ sub write_sequenom_csv_file {
 
   return $records_written;
 }
+
+sub parse_fluidigm_table {
+  my ($fh) = @_;
+  binmode($fh, ':utf8');
+
+  # True if we are in the header lines from 'Chip Run Info' to 'Allele
+  # Axis Mapping' inclusive
+  my $in_header = 0;
+  # True if we are in the unique column names row above the sample
+  # block
+  my $in_column_names = 0;
+  # True if we are past the header and into a data block
+  my $in_sample_block = 0;
+
+  # Arrays of sample data lines keyed on Chamber IDs
+  my %sample_data;
+
+  # For error reporting
+  my $line_num = 0;
+  my $expected_num_columns = 12;
+  my $num_sample_rows = 0;
+
+  my @header;
+  my @column_names;
+
+  while (my $line = <$fh>) {
+    ++$line_num;
+    chomp($line);
+    next if $line =~ m/^\s*$/;
+
+    if ($line =~ /^Chip Run Info/) { $in_header = 1; }
+    if ($line =~ /^Experiment/)    { $in_header = 0; }
+    if ($line =~ /^ID/)            { $in_column_names = 1; }
+    if ($line =~ /^S[0-9]+\-[A-Z][0-9]+/) {
+      $in_column_names = 0;
+      $in_sample_block = 1;
+    }
+
+    if ($in_header) {
+      push(@header, $line);
+      next;
+    }
+
+    if ($in_column_names) {
+      @column_names = map { trim($_) } split(',', $line);
+      my $num_columns = scalar @column_names;
+      unless ($num_columns == $expected_num_columns) {
+        $log->logconfess("Parse error: expected $expected_num_columns ",
+                         "columns, but found $num_columns at line $line_num");
+      }
+      next;
+    }
+
+    if ($in_sample_block) {
+      my @columns = map { trim($_) } split(',', $line);
+      my $num_columns = scalar @columns;
+      unless ($num_columns == $expected_num_columns) {
+        $log->logconfess("Parse error: expected $expected_num_columns ",
+                         "columns, but found $num_columns at line $line_num");
+      }
+
+      my $id = $columns[0];
+      my ($sample_address, $assay_num) = split('-', $id);
+      unless ($sample_address) {
+        $log->logconfess("Parse error: no sample address in '$id' ",
+                         "at line $line_num");
+      }
+      unless ($assay_num) {
+        $log->logconfess("Parse error: no assay number in '$id' ",
+                         "at line $line_num");
+      }
+
+      if (! exists $sample_data{$sample_address}) {
+        $sample_data{$sample_address} = [];
+      }
+
+      push(@{$sample_data{$sample_address}}, \@columns);
+      $num_sample_rows++;
+      next;
+    }
+  }
+
+  unless (@header) {
+    $log->logconfess("Parse error: no header rows found");
+  }
+  unless (@column_names) {
+    $log->logconfess("Parse error: no column names found");
+  }
+
+  if ($num_sample_rows == (96 * 96)) {
+    unless (scalar keys %sample_data == 96) {
+      $log->logconfess("Parse error: expected data for 96 samples, found ",
+                       scalar keys %sample_data);
+    }
+  }
+  elsif ($num_sample_rows == (192 * 24)) {
+    unless (scalar keys %sample_data == 192) {
+      $log->logconfess("Parse error: expected data for 192 samples, found ",
+                       scalar keys %sample_data);
+    }
+  }
+  else {
+    $log->logconfess("Parse error: expected ", 96 * 96, " or ", 192 * 24,
+                     " sample data rows, found $num_sample_rows");
+  }
+
+  return (\@header, \@column_names, \%sample_data);
+}
+
 
 sub get_single_metadata_value {
   my ($target, $key, %meta) = @_;
