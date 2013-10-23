@@ -6,17 +6,12 @@ package main;
 
 use strict;
 use warnings;
-use Cwd qw(abs_path);
-use DateTime;
-use File::Basename;
-use File::Find;
 use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
-use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
 use WTSI::NPG::iRODS qw(find_objects_by_meta);
 
