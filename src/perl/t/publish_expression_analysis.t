@@ -10,7 +10,7 @@ use Test::More tests => 106;
 
 use WTSI::NPG::Expression::Publication qw(parse_beadchip_table_v2);
 
-Log::Log4perl::init('etc/log4perl_tests.conf');
+Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 my $data_path = "t/publish_expression_analysis";
 
