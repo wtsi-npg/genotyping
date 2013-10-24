@@ -15,7 +15,7 @@ use WTSI::NPG::iRODS qw(add_collection
                         put_collection
                         remove_collection);
 
-Log::Log4perl::init('etc/log4perl_tests.conf');
+Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject'); }
 
@@ -42,7 +42,7 @@ sub teardown : Test(teardown) {
 };
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::FluidigmAssayDataObject');
+  require_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');
 };
 
 sub metadata : Test(2) {

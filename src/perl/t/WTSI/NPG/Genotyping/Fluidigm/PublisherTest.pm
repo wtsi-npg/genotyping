@@ -11,7 +11,7 @@ use base qw(Test::Class);
 use Test::More tests => 7;
 use Test::Exception;
 
-Log::Log4perl::init('etc/log4perl_tests.conf');
+Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher') };
 
