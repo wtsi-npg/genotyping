@@ -20,8 +20,19 @@ has 'collection' => (is => 'ro', isa => 'Str', required => 1,
 has 'data_object' => (is => 'ro', isa => 'Str',
                       predicate => 'has_data_object');
 
-has '+metadata' => (predicate => 'has_metadata',
-                    clearer => 'clear_metadata');
+# The following overrides the definition in
+# WTSI::NPG::Annotatable. Apparently our old version of Moose doesn't
+# support this attribute inheritance
+#
+has 'metadata' => (is => 'rw',
+                   isa => 'ArrayRef',
+                   predicate => 'has_metadata',
+                   clearer => 'clear_metadata');
+#
+# When on a newer Moose, remove the above and replace with this:
+#
+# has '+metadata' => (predicate => 'has_metadata',
+#                     clearer => 'clear_metadata');
 
 # Permit the constructor to use an iRODS path as its sole argument
 around BUILDARGS => sub {
