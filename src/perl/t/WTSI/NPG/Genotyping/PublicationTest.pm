@@ -59,7 +59,7 @@ sub make_fixture : Test(setup) {
                       name3
                       name3
                       name3);
-  my $study_id = 2520;
+  my $study_id = 0;
 
   for (my $i = 0; $i < scalar @data_files; $i++) {
     my $irods_path = "$irods_tmp_coll/infinium/" . $data_files[$i];
@@ -68,13 +68,12 @@ sub make_fixture : Test(setup) {
     add_object_meta($irods_path, 'dcterms:identifier', $sample_id);
     add_object_meta($irods_path, 'study_id', $study_id);
   }
-};
+}
 
 sub teardown : Test(teardown) {
   remove_collection($irods_tmp_coll);
   unlink $pipeline_dbfile;
-};
-
+}
 
 sub publish : Test(3) {
   my $publish_dest = $irods_tmp_coll;

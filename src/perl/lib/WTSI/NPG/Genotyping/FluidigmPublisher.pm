@@ -28,14 +28,40 @@ has 'resultset' => (is => 'ro',
                     isa => 'WTSI::NPG::Genotyping::FluidigmResultSet',
                     required => 1);
 
+
+=head2 publish
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+  Arg [2]    : Subset of plate addresses to publish. Optional, defaults to all.
+
+  Example    : $export->publish('/foo', 'S01', 'S02')
+  Description: Publish a FluidigmResultSet to an iRODS path.
+  Returntype : Int number of addresses published
+  Caller     : general
+
+=cut
+
 sub publish {
   my ($self, $publish_dest, @addresses) = @_;
 
-  my $fluidigm_collection = $self->publish_fluidigm_directory($publish_dest);
+  my $fluidigm_collection = $self->publish_directory($publish_dest);
   my $num_published = $self->publish_samples($fluidigm_collection, @addresses);
 
   return $num_published;
 }
+
+=head2 publish_samples
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+  Arg [2]    : Subset of plate addresses to publish. Optional, defaults to all.
+
+  Example    : $export->publish_samples('/foo', 'S01', 'S02')
+  Description: Publish the individual samples with a FluidigmResultSet to an
+               iRODS path.
+  Returntype : Int number of addresses published
+  Caller     : general
+
+=cut
 
 sub publish_samples {
   my ($self, $publish_dest, @addresses) = @_;
@@ -98,7 +124,19 @@ sub publish_samples {
   return $num_published;
 }
 
-sub publish_fluidigm_directory {
+=head2 publish_directory
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+
+  Example    : $export->publish_directory('/foo')
+  Description: Publish the directory with a FluidigmResultSet to an
+               iRODS path. Inserts a hashed directory path.
+  Returntype : Str the newly created iRODS collection
+  Caller     : general
+
+=cut
+
+sub publish_directory {
   my ($self, $publish_dest) = @_;
 
   my $export_file = $self->resultset->export_file;
@@ -151,7 +189,6 @@ Fluidigm results.
      publisher_uri => $publisher_uri,
      publication_time => DateTime->now,
      resultset => $resultset);
-
 
   # Publish all
   $publisher->publish($publish_dest);
