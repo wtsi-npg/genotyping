@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::FluidigmResultSet;
+package WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
 use Moose;
 
@@ -23,11 +23,11 @@ sub BUILD {
     my ($self) = @_;
     # validate main directory
     if (!(-e $self->directory)) {
-	 $self->logdie("Fluidigm directory path '", $self->directory,
-		       "' does not exist");
+      $self->logconfess("Fluidigm directory path '", $self->directory,
+                        "' does not exist");
     } elsif (!(-d $self->directory)) {
-	$self->logdie("Fluidigm directory path '", $self->directory,
-		      "' is not a directory");
+      $self->logconfess("Fluidigm directory path '", $self->directory,
+                        "' is not a directory");
     }
     # find barcode (identical to directory name, by definition)
     my @terms = split(/\//, $self->directory);
@@ -36,24 +36,25 @@ sub BUILD {
     # validate data subdirectory
     $self->_data_directory($self->directory .'/'. $DATA_DIRECTORY_NAME);
     if (!(-e $self->data_directory)) {
-	$self->logdie("Fluidigm data path '", $self->data_directory,
-		       "' does not exist");
+      $self->logconfess("Fluidigm data path '", $self->data_directory,
+                        "' does not exist");
     } elsif (!(-d $self->data_directory)) {
-	$self->logdie("Fluidigm data path '", $self->data_directory,
-		      "' is not a directory");
+      $self->logconfess("Fluidigm data path '", $self->data_directory,
+                        "' is not a directory");
     }
     # find .tif files
     my @tif = glob($self->data_directory.'/*\.{tif,tiff}');
     if (@tif!=$EXPECTED_TIF_TOTAL) {
-	$self->logdie("Should have exactly $EXPECTED_TIF_TOTAL .tif files in ".$self->data_directory);
+      $self->logconfess("Should have exactly $EXPECTED_TIF_TOTAL .tif ",
+                        "files in ".$self->data_directory);
     } else {
-	$self->_tif_files(\@tif);
+      $self->_tif_files(\@tif);
     }
     # look for export .csv file
     $self->_export_file($self->directory.'/'.$self->fluidigm_barcode.'.csv');
     if (!(-e $self->export_file)) {
-	 $self->logdie("Fluidigm export .csv '", $self->export_file,
-		       "' does not exist");
+      $self->logconfess("Fluidigm export .csv '", $self->export_file,
+                        "' does not exist");
     }
 }
 

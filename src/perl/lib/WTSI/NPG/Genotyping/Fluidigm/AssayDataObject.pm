@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::FluidigmAssayDataObject;
+package WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 
 use Moose;
 

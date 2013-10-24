@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::FluidigmExportFileTest;
+package WTSI::NPG::Genotyping::Fluidigm::ExportFileTest;
 
 use strict;
 use warnings;
@@ -15,9 +15,9 @@ use Test::Exception;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::FluidigmExportFile'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::ExportFile'); }
 
-use WTSI::NPG::Genotyping::FluidigmExportFile;
+use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 
 my $data_path = './t/fluidigm_export_file';
 my $complete_file = "$data_path/complete.csv";
@@ -25,31 +25,31 @@ my $header = "$data_path/header.txt";
 my $body = "$data_path/body.txt";
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::FluidigmExportFile');
+  require_ok('WTSI::NPG::Genotyping::Fluidigm::ExportFile');
 };
 
 sub constructor : Test(5) {
-  new_ok('WTSI::NPG::Genotyping::FluidigmExportFile',
+  new_ok('WTSI::NPG::Genotyping::Fluidigm::ExportFile',
          [file_name => $complete_file]);
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
       (file_name => 'no_such_file_exists') }
     "Expected to fail constructing with missing file";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new() }
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ExportFile->new() }
     "Expected to fail constructing with no arguments";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
       (file_name => $header) }
     "Expected to fail parsing when body is missing";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmExportFile->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
       (file_name => $body) }
     "Expected to fail parsing when header is missing";
 };
 
 sub header_parse : Test(3) {
-  my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $complete_file);
 
   is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode is 1381735059');
@@ -58,7 +58,7 @@ sub header_parse : Test(3) {
 };
 
 sub sample_assays : Test(97) {
-  my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $complete_file);
 
   my @sample_addresses;
@@ -76,7 +76,7 @@ sub sample_assays : Test(97) {
 };
 
 sub write_sample_assays : Test(192) {
-  my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $complete_file);
 
   my @sample_addresses;

@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::FluidigmAssayDataObjectTest;
+package WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest;
 
 use strict;
 use warnings;
@@ -19,7 +19,7 @@ Log::Log4perl::init('etc/log4perl_tests.conf');
 
 BEGIN { use_ok('WTSI::NPG::Genotyping::FluidigmAssayDataObject'); }
 
-use WTSI::NPG::Genotyping::FluidigmAssayDataObject;
+use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 
 my $data_path = './t/fluidigm_assay_data_object/1381735059';
 my $data_file = 'S01_1381735059.csv';
@@ -46,7 +46,7 @@ sub require : Test(1) {
 };
 
 sub metadata : Test(2) {
-  my $data_object = WTSI::NPG::Genotyping::FluidigmAssayDataObject->new
+  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
     ("$irods_tmp_coll/1381735059/$data_file");
 
   my (undef, $fluidigm_plate) = $data_object->get_avu('fluidigm_plate');
