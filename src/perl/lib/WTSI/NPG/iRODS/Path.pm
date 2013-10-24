@@ -107,8 +107,8 @@ sub add_avu {
                       $_->[1] eq $value &&
                       $_->[2] eq $units } @meta;
   if (@exists) {
-    $self->logcarp("Failed to add AVU ['$attribute' '$value' '$units'] ",
-                   "to '", $self->str, "': AVU is already present");
+    $self->debug("Failed to add AVU ['$attribute' '$value' '$units'] ",
+                 "to '", $self->str, "': AVU is already present");
   }
   else {
     if ($self->has_data_object) {
@@ -228,12 +228,23 @@ sub get_avu {
 
 =cut
 
-
 sub str {
   my ($self) = @_;
 
   return File::Spec->join($self->collection, $self->data_object);
 }
+
+=head2 json
+
+  Arg [1]    : None
+
+  Example    : $path->str
+  Description: Return a canonical JSON representation of this path,
+               including any AVUs.
+  Returntype : Str
+  Caller     : general
+
+=cut
 
 sub json {
   my ($self) = @_;
