@@ -1,12 +1,12 @@
 
-package WTSI::NPG::Genotyping::FluidigmPublisher;
+package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 
 use File::Basename;
 use File::Temp qw(tempdir);
 
 use Moose;
 
-use WTSI::NPG::Genotyping::FluidigmExportFile;
+use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
 
 use WTSI::NPG::Publication qw(publish_file_simply);
@@ -25,17 +25,42 @@ has 'publisher_uri' => (is => 'ro', isa => 'URI', required => 1);
 has 'publication_time' => (is => 'ro', isa => 'DateTime', required => 1);
 
 has 'resultset' => (is => 'ro',
-                    isa => 'WTSI::NPG::Genotyping::FluidigmResultSet',
+                    isa => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
                     required => 1);
+
+=head2 publish
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+  Arg [2]    : Subset of plate addresses to publish. Optional, defaults to all.
+
+  Example    : $export->publish('/foo', 'S01', 'S02')
+  Description: Publish a ResultSet to an iRODS path.
+  Returntype : Int number of addresses published
+  Caller     : general
+
+=cut
 
 sub publish {
   my ($self, $publish_dest, @addresses) = @_;
 
-  my $fluidigm_collection = $self->publish_fluidigm_directory($publish_dest);
+  my $fluidigm_collection = $self->publish_directory($publish_dest);
   my $num_published = $self->publish_samples($fluidigm_collection, @addresses);
 
   return $num_published;
 }
+
+=head2 publish_samples
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+  Arg [2]    : Subset of plate addresses to publish. Optional, defaults to all.
+
+  Example    : $export->publish_samples('/foo', 'S01', 'S02')
+  Description: Publish the individual samples with a FluidigmResultSet to an
+               iRODS path.
+  Returntype : Int number of addresses published
+  Caller     : general
+
+=cut
 
 sub publish_samples {
   my ($self, $publish_dest, @addresses) = @_;
@@ -44,7 +69,7 @@ sub publish_samples {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $current_file;
 
-  my $export_file = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  my $export_file = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $self->resultset->export_file);
 
   unless (@addresses) {
@@ -98,7 +123,19 @@ sub publish_samples {
   return $num_published;
 }
 
-sub publish_fluidigm_directory {
+=head2 publish_directory
+
+  Arg [1]    : Str iRODS path that will be the destination for publication
+
+  Example    : $export->publish_directory('/foo')
+  Description: Publish the directory with a FluidigmResultSet to an
+               iRODS path. Inserts a hashed directory path.
+  Returntype : Str the newly created iRODS collection
+  Caller     : general
+
+=cut
+
+sub publish_directory {
   my ($self, $publish_dest) = @_;
 
   my $export_file = $self->resultset->export_file;
@@ -143,15 +180,14 @@ Fluidigm results.
 
 =head1 SYNOPSIS
 
-  my $resultset = WTSI::NPG::Genotyping::FluidigmResultSet->new
+  my $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $dir);
 
-  my $publisher = WTSI::NPG::Genotyping::FluidigmPublisher->new
+  my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (creator_uri => $creator_uri,
      publisher_uri => $publisher_uri,
      publication_time => DateTime->now,
      resultset => $resultset);
-
 
   # Publish all
   $publisher->publish($publish_dest);

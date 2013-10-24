@@ -4,6 +4,6 @@ use utf8;
 use strict;
 use warnings;
 
-use WTSI::NPG::Genotyping::Fluidigm::ResultSetTest;
+use WTSI::NPG::iRODS::PathTest;
 
 Test::Class->runtests;

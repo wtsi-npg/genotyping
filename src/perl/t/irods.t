@@ -44,6 +44,7 @@ use WTSI::NPG::iRODS qw(
                         move_object
                         put_collection
                         remove_collection
+                        remove_group
                         remove_object
                         remove_object_meta
                         replace_object
@@ -375,9 +376,9 @@ is(hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
 is(hash_path("$data_path/md5sum/lorem.txt", 'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
 
 # find_zone_name
-is(find_zone_name('/Sanger1'), 'Sanger1');
-is(find_zone_name(ipwd()), 'Sanger1');
-is(find_zone_name('no_such_path'), 'Sanger1');
+like(find_zone_name('/Sanger1'), qr{^Sanger1});
+like(find_zone_name(ipwd()), qr{^Sanger1});
+like(find_zone_name('no_such_path'), qr{^Sanger1});
 is(find_zone_name('/no_such_zone'), 'no_such_zone');
 
 

@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::FluidigmExportFile;
+package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 
 use Moose;
 
@@ -188,7 +188,7 @@ instrument software.
 
 =head1 SYNOPSIS
 
-  my $export = WTSI::NPG::Genotyping::FluidigmExportFile->new
+  my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     ({file_name => 'results.csv'});
 
   print $export->fluidigm_barcode, "\n";

@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::FluidigmResultSetTest;
+package WTSI::NPG::Genotyping::Fluidigm::ResultSetTest;
 
 use strict;
 use warnings;
@@ -12,9 +12,9 @@ use Test::Exception;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::FluidigmResultSet'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet'); }
 
-use WTSI::NPG::Genotyping::FluidigmResultSet;
+use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
 my $result_dir = './t/fluidigm_result_set/complete/0123456789';
 
@@ -24,32 +24,32 @@ my $missing_tif = './t/fluidigm_result_set/missing_tif/0123456789';
 my $missing_dir = './t/fluidigm_noplace';
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::FluidigmResultSet');
+  require_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet');
 };
 
 sub constructor : Test(5) {
-  new_ok('WTSI::NPG::Genotyping::FluidigmResultSet',
+  new_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet',
          [directory => $result_dir]);
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmResultSet->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
       (directory => $missing_dir) }
     "Expected to fail when the directory does not exist";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmResultSet->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
       (directory => $missing_data) }
     "Expected to fail when the Data directory does not exist";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmResultSet->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
       (directory => $missing_export) }
     "Expected to fail when the export file does not exist";
 
-  dies_ok { WTSI::NPG::Genotyping::FluidigmResultSet->new
+  dies_ok { WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
       (directory => $missing_tif) }
     "Expected to fail when a tif file does not exist";
 };
 
 sub paths : Test(8) {
-  my $result_set = WTSI::NPG::Genotyping::FluidigmResultSet->new
+  my $result_set = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $result_dir);
 
   is($result_set->directory, $result_dir, "Directory is '$result_dir'");

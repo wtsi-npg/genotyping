@@ -12,8 +12,12 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
-use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
 use WTSI::NPG::iRODS qw(find_objects_by_meta);
+use WTSI::NPG::Metadata qw(make_sample_metadata);
+
+use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
+use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
+                                       $FLUIDIGM_PLATE_WELL_META_KEY);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -26,6 +30,8 @@ my $embedded_conf = q(
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 4;
+
+my $log;
 
 run() unless caller();
 
@@ -47,16 +53,11 @@ sub run {
              'help'           => sub { pod2usage(-verbose => 2,
                                                  -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
-             'type=s'         => \$type,
              'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type) {
-    pod2usage(-msg => "A --type argument is required\n",
               -exitval => 2);
   }
   unless (scalar @filter_key == scalar @filter_value) {
@@ -68,8 +69,6 @@ sub run {
   while (@filter_key) {
     push @filter, [pop @filter_key, pop @filter_value];
   }
-
-  my $log;
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
@@ -93,16 +92,22 @@ sub run {
                                    mysql_enable_utf8 => 1,
                                    mysql_auto_reconnect => 1);
 
-  my @infinium_data = find_objects_by_meta($publish_dest, [type => $type],
+  my @fluidigm_data = find_objects_by_meta($publish_dest,
+                                           [fluidigm_plate => '%', 'like'],
+                                           [fluidigm_well => '%', 'like'],
+                                           [type => 'csv'],
                                            @filter);
-  my $total = scalar @infinium_data;
+  my $total = scalar @fluidigm_data;
   my $updated = 0;
 
   $log->info("Updating metadata on $total data objects in '$publish_dest'");
 
-  foreach my $data_object (@infinium_data) {
+  foreach my $data_object (@fluidigm_data) {
     eval {
-      update_infinium_metadata($data_object, $ssdb);
+      my $fdo = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+        ($data_object);
+      $fdo->logger($log);
+      $fdo->update_secondary_metadata($ssdb);
       ++$updated;
     };
 
@@ -118,12 +123,11 @@ sub run {
              "'$publish_dest'");
 }
 
-
 __END__
 
 =head1 NAME
 
-update_infinium_metadata
+update_fluidigm_metadata
 
 =head1 SYNOPSIS
 
@@ -137,14 +141,13 @@ Options:
   --filter-value
   --help         Display help.
   --logconf      A log4perl configuration file. Optional.
-  --type         The data type to update. E.g. gtc, idat.
   --verbose      Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Searches for published Infinium genotyping experimental data in iRODS,
-identifies the Infinium plate from which it came by means of the
-infinium_plate and infinium_well metadata and adds relevant sample
+Searches for published Fluidigm genotyping experimental data in iRODS,
+identifies the Fluidigm plate from which it came by means of the
+fluidigm_plate and fluidigm_well metadata and adds relevant sample
 metadata taken from the Sequencescape warehouse. If the new metadata
 include study information, this is used to set access rights for the
 data in iRODS.

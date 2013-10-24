@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::FluidigmPublisherTest;
+package WTSI::NPG::Genotyping::Fluidigm::PublisherTest;
 
 use strict;
 use warnings;
@@ -13,10 +13,10 @@ use Test::Exception;
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::FluidigmPublisher') };
+BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher') };
 
-use WTSI::NPG::Genotyping::FluidigmPublisher;
-use WTSI::NPG::Genotyping::FluidigmResultSet;
+use WTSI::NPG::Genotyping::Fluidigm::Publisher;
+use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri);
@@ -32,7 +32,7 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  $resultset = WTSI::NPG::Genotyping::FluidigmResultSet->new
+  $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_directory);
 
   $irods_tmp_coll = "FluidigmPublisherTest.$pid";
@@ -59,7 +59,7 @@ sub constructor : Test(1) {
   my $publisher_uri = get_publisher_uri($uid);
   my $publication_time = DateTime->now();
 
-  new_ok('WTSI::NPG::Genotyping::FluidigmPublisher',
+  new_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher',
          [creator_uri => $creator_uri,
           publisher_uri => $publisher_uri,
           publication_time => $publication_time,
@@ -74,7 +74,7 @@ sub publish : Test(2) {
   my $publisher_uri = get_publisher_uri($uid);
   my $publication_time = DateTime->now();
 
-  my $publisher = WTSI::NPG::Genotyping::FluidigmPublisher->new
+  my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (creator_uri => $creator_uri,
      publisher_uri => $publisher_uri,
      publication_time => $publication_time,
@@ -101,7 +101,7 @@ sub publish_overwrite : Test(2) {
   my $publisher_uri = get_publisher_uri($uid);
   my $publication_time = DateTime->now();
 
-  my $publisher = WTSI::NPG::Genotyping::FluidigmPublisher->new
+  my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (creator_uri => $creator_uri,
      publisher_uri => $publisher_uri,
      publication_time => $publication_time,

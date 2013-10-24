@@ -503,6 +503,11 @@ sub publish_analysis_directory {
     my @uuid_meta = grep { $_->[0] =~ /uuid/ } @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
 
+    unless ($analysis_uuid) {
+      $log->logconfess("Failed to find the new analysis_uuid in metadata: [",
+                      join ", ", @uuid_meta, "]");
+    }
+
     foreach my $title (@project_titles) {
       # Find the samples included at the analysis stage
       my %included_samples =
