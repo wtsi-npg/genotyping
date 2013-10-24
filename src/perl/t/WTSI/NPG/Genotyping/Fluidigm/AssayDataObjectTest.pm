@@ -17,7 +17,7 @@ use WTSI::NPG::iRODS qw(add_collection
 
 Log::Log4perl::init('etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::FluidigmAssayDataObject'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject'); }
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 
