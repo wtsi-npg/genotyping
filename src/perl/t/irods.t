@@ -44,6 +44,7 @@ use WTSI::NPG::iRODS qw(
                         move_object
                         put_collection
                         remove_collection
+                        remove_group
                         remove_object
                         remove_object_meta
                         replace_object
