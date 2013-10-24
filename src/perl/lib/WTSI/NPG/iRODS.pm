@@ -45,6 +45,7 @@ our @EXPORT_OK = qw(
                     put_collection
                     remove_collection
                     remove_collection_meta
+                    remove_group
                     remove_object
                     remove_object_meta
                     replace_object
