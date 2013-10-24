@@ -295,8 +295,8 @@ else {
   # add_group
   dies_ok { add_group('rodsadmin') }
     'Expected to fail adding a group that exists already';
-  ok(add_group('test_group'));
-  ok(remove_group('test_group'));
+  ok(add_group('test_group' . $$));
+  ok(remove_group('test_group' . $$));
 }
 
 # collect_files
