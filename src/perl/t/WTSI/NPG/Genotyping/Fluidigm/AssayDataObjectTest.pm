@@ -1,13 +1,44 @@
 
 use utf8;
 
+{
+  package WTSI::NPG::Database::WarehouseStub;
+
+  use strict;
+  use warnings;
+
+  use base 'WTSI::NPG::Database';
+
+  Log::Log4perl::init('./etc/log4perl_tests.conf');
+
+  sub find_fluidigm_sample_by_plate {
+    return {internal_id        => 123456789,
+            sanger_sample_id   => '0123456789',
+            consent_withdrawn  => 0,
+            uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
+            name               => 'sample1',
+            common_name        => 'Homo sapiens',
+            supplier_name      => 'WTSI',
+            accession_number   => 'A0123456789',
+            gender             => 'Female',
+            cohort             => 'AAA111222333',
+            control            => 'XXXYYYZZZ',
+            study_id           => 0,
+            barcode_prefix     => 'DN',
+            barcode            => '0987654321',
+            plate_purpose_name => 'Fluidigm',
+            map                => 'S01'};
+  }
+}
+
 package WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest;
 
 use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 4;
+use File::Spec;
+use Test::More tests => 6;
 use Test::Exception;
 
 use WTSI::NPG::iRODS qw(add_collection
@@ -55,3 +86,32 @@ sub metadata : Test(2) {
   my (undef, $fluidigm_well) = $data_object->get_avu('fluidigm_well');
   is($fluidigm_well, 'S01', 'Well metadata is present');
 };
+
+sub update_secondary_metadata : Test(2) {
+  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+    ("$irods_tmp_coll/1381735059/$data_file");
+
+  my $ssdb = WTSI::NPG::Database::WarehouseStub->new
+    (name => 'sequencescape_warehouse',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
+
+  ok($data_object->update_secondary_metadata($ssdb));
+
+  my $expected_meta =
+    [['dcterms:identifier'      => '0123456789',   ''],
+     ['fluidigm_plate'          => '1381735059',   ''],
+     ['fluidigm_well'           => 'S01',          ''],
+     ['sample'                  => 'sample1',      ''],
+     ['sample_accession_number' => 'A0123456789',  ''],
+     ['sample_cohort'           => 'AAA111222333', ''],
+     ['sample_common_name'      => 'Homo sapiens', ''],
+     ['sample_consent'          => '1',            ''],
+     ['sample_control'          => 'XXXYYYZZZ',    ''],
+     ['sample_id'               => '123456789',    ''],
+     ['sample_supplier_name'    => 'WTSI',         ''],
+     ['study_id'                => '0',            '']];
+
+  my $meta = $data_object->metadata;
+  is_deeply($meta, $expected_meta, 'Secondary metadata added')
+    or diag explain $meta;
+}
