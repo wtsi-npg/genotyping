@@ -72,8 +72,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
                                            :chunk_size => 3,
                                            :zstart => 6,
                                            :ztotal => 1,
-                                           :memory => 2048,
-                                           :select => 'lenny'}]
+                                           :memory => 2048}]
       timeout = 1800 # was 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeZCall,

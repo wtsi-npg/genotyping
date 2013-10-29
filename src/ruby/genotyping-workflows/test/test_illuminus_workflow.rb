@@ -63,8 +63,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
                                            :filterconfig => fconfig,
                                            :gender_method => 'Supplied',
                                            :chunk_size => 10000,
-                                           :memory => 2048,
-                                           :select => 'lenny'}]
+                                           :memory => 2048}]
       timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
