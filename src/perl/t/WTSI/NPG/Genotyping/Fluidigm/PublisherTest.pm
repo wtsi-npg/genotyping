@@ -48,7 +48,7 @@ sub teardown : Test(teardown) {
 };
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::FluidigmPublisher');
+  require_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher');
 };
 
 sub constructor : Test(1) {
