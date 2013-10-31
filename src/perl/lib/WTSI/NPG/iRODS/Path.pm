@@ -210,7 +210,14 @@ sub get_avu {
     @exists = grep { $_->[0] eq $attribute } @meta;
   }
 
-  if (scalar @exists > 1) {
+  my @avu;
+  if (scalar @exists == 0) {
+    @avu = ();
+  }
+  elsif (scalar @exists == 1) {
+    @avu = @{$exists[0]};
+  }
+  else {
     $value ||= '';
     $units ||= '';
 
@@ -223,9 +230,7 @@ sub get_avu {
                       " matched [$matched]");
   }
 
-  my $avu = $exists[0];
-
-  return @$avu;
+  return @avu;
 }
 
 =head2 str
