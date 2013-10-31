@@ -5,6 +5,7 @@ use File::Basename;
 use File::Temp qw(tempdir);
 
 use Moose;
+use URI;
 
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
@@ -17,6 +18,14 @@ use WTSI::NPG::iRODS qw(add_collection
                         put_collection);
 
 with 'WTSI::NPG::Loggable';
+
+has 'audience_uri' => (is => 'ro', isa => 'URI', required => 1,
+                       default => sub {
+                         my $uri = URI->new('http:');
+                         $uri->host('psd-production.internal.sanger.ac.uk');
+                         $uri->port(6600);
+                         return $uri;
+                       });
 
 has 'creator_uri' => (is => 'ro', isa => 'URI', required => 1);
 
@@ -78,9 +87,9 @@ sub publish_samples {
 
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
-  my @meta = ([$FLUIDIGM_PLATE_NAME_META_KEY => $export_file->fluidigm_barcode],
-              [target => 1],
-              ['dcterms:audience' => 'http://psd-production.internal.sanger.ac.uk:6600/']);
+  my @meta =
+    ([$FLUIDIGM_PLATE_NAME_META_KEY => $export_file->fluidigm_barcode],
+     ['dcterms:audience'            => $self->audience_uri]);
 
   publish_file_simply($self->resultset->export_file, \@meta,
                       $self->creator_uri,

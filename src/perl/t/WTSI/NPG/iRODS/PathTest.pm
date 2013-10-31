@@ -8,10 +8,10 @@ use warnings;
 use File::Spec;
 
 use base qw(Test::Class);
-use Test::More tests => 38;
+use Test::More tests => 39;
 use Test::Exception;
 
-Log::Log4perl::init('etc/log4perl_tests.conf');
+Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 use WTSI::NPG::iRODS qw(add_collection
                         add_collection_meta
@@ -126,16 +126,19 @@ sub metadata : Test(2) {
             'obj metadata loaded') or diag explain $obj_path->metadata;
 }
 
-sub get_avu : Test(3) {
+sub get_avu : Test(4) {
   my $test_coll = "$irods_tmp_coll/irods_path_test/test_dir/";
 
   my $coll_path = WTSI::NPG::iRODS::Path->new($test_coll);
 
   my @avu1 = $coll_path->get_avu('a', 'x');
-  is_deeply(\@avu1, ['a', 'x', ''], 'matched one AVU 1');
+  is_deeply(\@avu1, ['a', 'x', ''], 'Matched one AVU 1');
 
   my @avu2 = $coll_path->get_avu('a', 'x', '');
-  is_deeply(\@avu2, ['a', 'x', ''], 'matched one AVU 2');
+  is_deeply(\@avu2, ['a', 'x', ''], 'Matched one AVU 2');
+
+  my @avu3 = $coll_path->get_avu('does_not_exist', 'does_not_exist');
+  is_deeply(\@avu3, [], 'Handles missing AVU');
 
   dies_ok { $coll_path->get_avu('a') }
     "Expected to fail getting ambiguous AVU";
