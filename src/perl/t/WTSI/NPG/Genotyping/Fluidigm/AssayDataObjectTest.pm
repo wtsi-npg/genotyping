@@ -38,7 +38,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 6;
+use Test::More tests => 7;
 use Test::Exception;
 
 use WTSI::NPG::iRODS qw(add_collection
@@ -76,7 +76,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');
 };
 
-sub metadata : Test(2) {
+sub metadata : Test(3) {
   my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
     ("$irods_tmp_coll/1381735059/$data_file");
 
