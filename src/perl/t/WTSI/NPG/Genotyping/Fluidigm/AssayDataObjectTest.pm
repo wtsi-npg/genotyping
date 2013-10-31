@@ -85,6 +85,9 @@ sub metadata : Test(2) {
 
   my (undef, $fluidigm_well) = $data_object->get_avu('fluidigm_well');
   is($fluidigm_well, 'S01', 'Well metadata is present');
+
+  my (undef, $audience) = $data_object->get_avu('dcterms:audience');
+  ok(! defined $audience);
 };
 
 sub update_secondary_metadata : Test(2) {
