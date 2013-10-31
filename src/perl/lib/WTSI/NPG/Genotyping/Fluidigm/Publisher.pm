@@ -79,7 +79,8 @@ sub publish_samples {
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
   my @meta = ([$FLUIDIGM_PLATE_NAME_META_KEY => $export_file->fluidigm_barcode],
-              [target => 1]);
+              [target => 1],
+              ['dcterms:audience' => 'http://psd-production.internal.sanger.ac.uk:6600/']);
 
   publish_file_simply($self->resultset->export_file, \@meta,
                       $self->creator_uri,
