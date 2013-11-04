@@ -4,51 +4,59 @@ use IPC::Run qw(start);
 
 has '_in' => (
   'is' => 'ro',
-  'isa' => 'ScalarRef',
-  'default' => sub {my$t=''; \$t},
+  'isa' => 'ScalarRef[Str]',
+  'default' => sub {my$t=''; return \$t},
 );
 
 has '_out' => (
   'is' => 'ro',
-  'isa' => 'ScalarRef',
-  'default' => sub {my$t=''; \$t},
+  'isa' => 'ScalarRef[Str]',
+  'default' => sub {my$t=''; return \$t},
 );
 
 
 has '_harness' => (
   'is' => 'ro',
   'builder' => '_build__harness',
-  'lazy' => 1
+  'lazy' => 1, #lazy as we need _in and _out to be instantiated before creating the harness
 );
 
 sub _build__harness {
                  my ($self) = @_;
                  my $out_ref = $self->_out;
-#use Data::Dumper;
-#warn Dumper [$self];
-#warn $out_ref;
-                 my $in_ref = $self->_in;
-#warn $in_ref;
-                 my $h = start [qw(igroupadmin)], q(<pty<), $in_ref, q(>pty>), $out_ref;
-                 while (1){ $h->pump; last if ${$out_ref}=~/^groupadmin\>/sm; }
+                 my $h = start [qw(igroupadmin)], q(<pty<), $self->_in, q(>pty>), $out_ref;
+                 $self->_pump_until_prompt($h);
                  ${$out_ref}=q();
                  return $h;
 }
 
-sub lg {
-  my $self = shift;
+sub _pump_until_prompt {
+  my($self,$h)=@_;
+  $h ||= $self->_harness;
+  while (1){ $h->pump; last if ${$self->_out}=~s/\r?\n\r?^groupadmin\>//sm; }
+  return;
+}
+
+sub _push_pump_trim_split {
+  my($self,$in)=@_;
   my $out_ref = $self->_out;
   ${$out_ref}=q();
-  my $in = join q( ), q(lg), @_, qq(\n);
   ${$self->_in} = $in;
-  while (1){ $self->_harness->pump ; last if ${$out_ref}=~s/\r?\n\r?^groupadmin\>//sm; }
+  $self->_pump_until_prompt();
+  ${$out_ref}=~s/\A\Q$in\E//smx;
   ${$out_ref}=~s/\r//smg;
-  ${$out_ref}=~s/\A$in//sm;
-  if(@_){
-    ${$out_ref}=~s/Members of group $_[0]:\n//sm;
-  }
   my@results=split /\r?\n\r?/, ${$out_ref};
   ${$out_ref}=q();
+  return @results;
+}
+
+sub lg {
+  my $self = shift;
+  my $in = join q( ), q(lg), @_, qq(\n);
+  my @results = $self->_push_pump_trim_split($in);
+  if(@results and $results[0]=~/\AMembers of group/smx){
+    shift @results;
+  }
   return @results;
 }
 
