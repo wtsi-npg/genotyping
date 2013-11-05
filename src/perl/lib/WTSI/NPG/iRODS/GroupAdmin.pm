@@ -1,10 +1,11 @@
 package WTSI::NPG::iRODS::GroupAdmin;
 use Moose;
 use IPC::Run qw(start);
+use Carp;
 
 =head1 NAME
 
-npg_tracking::Schema
+WTSI::NPG::iRODS::GroupAdmin
 
 =head1 VERSION
 
@@ -78,10 +79,22 @@ sub _push_pump_trim_split {
 sub lg {
   my($self,$group)=@_;
   my $in = q(lg);
-  if($group){ $in .= " $group";}
+  if(defined $group){
+    if ($group =~ /\A\s+\z/smx){
+      undef $group;
+    }else{
+      $in .= " $group";
+    }
+  }
   $in .= qq(\n);
   my @results = $self->_push_pump_trim_split($in);
-  if(@results and $results[0]=~/\AMembers\ of\ group/smx){
+  if(defined $group){
+    my $leadingtext = shift @results;
+    if( @results and not $leadingtext=~/\AMembers\ of\ group/smx) {
+      croak qq(unexpected text: \"$leadingtext\");
+    }
+  }
+  if (@results==1 and $results[0]=~/\ANo\ rows\ found/smx ){
     shift @results;
   }
   return @results;
