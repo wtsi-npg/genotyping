@@ -46,8 +46,10 @@ has '_harness' => (
 
 sub _build__harness {
                  my ($self) = @_;
+                 my $in_ref = $self->_in;
+                 ${$in_ref} = "\n"; #prevent initial hang - fetch the chicken...
                  my $out_ref = $self->_out;
-                 my $h = start [qw(igroupadmin)], q(<pty<), $self->_in, q(>pty>), $out_ref;
+                 my $h = start [qw(igroupadmin)], q(<pty<), $in_ref, q(>pty>), $out_ref;
                  $self->_pump_until_prompt($h);
                  ${$out_ref}=q();
                  return $h;
@@ -85,6 +87,12 @@ sub lg {
   return @results;
 }
 
+sub BUILD {
+  my ($self) = @_;
+  $self->_harness; #ensure we start igroupadmin at object creation (and so with expected environment)
+  return;
+}
+
 sub DEMOLISH {
   my ($self) = @_;
   ${$self->_out}=q();
@@ -101,7 +109,7 @@ __END__
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
-Will honour iRODS related environment at time of IPC::Run harness creation
+Will honour iRODS related environment at time of object creation
 
 =head1 DEPENDENCIES
 
@@ -122,8 +130,6 @@ Will honour iRODS related environment at time of IPC::Run harness creation
 =head1 BUGS AND LIMITATIONS
 
   In ad-hoc testing differnt numbers of results for the same query have been seen - but v rarely and not reproducibly!
-
-  The harness is created using a lazy build method therefore the environment of the underlying igroupadmin command for an object will be that of the program when the first method is called
 
 =head2 AUTHOR
 
