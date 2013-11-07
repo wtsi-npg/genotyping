@@ -76,14 +76,22 @@ sub _push_pump_trim_split {
   return @results;
 }
 
+=head2 lg
+
+List groups if not argument given, or list members of the group given as argument.
+
+=cut
+
 sub lg {
   my($self,$group)=@_;
   my $in = q(lg);
   if(defined $group){
-    if ($group =~ /\A\s+\z/smx){
-      undef $group;
+    if ($group =~ /"/smx){
+      croak qq(Cannot cope with group names containing double quotes '"' : $group);
+    }elsif($group eq q()){
+      croak q(empty string group name does not make sense to iRODs); # do we need this? Otherwise passing the empty string as argument gives a list of groups....
     }else{
-      $in .= " $group";
+      $in .= qq( "$group");
     }
   }
   $in .= qq(\n);
@@ -96,13 +104,16 @@ sub lg {
   }
   if (@results==1 and $results[0]=~/\ANo\ rows\ found/smx ){
     shift @results;
+    if (@results==0 and defined $group and not grep {$group eq $_} $self->lg){
+      croak qq(group "$group" does not exist);
+    }
   }
   return @results;
 }
 
 sub BUILD {
   my ($self) = @_;
-  $self->_harness; #ensure we start igroupadmin at object creation (and so with expected environment)
+  $self->_harness; #ensure we start igroupadmin at object creation (and so with expected environment: environment variables used by igroupadmin)
   return;
 }
 
