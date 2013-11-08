@@ -1,6 +1,9 @@
 package WTSI::NPG::iRODS::GroupAdmin;
 use Moose;
 use IPC::Run qw(start);
+use File::Which qw(which);
+use Cwd qw(abs_path);
+use Readonly;
 use Carp;
 
 =head1 NAME
@@ -26,6 +29,8 @@ A class for running iRODS group admin related commands for creating groups and a
 
 =cut
 
+Readonly::Scalar our $IGROUPADMIN => q(igroupadmin);
+
 has '_in' => (
   'is' => 'ro',
   'isa' => 'ScalarRef[Str]',
@@ -50,7 +55,10 @@ sub _build__harness {
                  my $in_ref = $self->_in;
                  ${$in_ref} = "\n"; #prevent initial hang - fetch the chicken...
                  my $out_ref = $self->_out;
-                 my $h = start [qw(igroupadmin)], q(<pty<), $in_ref, q(>pty>), $out_ref;
+                 # workaround Run::IPC caching : https://rt.cpan.org/Public/Bug/Display.html?id=57393
+                 my $cmd = which $IGROUPADMIN;
+                 if (not $cmd) { croak qq(Command '$IGROUPADMIN' not found)}
+                 my $h = start [abs_path $cmd], q(<pty<), $in_ref, q(>pty>), $out_ref;
                  $self->_pump_until_prompt($h);
                  ${$out_ref}=q();
                  return $h;
