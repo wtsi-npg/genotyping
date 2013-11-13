@@ -71,37 +71,37 @@ sub constructor : Test(8) {
 
 sub collection : Test(9) {
   my $path1 = WTSI::NPG::iRODS::Path->new('.');
-  ok($path1->has_collection, 'has collection 1');
-  ok(!$path1->has_data_object, 'has no data object 1');
+  ok($path1->has_collection, 'Has collection 1');
+  ok(!$path1->has_data_object, 'Has no data object 1');
   is($path1->collection, '.');
 
   my $path2 = WTSI::NPG::iRODS::Path->new('/');
-  ok($path2->has_collection, 'has collection 2');
-  ok(!$path2->has_data_object, 'has no data object 2');
+  ok($path2->has_collection, 'Has collection 2');
+  ok(!$path2->has_data_object, 'Has no data object 2');
   is($path2->collection, '/');
 
   my $path3 = WTSI::NPG::iRODS::Path->new('/foo/');
-  ok($path3->has_collection, 'has collection 3');
-  ok(!$path3->has_data_object, 'has no data object 3');
+  ok($path3->has_collection, 'Has collection 3');
+  ok(!$path3->has_data_object, 'Has no data object 3');
   is($path3->collection, '/foo/');
 };
 
 sub data_object : Test(12) {
   my $path1 = WTSI::NPG::iRODS::Path->new('/foo/bar.txt');
-  ok($path1->has_collection, 'has collection 1');
-  ok($path1->has_data_object, 'has data object 1');
+  ok($path1->has_collection, 'Has collection 1');
+  ok($path1->has_data_object, 'Has data object 1');
   is($path1->collection, '/foo/');
   is($path1->data_object, 'bar.txt');
 
   my $path2 = WTSI::NPG::iRODS::Path->new('bar.txt');
-  ok($path2->has_collection, 'has collection 2');
-  ok($path2->has_data_object, 'has data object 2');
+  ok($path2->has_collection, 'Has collection 2');
+  ok($path2->has_data_object, 'Has data object 2');
   is($path2->collection, '');
   is($path2->data_object, 'bar.txt');
 
   my $path3 = WTSI::NPG::iRODS::Path->new('./bar.txt');
-  ok($path3->has_collection, 'has collection 3');
-  ok($path3->has_data_object, 'has data object 3');
+  ok($path3->has_collection, 'Has collection 3');
+  ok($path3->has_data_object, 'Has data object 3');
   is($path3->collection, './');
   is($path3->data_object, 'bar.txt');
 };
@@ -119,11 +119,11 @@ sub metadata : Test(2) {
 
   my $coll_path = WTSI::NPG::iRODS::Path->new($test_coll);
   is_deeply($coll_path->metadata, $expected_meta,
-            'coll metadata loaded') or diag explain $coll_path->metadata;
+            'Coll metadata loaded') or diag explain $coll_path->metadata;
 
   my $obj_path = WTSI::NPG::iRODS::Path->new($test_obj);
   is_deeply($obj_path->metadata, $expected_meta,
-            'obj metadata loaded') or diag explain $obj_path->metadata;
+            'Obj metadata loaded') or diag explain $obj_path->metadata;
 }
 
 sub get_avu : Test(4) {
@@ -164,7 +164,7 @@ sub add_avu : Test(1) {
 
   my $meta = $coll_path->metadata;
   is_deeply($meta, $expected_meta,
-            'coll metadata AVUs added') or diag explain $meta;
+            'Coll metadata AVUs added') or diag explain $meta;
 }
 
 sub remove_avu : Test(1) {

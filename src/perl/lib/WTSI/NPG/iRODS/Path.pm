@@ -286,6 +286,7 @@ sub _sort_metadata {
          $a->[2] cmp $b->[2] } @{$self->metadata};
 }
 
+__PACKAGE__->meta->make_immutable;
 
 no Moose;
 

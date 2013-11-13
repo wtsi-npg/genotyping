@@ -9,6 +9,8 @@ use Moose::Role;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Executable';
 
+has 'started' => (is => 'rw', isa => 'Bool', default => 0);
+
 has 'harness' => (is => 'rw', isa => 'IPC::Run');
 
 sub BUILD {
@@ -24,17 +26,28 @@ sub BUILD {
 sub start {
   my ($self) = @_;
 
+  if ($self->started) {
+    $self->logwarn("Lister has started; cannot restart it");
+    return $self;
+  }
+
   my @cmd = ($self->executable, @{$self->arguments});
   my $command = join q{ }, @cmd;
   $self->debug("Starting '$command'");
 
   IPC::Run::start($self->harness);
+  $self->started(1);
 
   return $self;
 }
 
 sub stop {
   my ($self) = @_;
+
+  unless ($self->started) {
+    $self->logwarn("Lister has not started; cannot stop it");
+    return $self;
+  }
 
   my @cmd = ($self->executable, @{$self->arguments});
   my $command = join q{ }, @cmd;
@@ -48,6 +61,7 @@ sub stop {
     $harness->kill_kill;
     $self->logconfess($err);
   }
+  $self->started(0);
 
   return $self;
 }
@@ -55,7 +69,7 @@ sub stop {
 sub DEMOLISH {
   my ($self) = @_;
 
-  $self->finish;
+  $self->stop;
 
   return;
 }
