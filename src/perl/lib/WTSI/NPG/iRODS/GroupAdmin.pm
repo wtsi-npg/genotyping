@@ -1,8 +1,9 @@
 package WTSI::NPG::iRODS::GroupAdmin;
 use Moose;
-use IPC::Run qw(start);
+use IPC::Run qw(start run);
 use File::Which qw(which);
 use Cwd qw(abs_path);
+use List::MoreUtils qw(any none);
 use Readonly;
 use Carp;
 
@@ -12,7 +13,7 @@ WTSI::NPG::iRODS::GroupAdmin
 
 =head1 VERSION
 
-$LastChangedRevision: 16389 $
+1.0.0
 
 =head1 SYNOPSIS
 
@@ -29,7 +30,9 @@ A class for running iRODS group admin related commands for creating groups and a
 
 =cut
 
+Readonly::Scalar our $VERSION => q(1.0.0);
 Readonly::Scalar our $IGROUPADMIN => q(igroupadmin);
+Readonly::Scalar our $IENV => q(ienv);
 
 has '_in' => (
   'is' => 'ro',
@@ -79,9 +82,22 @@ sub _push_pump_trim_split {
   $self->_pump_until_prompt();
   ${$out_ref}=~s/\r//smxg; #igroupadmin inserts CR before LF - remove all
   ${$out_ref}=~s/\A\Q$in\E//smx;
+  if ( ${$out_ref}=~m/^ERROR:[^\n]+\z/smx ) {
+    croak 'igroupadmin error: '.${$out_ref};
+  }
   my@results=split /\n/smx, ${$out_ref};
   ${$out_ref}=q();
   return @results;
+}
+
+sub __croak_on_bad_group_name {
+  my($group)=@_;
+  if( (not defined $group ) or $group eq q()){
+      croak q(empty string group name does not make sense to iRODs);
+  }elsif ($group =~ /"/smx){
+      croak qq(Cannot cope with group names containing double quotes '"' : $group);
+  }
+  return;
 }
 
 =head2 lg
@@ -94,13 +110,8 @@ sub lg {
   my($self,$group)=@_;
   my $in = q(lg);
   if(defined $group){
-    if ($group =~ /"/smx){
-      croak qq(Cannot cope with group names containing double quotes '"' : $group);
-    }elsif($group eq q()){
-      croak q(empty string group name does not make sense to iRODs); # do we need this? Otherwise passing the empty string as argument gives a list of groups....
-    }else{
-      $in .= qq( "$group");
-    }
+    __croak_on_bad_group_name($group);
+    $in .= qq( "$group");
   }
   $in .= qq(\n);
   my @results = $self->_push_pump_trim_split($in);
@@ -119,6 +130,69 @@ sub lg {
   return @results;
 }
 
+
+has '_user' => (
+  'is' => 'ro',
+  'isa' => 'Str',
+  'builder' => '_build__user',
+);
+sub _build__user {
+  my $out = q();
+  my $cmd = which $IENV;
+  if (not $cmd) { croak qq(Command '$IENV' not found)}
+  run [abs_path $cmd], q(>), \$out;
+  if (my ($u) = $out =~ m/irodsUserName=(\S+)/smx and my ($z) = $out =~ m/irodsZone=(\S+)/smx) {
+    return "$u#$z";
+  } else {
+    croak 'Could not obtain user and zone from ienv: '.$out;
+  }
+}
+
+sub _op_g_u {
+  my($self,$op,$group,$user)=@_;
+  __croak_on_bad_group_name($group);
+  if( (not defined $user ) or $user eq q()){
+      croak q(empty string username does not make sense to iRODs);
+  }elsif ($user =~ /"/smx){
+      croak qq(Cannot cope with username containing double quotes '"' : $group);
+  }
+  my $in = qq($op "$group" "$user"\n);
+  $self->_push_pump_trim_split($in);
+  return;
+}
+
+sub _ensure_existence_of_group {
+  my($self,$group)=@_;
+  __croak_on_bad_group_name($group);
+  if ( any {$group eq $_} $self->lg){ return;}
+  $self->_push_pump_trim_split(qq(mkgroup "$group"\n));
+  return;
+}
+
+=head2 set_group_membership
+
+Given a group and list of members will ensure that the group exists and contains exactly this admin user and the members (adding or removing as appropriate)
+
+=cut
+
+sub set_group_membership {
+  my($self,$group,@members)=@_;
+  $self->_ensure_existence_of_group($group);
+  my @orig_members = $self->lg($group);
+  if (@orig_members){
+    if(none {$_ eq $self->_user} @orig_members) {carp "group $group does not contain user ".($self->_user).': authorization failure likely';}
+  }else{
+    $self->_op_g_u('atg',$group, $self->_user); #add this user to empty group (first) so admin rights to operate on it are retained
+    push @orig_members, $self->_user;
+  }
+  my%members = map{$_=>1}@members,$self->_user;
+  @orig_members = grep{ not delete $members{$_}} @orig_members; #make list to delete from orginal members if not in new list, leaves member to add in hash
+  foreach my $m (@orig_members){ $self->_op_g_u('rfg',$group,$m); }
+  @members = keys %members;
+  foreach my $m (@members) { $self->_op_g_u('atg',$group,$m); }
+  return;
+}
+
 sub BUILD {
   my ($self) = @_;
   $self->_harness; #ensure we start igroupadmin at object creation (and so with expected environment: environment variables used by igroupadmin)
@@ -127,9 +201,11 @@ sub BUILD {
 
 sub DEMOLISH {
   my ($self) = @_;
-  ${$self->_out}=q();
-  ${$self->_in}="quit\n";
-  $self->_harness->finish;
+  if($self->_out and $self->_in){
+    ${$self->_out}=q();
+    ${$self->_in}="quit\n";
+    $self->_harness->finish;
+  }
   return;
 }
 
@@ -155,13 +231,23 @@ Will honour iRODS related environment at time of object creation
 
 =item IPC::Run
 
+=item File::Which
+
+=item Cwd
+
+=item List::MoreUtils
+
+=item Readonly
+
+=item Carp
+
 =back
 
 =head1 INCOMPATIBILITIES
 
 =head1 BUGS AND LIMITATIONS
 
-  In ad-hoc testing differnt numbers of results for the same query have been seen - but v rarely and not reproducibly!
+  In ad-hoc testing different numbers of results for the same query have been seen - but v rarely and not reproducibly!
 
 =head2 AUTHOR
 
