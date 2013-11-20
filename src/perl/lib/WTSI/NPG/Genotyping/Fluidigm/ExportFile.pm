@@ -1,10 +1,12 @@
 
+use utf8;
+
 package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 
 use Moose;
+use Text::CSV;
 
-use WTSI::NPG::Genotyping::Publication qw(parse_fluidigm_table);
-
+use WTSI::NPG::Utilities qw(trim);
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
                                        $FLUIDIGM_PLATE_WELL_META_KEY);
 
@@ -42,8 +44,7 @@ sub BUILD {
   open my $in, '<:encoding(utf8)', $self->file_name
     or $self->logdie("Failed to open Fluidigm export file '",
                      $self->file_name, "': $!");
-
-  my ($header, $column_names, $sample_data) = parse_fluidigm_table($in);
+  my ($header, $column_names, $sample_data) = $self->_parse_fluidigm_table($in);
   close $in;
 
   $self->_write_header($header);
@@ -173,6 +174,114 @@ sub fluidigm_fingerprint {
   return $self->fluidigm_metadata($address);
 }
 
+sub _parse_fluidigm_table {
+  my ($self, $fh) = @_;
+  binmode($fh, ':utf8');
+
+  # True if we are in the header lines from 'Chip Run Info' to 'Allele
+  # Axis Mapping' inclusive
+  my $in_header = 0;
+  # True if we are in the unique column names row above the sample
+  # block
+  my $in_column_names = 0;
+  # True if we are past the header and into a data block
+  my $in_sample_block = 0;
+
+  # Arrays of sample data lines keyed on Chamber IDs
+  my %sample_data;
+
+  # For error reporting
+  my $line_num = 0;
+  my $expected_num_columns = 12;
+  my $num_sample_rows = 0;
+
+  my @header;
+  my @column_names;
+
+  while (my $line = <$fh>) {
+    ++$line_num;
+    chomp($line);
+    next if $line =~ m/^\s*$/;
+
+    if ($line =~ /^Chip Run Info/) { $in_header = 1; }
+    if ($line =~ /^Experiment/)    { $in_header = 0; }
+    if ($line =~ /^ID/)            { $in_column_names = 1; }
+    if ($line =~ /^S[0-9]+\-[A-Z][0-9]+/) {
+      $in_column_names = 0;
+      $in_sample_block = 1;
+    }
+
+    if ($in_header) {
+      push(@header, $line);
+      next;
+    }
+
+    if ($in_column_names) {
+      @column_names = map { trim($_) } split(',', $line);
+      my $num_columns = scalar @column_names;
+      unless ($num_columns == $expected_num_columns) {
+        $self->logconfess("Parse error: expected $expected_num_columns ",
+                          "columns, but found $num_columns at line $line_num");
+      }
+      next;
+    }
+
+    if ($in_sample_block) {
+      my @columns = map { trim($_) } split(',', $line);
+      my $num_columns = scalar @columns;
+      unless ($num_columns == $expected_num_columns) {
+        $self->logconfess("Parse error: expected $expected_num_columns ",
+                          "columns, but found $num_columns at line $line_num");
+      }
+
+      my $id = $columns[0];
+      my ($sample_address, $assay_num) = split('-', $id);
+      unless ($sample_address) {
+        $self->logconfess("Parse error: no sample address in '$id' ",
+                          "at line $line_num");
+      }
+      unless ($assay_num) {
+        $self->logconfess("Parse error: no assay number in '$id' ",
+                          "at line $line_num");
+      }
+
+      if (! exists $sample_data{$sample_address}) {
+        $sample_data{$sample_address} = [];
+      }
+
+      push(@{$sample_data{$sample_address}}, \@columns);
+      $num_sample_rows++;
+      next;
+    }
+  }
+
+  unless (@header) {
+    $self->logconfess("Parse error: no header rows found");
+  }
+  unless (@column_names) {
+    $self->logconfess("Parse error: no column names found");
+  }
+
+  if ($num_sample_rows == (96 * 96)) {
+    unless (scalar keys %sample_data == 96) {
+      $self->logconfess("Parse error: expected data for 96 samples, found ",
+                        scalar keys %sample_data);
+    }
+  }
+  elsif ($num_sample_rows == (192 * 24)) {
+    unless (scalar keys %sample_data == 192) {
+      $self->logconfess("Parse error: expected data for 192 samples, found ",
+                        scalar keys %sample_data);
+    }
+  }
+  else {
+    $self->logconfess("Parse error: expected ", 96 * 96, " or ", 192 * 24,
+                      " sample data rows, found $num_sample_rows");
+  }
+
+  return (\@header, \@column_names, \%sample_data);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -189,7 +298,7 @@ instrument software.
 =head1 SYNOPSIS
 
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
-    ({file_name => 'results.csv'});
+    (file_name => 'results.csv');
 
   print $export->fluidigm_barcode, "\n";
   print $export->confidence_threshold, "\n";

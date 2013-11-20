@@ -16,12 +16,8 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Genotyping::Database::Sequenom;
-use WTSI::NPG::Genotyping::Publication qw(publish_sequenom_files);
-use WTSI::NPG::iRODS;
-use WTSI::NPG::Metadata qw(make_sample_metadata
-                           make_md5_metadata
-                           make_type_metadata
-                           make_creation_metadata);
+use WTSI::NPG::Genotyping::Sequenom::Publisher;
+
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
                               get_publisher_name);
@@ -119,10 +115,15 @@ sub run {
   $log->debug("Found " . scalar @$plate_names . " finished plates");
 
   foreach my $plate_name (@$plate_names) {
-    my $results = $sqdb->find_plate_results($plate_name);
+    my $publisher = WTSI::NPG::Genotyping::Sequenom::Publisher->new
+    (creator_uri      => $creator_uri,
+     publisher_uri    => $publisher_uri,
+     publication_time => $now,
+     plate_name       => $plate_name,
+     sequenom_db      => $sqdb,
+     logger           => $log);
 
-    publish_sequenom_files($results, $creator_uri, $publish_dest,
-                           $publisher_uri, $now);
+    $publisher->publish($publish_dest);
   }
 
   return 0;

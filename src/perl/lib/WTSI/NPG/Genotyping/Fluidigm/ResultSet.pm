@@ -1,4 +1,6 @@
 
+use utf8;
+
 package WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
 use Moose;
@@ -11,13 +13,13 @@ our $EXPECTED_TIF_TOTAL = 3;
 has 'directory' => (is  => 'ro', isa => 'Str', required => 1,
                     writer => '_directory');
 has 'data_directory' => (is  => 'ro', isa => 'Str',
-			 writer => '_data_directory');
+                         writer => '_data_directory');
 has 'export_file' => (is  => 'ro', isa => 'Str',
-		      writer => '_export_file');
+                      writer => '_export_file');
 has 'tif_files' => (is => 'ro', isa => 'ArrayRef[Str]',
-		    writer => '_tif_files');
+                    writer => '_tif_files');
 has 'fluidigm_barcode' =>(is  => 'ro', isa => 'Str',
-			  writer => '_fluidigm_barcode');
+                          writer => '_fluidigm_barcode');
 
 sub BUILD {
     my ($self) = @_;

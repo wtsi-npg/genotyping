@@ -3,6 +3,7 @@ use utf8;
 
 package WTSI::NPG::iRODS2;
 
+use English;
 use File::Basename qw(basename);
 use File::Spec;
 use JSON;
@@ -15,35 +16,67 @@ use WTSI::NPG::Runnable;
 
 with 'WTSI::NPG::Loggable';
 
-has 'working_collection' => (is => 'rw', isa => 'Str',
-                             predicate => 'has_working_collection',
-                             clearer   => 'clear_working_collection');
+has 'environment' =>
+  (is       => 'ro',
+   isa      => 'HashRef',
+   required => 1,
+   default  => sub { \%ENV });
 
-has 'lister' => (is => 'ro', isa => 'WTSI::NPG::iRODS::Lister',
-                 required => 1, lazy => 1,
-                 default => sub {
-                   return WTSI::NPG::iRODS::Lister->new->start;
-                 });
+has 'working_collection' =>
+  (is        => 'rw',
+   isa       => 'Str',
+   predicate => 'has_working_collection',
+   clearer   => 'clear_working_collection');
 
-has 'meta_lister' => (is => 'ro', isa => 'WTSI::NPG::iRODS::MetaLister',
-                      required => 1, lazy => 1,
-                      default => sub {
-                        return WTSI::NPG::iRODS::MetaLister->new->start;
-                      });
+has 'lister' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::Lister',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
 
-has 'meta_adder' => (is => 'ro', isa => 'WTSI::NPG::iRODS::MetaModifier',
-                     required => 1, lazy => 1,
-                     default => sub {
-                       return WTSI::NPG::iRODS::MetaModifier->new
-                         (arguments => ['--operation', 'add'])->start;
-                     });
+     return WTSI::NPG::iRODS::Lister->new
+       (environment => $self->environment)->start;
+   });
 
-has 'meta_remover' => (is => 'ro', isa => 'WTSI::NPG::iRODS::MetaModifier',
-                       required => 1, lazy => 1,
-                       default => sub {
-                         return WTSI::NPG::iRODS::MetaModifier->new
-                           (arguments => ['--operation', 'rem'])->start;
-                       });
+has 'meta_lister' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaLister',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaLister->new
+       (environment => $self->environment)->start;
+   });
+
+has 'meta_adder' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaModifier->new
+       (arguments   => ['--operation', 'add'],
+        environment => $self->environment)->start;
+   });
+
+has 'meta_remover' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaModifier->new
+       (arguments   => ['--operation', 'rem'],
+        environment => $self->environment)->start;
+   });
 
 our $IGROUPADMIN = 'igroupadmin';
 our $ICD = 'icd';
@@ -69,12 +102,14 @@ around 'working_collection' => sub {
     $collection = $self->_ensure_absolute_path($collection);
     $self->debug("Changing working_collection to '$collection'");
 
-    WTSI::NPG::Runnable->new(executable => $ICD,
-                             arguments  => [$collection])->run;
+    WTSI::NPG::Runnable->new(executable  => $ICD,
+                             arguments   => [$collection],
+                             environment => $self->environment)->run;
     $self->$orig($collection);
   }
   elsif (!$self->has_working_collection) {
-    my ($wc) = WTSI::NPG::Runnable->new(executable => $IPWD)->run;
+    my ($wc) = WTSI::NPG::Runnable->new(executable  => $IPWD,
+                                        environment => $self->environment)->run;
     $self->$orig($wc);
   }
 
@@ -135,8 +170,9 @@ sub make_group_name {
 sub list_groups {
   my ($self, @args) = @_;
 
-  my @groups = WTSI::NPG::Runnable->new(executable => $IGROUPADMIN,
-                                        arguments  => ['lg'])->run;
+  my @groups = WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                                        arguments   => ['lg'],
+                                        environment => $self->environment)->run;
   return @groups;
 }
 
@@ -173,8 +209,9 @@ sub add_group {
     $self->logconfess("Failed to create iRODS group '$name' because it exists");
   }
 
-  WTSI::NPG::Runnable->new(executable => $IGROUPADMIN,
-                           arguments  => ['mkgroup', $name])->run;
+  WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                           arguments   => ['mkgroup', $name],
+                           environment => $self->environment)->run;
   return $name;
 }
 
@@ -197,8 +234,9 @@ sub remove_group {
                       "it doesn't exist");
   }
 
-  WTSI::NPG::Runnable->new(executable => $IGROUPADMIN,
-                           arguments  => ['rmgroup', $name])->run;
+  WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                           arguments   => ['rmgroup', $name],
+                           environment => $self->environment)->run;
   return $name;
 }
 
@@ -220,8 +258,9 @@ sub set_group_access {
   my $perm_str = defined $permission ? $permission : 'null';
 
   my @args = ($perm_str, $group, @objects);
-  WTSI::NPG::Runnable->new(executable => $ICHMOD,
-                           arguments  => \@args)->run;
+  WTSI::NPG::Runnable->new(executable  => $ICHMOD,
+                           arguments   => \@args,
+                           environment => $self->environment)->run;
 
   return @objects;
 }
@@ -239,7 +278,8 @@ sub set_group_access {
 sub reset_working_collection {
   my ($self) = @_;
 
-  WTSI::NPG::Runnable->new(executable => $ICD)->run;
+  WTSI::NPG::Runnable->new(executable  => $ICD,
+                           environment => $self->environment)->run;
   $self->clear_working_collection;
 
   return $self;
@@ -295,8 +335,9 @@ sub add_collection {
   $collection = $self->_ensure_absolute_path($collection);
   $self->debug("Adding collection '$collection'");
 
-  WTSI::NPG::Runnable->new(executable => $IMKDIR,
-                           arguments  => ['-p', $collection])->run;
+  WTSI::NPG::Runnable->new(executable  => $IMKDIR,
+                           arguments   => ['-p', $collection],
+                           environment => $self->environment)->run;
   return $collection;
 }
 
@@ -330,8 +371,9 @@ sub put_collection {
   $self->debug("Putting directory '$dir' into collection '$target'");
 
   my @args = ('-r', $dir, $target);
-  WTSI::NPG::Runnable->new(executable => $IPUT,
-                           arguments  => \@args)->run;
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => \@args,
+                           environment => $self->environment)->run;
 
   # FIXME - this is handling a case where the target collection exists
   return $target . '/' . basename($dir);
@@ -367,9 +409,9 @@ sub move_collection {
   $target = $self->_ensure_absolute_path($target);
   $self->debug("Moving collection from '$source' to '$target'");
 
-  WTSI::NPG::Runnable->new(executable => $IMV,
-                           arguments  => [$source, $target])->run;
-
+  WTSI::NPG::Runnable->new(executable  => $IMV,
+                           arguments   => [$source, $target],
+                           environment => $self->environment)->run;
   return $target;
 }
 
@@ -396,8 +438,9 @@ sub remove_collection {
   $collection = $self->_ensure_absolute_path($collection);
   $self->debug("Removing collection '$collection'");
 
-  WTSI::NPG::Runnable->new(executable => $IRM,
-                           arguments  => ['-r', '-f', $collection])->run;
+  WTSI::NPG::Runnable->new(executable  => $IRM,
+                           arguments   => ['-r', '-f', $collection],
+                           environment => $self->environment)->run;
   return $collection;
 }
 
@@ -549,8 +592,10 @@ sub find_collections_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-C', @query);
-  my @results = WTSI::NPG::Runnable->new(executable => $IMETA,
-                                         arguments  => \@args)->run;
+  my @results =
+    WTSI::NPG::Runnable->new(executable  => $IMETA,
+                             arguments   => \@args,
+                             environment => $self->environment)->run;
 
   # imeta doesn't permit filtering by path, natively.
   return grep { /^$root/ } @results;
@@ -606,8 +651,9 @@ sub add_object {
   $target = $self->_ensure_absolute_path($target);
   $self->debug("Adding '$file' as new object '$target'");
 
-  WTSI::NPG::Runnable->new(executable => $IPUT,
-                           arguments  => [$file, $target])->run;
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => [$file, $target],
+                           environment => $self->environment)->run;
   return $target;
 }
 
@@ -637,8 +683,9 @@ sub replace_object {
   $target = $self->_ensure_absolute_path($target);
   $self->debug("Replacing object '$target' with '$file'");
 
-  WTSI::NPG::Runnable->new(executable => $IPUT,
-                           arguments  => ['-f', $file, $target])->run;
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => ['-f', $file, $target],
+                           environment => $self->environment)->run;
   return $target;
 }
 
@@ -669,8 +716,9 @@ sub move_object {
   $target = $self->_ensure_absolute_path($target);
   $self->debug("Moving object from '$source' to '$target'");
 
-  WTSI::NPG::Runnable->new(executable => $IMV,
-                           arguments  => [$source, $target])->run;
+  WTSI::NPG::Runnable->new(executable  => $IMV,
+                           arguments   => [$source, $target],
+                           environment => $self->environment)->run;
   return $target
 }
 
@@ -694,8 +742,9 @@ sub remove_object {
 
   $self->debug("Removing object '$target'");
 
-  WTSI::NPG::Runnable->new(executable => $IRM,
-                           arguments  => [$target])->run;
+  WTSI::NPG::Runnable->new(executable  => $IRM,
+                           arguments   => [$target],
+                           environment => $self->environment)->run;
   return $target;
 }
 
@@ -839,8 +888,10 @@ sub find_objects_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-d', @query);
-  my @results = WTSI::NPG::Runnable->new(executable => $IMETA,
-                                         arguments  => \@args)->run;
+  my @results =
+    WTSI::NPG::Runnable->new(executable  => $IMETA,
+                             arguments   => \@args,
+                             environment => $self->environment)->run;
 
   # imeta doesn't permit filtering by path, natively.
   return grep { /^$root/ } @results;
@@ -867,8 +918,9 @@ sub calculate_checksum {
   $object = $self->_ensure_absolute_path($object);
 
   my @raw_checksum =
-    WTSI::NPG::Runnable->new(executable => $ICHKSUM,
-                             arguments  => [$object])->run;
+    WTSI::NPG::Runnable->new(executable  => $ICHKSUM,
+                             arguments   => [$object],
+                             environment => $self->environment)->run;
   unless (@raw_checksum) {
     $self->logconfess("Failed to get iRODS checksum for '$object'");
   }
@@ -936,8 +988,9 @@ sub md5sum {
   defined $file or $self->logconfess('A defined file argument is required');
   $file eq '' and $self->logconfess('A non-empty file argument is required');
 
-  my @result =  WTSI::NPG::Runnable->new(executable => $MD5SUM,
-                                         arguments  => [$file])->run;
+  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
+                                        arguments   => [$file],
+                                        environment => $self->environment)->run;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;

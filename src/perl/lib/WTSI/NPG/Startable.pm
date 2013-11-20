@@ -35,7 +35,11 @@ sub start {
   my $command = join q{ }, @cmd;
   $self->debug("Starting '$command'");
 
-  IPC::Run::start($self->harness);
+  {
+    local %ENV = %{$self->environment};
+    IPC::Run::start($self->harness);
+  }
+
   $self->started(1);
 
   return $self;

@@ -2,6 +2,21 @@
 use utf8;
 
 {
+  package WTSI::NPG::Genotyping::Database::SNPStub;
+
+  use strict;
+  use warnings;
+
+  use base 'WTSI::NPG::Genotyping::Database::SNP';
+
+  Log::Log4perl::init('./etc/log4perl_tests.conf');
+
+  sub find_sequenom_plate_id {
+    return 123456789;
+  }
+}
+
+{
   package WTSI::NPG::Database::WarehouseStub;
 
   use strict;
@@ -11,7 +26,7 @@ use utf8;
 
   Log::Log4perl::init('./etc/log4perl_tests.conf');
 
-  sub find_fluidigm_sample_by_plate {
+  sub find_sample_by_plate {
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
@@ -31,39 +46,38 @@ use utf8;
   }
 }
 
-package WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest;
+package WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest;
 
 use strict;
 use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 7;
+use Test::More tests => 6;
 use Test::Exception;
 
 use WTSI::NPG::iRODS2;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::Sequenom::AssayDataObject'); }
 
-use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
+use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 
-my $data_path = './t/fluidigm_assay_data_object/1381735059';
-my $data_file = 'S01_1381735059.csv';
+my $data_path = './t/sequenom_assay_data_object';
+my $data_file = 'plate1_A01.csv';
 my $irods_tmp_coll;
 
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS2->new;
-  $irods_tmp_coll = $irods->add_collection("FluidigmAssayDataObjectTest.$pid");
-  $irods->put_collection($data_path, $irods_tmp_coll);
+  $irods_tmp_coll = $irods->add_collection("SequenomAssayDataObjectTest.$pid");
+  my $irods_path = "$irods_tmp_coll/$data_file";
 
-  my $irods_path = "$irods_tmp_coll/1381735059/$data_file";
-
-  $irods->add_object_avu($irods_path, 'fluidigm_plate', '1381735059');
-  $irods->add_object_avu($irods_path, 'fluidigm_well', 'S01');
+  $irods->add_object("$data_path/$data_file", $irods_path);
+  $irods->add_object_avu($irods_path, 'sequenom_plate', 'plate1');
+  $irods->add_object_avu($irods_path, 'sequenom_well', 'A01');
 }
 
 sub teardown : Test(teardown) {
@@ -72,41 +86,41 @@ sub teardown : Test(teardown) {
 }
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');
+  require_ok('WTSI::NPG::Genotyping::Sequenom::AssayDataObject');
 }
 
-sub metadata : Test(3) {
+sub metadata : Test(2) {
   my $irods = WTSI::NPG::iRODS2->new;
 
-  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-    ($irods, "$irods_tmp_coll/1381735059/$data_file");
+  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/$data_file");
 
-  my $fluidigm_plate = $data_object->get_avu('fluidigm_plate');
-  is($fluidigm_plate->{value}, '1381735059', 'Plate metadata is present');
+  my $sequenom_plate = $data_object->get_avu('sequenom_plate');
+  is($sequenom_plate->{value}, 'plate1', 'Plate metadata is present');
 
-  my $fluidigm_well = $data_object->get_avu('fluidigm_well');
-  is($fluidigm_well->{value}, 'S01', 'Well metadata is present');
-
-  my $audience = $data_object->get_avu('dcterms:audience');
-  ok(! defined $audience);
+  my $sequenom_well = $data_object->get_avu('sequenom_well');
+  is($sequenom_well->{value}, 'A01', 'Well metadata is present');
 }
 
 sub update_secondary_metadata : Test(2) {
   my $irods = WTSI::NPG::iRODS2->new;
 
-  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-    ($irods, "$irods_tmp_coll/1381735059/$data_file");
+  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/$data_file");
+
+
+  my $snpdb = WTSI::NPG::Genotyping::Database::SNPStub->new
+    (name => 'snp',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
     (name => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
-  ok($data_object->update_secondary_metadata($ssdb));
+  ok($data_object->update_secondary_metadata($snpdb, $ssdb));
 
   my $expected_meta =
     [{attribute => 'dcterms:identifier',      value => '0123456789'},
-     {attribute => 'fluidigm_plate',          value => '1381735059'},
-     {attribute => 'fluidigm_well',           value => 'S01'},
      {attribute => 'sample',                  value => 'sample1' },
      {attribute => 'sample_accession_number', value => 'A0123456789'},
      {attribute => 'sample_cohort',           value => 'AAA111222333'},
@@ -115,6 +129,8 @@ sub update_secondary_metadata : Test(2) {
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'WTSI'},
+     {attribute => 'sequenom_plate',          value => 'plate1'},
+     {attribute => 'sequenom_well',           value => 'A01'},
      {attribute => 'study_id',                value => '0'}];
 
   my $meta = $data_object->metadata;

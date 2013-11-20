@@ -8,7 +8,7 @@ use warnings;
 use File::Spec;
 
 use base qw(Test::Class);
-use Test::More tests => 34;
+use Test::More tests => 37;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -70,19 +70,19 @@ sub data_object : Test(12) {
   my $path1 = WTSI::NPG::iRODS::DataObject->new($irods, '/foo/bar.txt');
   ok($path1->has_collection, 'Has collection 1');
   ok($path1->has_data_object, 'Has data object 1');
-  is($path1->collection, '/foo/');
+  is($path1->collection, '/foo');
   is($path1->data_object, 'bar.txt');
 
   my $path2 = WTSI::NPG::iRODS::DataObject->new($irods, 'bar.txt');
   ok($path2->has_collection, 'Has collection 2');
   ok($path2->has_data_object, 'Has data object 2');
-  is($path2->collection, '');
+  is($path2->collection, '.');
   is($path2->data_object, 'bar.txt');
 
   my $path3 = WTSI::NPG::iRODS::DataObject->new($irods, './bar.txt');
   ok($path3->has_collection, 'Has collection 3');
   ok($path3->has_data_object, 'Has data object 3');
-  is($path3->collection, './');
+  is($path3->collection, '.');
   is($path3->data_object, 'bar.txt');
 }
 
@@ -95,6 +95,20 @@ sub is_present : Test(2) {
 
   ok(!WTSI::NPG::iRODS::DataObject->new
      ($irods, "no_such_object.txt")->is_present);
+}
+
+sub absolute : Test(3) {
+  my $irods = WTSI::NPG::iRODS2->new;
+  my $wc = $irods->working_collection;
+
+  my $obj1 = WTSI::NPG::iRODS::DataObject->new($irods, "./foo.txt");
+  is($obj1->absolute->str, "$wc/foo.txt", 'Absolute path from relative 1');
+
+  my $obj2 = WTSI::NPG::iRODS::DataObject->new($irods, "foo.txt");
+  is($obj2->absolute->str, "$wc/foo.txt", 'Absolute path from relative 2');
+
+  my $obj3 = WTSI::NPG::iRODS::DataObject->new($irods, "/foo.txt");
+  is($obj3->absolute->str, '/foo.txt', 'Absolute path from relative 3');
 }
 
 sub metadata : Test(1) {

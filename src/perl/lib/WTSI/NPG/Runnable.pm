@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::Runnable;
@@ -28,10 +27,15 @@ sub run {
   my $command = join q{ }, @cmd;
   $self->debug("Running '$command'");
 
-  my $result = IPC::Run::run(\@cmd,
-                             '<',  $self->stdin,
-                             '>',  $self->stdout,
-                             '2>', $self->stderr);
+  my $result;
+  {
+    local %ENV = %{$self->environment};
+    $result = IPC::Run::run(\@cmd,
+                            '<',  $self->stdin,
+                            '>',  $self->stdout,
+                            '2>', $self->stderr);
+  }
+
   my $status = $CHILD_ERROR;
   if ($status) {
     my $signal = $status & 127;

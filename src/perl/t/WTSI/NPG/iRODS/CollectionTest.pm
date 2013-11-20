@@ -8,7 +8,7 @@ use warnings;
 use File::Spec;
 
 use base qw(Test::Class);
-use Test::More tests => 30;
+use Test::More tests => 34;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -89,6 +89,23 @@ sub is_present : Test(2) {
   ok(!WTSI::NPG::iRODS::Collection->new
      ($irods, "/no_such_object_collection")->is_present,
      'Collection is not present');
+}
+
+sub absolute : Test(4) {
+  my $irods = WTSI::NPG::iRODS2->new;
+  my $wc = $irods->working_collection;
+
+  my $coll1 = WTSI::NPG::iRODS::Collection->new($irods, ".");
+  is($coll1->absolute->str, $wc, 'Absolute collection from relative 1');
+
+  my $coll2 = WTSI::NPG::iRODS::Collection->new($irods, "./");
+  is($coll2->absolute->str, $wc, 'Absolute collection from relative 2');
+
+  my $coll3 = WTSI::NPG::iRODS::Collection->new($irods, "/");
+  is($coll3->absolute->str, '/', 'Absolute collection from relative 3');
+
+  my $coll4 = WTSI::NPG::iRODS::Collection->new($irods, "foo");
+  is($coll4->absolute->str, "$wc/foo", 'Absolute collection from relative 4');
 }
 
 sub metadata : Test(1) {

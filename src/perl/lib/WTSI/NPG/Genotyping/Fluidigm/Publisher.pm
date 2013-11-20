@@ -1,23 +1,25 @@
 
+use utf8;
+
 package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 
 use File::Basename;
+use File::Spec;
 use File::Temp qw(tempdir);
-
 use Moose;
 use URI;
 
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
-
-use WTSI::NPG::Publication qw(publish_file_simply);
-use WTSI::NPG::iRODS qw(add_collection
-                        hash_path
-                        list_collection
-                        md5sum
-                        put_collection);
+use WTSI::NPG::iRODS2;
+use WTSI::NPG::SimplePublisher;
 
 with 'WTSI::NPG::Loggable';
+
+has 'irods' => (is => 'ro', isa => 'WTSI::NPG::iRODS2', required => 1,
+                default => sub {
+                  return WTSI::NPG::iRODS2->new;
+                });
 
 has 'audience_uri' => (is => 'ro', isa => 'URI', required => 1,
                        default => sub {
@@ -37,6 +39,13 @@ has 'resultset' => (is => 'ro',
                     isa => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
                     required => 1);
 
+sub BUILD {
+  my ($self) = @_;
+
+  # Make our irods handle use our logger by default
+  $self->irods->logger($self->logger);
+}
+
 =head2 publish
 
   Arg [1]    : Str iRODS path that will be the destination for publication
@@ -45,7 +54,6 @@ has 'resultset' => (is => 'ro',
   Example    : $export->publish('/foo', 'S01', 'S02')
   Description: Publish a ResultSet to an iRODS path.
   Returntype : Int number of addresses published
-  Caller     : general
 
 =cut
 
@@ -64,10 +72,9 @@ sub publish {
   Arg [2]    : Subset of plate addresses to publish. Optional, defaults to all.
 
   Example    : $export->publish_samples('/foo', 'S01', 'S02')
-  Description: Publish the individual samples with a FluidigmResultSet to an
+  Description: Publish the individual samples within a Fluidigm::ResultSet to an
                iRODS path.
   Returntype : Int number of addresses published
-  Caller     : general
 
 =cut
 
@@ -85,17 +92,19 @@ sub publish_samples {
     @addresses = @{$export_file->addresses};
   }
 
+  my $publisher = WTSI::NPG::SimplePublisher->new(irods => $self->irods,
+                                                  logger => $self->logger);
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
   my @meta =
     ([$FLUIDIGM_PLATE_NAME_META_KEY => $export_file->fluidigm_barcode],
-     ['dcterms:audience'            => $self->audience_uri]);
+     ['dcterms:audience'            => $self->audience_uri->as_string]);
 
-  publish_file_simply($self->resultset->export_file, \@meta,
-                      $self->creator_uri,
-                      $publish_dest,
-                      $self->publisher_uri,
-                      $self->publication_time);
+  $publisher->publish_file($self->resultset->export_file, \@meta,
+                           $self->creator_uri,
+                           $publish_dest,
+                           $self->publisher_uri,
+                           $self->publication_time);
 
   my $total = scalar @addresses;
   my $possible = $export_file->size;
@@ -112,11 +121,11 @@ sub publish_samples {
       $self->debug("Wrote $record_count records into '$file'");
 
       my @fingerprint = $export_file->fluidigm_fingerprint($address);
-      my $data_object = publish_file_simply($file, \@fingerprint,
-                                            $self->creator_uri,
-                                            $publish_dest,
-                                            $self->publisher_uri,
-                                            $self->publication_time);
+      my $data_object = $publisher->publish_file($file, \@fingerprint,
+                                                 $self->creator_uri,
+                                                 $publish_dest,
+                                                 $self->publisher_uri,
+                                                 $self->publication_time);
       ++$num_published;
     };
 
@@ -138,7 +147,7 @@ sub publish_samples {
   Arg [1]    : Str iRODS path that will be the destination for publication
 
   Example    : $export->publish_directory('/foo')
-  Description: Publish the directory with a FluidigmResultSet to an
+  Description: Publish the directory with a Fluidigm::ResultSet to an
                iRODS path. Inserts a hashed directory path.
   Returntype : Str the newly created iRODS collection
   Caller     : general
@@ -148,28 +157,28 @@ sub publish_samples {
 sub publish_directory {
   my ($self, $publish_dest) = @_;
 
+  my $irods = $self->irods;
   my $export_file = $self->resultset->export_file;
-  my $md5 = md5sum($export_file);
-  my $hash_path = hash_path($export_file, $md5);
+  my $md5 = $irods->md5sum($export_file);
+  my $hash_path = $irods->hash_path($export_file, $md5);
   $self->debug("Checksum of file '$export_file' is '$md5'");
 
   my $dest_collection = $publish_dest;
-  $dest_collection =~ s!/$!//!;
-  $dest_collection = $dest_collection . '/' . $hash_path;
+  $dest_collection = File::Spec->catdir($publish_dest, $hash_path);
 
   my $fluidigm_collection;
-  if (list_collection($dest_collection)) {
+  if ($irods->list_collection($dest_collection)) {
     $self->info("Skipping publication of Fluidigm data collection ",
                 "'$dest_collection': already exists");
 
     my $dir = basename($self->resultset->directory);
-    $fluidigm_collection = $dest_collection . '/' . $dir;
+    $fluidigm_collection = File::Spec->catdir($dest_collection, $dir);
   }
   else {
     $self->info("Publishing new Fluidigm data collection '$dest_collection'");
-    add_collection($dest_collection);
-    $fluidigm_collection = put_collection($self->resultset->directory,
-                                          $dest_collection);
+    $irods->add_collection($dest_collection);
+    $fluidigm_collection = $irods->put_collection($self->resultset->directory,
+                                                  $dest_collection);
   }
 
   return $fluidigm_collection;
@@ -185,8 +194,8 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::FluidigmPublisher - An iRODS data publisher for
-Fluidigm results.
+WTSI::NPG::Genotyping::Fluidigm::Publisher - An iRODS data publisher
+for Fluidigm results.
 
 =head1 SYNOPSIS
 
@@ -194,10 +203,11 @@ Fluidigm results.
     (directory => $dir);
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
-    (creator_uri => $creator_uri,
-     publisher_uri => $publisher_uri,
+    (irods            => $irods_handle,
+     creator_uri      => $creator_uri,
+     publisher_uri    => $publisher_uri,
      publication_time => DateTime->now,
-     resultset => $resultset);
+     resultset        => $resultset);
 
   # Publish all
   $publisher->publish($publish_dest);

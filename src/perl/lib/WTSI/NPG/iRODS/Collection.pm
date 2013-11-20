@@ -1,4 +1,6 @@
 
+use utf8;
+
 package WTSI::NPG::iRODS::Collection;
 
 use JSON;
@@ -25,6 +27,26 @@ sub is_present {
   my ($self) = @_;
 
   return $self->irods->list_collection($self->str);
+}
+
+sub absolute {
+  my ($self) = @_;
+
+  my $absolute;
+  if (File::Spec->file_name_is_absolute($self->str)) {
+    $absolute = $self->str;
+  }
+  else {
+    unless ($self->irods) {
+      $self->logconfess("Failed to make '", $self->str, "' into an absolute ",
+                        "path because it has no iRODS handle attached.");
+    }
+
+    $absolute = File::Spec->catdir($self->irods->working_collection,
+                                   $self->collection);
+  }
+
+  return WTSI::NPG::iRODS::Collection->new($self->irods, $absolute);
 }
 
 =head2 add_avu

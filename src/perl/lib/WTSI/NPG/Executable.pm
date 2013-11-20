@@ -13,9 +13,13 @@ has 'stdout' => (is => 'ro', isa => 'ScalarRef',
 has 'stderr' => (is => 'ro', isa => 'ScalarRef',
                  default => sub { my $x = ''; return \$x; });
 
+has 'environment' => (is => 'ro', isa => 'HashRef', lazy => 1,
+                      default => sub { \%ENV });
 has 'executable' => (is => 'ro', isa => 'Str', required => 1);
 has 'arguments'  => (is => 'ro', isa => 'ArrayRef', lazy => 1,
                      default => sub { [] });
+
+
 
 no Moose;
 

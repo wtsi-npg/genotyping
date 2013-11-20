@@ -33,7 +33,8 @@ sub list_collection_meta {
 
   $collection = File::Spec->canonpath($collection);
 
-  my $json = qq({"collection": "$collection"});
+  my $spec = {collection => $collection};
+  my $json = JSON->new->utf8->encode($spec);
 
   return $self->_list_path_meta($json);
 }
@@ -48,10 +49,12 @@ sub list_object_meta {
     $self->logconfess("An absolute object path argument is required: ",
                       "recieved '$object'");
 
-  my ($volume, $coll_name, $data_name) = File::Spec->splitpath($object);
-  $coll_name = File::Spec->canonpath($coll_name);
+  my ($volume, $collection, $data_name) = File::Spec->splitpath($object);
+  $collection = File::Spec->canonpath($collection);
 
-  my $json = qq({"collection": "$coll_name", "data_object": "$data_name"});
+  my $spec = {collection  => $collection,
+              data_object => $data_name};
+  my $json = JSON->new->utf8->encode($spec);
 
   return $self->_list_path_meta($json);
 }
@@ -78,7 +81,7 @@ sub _list_path_meta {
 
   # TODO -- factor out JSON protocol handling into a Role
   if (exists $result->{error}) {
-    $self->logconfess($result->error->{message});
+    $self->logconfess($result->{error}->{message});
   }
 
   exists $result->{avus} or

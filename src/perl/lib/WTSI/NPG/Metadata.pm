@@ -68,9 +68,9 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 sub make_creation_metadata {
   my ($creator, $creation_time, $publisher) = @_;
 
-  return (['dcterms:creator'   => $creator],
+  return (['dcterms:creator'   => $creator->as_string],
           ['dcterms:created'   => $creation_time->iso8601],
-          ['dcterms:publisher' => $publisher]);
+          ['dcterms:publisher' => $publisher->as_string]);
 }
 
 =head2 make_modification_metadata
@@ -87,7 +87,7 @@ sub make_creation_metadata {
 sub make_modification_metadata {
   my ($modification_time) = @_;
 
-  return (['dcterms:modified' => $modification_time]);
+  return (['dcterms:modified' => $modification_time->iso8601]);
 }
 
 =head2 make_sample_metadata

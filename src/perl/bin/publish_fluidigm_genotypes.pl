@@ -13,9 +13,9 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::iRODS qw(collect_files
-                        collect_dirs
-                        modified_between);
+use WTSI::NPG::Utilities qw(collect_files
+                            collect_dirs
+                            modified_between);
 
 use WTSI::NPG::Publication qw(get_wtsi_uri
                               get_publisher_uri
@@ -124,10 +124,12 @@ sub run {
       (directory => $dir);
 
     my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
-      (creator_uri => $creator_uri,
-       publisher_uri => $publisher_uri,
+      (creator_uri      => $creator_uri,
+       publisher_uri    => $publisher_uri,
        publication_time => $now,
-       resultset => $resultset);
+       resultset        => $resultset,
+       logger           => $log);
+    $publisher->irods->logger($log);
 
     $publisher->publish($publish_dest);
   }

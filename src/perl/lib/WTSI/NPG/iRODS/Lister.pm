@@ -30,13 +30,16 @@ sub list_object {
 
   $object =~ m{^/} or
     $self->logconfess("An absolute object path argument is required: ",
-                      "recieved '$object'");
+                      "received '$object'");
 
-  my ($volume, $coll_name, $data_name) = File::Spec->splitpath($object);
-  $coll_name = File::Spec->canonpath($coll_name);
+  my ($volume, $collection, $data_name) = File::Spec->splitpath($object);
+  $collection = File::Spec->canonpath($collection);
 
   # TODO -- factor out JSON protocol handling into a Role
-  my $json = qq({"collection": "$coll_name", "data_object": "$data_name"});
+  my $spec = {collection  => $collection,
+              data_object => $data_name};
+  my $json = JSON->new->utf8->encode($spec);
+
   my $parser = JSON->new->max_size(4096);
   my $result;
 
@@ -49,12 +52,32 @@ sub list_object {
     ${$self->stdout} = '';
   }
 
-  # TODO -- factor out JSON protocol handling into a Role
-  if (exists $result->{error}) {
-    $self->logconfess($result->error->{message});
+  unless (defined $result) {
+    $self->logconfess("Failed to get a result from '$json'");
   }
 
-  return $self->_to_path_str($result);
+  unless (ref $result eq 'HASH' ) {
+    $self->logconfess("Failed to get a hash result from '$json'; got ",
+                      ref $result);
+  }
+
+  my $path;
+  # TODO -- factor out JSON protocol handling into a Role
+  if (exists $result->{error}) {
+    # Code for non-existance
+    if ($result->{error}->{code} == -310000) {
+      # Continue to return undef
+    }
+    else {
+      $self->logconfess($result->{error}->{message}, " Error code: ",
+                        $result->{error}->{code});
+    }
+  }
+  else {
+    $path = $self->_to_path_str($result);
+  }
+
+  return $path;
 }
 
 sub list_collection {
@@ -68,14 +91,16 @@ sub list_collection {
                       "recieved '$collection'");
 
   # TODO -- factor out JSON protocol handling into a Role
-  my $path_spec = qq({"collection": "$collection"});
+  my $spec = {collection => $collection};
+  my $json = JSON->new->utf8->encode($spec);
+
   my $parser = JSON->new->max_size(1024 *1024);
   my $result;
 
-  ${$self->stdin} .= $path_spec;
+  ${$self->stdin} .= $json;
   ${$self->stderr} = '';
 
-  $self->debug("Sending JSON path spec $path_spec to ", $self->executable);
+  $self->debug("Sending JSON spec $json to ", $self->executable);
 
   while ($self->harness->pumpable && !defined $result) {
     $self->harness->pump;
@@ -83,28 +108,40 @@ sub list_collection {
     ${$self->stdout} = '';
   }
 
+  my @paths;
+
   # TODO -- factor out JSON protocol handling into a Role
   if (ref $result eq 'HASH') {
     if (exists $result->{error}) {
-      $self->logconfess($result->{error}->{message});
+      # Code for non-existance
+      if ($result->{error}->{code} == -310000) {
+        # Continue to return empty list
+      }
+      else {
+        $self->logconfess($result->{error}->{message}, " Error code: ",
+                          $result->{error}->{code});
+      }
     }
   }
+  else {
+    my @data_objects;
+    my @collections;
 
-  my @data_objects;
-  my @collections;
+    foreach my $path_spec (@$result) {
+      my $path = $self->_to_path_str($path_spec);
 
-  foreach my $path_spec (@$result) {
-    my $path = $self->_to_path_str($path_spec);
-
-    if (exists $path_spec->{data_object}) {
-      push @data_objects, $path;
+      if (exists $path_spec->{data_object}) {
+        push @data_objects, $path;
+      }
+      else {
+        push @collections, $path;
+      }
     }
-    else {
-      push @collections, $path;
-    }
+
+    @paths =  (\@data_objects, \@collections);
   }
 
-  return (\@data_objects, \@collections);
+  return @paths;
 }
 
 # TODO -- factor out JSON protocol handling into a Role

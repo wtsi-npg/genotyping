@@ -1,4 +1,6 @@
 
+use utf8;
+
 package WTSI::NPG::iRODS::DataObject;
 
 use JSON;
@@ -13,14 +15,19 @@ has 'data_object' => (is => 'ro', isa => 'Str', required => 1,
                       default => '.', lazy => 1,
                       predicate => 'has_data_object');
 
+# TODO: Add a check so that a DataObject cannot be built from a path
+# that is in fact a collection.
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
   if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS2') {
     my ($volume, $collection, $data_name) = File::Spec->splitpath($args[1]);
+    $collection = File::Spec->canonpath($collection);
+    $collection ||= '.';
 
-    return $class->$orig(irods => $args[0], collection => $collection,
-                         data_object =>$data_name);
+    return $class->$orig(irods       => $args[0],
+                         collection  => $collection,
+                         data_object => $data_name);
   }
   else {
     return $class->$orig(@_);
@@ -45,6 +52,38 @@ sub is_present {
   return $self->irods->list_object($self->str);
 }
 
+sub absolute {
+  my ($self) = @_;
+
+  my $absolute;
+  if (File::Spec->file_name_is_absolute($self->str)) {
+    $absolute = $self->str;
+  }
+  else {
+    unless ($self->irods) {
+      $self->logconfess("Failed to make '", $self->str, "' into an absolute ",
+                        "path because it has no iRODS handle attached.");
+    }
+
+    $absolute = File::Spec->catfile($self->irods->working_collection,
+                                    $self->collection, $self->data_object);
+  }
+
+  return WTSI::NPG::iRODS::DataObject->new($self->irods, $absolute);
+}
+
+sub calculate_checksum {
+  my ($self) = @_;
+
+  return $self->irods->calculate_checksum($self->str);
+}
+
+sub validate_checksum_metadata {
+  my ($self) = @_;
+
+  return $self->irods->validate_checksum_metadata($self->str);
+}
+
 =head2 add_avu
 
   Arg [1]    : attribute
@@ -63,7 +102,9 @@ sub add_avu {
   my ($self, $attribute, $value, $units) = @_;
 
   if ($self->find_in_metadata($attribute, $value, $units)) {
-    $self->debug("Failed to add AVU {'$attribute', '$value', '$units'} ",
+    my $units_str = defined $units ? "'$units'" : 'undef';
+
+    $self->debug("Failed to add AVU {'$attribute', '$value', $units_str} ",
                  "to '", $self->str, "': AVU is already present");
   }
   else {
@@ -136,7 +177,7 @@ sub str {
 
   Arg [1]    : None
 
-  Example    : $path->str
+  Example    : $path->json
   Description: Return a canonical JSON representation of this path,
                including any AVUs.
   Returntype : Str
