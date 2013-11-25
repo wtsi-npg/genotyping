@@ -21,7 +21,7 @@ Each metric requires appropriate threshold criteria to include or exclude sample
 \subsubsection*{Metric descriptions}
 
 \begin{enumerate}
-\item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  Samples are recommended for exclusion where identity cannot be confirmed, defined as SNP concordance falling below a given minimum threshold.  
+\item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  The check requires a minimum number of Sequenom sites to be called in Illumina output (default is 10). If there are sufficient shared sites and concordance is greater than a chosen threshold, the sample will pass. If there are fewer than the minimum shared sites, the identity check is not applied and the sample is marked as a pass \emph{regardless} of concordance.
 
 See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
 
