@@ -23,7 +23,7 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   $irods_tmp_coll = $irods->add_collection("DataObjectTest.$pid");
   $irods->put_collection($data_path, $irods_tmp_coll);
@@ -41,7 +41,7 @@ sub make_fixture : Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   $irods->remove_collection($irods_tmp_coll);
 }
@@ -51,7 +51,7 @@ sub require : Test(1) {
 }
 
 sub constructor : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   new_ok('WTSI::NPG::iRODS::DataObject', [irods       => $irods,
                                           collection  => '/foo',
@@ -65,7 +65,7 @@ sub constructor : Test(3) {
 }
 
 sub data_object : Test(12) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $path1 = WTSI::NPG::iRODS::DataObject->new($irods, '/foo/bar.txt');
   ok($path1->has_collection, 'Has collection 1');
@@ -87,7 +87,7 @@ sub data_object : Test(12) {
 }
 
 sub is_present : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
 
   my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
@@ -98,7 +98,7 @@ sub is_present : Test(2) {
 }
 
 sub absolute : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $wc = $irods->working_collection;
 
   my $obj1 = WTSI::NPG::iRODS::DataObject->new($irods, "./foo.txt");
@@ -112,7 +112,7 @@ sub absolute : Test(3) {
 }
 
 sub metadata : Test(1) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
                        {attribute => 'a', value => 'y'},
@@ -127,7 +127,7 @@ sub metadata : Test(1) {
 }
 
 sub get_avu : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
   my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
 
@@ -142,7 +142,7 @@ sub get_avu : Test(3) {
 }
 
 sub add_avu : Test(5) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
                        {attribute => 'a', value => 'y'},
@@ -172,7 +172,7 @@ sub add_avu : Test(5) {
 }
 
 sub remove_avu : Test(5) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
   my $expected_meta = [{attribute => 'a', value => 'y'},
                        {attribute => 'b', value => 'x', units => 'cm'},
@@ -196,7 +196,7 @@ sub remove_avu : Test(5) {
 }
 
 sub str : Test(1) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
 
   my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);

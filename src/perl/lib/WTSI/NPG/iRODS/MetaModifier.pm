@@ -12,8 +12,12 @@ with 'WTSI::NPG::Startable';
 our $META_ADD_OP = 'add';
 our $META_REM_OP = 'rem';
 
-has 'operation' => (is => 'ro', isa => 'Str', required => 1,
-                    default => $META_ADD_OP, lazy => 1);
+has 'operation' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   lazy     => 1,
+   default  => $META_ADD_OP);
 
 has '+executable' => (default => 'json-metamod');
 
@@ -42,8 +46,6 @@ sub modify_collection_meta {
     $self->logconfess('A defined attribute argument is required');
   defined $value or
     $self->logconfess('A defined value argument is required');
-#  defined $units or
-#    $self->logconfess('A defined units argument is required');
 
   $collection = File::Spec->canonpath($collection);
 

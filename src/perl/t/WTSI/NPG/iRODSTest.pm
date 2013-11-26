@@ -16,18 +16,18 @@ use Log::Log4perl;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
-BEGIN { use_ok('WTSI::NPG::iRODS2'); }
+BEGIN { use_ok('WTSI::NPG::iRODS'); }
 
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 my $pid = $PID;
-my $cwc = WTSI::NPG::iRODS2->new->working_collection;
+my $cwc = WTSI::NPG::iRODS->new->working_collection;
 
 my $data_path = './t/irods';
 my $irods_tmp_coll;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   $irods_tmp_coll = $irods->add_collection("iRODSTest.$pid");
   $irods->put_collection($data_path, $irods_tmp_coll);
@@ -46,25 +46,25 @@ sub make_fixture : Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   $irods->working_collection($cwc);
   $irods->remove_collection($irods_tmp_coll);
 }
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::iRODS2');
+  require_ok('WTSI::NPG::iRODS');
 }
 
 sub find_zone_name : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   like($irods->find_zone_name('/Sanger1'), qr{^Sanger1});
   is($irods->find_zone_name('/no_such_zone'), 'no_such_zone');
 }
 
 sub working_collection : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   like($irods->working_collection, qr{^/}, 'Found a working collection');
 
@@ -74,20 +74,20 @@ sub working_collection : Test(4) {
 }
 
 sub list_groups : Test(1) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   ok(grep { /^rodsadmin$/ } $irods->list_groups, 'Listed the rodsadmin group');
 }
 
 sub group_exists : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   ok($irods->group_exists('rodsadmin'), 'The rodsadmin group exists');
   ok(!$irods->group_exists('no_such_group'), 'An absent group does not exist');
 }
 
 sub set_group_access : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
 
   dies_ok { $irods->set_group_access('no_such_permission', 'public',
@@ -103,7 +103,7 @@ sub set_group_access : Test(4) {
 }
 
 sub list_collection : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my ($objs, $colls) = $irods->list_collection("$irods_tmp_coll/irods");
 
   is_deeply($objs, ["$irods_tmp_coll/irods/lorem.txt",
@@ -118,7 +118,7 @@ sub list_collection : Test(3) {
 }
 
 sub add_collection : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   # Deliberate spaces in names
   my $coll = "$irods_tmp_coll/add_ _collection";
@@ -127,7 +127,7 @@ sub add_collection : Test(2) {
 }
 
 sub put_collection : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $dir = File::Spec->catdir($data_path, 'test');
   my $target = "$irods_tmp_coll/put_collection";
@@ -147,7 +147,7 @@ sub put_collection : Test(2) {
 }
 
 sub move_collection : Test(5) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $coll_to_move = "$irods_tmp_coll/irods";
   my $coll_moved = "$irods_tmp_coll/irods_moved";
@@ -165,7 +165,7 @@ sub move_collection : Test(5) {
 }
 
 sub remove_collection : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $coll = "$irods_tmp_coll/irods";
   is($irods->remove_collection($coll), $coll, 'Removed a collection');
@@ -178,7 +178,7 @@ sub remove_collection : Test(4) {
 }
 
 sub get_collection_meta : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $coll = "$irods_tmp_coll/irods";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
@@ -201,7 +201,7 @@ sub get_collection_meta : Test(2) {
 }
 
 sub add_collection_avu : Test(11) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $num_attrs = 8;
   my %meta = map { 'cattr' . $_ => 'cval' . $_ } 0 .. $num_attrs;
@@ -235,7 +235,7 @@ sub add_collection_avu : Test(11) {
 }
 
 sub remove_collection_avu : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $coll = "$irods_tmp_coll/irods";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
@@ -259,7 +259,7 @@ sub remove_collection_avu : Test(4) {
 }
 
 sub find_collections_by_meta : Test(7) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $expected_coll = "$irods_tmp_coll/irods";
 
@@ -289,7 +289,7 @@ sub find_collections_by_meta : Test(7) {
 }
 
 sub list_object : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_file = "$data_path/lorem.txt";
   my $lorem_object = "$irods_tmp_coll/lorem.txt";
@@ -308,7 +308,7 @@ sub list_object : Test(4) {
 }
 
 sub add_object : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_file = "$data_path/lorem.txt";
   my $lorem_object = "$irods_tmp_coll/lorem_added.txt";
@@ -324,7 +324,7 @@ sub add_object : Test(3) {
 }
 
 sub replace_object : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_file = "$data_path/lorem.txt";
   my $to_replace = "$irods_tmp_coll/lorem_to_replace.txt";
@@ -343,7 +343,7 @@ sub replace_object : Test(3) {
 }
 
 sub move_object : Test(5) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_file = "$data_path/lorem.txt";
   my $object_to_move = "$irods_tmp_coll/lorem_to_move.txt";
@@ -363,7 +363,7 @@ sub move_object : Test(5) {
 }
 
 sub remove_object : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
   is($irods->remove_object($lorem_object), $lorem_object,
@@ -377,7 +377,7 @@ sub remove_object : Test(4) {
 }
 
 sub get_object_meta : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
@@ -399,7 +399,7 @@ sub get_object_meta : Test(2) {
 }
 
 sub add_object_avu : Test(11) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $num_attrs = 8;
   my %meta = map { 'dattr' . $_ => 'dval' . $_ } 0 .. $num_attrs;
@@ -432,7 +432,7 @@ sub add_object_avu : Test(11) {
 }
 
 sub remove_object_avu : Test(4) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
   my $expected_meta = [{attribute => 'a', value => 'x', units => 'cm'},
@@ -457,7 +457,7 @@ sub remove_object_avu : Test(4) {
 }
 
 sub find_objects_by_meta : Test(6) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
 
@@ -484,7 +484,7 @@ sub find_objects_by_meta : Test(6) {
 }
 
 sub calculate_checksum : Test(1) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
   my $expected_checksum = '39a4aa291ca849d601e4e5b8ed627a04';
@@ -494,7 +494,7 @@ sub calculate_checksum : Test(1) {
 }
 
 sub validate_checksum_metadata : Test(8) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
   my $expected_checksum = '39a4aa291ca849d601e4e5b8ed627a04';
@@ -516,14 +516,14 @@ sub validate_checksum_metadata : Test(8) {
 }
 
 sub md5sum : Test(1) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   is($irods->md5sum("$data_path/md5sum/lorem.txt"),
      '39a4aa291ca849d601e4e5b8ed627a04');
 }
 
 sub hash_path : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   is($irods->hash_path("$data_path/md5sum/lorem.txt"), '39/a4/aa');
 

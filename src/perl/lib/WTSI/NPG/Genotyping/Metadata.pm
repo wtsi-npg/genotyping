@@ -8,8 +8,6 @@ use Carp;
 use File::Basename;
 use UUID;
 
-use WTSI::NPG::iRODS qw(md5sum);
-
 use WTSI::NPG::Metadata qw(make_fingerprint);
 
 use base 'Exporter';

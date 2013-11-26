@@ -8,7 +8,7 @@ use Carp;
 use File::Basename;
 use UUID;
 
-use WTSI::NPG::iRODS qw(md5sum);
+use WTSI::NPG::Utilities qw(md5sum);
 
 use base 'Exporter';
 our @EXPORT_OK = qw(

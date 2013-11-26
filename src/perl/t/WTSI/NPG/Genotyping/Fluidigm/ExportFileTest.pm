@@ -26,7 +26,7 @@ my $body = "$data_path/body.txt";
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Fluidigm::ExportFile');
-};
+}
 
 sub constructor : Test(5) {
   new_ok('WTSI::NPG::Genotyping::Fluidigm::ExportFile',
@@ -46,7 +46,7 @@ sub constructor : Test(5) {
   dies_ok { WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
       (file_name => $body) }
     "Expected to fail parsing when header is missing";
-};
+}
 
 sub header_parse : Test(3) {
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
@@ -55,7 +55,7 @@ sub header_parse : Test(3) {
   is($export->fluidigm_barcode, '1381735059', 'Fluidigm barcode is 1381735059');
   cmp_ok($export->confidence_threshold, '==', 65, 'Confidence threshold == 65');
   cmp_ok($export->size, '==', 96, 'Number of samples == 96');
-};
+}
 
 sub sample_assays : Test(97) {
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
@@ -73,7 +73,7 @@ sub sample_assays : Test(97) {
     cmp_ok(@{$export->sample_assays($address)}, '==', 96,
            "Sample assay count at address $address");
   }
-};
+}
 
 sub write_sample_assays : Test(192) {
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
@@ -99,4 +99,4 @@ sub write_sample_assays : Test(192) {
 
     unlink $test_file;
   }
-};
+}

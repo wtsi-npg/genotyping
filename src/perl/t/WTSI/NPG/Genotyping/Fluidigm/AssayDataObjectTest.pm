@@ -9,8 +9,6 @@ use utf8;
 
   use base 'WTSI::NPG::Database';
 
-  Log::Log4perl::init('./etc/log4perl_tests.conf');
-
   sub find_fluidigm_sample_by_plate {
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
@@ -41,7 +39,7 @@ use File::Spec;
 use Test::More tests => 7;
 use Test::Exception;
 
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -56,7 +54,7 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods_tmp_coll = $irods->add_collection("FluidigmAssayDataObjectTest.$pid");
   $irods->put_collection($data_path, $irods_tmp_coll);
 
@@ -67,7 +65,7 @@ sub make_fixture : Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
 }
 
@@ -76,7 +74,7 @@ sub require : Test(1) {
 }
 
 sub metadata : Test(3) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
     ($irods, "$irods_tmp_coll/1381735059/$data_file");
@@ -92,7 +90,7 @@ sub metadata : Test(3) {
 }
 
 sub update_secondary_metadata : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
     ($irods, "$irods_tmp_coll/1381735059/$data_file");

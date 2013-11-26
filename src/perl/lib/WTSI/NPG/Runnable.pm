@@ -67,7 +67,7 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Executable
+WTSI::NPG::Runnable
 
 =head1 DESCRIPTION
 

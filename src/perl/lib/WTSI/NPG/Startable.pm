@@ -9,9 +9,14 @@ use Moose::Role;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Executable';
 
-has 'started' => (is => 'rw', isa => 'Bool', default => 0);
+has 'started' =>
+  (is      => 'rw',
+   isa     => 'Bool',
+   default => 0);
 
-has 'harness' => (is => 'rw', isa => 'IPC::Run');
+has 'harness' =>
+  (is  => 'rw',
+   isa => 'IPC::Run');
 
 sub BUILD {
   my ($self) = @_;
@@ -81,3 +86,35 @@ sub DEMOLISH {
 no Moose;
 
 1;
+
+
+__END__
+
+=head1 NAME
+
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

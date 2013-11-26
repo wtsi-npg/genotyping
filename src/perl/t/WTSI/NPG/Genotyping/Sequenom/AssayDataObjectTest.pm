@@ -56,7 +56,7 @@ use File::Spec;
 use Test::More tests => 6;
 use Test::Exception;
 
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -71,7 +71,7 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods_tmp_coll = $irods->add_collection("SequenomAssayDataObjectTest.$pid");
   my $irods_path = "$irods_tmp_coll/$data_file";
 
@@ -81,7 +81,7 @@ sub make_fixture : Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
 }
 
@@ -90,7 +90,7 @@ sub require : Test(1) {
 }
 
 sub metadata : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
     ($irods, "$irods_tmp_coll/$data_file");
@@ -103,11 +103,10 @@ sub metadata : Test(2) {
 }
 
 sub update_secondary_metadata : Test(2) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
     ($irods, "$irods_tmp_coll/$data_file");
-
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNPStub->new
     (name => 'snp',

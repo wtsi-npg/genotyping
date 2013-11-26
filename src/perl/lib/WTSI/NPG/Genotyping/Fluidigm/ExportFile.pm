@@ -6,9 +6,10 @@ package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use Moose;
 use Text::CSV;
 
-use WTSI::NPG::Utilities qw(trim);
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
                                        $FLUIDIGM_PLATE_WELL_META_KEY);
+use WTSI::NPG::Utilities qw(trim);
+
 
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
@@ -18,21 +19,34 @@ our $HEADER_CONF_THRESHOLD_COL = 1;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Addressable';
 
-has 'file_name' => (is  => 'ro', isa => 'Str', required => 1);
+has 'file_name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
 
-has 'header' => (is  => 'ro', isa => 'ArrayRef[Str]',
-                 writer => '_write_header');
+has 'header' =>
+  (is     => 'ro',
+   isa    => 'ArrayRef[Str]',
+   writer => '_write_header');
 
-has 'column_names' => (is => 'ro', isa => 'ArrayRef[Str]',
-                       writer => '_write_column_names');
+has 'column_names' =>
+  (is     => 'ro',
+   isa    => 'ArrayRef[Str]',
+   writer => '_write_column_names');
 
-has 'fluidigm_barcode' => (is => 'ro', isa => 'Str', required => 1,
-                           builder => '_build_fluidigm_barcode',
-                           lazy => 1);
+has 'fluidigm_barcode' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   lazy     => 1,
+   builder  => '_build_fluidigm_barcode');
 
-has 'confidence_threshold' => (is => 'ro', isa => 'Str', required => 1,
-                               builder => '_build_confidence_threshold',
-                               lazy => 1);
+has 'confidence_threshold' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   lazy     => 1,
+   builder  => '_build_confidence_threshold');
 
 sub BUILD {
   my ($self) = @_;
@@ -203,9 +217,9 @@ sub _parse_fluidigm_table {
     chomp($line);
     next if $line =~ m/^\s*$/;
 
-    if ($line =~ /^Chip Run Info/) { $in_header = 1; }
-    if ($line =~ /^Experiment/)    { $in_header = 0; }
-    if ($line =~ /^ID/)            { $in_column_names = 1; }
+    if ($line =~ /^Chip Run Info/) { $in_header = 1 }
+    if ($line =~ /^Experiment/)    { $in_header = 0 }
+    if ($line =~ /^ID/)            { $in_column_names = 1 }
     if ($line =~ /^S[0-9]+\-[A-Z][0-9]+/) {
       $in_column_names = 0;
       $in_sample_block = 1;

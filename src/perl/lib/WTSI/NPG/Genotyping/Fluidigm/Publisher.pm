@@ -3,7 +3,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 
-use File::Basename;
+use File::Basename qw(basename);
 use File::Spec;
 use File::Temp qw(tempdir);
 use Moose;
@@ -11,33 +11,40 @@ use URI;
 
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 
-has 'irods' => (is => 'ro', isa => 'WTSI::NPG::iRODS2', required => 1,
-                default => sub {
-                  return WTSI::NPG::iRODS2->new;
-                });
+has 'irods' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS',
+   required => 1,
+   default  => sub {
+     return WTSI::NPG::iRODS->new;
+   });
 
-has 'audience_uri' => (is => 'ro', isa => 'URI', required => 1,
-                       default => sub {
-                         my $uri = URI->new('http:');
-                         $uri->host('psd-production.internal.sanger.ac.uk');
-                         $uri->port(6600);
-                         return $uri;
-                       });
+has 'audience_uri' =>
+  (is       => 'ro',
+   isa      => 'URI',
+   required => 1,
+   default  => sub {
+     my $uri = URI->new('http:');
+     $uri->host('psd-production.internal.sanger.ac.uk');
+     $uri->port(6600);
 
-has 'creator_uri' => (is => 'ro', isa => 'URI', required => 1);
+     return $uri;
+   });
 
-has 'publisher_uri' => (is => 'ro', isa => 'URI', required => 1);
+has 'publication_time' =>
+  (is       => 'ro',
+   isa      => 'DateTime',
+   required => 1);
 
-has 'publication_time' => (is => 'ro', isa => 'DateTime', required => 1);
-
-has 'resultset' => (is => 'ro',
-                    isa => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
-                    required => 1);
+has 'resultset' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
+   required => 1);
 
 sub BUILD {
   my ($self) = @_;
@@ -92,8 +99,11 @@ sub publish_samples {
     @addresses = @{$export_file->addresses};
   }
 
-  my $publisher = WTSI::NPG::SimplePublisher->new(irods => $self->irods,
-                                                  logger => $self->logger);
+  my $publisher = WTSI::NPG::SimplePublisher->new
+    (irods         => $self->irods,
+     accountee_uid => $self->accountee_uid,
+     logger        => $self->logger);
+
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
   my @meta =
@@ -101,9 +111,7 @@ sub publish_samples {
      ['dcterms:audience'            => $self->audience_uri->as_string]);
 
   $publisher->publish_file($self->resultset->export_file, \@meta,
-                           $self->creator_uri,
                            $publish_dest,
-                           $self->publisher_uri,
                            $self->publication_time);
 
   my $total = scalar @addresses;
@@ -122,9 +130,7 @@ sub publish_samples {
 
       my @fingerprint = $export_file->fluidigm_fingerprint($address);
       my $data_object = $publisher->publish_file($file, \@fingerprint,
-                                                 $self->creator_uri,
                                                  $publish_dest,
-                                                 $self->publisher_uri,
                                                  $self->publication_time);
       ++$num_published;
     };

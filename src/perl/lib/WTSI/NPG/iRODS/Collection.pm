@@ -7,7 +7,7 @@ use JSON;
 use File::Spec;
 use Moose;
 
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::iRODS::Path';
 
@@ -110,12 +110,12 @@ sub remove_avu {
 }
 
 sub grant_group_access {
-  my ($self,  $permission, @groups) = @_;
+  my ($self, $permission, @groups) = @_;
 
   my $path = $self->str;
   foreach my $group (@groups) {
-    $self->info("Giving group '$group' '$permission' access to '$path'");
-    $self->irods->set_group_access($permission, $group, $path);
+    $self->info("Giving group '$group' -r '$permission' access to '$path'");
+    $self->irods->set_group_access('-r', $permission, $group, $path);
   }
 }
 

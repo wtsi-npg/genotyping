@@ -8,34 +8,32 @@ use File::Spec;
 use Moose::Role;
 
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotatable';
 
-has 'collection' => (is => 'ro', isa => 'Str', required => 1,
-                     default => '.', lazy => 1,
-                     predicate => 'has_collection');
+has 'collection' =>
+  (is        => 'ro',
+   isa       => 'Str',
+   required  => 1,
+   lazy      => 1,
+   default   => '.',
+   predicate => 'has_collection');
 
-has 'irods' => (is => 'ro', isa => 'WTSI::NPG::iRODS2', required => 1);
+has 'irods' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS',
+   required => 1);
 
-# The following overrides the definition in
-# WTSI::NPG::Annotatable. Apparently our old version of Moose doesn't
-# support this attribute inheritance
-#
-has 'metadata' => (is => 'rw',
-                   isa => 'ArrayRef',
+has 'metadata' => (is        => 'rw',
+                   isa       => 'ArrayRef',
                    predicate => 'has_metadata',
-                   clearer => 'clear_metadata');
-#
-# When on a newer Moose, remove the above and replace with this:
-#
-# has '+metadata' => (predicate => 'has_metadata',
-#                     clearer => 'clear_metadata');
+                   clearer   => 'clear_metadata');
 
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
-  if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS2') {
+  if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS') {
     return $class->$orig(irods      => $args[0],
                          collection => $args[1]);
   }

@@ -15,12 +15,12 @@ our @EXPORT_OK = qw(collect_dirs
                     collect_files
                     common_stem
                     make_collector
+                    md5sum
                     modified_between
                     trim
                     user_session_log);
 
-our $log = Log::Log4perl->get_logger('npg');
-
+our $MD5SUM = 'md5sum';
 our $USER_SESSION_LOG_DIR = '/nfs/srpipe_data/logs/user_session_logs/';
 
 =head2 common_stem
@@ -111,7 +111,7 @@ sub user_session_log {
     croak "The session_name argument must match [A-Za-z0-9]+\n";
   }
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
   return sprintf("%s/%s.%s.%s.log", $USER_SESSION_LOG_DIR,
                  $session_name, $uid, $now->strftime("%F"));
 }
@@ -137,7 +137,7 @@ sub user_session_log {
 sub collect_files {
   my ($root, $test, $depth, $regex) = @_;
 
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
+  $root eq '' and croak 'A non-empty root argument is required';
 
   my @files;
   my $collector = make_collector($test, \@files);
@@ -199,7 +199,7 @@ sub collect_files {
 sub collect_dirs {
   my ($root, $test, $depth, $regex) = @_;
 
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
+  $root eq '' and croak 'A non-empty root argument is required';
 
   my @dirs;
   my $collector = make_collector($test, \@dirs);
@@ -224,7 +224,6 @@ sub collect_dirs {
           my $current_depth = $File::Find::name =~ tr[/][];
 
           if (!defined $stop_depth || $current_depth < $stop_depth) {
-
             if ($regex) {
               $collector->($File::Find::name) if $_ =~ $regex;
             }
@@ -265,6 +264,30 @@ sub make_collector {
   }
 }
 
+=head2 md5sum
+
+  Arg [1]    : string path to a file
+  Example    : my $md5 = md5sum($filename)
+  Description: Calculate the MD5 checksum of a file.
+  Returntype : Str
+
+=cut
+
+sub md5sum {
+  my ($file) = @_;
+
+  defined $file or croak 'A defined file argument is required';
+  $file eq '' and croak 'A non-empty file argument is required';
+
+  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
+                                        arguments   => [$file])->run;
+  my $raw = shift @result;
+
+  my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;
+
+  return $md5;
+}
+
 =head2 modified_between
 
   Arg [1]    : time in seconds since the epoch
@@ -288,7 +311,7 @@ sub modified_between {
     my $stat = stat($file);
     unless (defined $stat) {
       my $wd = `pwd`;
-      $log->logconfess("Failed to stat file '$file' in $wd: $!");
+      croak "Failed to stat file '$file' in $wd: $!";
     }
 
     my $mtime = $stat->mtime;
@@ -296,7 +319,6 @@ sub modified_between {
     return ($start <= $mtime) && ($mtime <= $finish);
   }
 }
-
 
 1;
 

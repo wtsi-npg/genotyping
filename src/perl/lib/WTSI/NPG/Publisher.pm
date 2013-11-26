@@ -15,9 +15,12 @@ use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
                            make_modification_metadata
                            make_sample_metadata);
 
-has 'irods' => (is => 'ro', isa => 'WTSI::NPG::iRODS2', required => 1);
+has 'irods' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS',
+   required => 1);
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 
 =head2 publish_file
 
@@ -42,8 +45,7 @@ with 'WTSI::NPG::Loggable';
 =cut
 
 sub publish_file {
-  my ($self, $file, $sample_meta, $creator_uri, $publish_dest,
-      $publisher_uri, $time) = @_;
+  my ($self, $file, $sample_meta, $publish_dest, $time) = @_;
 
   my $irods = $self->irods;
   my ($volume, $directories, $filename) = File::Spec->splitpath($file);
@@ -162,6 +164,9 @@ sub publish_file {
   else {
     $self->info("Publishing new object '$target'");
     $irods->add_object($file, $target_obj->str);
+
+    my $creator_uri = $self->affiliation_uri;
+    my $publisher_uri = $self->accountee_uri;
     push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
     push(@meta, make_md5_metadata($file));
   }
@@ -181,3 +186,35 @@ __PACKAGE__->meta->make_immutable;
 no Moose;
 
 1;
+
+
+__END__
+
+=head1 NAME
+
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

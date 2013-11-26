@@ -3,7 +3,6 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::Publisher;
 
-use File::Basename;
 use File::Spec;
 use File::Temp qw(tempdir);
 use Moose;
@@ -13,26 +12,32 @@ use URI;
 use WTSI::NPG::Genotyping::Metadata qw(make_sequenom_metadata
                                        sequenom_fingerprint);
 use WTSI::NPG::Publisher;
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 
-has 'irods' => (is => 'ro', isa => 'WTSI::NPG::iRODS2', required => 1,
-                default => sub {
-                  return WTSI::NPG::iRODS2->new;
-                });
+has 'irods' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS',
+   required => 1,
+   default  => sub {
+     return WTSI::NPG::iRODS->new;
+   });
 
-has 'creator_uri' => (is => 'ro', isa => 'URI', required => 1);
+has 'publication_time' =>
+  (is       => 'ro',
+   isa      => 'DateTime',
+   required => 1);
 
-has 'publisher_uri' => (is => 'ro', isa => 'URI', required => 1);
+has 'plate_name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
 
-has 'publication_time' => (is => 'ro', isa => 'DateTime', required => 1);
-
-has 'plate_name' => (is => 'ro', isa => 'Str', required => 1);
-
-has 'sequenom_db' => (is => 'ro',
-                      isa => 'WTSI::NPG::Genotyping::Database::Sequenom',
-                      required => 1);
+has 'sequenom_db' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::Database::Sequenom',
+   required => 1);
 
 sub BUILD {
   my ($self) = @_;
@@ -85,8 +90,10 @@ sub publish_samples {
     @addresses = sort keys %$plate;
   }
 
-  my $publisher = WTSI::NPG::Publisher->new(irods  => $self->irods,
-                                            logger => $self->logger);
+  my $publisher =
+    WTSI::NPG::Publisher->new(irods         => $self->irods,
+                              accountee_uid => $self->accountee_uid,
+                              logger        => $self->logger);
 
   my $plate_name;
   my $total = scalar @addresses;
@@ -112,9 +119,7 @@ sub publish_samples {
       my @meta = make_sequenom_metadata($first);
       my @fingerprint = sequenom_fingerprint(@meta);
       my $data_object = $publisher->publish_file($file, \@fingerprint,
-                                                 $self->creator_uri,
                                                  $publish_dest,
-                                                 $self->publisher_uri,
                                                  $self->publication_time);
       unlink $file;
       ++$num_published;

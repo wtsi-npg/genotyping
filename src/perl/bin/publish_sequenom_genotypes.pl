@@ -18,10 +18,6 @@ use Pod::Usage;
 use WTSI::NPG::Genotyping::Database::Sequenom;
 use WTSI::NPG::Genotyping::Sequenom::Publisher;
 
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
-
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
 
@@ -81,7 +77,7 @@ sub run {
     }
   }
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch
@@ -92,27 +88,18 @@ sub run {
   }
 
   my $begin = DateTime->from_epoch
-    (epoch => $end->epoch())->subtract(days => $days);
-
-  $log->info("Publishing Sequenom results to '$publish_dest'",
-             " finished between ", $begin->iso8601,
-             " and ", $end->iso8601);
+    (epoch => $end->epoch)->subtract(days => $days);
 
    my $sqdb = WTSI::NPG::Genotyping::Database::Sequenom->new
      (name    => 'mspec2',
       inifile => $config)->connect(RaiseError => 1);
 
-  my $uid = `whoami`;
-  chomp($uid);
-
-  my $creator_uri = get_wtsi_uri();
-  my $publisher_uri = get_publisher_uri($uid);
-  my $name = get_publisher_name($publisher_uri);
-
-  $log->info("Publishing to '$publish_dest' as ", $name);
+  $log->info("Publishing from '", $sqdb->name, "' to '$publish_dest' ",
+             "Sequenom results finished between ",
+             $begin->iso8601, " and ", $end->iso8601);
 
   my $plate_names = $sqdb->find_finished_plate_names($begin, $end);
-  $log->debug("Found " . scalar @$plate_names . " finished plates");
+  $log->debug("Found ", scalar @$plate_names, " finished plates");
 
   foreach my $plate_name (@$plate_names) {
     my $publisher = WTSI::NPG::Genotyping::Sequenom::Publisher->new

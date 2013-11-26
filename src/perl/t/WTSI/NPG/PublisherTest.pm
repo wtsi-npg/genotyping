@@ -5,7 +5,6 @@ package WTSI::NPG::PublisherTest;
 use strict;
 use warnings;
 use DateTime;
-use URI;
 
 use base qw(Test::Class);
 use Test::More tests => 8;
@@ -24,26 +23,23 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods_tmp_coll = $irods->add_collection("PublisherTest.$pid");
   $irods->add_collection($irods_tmp_coll);
-};
+}
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
-};
+}
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Publisher');
-};
+}
 
 sub publish_file : Test(6) {
-  my $irods = WTSI::NPG::iRODS2->new;
+  my $irods = WTSI::NPG::iRODS->new;
   my $publisher = WTSI::NPG::Publisher->new(irods => $irods);
-
-  my $creator_uri = URI->new("http://www.sanger.ac.uk/test/creator");
-  my $publisher_uri = URI->new("http://www.sanger.ac.uk/test/publisher");
   my $time = DateTime->from_epoch(epoch => 0);
 
   my $publish_dest = $irods_tmp_coll;
@@ -52,23 +48,25 @@ sub publish_file : Test(6) {
   my $lorem_file = "$data_path/lorem.txt";
   my $lorem_path = "$publish_dest/39/a4/aa/lorem.txt";
 
-  is($publisher->publish_file($lorem_file, $sample_meta, $creator_uri,
-                              $publish_dest, $publisher_uri, $time),
+  is($publisher->publish_file($lorem_file, $sample_meta, $publish_dest, $time),
      $lorem_path, 'Published new file');
 
   my $lorem_obj = WTSI::NPG::iRODS::DataObject->new($irods, $lorem_path);
 
+  my $uid = `whoami`;
+  chomp($uid);
+  my $publisher_uri = "ldap://ldap.internal.sanger.ac.uk/" .
+    "ou=people,dc=sanger,dc=ac,dc=uk?title?sub?(uid=$uid)";
+
   my $expected_meta =
-    [{attribute => 'a',               value => "x.$pid"},
-     {attribute => 'b',               value => "y.$pid"},
-     {attribute => 'dcterms:created', value => $time->iso8601},
-     {attribute => 'dcterms:creator',
-      value     => 'http://www.sanger.ac.uk/test/creator'},
-     {attribute => 'dcterms:publisher',
-      value     => 'http://www.sanger.ac.uk/test/publisher'},
+    [{attribute => 'a',                 value => "x.$pid"},
+     {attribute => 'b',                 value => "y.$pid"},
+     {attribute => 'dcterms:created',   value => $time->iso8601},
+     {attribute => 'dcterms:creator',   value => 'http://www.sanger.ac.uk'},
+     {attribute => 'dcterms:publisher', value => $publisher_uri},
      {attribute => 'md5',
       value => '39a4aa291ca849d601e4e5b8ed627a04'},
-     {attribute => 'type',            value => 'txt'}];
+     {attribute => 'type',              value => 'txt'}];
 
   my $meta = $lorem_obj->metadata;
   is_deeply($meta, $expected_meta, 'Primary metadata added')
@@ -77,8 +75,8 @@ sub publish_file : Test(6) {
   my $updated_lorem_file = "$data_path/update/lorem.txt";
   my $updated_lorem_path = "$publish_dest/8e/b0/18/lorem.txt";
 
-  is($publisher->publish_file($updated_lorem_file, $sample_meta, $creator_uri,
-                              $publish_dest, $publisher_uri, DateTime->now),
+  is($publisher->publish_file($updated_lorem_file, $sample_meta,
+                              $publish_dest, DateTime->now),
      $updated_lorem_path, 'Updated a published file');
 
   my $updated_lorem_obj =

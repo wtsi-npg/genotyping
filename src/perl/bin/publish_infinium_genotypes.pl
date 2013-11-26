@@ -9,20 +9,17 @@ use warnings;
 use Cwd qw(abs_path);
 use DateTime;
 use Getopt::Long;
+use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
-use WTSI::NPG::Genotyping::Publication qw(publish_idat_files
-                                          publish_gtc_files);
-use WTSI::NPG::iRODS qw(collect_files
-                        collect_dirs
-                        modified_between);
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
+use WTSI::NPG::Genotyping::Infinium::Publisher;
+use WTSI::NPG::Utilities qw(collect_files
+                            collect_dirs
+                            modified_between);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -45,9 +42,9 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
-  my $source;
-  my $type;
   my $verbose;
+
+  my @sources;
 
   GetOptions('config=s'   => \$config,
              'days=i'     => \$days,
@@ -56,31 +53,21 @@ sub run {
              'dest=s'     => \$publish_dest,
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
-             'source=s'   => \$source,
-             'type=s'     => \$type,
+             'source=s'   => \@sources,
              'verbose'    => \$verbose);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
   }
-  unless ($source) {
+  unless (@sources) {
     pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type) {
-    pod2usage(-msg => "A --type argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type =~ m{^idat$}msxi or $type =~ m{^gtc$}msxi) {
-    pod2usage(-msg => "Invalid --type '$type'; expected one of [gtc, idat]\n",
               -exitval => 2);
   }
 
   $config ||= $DEFAULT_INI;
   $days ||= $DEFAULT_DAYS;
   $days_ago ||= 0;
-  $type = lc($type);
 
   my $log;
 
@@ -100,78 +87,51 @@ sub run {
     }
   }
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch
-      (epoch => $now->epoch())->subtract(days => $days_ago);
+      (epoch => $now->epoch)->subtract(days => $days_ago);
   }
   else {
     $end = $now;
   }
-
-  my $begin = DateTime->from_epoch
-    (epoch => $end->epoch())->subtract(days => $days);
-
-  $log->info("Publishing '$type' from '$source' to '$publish_dest'",
-             " last modified between ", $begin->iso8601,
-             " and ", $end->iso8601);
-
-  my $file_test = modified_between($begin->epoch(), $end->epoch());
-  my $file_regex = qr{.($type)$}msxi;
-  my $source_dir = abs_path($source);
-  my $relative_depth = 2;
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
      inifile => $config)->connect(RaiseError => 1);
   # $ifdb->log($log);
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1,
-                                  mysql_enable_utf8 => 1,
-                                  mysql_auto_reconnect => 1);
-  # $ssdb->log($log);
-
-  my $uid = `whoami`;
-  chomp($uid);
-
-  my $creator_uri = get_wtsi_uri();
-  my $publisher_uri = get_publisher_uri($uid);
-  my $name = get_publisher_name($publisher_uri);
-
-  $log->info("Publishing from '$source' to '$publish_dest' as ", $name);
+  my $begin = DateTime->from_epoch
+    (epoch => $end->epoch)->subtract(days => $days);
+  my $file_test = modified_between($begin->epoch, $end->epoch);
+  my $file_regex = qr{.(gtc|idat)$}i;
+  my $relative_depth = 2;
 
   my @files;
-  foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
-    $log->debug("Checking directory '$dir'");
-    my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
-    $log->debug("Found " . scalar @found . " matching items in '$dir'");
-    push(@files, @found);
-  }
 
-  # The above contains dupes due to the 2-level processing. Remove them.
-  my @unique;
-  my %seen;
-  foreach my $file (@files) {
-    if (!$seen{$file}) {
-      push(@unique, $file);
-      $seen{$file}++;
+  foreach my $source (@sources) {
+    my $source_dir = abs_path($source);
+    $log->info("Publishing from '$source_dir' to '$publish_dest' Infinium ",
+               "results last modified between ",
+               $begin->iso8601, " and ", $end->iso8601);
+
+    foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
+      $log->debug("Checking directory '$dir'");
+      my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
+      $log->debug("Found ", scalar @found, " matching items in '$dir'");
+      push @files, @found;
     }
   }
 
-  if ($type eq 'idat') {
-    publish_idat_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                       $ifdb, $ssdb, $now);
-  }
-  elsif ($type eq 'gtc') {
-    publish_gtc_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                      $ifdb, $ssdb, $now);
-  }
-  else {
-    $log->logcroak("Unable to publish unknown data type '$type'");
-  }
+  @files = uniq(@files);
+  $log->debug("Found ", scalar @files, " unique files");
+
+  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+    (publication_time => $now,
+     data_files       => \@files,
+     infinium_db      => $ifdb);
+  $publisher->publish($publish_dest);
 
   return 0;
 }
@@ -180,14 +140,13 @@ __END__
 
 =head1 NAME
 
-publish_sample_data
+publish_infinium_genotypes
 
 =head1 SYNOPSIS
 
 publish_sample_data [--config <database .ini file>] \
    [--days-ago <n>] [--days <n>] \
-   --source <directory> --dest <irods collection> \
-   --type <data type>
+   --source <directory> --dest <irods collection>
 
 Options:
 
@@ -202,20 +161,16 @@ Options:
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
-  --source      The root directory to search for sample data.
-  --type        The data type to publish. One of [idat, gtc].
+  --source      The root directory to search for sample data. Multiple
+                source arguments may be given.
   --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Searches a directory recursively for idat or GTC sample data files
-that have been modified within the n days prior to a specific time.
-Any files identified are published to iRODS with metadata obtained from
-LIMS.
-
-=head1 METHODS
-
-None
+Searches one or more a directories recursively for idat and GTC sample
+data files that have been modified within the n days prior to a
+specific time.  Any files identified are published to iRODS with
+metadata obtained from LIMS.
 
 =head1 AUTHOR
 
@@ -223,7 +178,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012-2013 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

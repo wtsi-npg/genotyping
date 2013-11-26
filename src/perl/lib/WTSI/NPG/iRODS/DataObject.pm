@@ -7,20 +7,24 @@ use JSON;
 use File::Spec;
 use Moose;
 
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::iRODS::Path';
 
-has 'data_object' => (is => 'ro', isa => 'Str', required => 1,
-                      default => '.', lazy => 1,
-                      predicate => 'has_data_object');
+has 'data_object' =>
+  (is        => 'ro',
+   isa       => 'Str',
+   required  => 1,
+   lazy      => 1,
+   default   => '.',
+   predicate => 'has_data_object');
 
 # TODO: Add a check so that a DataObject cannot be built from a path
 # that is in fact a collection.
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
-  if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS2') {
+  if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS') {
     my ($volume, $collection, $data_name) = File::Spec->splitpath($args[1]);
     $collection = File::Spec->canonpath($collection);
     $collection ||= '.';

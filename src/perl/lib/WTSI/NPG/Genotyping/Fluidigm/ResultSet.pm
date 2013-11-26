@@ -10,54 +10,74 @@ with 'WTSI::NPG::Loggable';
 our $DATA_DIRECTORY_NAME = 'Data';
 our $EXPECTED_TIF_TOTAL = 3;
 
-has 'directory' => (is  => 'ro', isa => 'Str', required => 1,
-                    writer => '_directory');
-has 'data_directory' => (is  => 'ro', isa => 'Str',
-                         writer => '_data_directory');
-has 'export_file' => (is  => 'ro', isa => 'Str',
-                      writer => '_export_file');
-has 'tif_files' => (is => 'ro', isa => 'ArrayRef[Str]',
-                    writer => '_tif_files');
-has 'fluidigm_barcode' =>(is  => 'ro', isa => 'Str',
-                          writer => '_fluidigm_barcode');
+has 'directory' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   writer   => '_directory');
+
+has 'data_directory' =>
+  (is     => 'ro',
+   isa    => 'Str',
+   writer => '_data_directory');
+
+has 'export_file' =>
+  (is     => 'ro',
+   isa    => 'Str',
+   writer => '_export_file');
+
+has 'tif_files' =>
+  (is     => 'ro',
+   isa    => 'ArrayRef[Str]',
+   writer => '_tif_files');
+
+has 'fluidigm_barcode' =>
+  (is     => 'ro',
+   isa    => 'Str',
+   writer => '_fluidigm_barcode');
 
 sub BUILD {
-    my ($self) = @_;
-    # validate main directory
-    if (!(-e $self->directory)) {
-      $self->logconfess("Fluidigm directory path '", $self->directory,
-                        "' does not exist");
-    } elsif (!(-d $self->directory)) {
-      $self->logconfess("Fluidigm directory path '", $self->directory,
-                        "' is not a directory");
-    }
-    # find barcode (identical to directory name, by definition)
-    my @terms = split(/\//, $self->directory);
-    if ($terms[-1] eq '') { pop @terms; } # in case of trailing / in path
-    $self->_fluidigm_barcode(pop(@terms));
-    # validate data subdirectory
-    $self->_data_directory($self->directory .'/'. $DATA_DIRECTORY_NAME);
-    if (!(-e $self->data_directory)) {
-      $self->logconfess("Fluidigm data path '", $self->data_directory,
-                        "' does not exist");
-    } elsif (!(-d $self->data_directory)) {
-      $self->logconfess("Fluidigm data path '", $self->data_directory,
-                        "' is not a directory");
-    }
-    # find .tif files
-    my @tif = glob($self->data_directory.'/*\.{tif,tiff}');
-    if (@tif!=$EXPECTED_TIF_TOTAL) {
-      $self->logconfess("Should have exactly $EXPECTED_TIF_TOTAL .tif ",
-                        "files in ".$self->data_directory);
-    } else {
-      $self->_tif_files(\@tif);
-    }
-    # look for export .csv file
-    $self->_export_file($self->directory.'/'.$self->fluidigm_barcode.'.csv');
-    if (!(-e $self->export_file)) {
-      $self->logconfess("Fluidigm export .csv '", $self->export_file,
-                        "' does not exist");
-    }
+  my ($self) = @_;
+  # validate main directory
+  unless (-e $self->directory) {
+    $self->logconfess("Fluidigm directory path '", $self->directory,
+                      "' does not exist");
+  }
+  unless (-d $self->directory) {
+    $self->logconfess("Fluidigm directory path '", $self->directory,
+                      "' is not a directory");
+  }
+
+  # find barcode (identical to directory name, by definition)
+  my @terms = split(/\//, $self->directory);
+  if ($terms[-1] eq '') { pop @terms; } # in case of trailing / in path
+  $self->_fluidigm_barcode(pop(@terms));
+  # validate data subdirectory
+  $self->_data_directory($self->directory .'/'. $DATA_DIRECTORY_NAME);
+
+  unless (-e $self->data_directory) {
+    $self->logconfess("Fluidigm data path '", $self->data_directory,
+                      "' does not exist");
+  }
+  unless (-d $self->data_directory) {
+    $self->logconfess("Fluidigm data path '", $self->data_directory,
+                      "' is not a directory");
+  }
+
+  # find .tif files
+  my @tif = glob($self->data_directory.'/*\.{tif,tiff}');
+  unless (@tif==$EXPECTED_TIF_TOTAL) {
+    $self->logconfess("Should have exactly $EXPECTED_TIF_TOTAL .tif ",
+                      "files in ".$self->data_directory);
+  }
+  $self->_tif_files(\@tif);
+
+  # look for export .csv file
+  $self->_export_file($self->directory.'/'.$self->fluidigm_barcode.'.csv');
+  unless (-e $self->export_file) {
+    $self->logconfess("Fluidigm export .csv '", $self->export_file,
+                      "' does not exist");
+  }
 }
 
 __PACKAGE__->meta->make_immutable;
@@ -66,6 +86,7 @@ no Moose;
 
 1;
 
+__END__
 
 =head1 AUTHOR
 
