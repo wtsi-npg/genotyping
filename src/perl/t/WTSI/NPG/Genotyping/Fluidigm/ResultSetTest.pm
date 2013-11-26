@@ -16,16 +16,16 @@ BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet'); }
 
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
-my $result_dir = './t/fluidigm_result_set/complete/0123456789';
+my $result_dir = './t/fluidigm_resultset/complete/0123456789';
 
-my $missing_data = './t/fluidigm_result_set/missing_data/0123456789';
-my $missing_export = './t/fluidigm_result_set/missing_export/0123456789';
-my $missing_tif = './t/fluidigm_result_set/missing_tif/0123456789';
+my $missing_data = './t/fluidigm_resultset/missing_data/0123456789';
+my $missing_export = './t/fluidigm_resultset/missing_export/0123456789';
+my $missing_tif = './t/fluidigm_resultset/missing_tif/0123456789';
 my $missing_dir = './t/fluidigm_noplace';
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet');
-};
+}
 
 sub constructor : Test(5) {
   new_ok('WTSI::NPG::Genotyping::Fluidigm::ResultSet',
@@ -46,7 +46,7 @@ sub constructor : Test(5) {
   dies_ok { WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
       (directory => $missing_tif) }
     "Expected to fail when a tif file does not exist";
-};
+}
 
 sub paths : Test(8) {
   my $result_set = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
@@ -70,4 +70,4 @@ sub paths : Test(8) {
                                      "$result_dir/Data/athos.tif",
                                      "$result_dir/Data/porthos.tif"]) or
      diag explain $result_set->tif_files;
-};
+}

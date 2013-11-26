@@ -13,17 +13,12 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::iRODS qw(collect_files
-                        collect_dirs
-                        modified_between);
-
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
-
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
+use WTSI::NPG::Utilities qw(collect_files
+                            collect_dirs
+                            modified_between);
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -99,23 +94,14 @@ sub run {
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch())->subtract(days => $days);
 
-  $log->info("Publishing Fluidigm results to '$publish_dest'",
-             " finished between ", $begin->iso8601,
-             " and ", $end->iso8601);
-
-  my $uid = `whoami`;
-  chomp($uid);
-
-  my $creator_uri = get_wtsi_uri();
-  my $publisher_uri = get_publisher_uri($uid);
-  my $name = get_publisher_name($publisher_uri);
-
-  $log->info("Publishing to '$publish_dest' as ", $name);
-
   my $dir_test = modified_between($begin->epoch(), $end->epoch());
   my $dir_regex = qr{^[0-9]{10}$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
+
+  $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
+             " results finished between ",
+             $begin->iso8601, " and ", $end->iso8601);
 
   foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
                                 $dir_regex)) {
@@ -124,10 +110,10 @@ sub run {
       (directory => $dir);
 
     my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
-      (creator_uri => $creator_uri,
-       publisher_uri => $publisher_uri,
-       publication_time => $now,
-       resultset => $resultset);
+      (publication_time => $now,
+       resultset        => $resultset,
+       logger           => $log);
+    $publisher->irods->logger($log);
 
     $publisher->publish($publish_dest);
   }
