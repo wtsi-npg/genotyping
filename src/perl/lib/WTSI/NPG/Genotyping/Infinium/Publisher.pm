@@ -60,6 +60,14 @@ sub publish {
 sub publish_samples {
   my ($self, $publish_dest) = @_;
 
+  defined $publish_dest or
+    $self->logconfess('A defined publish_dest argument is required');
+
+  $publish_dest eq '' and
+    $self->logconfess('A non-empty publish_dest argument is required');
+
+  $publish_dest = File::Spec->canonpath($publish_dest);
+
   my $num_published = 0;
   my $total = scalar @{$self->resultsets} * 3;
 

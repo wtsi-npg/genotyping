@@ -27,8 +27,8 @@ sub update_secondary_metadata {
   # not contain tracking information on Sequenom plates
   my $plate_id = $snpdb->find_sequenom_plate_id($plate_name);
   if (defined $plate_id) {
-    $self->debug("Found Sequencescape plate identifier '$plate_id' for ",
-                 "'", $self->str, "'");
+    $self->debug("Found Sequencescape plate identifier '$plate_id' for '",
+                 $self->str, "'");
 
     my $ss_sample = $ssdb->find_sample_by_plate($plate_id, $well);
     unless ($ss_sample) {

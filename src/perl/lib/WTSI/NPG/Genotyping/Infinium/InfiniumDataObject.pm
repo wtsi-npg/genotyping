@@ -26,7 +26,7 @@ sub update_secondary_metadata {
     $ssdb->find_infinium_sample_by_plate($infinium_barcode, $well);
 
   if ($ss_sample) {
-    $self->info("Updating metadata for '", $self->str ,"' from plate ",
+    $self->info("Updating metadata for '", $self->str, "' from plate ",
                 "'$infinium_barcode' well '$well'");
 
     my @meta = make_sample_metadata($ss_sample);

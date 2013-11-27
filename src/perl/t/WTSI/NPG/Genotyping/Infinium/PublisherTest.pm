@@ -117,9 +117,9 @@ sub resultsets : Test(1) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (publication_time => $publication_time,
-     data_files       => \@data_files,
-     infinium_db      => $ifdb);
+    (data_files       => \@data_files,
+     infinium_db      => $ifdb,
+     publication_time => $publication_time,);
 
   cmp_ok(scalar @{$publisher->resultsets}, '==', 6,
          'Found only complete resultsets');
@@ -133,9 +133,9 @@ sub publish : Test(4) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (publication_time => $publication_time,
-     data_files       => [@data_files[0 .. 2]],
-     infinium_db      => $ifdb);
+    (data_files       => [@data_files[0 .. 2]],
+     infinium_db      => $ifdb,
+     publication_time => $publication_time);
 
   cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
          'Number of resultsets prepared');
@@ -165,9 +165,9 @@ sub publish_overwrite : Test(5) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (publication_time => $publication_time,
-     data_files       => [@data_files[0 .. 2]],
-     infinium_db      => $ifdb);
+    (data_files       => [@data_files[0 .. 2]],
+     infinium_db      => $ifdb,
+     publication_time => $publication_time);
 
   cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
          'Number of resultsets prepared');
