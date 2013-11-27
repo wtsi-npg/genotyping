@@ -26,7 +26,7 @@ sub update_secondary_metadata {
     $ssdb->find_fluidigm_sample_by_plate($fluidigm_barcode, $well);
 
   if ($ss_sample) {
-    $self->info("Updating metadata for '", $self->str ,"' from plate ",
+    $self->info("Updating metadata for '", $self->str, "' from plate ",
                 "'$fluidigm_barcode' well '$well'");
 
     my @meta = make_sample_metadata($ss_sample);

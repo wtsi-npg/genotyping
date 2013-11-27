@@ -83,15 +83,15 @@ sub _parse_beadchip_table {
         last;
       }
       else {
-        my $sample_id = $self->_validate_sample_id($row[$sample_id_col], $n);
+        my $sample = $self->_validate_sample_id($row[$sample_id_col], $n);
         my $plate = $self->_validate_plate_id($row[$supplier_plate_id_col], $n);
         my $well = $self->_validate_well_id($row[$supplier_well_id_col], $n);
         my $beadchip = $self->_validate_beadchip($row[$beadchip_col], $n);
         my $section = $self->_validate_section($row[$section_col], $n);
 
-        push @samples, {sample_id        => $sample_id,
-                        infinium_plate   => $plate,
-                        infinium_well    => $well,
+        push @samples, {sample_id        => $sample,
+                        plate_id         => $plate,
+                        well_id          => $well,
                         beadchip         => $beadchip,
                         beadchip_section => $section};
       }

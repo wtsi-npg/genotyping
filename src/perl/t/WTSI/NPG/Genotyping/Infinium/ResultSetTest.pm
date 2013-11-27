@@ -23,7 +23,7 @@ my $red_path = "$data_path/0123456789_R01C01_Red.idat";
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Infinium::ResultSet');
-};
+}
 
 sub constructor : Test(4) {
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
@@ -62,4 +62,4 @@ sub constructor : Test(4) {
          red_idat_file    => 'no_such_path')
       }
     "Expected to fail when the Red idat file does not exist";
-};
+}
