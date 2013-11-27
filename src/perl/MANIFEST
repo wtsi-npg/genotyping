@@ -92,6 +92,7 @@ lib/WTSI/NPG/Genotyping/Schema/Result/Well.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/iRODS.pm
+lib/WTSI/NPG/iRODS/GroupAdmin.pm
 lib/WTSI/NPG/Metadata.pm
 lib/WTSI/NPG/Publication.pm
 lib/WTSI/NPG/Utilities.pm
