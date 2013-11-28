@@ -51,9 +51,6 @@ BEGIN { use_ok('WTSI::NPG::Expression::Publisher') };
 use WTSI::NPG::Expression::ChipLoadingManifestV2;
 use WTSI::NPG::Expression::Publisher;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::Utilities qw(collect_files
-                            collect_dirs
-                            modified_between);
 
 my $config = $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -88,7 +85,7 @@ sub require : Test(1) {
 
 sub constructor : Test(1) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $manifest =  WTSI::NPG::Expression::ChipLoadingManifestV2->new
@@ -104,7 +101,7 @@ sub constructor : Test(1) {
 
 sub resultsets : Test(1) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $manifest =  WTSI::NPG::Expression::ChipLoadingManifestV2->new
@@ -122,7 +119,7 @@ sub resultsets : Test(1) {
 
 sub publish : Test(4) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $manifest =  WTSI::NPG::Expression::ChipLoadingManifestV2->new
@@ -161,7 +158,7 @@ sub publish : Test(4) {
 
 sub publish_overwrite : Test(5) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $manifest =  WTSI::NPG::Expression::ChipLoadingManifestV2->new

@@ -28,9 +28,8 @@ our $EXPRESSION_ANALYSIS_UUID_META_KEY = 'analysis_uuid';
 our $EXPRESSION_BEADCHIP_META_KEY         = 'beadchip';
 our $EXPRESSION_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
 our $EXPRESSION_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
-
-our $log = Log::Log4perl->get_logger('npg.irods.publish');
-
+our $EXPRESSION_PLATE_NAME_META_KEY       = 'gex_plate';
+our $EXPRESSION_PLATE_WELL_META_KEY       = 'gex_well';
 
 =head2 make_infinium_metadata
 
@@ -46,9 +45,19 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 sub make_infinium_metadata {
   my ($resultset) = @_;
 
-  return (['dcterms:identifier'                  => $resultset->sample_id],
-          [$EXPRESSION_BEADCHIP_META_KEY         => $resultset->beadchip],
-          [$EXPRESSION_BEADCHIP_SECTION_META_KEY => $resultset->beadchip_section]);
+  my @meta =
+    (['dcterms:identifier'                  => $resultset->sample_id],
+     [$EXPRESSION_BEADCHIP_META_KEY         => $resultset->beadchip],
+     [$EXPRESSION_BEADCHIP_SECTION_META_KEY => $resultset->beadchip_section]);
+
+  if ($resultset->plate_id) {
+    push @meta,  [$EXPRESSION_PLATE_NAME_META_KEY => $resultset->plate_id];
+  }
+  if ($resultset->well_id) {
+    push @meta,  [$EXPRESSION_PLATE_WELL_META_KEY => $resultset->well_id];
+  }
+
+  return @meta;
 }
 
 =head2 make_analysis_metadata

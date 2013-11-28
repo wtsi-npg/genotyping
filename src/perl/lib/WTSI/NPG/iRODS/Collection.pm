@@ -67,7 +67,8 @@ sub add_avu {
   my ($self, $attribute, $value, $units) = @_;
 
   if ($self->find_in_metadata($attribute, $value, $units)) {
-    $self->debug("Failed to add AVU {'$attribute', '$value', '$units'} ",
+    my $units_str = defined $units ? "'$units'" : 'undef';
+    $self->debug("Failed to add AVU {'$attribute', '$value', $units_str} ",
                  "to '", $self->str, "': AVU is already present");
   }
   else {
@@ -100,7 +101,8 @@ sub remove_avu {
     $self->irods->remove_collection_avu($self->str, $attribute, $value, $units);
   }
   else {
-    $self->logcarp("Failed to remove AVU {'$attribute', '$value', '$units'} ",
+    my $units_str = defined $units ? "'$units'" : 'undef';
+    $self->logcarp("Failed to remove AVU {'$attribute', '$value', $units_str} ",
                    "from '", $self->str, "': AVU is not present");
   }
 
