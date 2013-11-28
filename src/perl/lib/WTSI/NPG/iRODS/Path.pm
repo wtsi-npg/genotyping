@@ -107,6 +107,7 @@ sub get_avu {
 
 sub find_in_metadata {
   my ($self, $attribute, $value, $units) = @_;
+  $attribute or $self->logcroak("An attribute argument is required");
 
   my @meta = @{$self->metadata};
   my @exists;
