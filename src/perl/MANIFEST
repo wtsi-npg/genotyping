@@ -125,6 +125,7 @@ lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/iRODS.pm
 lib/WTSI/NPG/iRODS/Collection.pm
 lib/WTSI/NPG/iRODS/DataObject.pm
+lib/WTSI/NPG/iRODS/GroupAdmin.pm
 lib/WTSI/NPG/iRODS/Lister.pm
 lib/WTSI/NPG/iRODS/MetaLister.pm
 lib/WTSI/NPG/iRODS/MetaModifier.pm
@@ -139,6 +140,7 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
+MANIFEST.orig
 README
 t/critic.ignore
 t/database_infinium.t
@@ -361,6 +363,9 @@ t/irods/test/file1.txt
 t/irods/test/file2.txt
 t/irods_collection_test.t
 t/irods_dataobject_test.t
+t/irods_groupadmin.t
+t/irods_groupadmin/ienv
+t/irods_groupadmin/igroupadmin
 t/irods_path_test/test_dir/test_file.txt
 t/perlcriticrc
 t/publish_expression_analysis/beadchip_table_example.txt
@@ -426,6 +431,7 @@ t/WTSI/NPG/Expression/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Expression/PublisherTest.pm
 t/WTSI/NPG/Expression/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/AssayDataObjectTest.pm
+t/WTSI/NPG/Genotyping/Fluidigm/AssayDataObjectTest.pm.orig
 t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm
