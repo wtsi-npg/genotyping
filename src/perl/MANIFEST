@@ -121,6 +121,9 @@ t/gender/input_xhet_large.txt
 t/gender_standalone.t
 t/identity.t
 t/intensity_metrics.t
+t/irods_groupadmin.t
+t/irods_groupadmin/ienv
+t/irods_groupadmin/igroupadmin
 t/irods.t
 t/irods/collect_files/a/10.txt
 t/irods/collect_files/a/x/1.txt
