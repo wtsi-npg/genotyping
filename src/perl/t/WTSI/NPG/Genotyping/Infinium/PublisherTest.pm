@@ -119,7 +119,7 @@ sub resultsets : Test(1) {
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (data_files       => \@data_files,
      infinium_db      => $ifdb,
-     publication_time => $publication_time,);
+     publication_time => $publication_time);
 
   cmp_ok(scalar @{$publisher->resultsets}, '==', 6,
          'Found only complete resultsets');

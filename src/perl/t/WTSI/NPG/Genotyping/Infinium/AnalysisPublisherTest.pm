@@ -80,14 +80,14 @@ sub publish : Test(3) {
   my $publish_dest = $irods_tmp_coll;
   my $sample_archive = "$irods_tmp_coll/infinium";
   my $run_name = 'test';
+  my $publication_time = DateTime->now;
 
-  my $time = DateTime->now;
   my $pipedb = make_pipedb($pipeline_dbfile);
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::AnalysisPublisher->new
     (analysis_directory => $analysis_data_path,
      pipe_db            => $pipedb,
-     publication_time   => $time,
+     publication_time   => $publication_time,
      run_name           => $run_name,
      sample_archive     => $sample_archive);
 
@@ -102,14 +102,14 @@ sub publish : Test(3) {
   my @sample_data =
     $irods->find_objects_by_meta("$irods_tmp_coll/infinium",
                                  [analysis_uuid => $analysis_uuid]);
-
+  # The third sample is excluded from publication
   my @expected_sample_data = map { "$irods_tmp_coll/infinium/$_" }
-     qw(1111111111_R01C01.gtc
-        1111111111_R01C01_Grn.idat
-        1111111111_R01C01_Red.idat
-        2222222222_R01C01.gtc
-        2222222222_R01C01_Grn.idat
-        2222222222_R01C01_Red.idat);
+    qw(1111111111_R01C01.gtc
+       1111111111_R01C01_Grn.idat
+       1111111111_R01C01_Red.idat
+       2222222222_R01C01.gtc
+       2222222222_R01C01_Grn.idat
+       2222222222_R01C01_Red.idat);
 
   is_deeply(\@sample_data, \@expected_sample_data,
            "Annotated sample objects match") or diag explain \@sample_data;
@@ -151,6 +151,7 @@ sub make_pipedb {
 
          my $sample = add_sample($dataset, @args);
 
+         # Exclude the third sample from publication
          if ($i == 3) {
            $sample->add_to_states($withdrawn);
            $sample->include_from_state;
