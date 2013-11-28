@@ -2895,6 +2895,43 @@ groupadmin>';
 
 plain_lg();
 
+plain_lg();
+die 'unexpected command' unless (qq(lg "ss_0"\n) eq <STDIN>);
+print 'Members of group ss_0:
+No rows found
+groupadmin>';
+plain_lg();
+die 'unexpected command' unless (qq(atg "ss_0" "dj3#Sanger1-dev"\n) eq <STDIN>);
+print 'groupadmin>';
+die 'unexpected command' unless (qq(atg "ss_0" "jl10#Sanger1-dev"\n) eq <STDIN>);
+print 'groupadmin>';
+die 'unexpected command' unless (qq(atg "ss_0" "kc7#Sanger1-dev"\n) eq <STDIN>);
+print 'groupadmin>';
+
+die 'unexpected command' unless (qq(lg "ss_0"\n) eq <STDIN>);
+print 'Members of group ss_0:^M
+dj3#Sanger1-dev
+jl10#Sanger1-dev
+dj3#Sanger1-dev
+groupadmin>';
+
+plain_lg();
+die 'unexpected command' unless (qq(lg "ss_0"\n) eq <STDIN>);
+print 'Members of group ss_0:^M
+dj3#Sanger1-dev
+jl10#Sanger1-dev
+kc7#Sanger1-dev
+groupadmin>';
+die 'unexpected command' unless (qq(rfg "ss_0" "jl10#Sanger1-dev"\n) eq <STDIN>);
+print 'groupadmin>';
+die 'unexpected command' unless (qq(rfg "ss_0" "kc7#Sanger1-dev"\n) eq <STDIN>);
+print 'groupadmin>';
+
+die 'unexpected command' unless (qq(lg "ss_0"\n) eq <STDIN>);
+print 'Members of group ss_0:^M
+dj3#Sanger1-dev
+groupadmin>';
+
 die 'unexpected command' unless (qq(quit\n) eq <STDIN>);
 print '';
 exit(0);

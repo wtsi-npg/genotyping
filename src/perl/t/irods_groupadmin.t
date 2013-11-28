@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 8;
+use Test::More tests => 12;
 use Test::Exception;
 
 
@@ -23,9 +23,19 @@ throws_ok {
   $iga->lg(q());
 } qr/empty string/sm, 'empty string group throw';
 
- throws_ok {
+throws_ok {
   $ENV{PATH}=q();
   WTSI::NPG::iRODS::GroupAdmin->new();
- } qr/Command 'i\S+' not found/sm, 'no igroupadmin';
+} qr/Command 'i\S+' not found/sm, 'no igroupadmin';
+
+lives_ok {
+  $iga->set_group_membership(q(ss_0), qw(jl10#Sanger1-dev kc7#Sanger1-dev));
+} 'add 2 members to group';
+cmp_ok scalar $iga->lg(q(ss_0)), q(==), 3, 'has 3 members (as admin user automatically added)';
+lives_ok {
+  $iga->set_group_membership(q(ss_0));
+} 'empty group membership';
+cmp_ok scalar $iga->lg(q(ss_0)), q(==), 1, 'has 1 members (as admin user left)';
+
 1;
 
