@@ -57,11 +57,11 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
   Arg [1]    : DateTime creation time
   Arg [2]    : string publisher (LDAP URI of publisher)
+
   Example    : my @meta = make_creation_metadata($time, $publisher)
   Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -76,11 +76,11 @@ sub make_creation_metadata {
 =head2 make_modification_metadata
 
   Arg [1]    : DateTime modification time
+
   Example    : my @meta = make_modification_metadata($time)
   Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -93,11 +93,11 @@ sub make_modification_metadata {
 =head2 make_sample_metadata
 
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
+
   Example    : my @meta = make_sample_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -167,11 +167,11 @@ sub make_sample_metadata {
 
   Arg [1]    : string filename
   Arg [2]    : array of valid file suffix strings
+
   Example    : my @meta = make_type_metadata($sample, '.txt', '.csv')
   Description: Return a list of metadata key/value pairs describing
                the file 'type' (suffix).
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -191,11 +191,11 @@ sub make_type_metadata {
 =head2 make_md5_metadata
 
   Arg [1]    : string filename
+
   Example    : my @meta = make_md5_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                file MD5 checksum.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -208,11 +208,11 @@ sub make_md5_metadata {
 =head2 make_ticket_metadata
 
   Arg [1]    : string filename
+
   Example    : my @meta = make_ticket_metadata($ticket_number)
   Description: Return a list of metadata key/value pairs describing a
                ticket relating to the file
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -225,11 +225,11 @@ sub make_ticket_metadata {
 =head2 has_consent
 
   Arg [1]    : metadata array
+
   Example    : My $consent = has_consent(@meta);
   Description: Return true if the sample metadata contains an indication that
                consent has been given.
   Returntype : boolean
-  Caller     : general
 
 =cut
 

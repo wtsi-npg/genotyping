@@ -208,12 +208,6 @@ __END__
 WTSI::NPG::Genotyping::Sequenom::Publisher - An iRODS data publisher
 for Sequenom results.
 
-=head1 SYNOPSIS
-
-
-=head1 DESCRIPTION
-
-
 =head1 AUTHOR
 
 Keith James <kdj@sanger.ac.uk>

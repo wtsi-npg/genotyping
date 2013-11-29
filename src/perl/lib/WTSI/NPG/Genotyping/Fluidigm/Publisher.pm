@@ -164,7 +164,6 @@ sub publish_samples {
   Description: Publish the directory with a Fluidigm::ResultSet to an
                iRODS path. Inserts a hashed directory path.
   Returntype : Str the newly created iRODS collection
-  Caller     : general
 
 =cut
 

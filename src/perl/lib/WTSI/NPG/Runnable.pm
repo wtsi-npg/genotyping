@@ -16,7 +16,6 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::Executable';
                string. Capture STDOUT and STDERR as strings and return an
                array of STDOUT split on the output record separator.
   Returntype : Array Str
-  Caller     : general
 
 =cut
 
