@@ -27,13 +27,13 @@ our $USER_SESSION_LOG_DIR = '/nfs/srpipe_data/logs/user_session_logs/';
 
   Arg [1]    : string
   Arg [2]    : string
+
   Example    : $stem = common_stem("foo13240a", "foo199")
   Description: Return the common part of the two arguments, starting
                from the left (index 0). If one or more of the arguments
                are empty strings, or the arguments differ at the first
                character, an empty string is returned.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
@@ -65,11 +65,11 @@ sub common_stem {
 =head2 trim
 
   Arg [1]    : string
+
   Example    : $trimmed = trim("  foo ");
   Description: Trim leading and trailing whitespace, withina  line, from a copy
                of the argument. Return the trimmed string.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
@@ -90,8 +90,7 @@ sub trim {
 
   Example    : $log = user_session_log($uid, 'my_session');
   Description: Return a log file path for a program user session.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
@@ -125,12 +124,12 @@ sub user_session_log {
                Optional (undef for unlimited depth).
   Arg [4]    : A file matching regex that is applied in addition to to
                the test. Optional.
+
   Example    : @files = collect_files('/home', $modified, 3, qr/.txt$/i)
   Description: Returns an array of file names present under the specified
                root, for which the test predicate returns true, up to the
                specified depth.
   Returntype : array of strings (file names)
-  Caller     : general
 
 =cut
 
@@ -192,7 +191,6 @@ sub collect_files {
                root, for which the test predicate returns true, up to the
                specified depth.
   Returntype : array of strings (dir names)
-  Caller     : general
 
 =cut
 
@@ -243,11 +241,11 @@ sub collect_dirs {
                returns true if that object is to be collected.
   Arg [2]    : arrayref of an array into which matched object will be pushed
                if the test returns true.
+
   Example    : $collector = make_collector(sub { ... }, \@found);
   Description: Returns a function that will push matched objects onto a
                specified array.
   Returntype : coderef
-  Caller     : general
 
 =cut
 
@@ -267,6 +265,7 @@ sub make_collector {
 =head2 md5sum
 
   Arg [1]    : string path to a file
+
   Example    : my $md5 = md5sum($filename)
   Description: Calculate the MD5 checksum of a file.
   Returntype : Str
@@ -292,13 +291,13 @@ sub md5sum {
 
   Arg [1]    : time in seconds since the epoch
   Arg [2]    : time in seconds since the epoch
+
   Example    : $test = modified_between($start_time, $end_time)
   Description: Return a function that accepts a single argument (a
                file name string) and returns true if that file has
                last been modified between the two specified times in
                seconds (inclusive).
   Returntype : coderef
-  Caller     : general
 
 =cut
 
