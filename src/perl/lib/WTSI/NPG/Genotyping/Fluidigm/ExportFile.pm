@@ -148,10 +148,10 @@ sub write_sample_assays {
 =head2 fluidigm_metadata
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
+
   Example    : $export->fluidigm_metadata('S01')
   Description: Return the metadata for the sample assayed at the address.
   Returntype : ArrayRef
-  Caller     : general
 
 =cut
 
@@ -171,11 +171,11 @@ sub fluidigm_metadata {
 =head2 fluidigm_fingerprint
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
+
   Example    : $export->fluidigm_metadata('S01')
   Description: Return the metadata fingerprint for the sample assayed at
                the address.
   Returntype : ArrayRef
-  Caller     : general
 
 =cut
 

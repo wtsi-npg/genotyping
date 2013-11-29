@@ -13,13 +13,13 @@ use base 'WTSI::NPG::Database';
 
   Arg [1]    : start DateTime
   Arg [2]    : end DateTime. Optional, defaults to start
+
   Example    : $db->find_finished_plate_names($then, $now)
   Description: Returns a list of names of plates finished between start and end
                dates, inclusive. Only the date part of the DateTime arguments is
                significant; these arguments are cloned and truncated prior to
                comparison.
   Returntype : arrayref of string
-  Caller     : general
 
 =cut
 
@@ -64,6 +64,7 @@ sub find_finished_plate_names {
 =head2 find_plate_results
 
   Arg [1]    : string
+
   Example    : $db->find_plate_results('plate name')
   Description: Returns details of the Sequenom assay results for a plate.
                The plate's results are returned as a hashref keyed on well
@@ -83,7 +84,6 @@ sub find_finished_plate_names {
                 height     => <assay result peak height numeric value>}
 
   Returntype : hashref of arrayrefs of hashrefs
-  Caller     : general
 
 =cut
 

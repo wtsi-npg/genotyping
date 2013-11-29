@@ -26,14 +26,12 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 
   Arg [1]    : file name
   Arg [2]    : Sample metadata
-  Arg [3]    : URI object of creator
-  Arg [4]    : Publication path in iRODS
-  Arg [5]    : URI object of publisher (typically an LDAP URI)
-  Arg [6]    : DateTime object of publication
+  Arg [3]    : Publication path in iRODS
+  Arg [4]    : DateTime object of publication
 
-  Example    : my $data_obj = publish_file($file, \@metadata, $creator_uri,
-                                          '/my/file', $publisher_uri, $now);
-  Description: Publish a file to iRODS with attendant metadata. Republish any
+  Example    : my $data_obj = $publisher->publish_file($file, \@metadata,
+                                                       '/my/file', $now);
+  Description: Publish a file to iRODS with metadata. Republish any
                file that is already published, but whose checksum has
                changed. This method distributes files into paths based on
                the file checksum. It attempts to identify, using metadata,
@@ -187,17 +185,22 @@ no Moose;
 
 1;
 
-
 __END__
 
 =head1 NAME
 
+WTSI::NPG::Publisher - Basic file publishing to iRODS with metadata
+and checksum tests.
 
 =head1 SYNOPSIS
 
+  my $publisher = WTSI::NPG::Publisher->new;
+  my $data_obj = $publisher->publish_file($file, \@metadata,
+                                          '/my/file', $now);
 
 =head1 DESCRIPTION
 
+This class provides general purpose file publishing functionality.
 
 =head1 AUTHOR
 

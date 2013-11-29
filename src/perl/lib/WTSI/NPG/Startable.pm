@@ -28,6 +28,15 @@ sub BUILD {
                                    $self->stderr));
 }
 
+=head2 start
+
+  Example    : WTSI::NPG::Startable->new(executable => 'cat',
+                                         arguments  => ['-N'])->run
+  Description: Starts the executable via its IPC::Run harness.
+  Returntype : WTSI::NPG::Startable
+
+=cut
+
 sub start {
   my ($self) = @_;
 
@@ -50,11 +59,19 @@ sub start {
   return $self;
 }
 
+=head2 start
+
+  Example    : $program->stop
+  Description: Stops the executable via its IPC::Run harness.
+  Returntype : WTSI::NPG::Startable
+
+=cut
+
 sub stop {
   my ($self) = @_;
 
   unless ($self->started) {
-    $self->logwarn("Lister has not started; cannot stop it");
+    $self->logwarn($self->executable, " has not started; cannot stop it");
     return $self;
   }
 
@@ -87,17 +104,16 @@ no Moose;
 
 1;
 
-
 __END__
 
 =head1 NAME
 
-
-=head1 SYNOPSIS
-
+WTSI::NPG::Startable
 
 =head1 DESCRIPTION
 
+An instance of this class enables an external program to be run (using
+IPC::Run::start / IPC::Run::finish).
 
 =head1 AUTHOR
 

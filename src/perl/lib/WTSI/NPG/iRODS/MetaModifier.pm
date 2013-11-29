@@ -40,7 +40,7 @@ sub modify_collection_meta {
 
   $collection =~ m{^/} or
     $self->logconfess("An absolute collection path argument is required: ",
-                      "recieved '$collection'");
+                      "received '$collection'");
 
   defined $attribute or
     $self->logconfess('A defined attribute argument is required');
@@ -57,7 +57,7 @@ sub modify_collection_meta {
   }
 
   my $json = JSON->new->utf8->encode($spec);
-  my $result_parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $json;
@@ -65,10 +65,15 @@ sub modify_collection_meta {
 
   $self->debug("Sending JSON spec $json to ", $self->executable);
 
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-    $result = $result_parser->incr_parse(${$self->stdout});
+  eval {
+    # baton send JSON responses on a single line
+    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
+    $result = $parser->decode(${$self->stdout});
     ${$self->stdout} = '';
+  };
+
+  if ($@) {
+    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
   # TODO -- factor out JSON protocol handling into a Role
@@ -87,7 +92,7 @@ sub modify_object_meta {
 
   $object =~ m{^/} or
     $self->logconfess("An absolute object path argument is required: ",
-                      "recieved '$object'");
+                      "received '$object'");
 
   defined $attribute or
     $self->logconfess('A defined attribute argument is required');
@@ -106,7 +111,7 @@ sub modify_object_meta {
   }
 
   my $json = JSON->new->utf8->encode($spec);
-  my $result_parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $json;
@@ -116,7 +121,14 @@ sub modify_object_meta {
 
   while ($self->harness->pumpable && !defined $result) {
     $self->harness->pump;
-    $result = $result_parser->incr_parse(${$self->stdout});
+
+    eval { $result = $parser->incr_parse(${$self->stdout}) };
+
+    if ($@) {
+      $self->logwarn("JSON parse error on: '", ${$self->stdout}, "'");
+      $parser->incr_skip;
+    }
+
     ${$self->stdout} = '';
   }
 
@@ -133,3 +145,33 @@ __PACKAGE__->meta->make_immutable;
 no Moose;
 
 1;
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::iRODS::MetaModifier
+
+=head1 DESCRIPTION
+
+A client that modifies iRODS metadata.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

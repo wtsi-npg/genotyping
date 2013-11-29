@@ -98,7 +98,6 @@ sub validate_checksum_metadata {
   Description: Add an AVU to an iRODS path (data object or collection)
                Return self.
   Returntype : WTSI::NPG::iRODS::DataObject
-  Caller     : general
 
 =cut
 
@@ -167,7 +166,6 @@ sub grant_group_access {
   Example    : $path->str
   Description: Return an absolute path string in iRODS.
   Returntype : Str
-  Caller     : general
 
 =cut
 
@@ -185,7 +183,6 @@ sub str {
   Description: Return a canonical JSON representation of this path,
                including any AVUs.
   Returntype : Str
-  Caller     : general
 
 =cut
 
@@ -204,3 +201,34 @@ __PACKAGE__->meta->make_immutable;
 no Moose;
 
 1;
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::iRODS::DataObject - An iRODS data object.
+
+=head1 DESCRIPTION
+
+Represents a data object and provides methods for adding and removing
+metdata, applying checksums and setting access permissions.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

@@ -11,10 +11,6 @@ use Carp;
 
 WTSI::NPG::iRODS::GroupAdmin
 
-=head1 VERSION
-
-1.0.0
-
 =head1 SYNOPSIS
 
   use WTSI::NPG::iRODS::GroupAdmin;
@@ -30,7 +26,6 @@ A class for running iRODS group admin related commands for creating groups and a
 
 =cut
 
-Readonly::Scalar our $VERSION => q(1.0.0);
 Readonly::Scalar our $IGROUPADMIN => q(igroupadmin);
 Readonly::Scalar our $IENV => q(ienv);
 

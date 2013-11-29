@@ -69,7 +69,6 @@ lib/WTSI/NPG/Expression/ChipLoadingManifestV1.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV2.pm
 lib/WTSI/NPG/Expression/InfiniumDataObject.pm
 lib/WTSI/NPG/Expression/Metadata.pm
-lib/WTSI/NPG/Expression/Publication.pm
 lib/WTSI/NPG/Expression/Publisher.pm
 lib/WTSI/NPG/Expression/ResultSet.pm
 lib/WTSI/NPG/Genotyping.pm
@@ -140,7 +139,6 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
-MANIFEST.orig
 README
 t/critic.ignore
 t/database_infinium.t
@@ -431,7 +429,6 @@ t/WTSI/NPG/Expression/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Expression/PublisherTest.pm
 t/WTSI/NPG/Expression/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/AssayDataObjectTest.pm
-t/WTSI/NPG/Genotyping/Fluidigm/AssayDataObjectTest.pm.orig
 t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm

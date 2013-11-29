@@ -13,12 +13,12 @@ use Log::Log4perl;
 
   Arg [1]    : name => string
   Arg [2]    : inifile => string
+
   Example    : WTSI::NPG::Database::<some class>->new
                  (name => 'my_database', inifile => 'my_database.ini')
   Description: Return a new database handle configured from an
                .ini-style file.
   Returntype : WTSI::NPG::Database
-  Caller     : general
 
 =cut
 
@@ -35,12 +35,12 @@ sub new {
 
   Arg [1]    : name => string
   Arg [2]    : inifile => string
+
   Example    : $db->configure(name => 'my_database',
                               inifile => 'my_database.ini')
   Description: Configure an exisiting database handle from an
                .ini-style file.
   Returntype : WTSI::NPG::Database
-  Caller     : constructor, general
 
 =cut
 
@@ -72,10 +72,10 @@ sub configure {
 =head2 inifile
 
   Arg [1]    : None
+
   Example    : $db->inifile
   Description: Return the current .ini-style file.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -92,12 +92,12 @@ sub inifile {
 =head2 connect
 
   Arg [n]    : key => value
+
   Example    : my $dbh = $db->connect(AutoCommit => 0, RaiseError => 1)->dbh;
   Description: Connect to the configured database using DBI. Additional
                DBI connection arguments may be supplied as key => value
                pairs.
   Returntype : WTSI::NPG::Database
-  Caller     : general
 
 =cut
 
@@ -122,10 +122,10 @@ sub connect {
 =head2 disconnect
 
   Arg [1]    : None
+
   Example    : $db->disconnect
   Description: Disconnect the database handle.
   Returntype : 
-  Caller     : general
 
 =cut
 
@@ -141,10 +141,10 @@ sub disconnect {
 =head2 is_connected
 
   Arg [1]    : None
+
   Example    : $db->is_connected
   Description: Return true if the database handle is connected.
   Returntype : boolean
-  Caller     : general
 
 =cut
 
@@ -157,10 +157,10 @@ sub is_connected {
 =head2 dbh
 
   Arg [1]    : None
+
   Example    : $db->dbh
   Description: Return the current database handle.
   Returntype : DBI handle
-  Caller     : general
 
 =cut
 
@@ -173,10 +173,10 @@ sub dbh {
 =head2 name
 
   Arg [1]    : None
+
   Example    : $db->name
   Description: Return the current database name.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -193,10 +193,10 @@ sub name {
 =head2 data_source
 
   Arg [1]    : None
+
   Example    : $db->data_source
   Description: Return the current database data source.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -213,10 +213,10 @@ sub data_source {
 =head2 username
 
   Arg [1]    : None
+
   Example    : $db->username
   Description: Return the current database user name.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -232,10 +232,10 @@ sub username {
 =head2 password
 
   Arg [1]    : None
+
   Example    : $db->password
   Description: Return the current database password.
   Returntype : string or undef
-  Caller     : general
 
 =cut
 
@@ -251,10 +251,10 @@ sub password {
 =head2 log
 
   Arg [1]    : None
+
   Example    : $db->log
   Description: Return the current logger.
   Returntype : Logger object
-  Caller     : general
 
 =cut
 
