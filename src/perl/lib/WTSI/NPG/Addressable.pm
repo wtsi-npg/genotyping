@@ -5,15 +5,25 @@ use Moose::Role;
 
 with 'WTSI::NPG::Loggable';
 
-has 'size' => (is => 'ro', isa => 'Int', required => 1,
-               builder => '_build_size', lazy => 1);
+has 'size' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   required => 1,
+   builder  => '_build_size',
+   lazy     => 1);
 
-has 'addresses' => (is => 'ro', isa => 'ArrayRef[Str]', required => 1,
-                    builder => '_build_addresses', lazy => 1);
+has 'addresses' =>
+  (is       => 'ro',
+   isa      => 'ArrayRef[Str]',
+   required => 1,
+   lazy     => 1,
+   builder  => '_build_addresses');
 
-has 'content' => (is => 'ro', isa => 'HashRef',
-                  default => sub { {} },
-                  writer => '_write_content');
+has 'content' =>
+  (is      => 'ro',
+   isa     => 'HashRef',
+   default => sub { return {} },
+   writer  => '_write_content');
 
 sub lookup {
   my ($self, $address) = @_;

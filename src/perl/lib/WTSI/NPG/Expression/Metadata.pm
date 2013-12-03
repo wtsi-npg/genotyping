@@ -13,8 +13,7 @@ use WTSI::NPG::iRODS qw(md5sum);
 use WTSI::NPG::Metadata qw(make_fingerprint);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(
-                    $EXPRESSION_ANALYSIS_UUID_META_KEY
+our @EXPORT_OK = qw($EXPRESSION_ANALYSIS_UUID_META_KEY
                     $EXPRESSION_BEADCHIP_DESIGN_META_KEY
                     $EXPRESSION_BEADCHIP_META_KEY
                     $EXPRESSION_BEADCHIP_SECTION_META_KEY
@@ -22,17 +21,15 @@ our @EXPORT_OK = qw(
 
                     infinium_fingerprint
                     make_analysis_metadata
-                    make_infinium_metadata
-);
+                    make_infinium_metadata);
 
 our $EXPRESSION_PROJECT_TITLE_META_KEY = 'dcterms:title';
 our $EXPRESSION_ANALYSIS_UUID_META_KEY = 'analysis_uuid';
 our $EXPRESSION_BEADCHIP_META_KEY         = 'beadchip';
 our $EXPRESSION_BEADCHIP_DESIGN_META_KEY  = 'beadchip_design';
 our $EXPRESSION_BEADCHIP_SECTION_META_KEY = 'beadchip_section';
-
-our $log = Log::Log4perl->get_logger('npg.irods.publish');
-
+our $EXPRESSION_PLATE_NAME_META_KEY       = 'gex_plate';
+our $EXPRESSION_PLATE_WELL_META_KEY       = 'gex_well';
 
 =head2 make_infinium_metadata
 
@@ -46,11 +43,21 @@ our $log = Log::Log4perl->get_logger('npg.irods.publish');
 =cut
 
 sub make_infinium_metadata {
-  my ($sample) = @_;
+  my ($resultset) = @_;
 
-  return (['dcterms:identifier'                  => $sample->{sanger_sample_id}],
-          [$EXPRESSION_BEADCHIP_META_KEY         => $sample->{beadchip}],
-          [$EXPRESSION_BEADCHIP_SECTION_META_KEY => $sample->{beadchip_section}]);
+  my @meta =
+    (['dcterms:identifier'                  => $resultset->sample_id],
+     [$EXPRESSION_BEADCHIP_META_KEY         => $resultset->beadchip],
+     [$EXPRESSION_BEADCHIP_SECTION_META_KEY => $resultset->beadchip_section]);
+
+  if ($resultset->plate_id) {
+    push @meta,  [$EXPRESSION_PLATE_NAME_META_KEY => $resultset->plate_id];
+  }
+  if ($resultset->well_id) {
+    push @meta,  [$EXPRESSION_PLATE_WELL_META_KEY => $resultset->well_id];
+  }
+
+  return @meta;
 }
 
 =head2 make_analysis_metadata

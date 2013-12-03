@@ -10,13 +10,13 @@ use base 'WTSI::NPG::Database';
 =head2 find_sequenom_plate_id
 
   Arg [1]    : A plate name from the Sequenom LIMS
+
   Example    : $db->find_sequenom_plate_id('my_plate_name')
   Description: Given the name of a Sequenom LIMS plate, return the
                Sequencescape identifier ("internal_id") of that
                plate.
 
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -70,6 +70,7 @@ sub find_sequenom_plate_id {
 
   Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
   Arg [2]    : arrayref of WTSI::NPG::Genotyping::Schema::Result::Sample objects
+
   Example    : $db->insert_sequenom_calls($pipedb, $samples)
   Description: Inserts Sequenom results from the SNP database into the
                pipeline database. The 'name' field of the Sample is expected
@@ -88,7 +89,6 @@ sub find_sequenom_plate_id {
 
   Returntype : integer (total number of
                WTSI::NPG::Genotyping::Schema::Result::SnpResults inserted)
-  Caller     : general
 
 =cut
 
@@ -164,12 +164,12 @@ sub insert_sequenom_calls {
   Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
   Arg [2]    : Reference to a hash. Keys are sample names, values are
                sample IDs in the SNP database.
+
   Description: Query the SNP database by sample and return details of calls.
                Returns a hash of hashes of calls indexed by sample and SNP; 
                hash of SNPs found; hash of samples with no calls in SNP;
                total number of calls read
   Returntype : (hashref, hashref, hashref, integer)
-  Caller     : General
 
 =cut
 

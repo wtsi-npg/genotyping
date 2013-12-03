@@ -1,180 +1,62 @@
 
+use utf8;
+
 package WTSI::NPG::iRODS::Path;
 
 use JSON;
 use File::Spec;
-use Moose;
+use Moose::Role;
 
-use WTSI::NPG::iRODS qw(add_collection_meta
-                        add_object_meta
-                        get_collection_meta
-                        get_object_meta
-                        remove_collection_meta
-                        remove_object_meta);
+use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
+use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotatable';
 
-has 'collection' => (is => 'ro', isa => 'Str', required => 1,
-                     predicate => 'has_collection');
+has 'collection' =>
+  (is        => 'ro',
+   isa       => 'Str',
+   required  => 1,
+   lazy      => 1,
+   default   => '.',
+   predicate => 'has_collection');
 
-has 'data_object' => (is => 'ro', isa => 'Str',
-                      predicate => 'has_data_object');
+has 'irods' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS',
+   required => 1);
 
-# The following overrides the definition in
-# WTSI::NPG::Annotatable. Apparently our old version of Moose doesn't
-# support this attribute inheritance
-#
-has 'metadata' => (is => 'rw',
-                   isa => 'ArrayRef',
+has 'metadata' => (is        => 'rw',
+                   isa       => 'ArrayRef',
                    predicate => 'has_metadata',
-                   clearer => 'clear_metadata');
-#
-# When on a newer Moose, remove the above and replace with this:
-#
-# has '+metadata' => (predicate => 'has_metadata',
-#                     clearer => 'clear_metadata');
+                   clearer   => 'clear_metadata');
 
-# Permit the constructor to use an iRODS path as its sole argument
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
-  # TODO -- Improve this method so that we can pass an array of path
-  # elements to the constructor. The elements will be joined using the
-  # path separator to form a complete path.
-
-  if (@args == 1 && !ref $args[0]) {
-    # Ends with '/' therefore is a collection
-    if ($args[0] eq '.' ||
-        $args[0] =~ m{/$}) {
-      return $class->$orig(collection => $args[0]);
-    }
-    else {
-      my ($volumes, $directory, $filename) = File::Spec->splitpath($args[0]);
-      return $class->$orig(collection => $directory,
-                           data_object => $filename);
-    }
+  if (@args == 2 && ref $args[0] eq 'WTSI::NPG::iRODS') {
+    return $class->$orig(irods      => $args[0],
+                         collection => $args[1]);
   }
   else {
     return $class->$orig(@_);
   }
 };
 
-# Lazily load metadata from iRODS
+sub BUILD {
+  my ($self) = @_;
+
+  # Make our logger be the iRODS logger by default
+  $self->logger($self->irods->logger);
+}
+
 around 'metadata' => sub {
-  my ($orig, $self) = @_;
+   my ($orig, $self, @args) = @_;
 
-  unless ($self->has_metadata) {
-    my %meta;
-    if ($self->has_data_object) {
-      %meta = get_object_meta($self->str);
-    }
-    else {
-      %meta = get_collection_meta($self->str);
-    }
-
-    my @meta;
-    foreach my $attr (sort keys %meta) {
-      unless (ref $meta{$attr} eq 'ARRAY') {
-        $self->logconfess("Malformed value for attribute '$attr': ",
-                          "expected an ArrayRef");
-      }
-
-      unless (scalar @{$meta{$attr}} > 0) {
-        $self->logconfess("Malformed value for attribute '$attr': ",
-                          "value array was empty");
-      }
-
-      # TODO -- remove this when we support fully units in metadata
-      foreach my $value (sort @{$meta{$attr}}) {
-        push @meta, [$attr, $value, ""];
-      }
-    }
-    $self->$orig(\@meta);
-  }
-
-  return $self->$orig;
+   my @sorted = sort { $a->{attribute} cmp $b->{attribute} ||
+                       $a->{value}     cmp $b->{value}     ||
+                       $a->{units}     cmp $b->{units} } @{$self->$orig(@args)};
+   return \@sorted;
 };
-
-=head2 add_avu
-
-  Arg [1]    : attribute
-  Arg [2]    : value
-  Arg [2]    : units (optional)
-
-  Example    : $path->add_avu('foo', 'bar')
-  Description: Add an AVU to an iRODS path (data object or collection)
-               Return self.
-  Returntype : WTSI::NPG::iRODS::Path
-  Caller     : general
-
-=cut
-
-sub add_avu {
-  my ($self, $attribute, $value, $units) = @_;
-  $units ||= '';
-
-  my @meta = @{$self->metadata};
-  my @exists = grep { $_->[0] eq $attribute &&
-                      $_->[1] eq $value &&
-                      $_->[2] eq $units } @meta;
-  if (@exists) {
-    $self->debug("Failed to add AVU ['$attribute' '$value' '$units'] ",
-                 "to '", $self->str, "': AVU is already present");
-  }
-  else {
-    if ($self->has_data_object) {
-      add_object_meta($self->str, $attribute, $value, $units);
-    }
-    else {
-      add_collection_meta($self->str, $attribute, $value, $units);
-    }
-  }
-
-  $self->clear_metadata;
-
-  return $self;
-}
-
-=head2 remove_avu
-
-  Arg [1]    : attribute
-  Arg [2]    : value
-  Arg [2]    : units (optional)
-
-  Example    : $path->remove_avu('foo', 'bar')
-  Description: Remove an AVU from an iRODS path (data object or collection)
-               Return self.
-  Returntype : WTSI::NPG::iRODS::Path
-  Caller     : general
-
-=cut
-
-sub remove_avu {
-  my ($self, $attribute, $value, $units) = @_;
-  $units ||= '';
-
-  my @meta = @{$self->metadata};
-  my @exists = grep { $_->[0] eq $attribute &&
-                      $_->[1] eq $value &&
-                      $_->[2] eq $units } @meta;
-
-  if (@exists) {
-    if ($self->has_data_object) {
-      remove_object_meta($self->str, $attribute, $value, $units);
-    }
-    else {
-      remove_collection_meta($self->str, $attribute, $value, $units);
-    }
-  }
-  else {
-    $self->logcarp("Failed to remove AVU ['$attribute' '$value' '$units'] ",
-                   "from '", $self->str, "': AVU is not present");
-  }
-
-  $self->clear_metadata;
-
-  return $self;
-}
 
 =head2 get_avu
 
@@ -185,8 +67,7 @@ sub remove_avu {
   Example    : $path->get_avu('foo')
   Description: Return a single matching AVU. If multiple candidate AVUs
                match the arguments, an error is raised.
-  Returntype : Array
-  Caller     : general
+  Returntype : HashRef
 
 =cut
 
@@ -194,99 +75,153 @@ sub get_avu {
   my ($self, $attribute, $value, $units) = @_;
   $attribute or $self->logcroak("An attribute argument is required");
 
+  my @exists = $self->find_in_metadata($attribute, $value, $units);
+
+  my $avu;
+  if (@exists) {
+    if (scalar @exists == 1) {
+      $avu = $exists[0];
+    }
+    else {
+      $value ||= '';
+      $units ||= '';
+
+      my $fn = sub {
+        my $avu = shift;
+
+        return sprintf("{'%s', '%s', '%s'}", $avu->{attribute}, $avu->{value},
+                       $avu->{units});
+      };
+
+      my $matched = join ", ", map { $fn->($_) } @exists;
+
+      $self->logconfess("Failed to get a single AVU matching ",
+                        "{'$attribute', '$value', '$units'}: ",
+                        "matched [$matched]");
+    }
+  }
+
+  return $avu;
+}
+
+=head2 find_in_metadata
+
+  Arg [1]    : attribute
+  Arg [2]    : value (optional)
+  Arg [2]    : units (optional)
+
+  Example    : my @avus = $path->get_find_in_metadata('foo')
+  Description: Return all matching AVUs
+  Returntype : Array
+
+=cut
+
+sub find_in_metadata {
+  my ($self, $attribute, $value, $units) = @_;
+  $attribute or $self->logcroak("An attribute argument is required");
+
   my @meta = @{$self->metadata};
   my @exists;
 
   if ($value && $units) {
-    @exists = grep { $_->[0] eq $attribute &&
-                     $_->[1] eq $value &&
-                     $_->[2] eq $units } @meta;
+    @exists = grep { $_->{attribute} eq $attribute &&
+                     $_->{value}     eq $value &&
+                     $_->{units}     eq $units } @meta;
   }
   elsif ($value) {
-    @exists = grep { $_->[0] eq $attribute &&
-                     $_->[1] eq $value } @meta;
+    @exists = grep { $_->{attribute} eq $attribute &&
+                     $_->{value}     eq $value } @meta;
   }
   else {
-    @exists = grep { $_->[0] eq $attribute } @meta;
+    @exists = grep { $_->{attribute} eq $attribute } @meta;
   }
 
-  my @avu;
-  if (scalar @exists == 0) {
-    @avu = ();
-  }
-  elsif (scalar @exists == 1) {
-    @avu = @{$exists[0]};
-  }
-  else {
-    $value ||= '';
-    $units ||= '';
-
-    my $fn = sub { sprintf("['%s' -> '%s', '%s']",
-                           $_[0]->[0], $_[0]->[1], $_[0]->[2]) };
-    my $matched = join ", ", map { $fn->($_) } @exists;
-
-    $self->logconfess("Failed to get a single AVU matching ",
-                      "['$attribute', '$value', '$units']:",
-                      " matched [$matched]");
-  }
-
-  return @avu;
+  return @exists;
 }
 
-=head2 str
+=head2 expected_irods_groups
 
   Arg [1]    : None
 
-  Example    : $path->str
-  Description: Return an absolute path string in iRODS.
-  Returntype : Str
-  Caller     : general
+  Example    : @groups = $path->expected_irods_groups
+  Description: Return an array of iRODS group names given metadata containing
+               >=1 study_id under the key $STUDY_ID_META_KEY
+  Returntype : Array
 
 =cut
 
-sub str {
+sub expected_irods_groups {
   my ($self) = @_;
 
-  return File::Spec->join($self->collection, $self->data_object);
+  my @ss_study_avus = $self->find_in_metadata($STUDY_ID_META_KEY);
+  unless (@ss_study_avus) {
+    $self->logwarn("Did not find any study information in metadata");
+  }
+
+  my @groups;
+  foreach my $avu (@ss_study_avus) {
+    my $study_id = $avu->{value};
+    my $group = $self->irods->make_group_name($study_id);
+    push(@groups, $group);
+  }
+
+  return @groups;
 }
 
-=head2 json
+sub meta_str {
+  my ($self) = @_;
+
+  return $self->json;
+}
+
+=head2 meta_json
 
   Arg [1]    : None
 
-  Example    : $path->str
-  Description: Return a canonical JSON representation of this path,
-               including any AVUs.
+  Example    : $json = $path->meta_json
+  Description: Return all metadata as UTF-8 encoded JSON.
   Returntype : Str
-  Caller     : general
 
 =cut
 
-sub json {
+sub meta_json {
   my ($self) = @_;
 
-  my @avus = map { { attribute => $_->[0],
-                     value     => $_->[1],
-                     units     => $_->[2] } } @{$self->metadata};
-
-  my $json = {collection => $self->collection,
-              avus       => \@avus};
-  if ($self->has_data_object) {
-    $json->{data_object} = $self->data_object;
-  }
-
-  return to_json($json);
+  return JSON->new->utf8->encode($self->metadata);
 }
-
-sub _sort_metadata {
-  my ($self) = @_;
-
-  sort { $a->[0] cmp $b->[0] ||
-         $a->[1] cmp $b->[1] ||
-         $a->[2] cmp $b->[2] } @{$self->metadata};
-}
-
 
 no Moose;
 
 1;
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::iRODS::Path - The base class for representing iRODS
+collections and data objects.
+
+=head1 DESCRIPTION
+
+Represents the features common to all iRODS paths; the collection and
+the metadata.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
