@@ -43,7 +43,7 @@ sub ug2id {
   if(my$gha=$ug2id{$g}){return @{$gha};}
   $g=`getent group $g`;
   chomp $g;
-  my@g = split q(,), (split q(:),$g)[-1];
+  my@g = split q(,), (split q(:),$g)[-1]||q();
   $ug2id{$g}=\@g;
   return @g;
 }
