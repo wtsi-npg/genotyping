@@ -51,6 +51,7 @@ sub ug2id {
 my $s=npg_warehouse::Schema->connect();
 my$rs=$s->resultset(q(CurrentStudy));
 
+my($group_count,$altered_count)= (0,0);
 while (my$st=$rs->next){
   my$study_id=$st->internal_id;
   my$g=$st->data_access_group;
@@ -58,7 +59,10 @@ while (my$st=$rs->next){
   my@m=$g      ? map{ _uid_to_iRODSuid($_) } ug2id($g) :
        $is_seq ? @public :
                  ();
-  $iga->set_group_membership("ss_$study_id",@m);
+  $altered_count += $iga->set_group_membership("ss_$study_id",@m) ? 1 : 0;
+  $group_count++;
 }
 
-
+if($altered_count){
+  print {*STDERR} "$altered_count of $group_count iRODS groups created or membership altered (by ".($iga->_user).")\n";
+}
