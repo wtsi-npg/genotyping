@@ -64,5 +64,5 @@ while (my$st=$rs->next){
 }
 
 if($altered_count){
-  print {*STDERR} "$altered_count of $group_count iRODS groups created or membership altered (by ".($iga->_user).")\n";
+  print {*STDERR} "When considering $group_count Sequencescape studies, $altered_count iRODS groups were created or their membership altered (by ".($iga->_user).")\n";
 }
