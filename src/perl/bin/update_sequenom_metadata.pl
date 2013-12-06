@@ -103,7 +103,6 @@ sub run {
     $irods->find_objects_by_meta($publish_dest,
                                  [sequenom_plate => '%', 'like'],
                                  [sequenom_well  => '%', 'like'],
-                                 [type           => 'csv'],
                                  @filter);
   my $total = scalar @sequenom_data;
   my $updated = 0;
