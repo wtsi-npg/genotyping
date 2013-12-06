@@ -154,11 +154,11 @@ __END__
 
 =head1 NAME
 
-publish_analysis_data
+publish_infinium_analysis
 
 =head1 SYNOPSIS
 
-publish_analysis_data [--config <database .ini file>] \
+publish_infinium_analysis [--config <database .ini file>] \
    [--dbfile <SQLite file>] --run <pipeline run name> \
    --source <directory> --dest <irods collection> [--verbose]
 
