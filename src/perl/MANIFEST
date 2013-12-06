@@ -17,6 +17,7 @@ bin/plot_box_bean.pl
 bin/plot_cr_het_density.pl
 bin/plot_fail_causes.pl
 bin/plot_metric_scatter.pl
+bin/populate_wtsi_irods_groups.pl
 bin/print_simfile_header.pl
 bin/publish_expression_analysis.pl
 bin/publish_fluidigm_genotypes.pl

@@ -161,31 +161,34 @@ sub _ensure_existence_of_group {
   __croak_on_bad_group_name($group);
   if ( any {$group eq $_} $self->lg){ return;}
   $self->_push_pump_trim_split(qq(mkgroup "$group"\n));
-  return;
+  return 1; #return true if we make a group
 }
 
 =head2 set_group_membership
 
-Given a group and list of members will ensure that the group exists and contains exactly this admin user and the members (adding or removing as appropriate)
+Given a group and list of members will ensure that the group exists and contains exactly this admin user and the members (adding or removing as appropriate). Return true if a group is created or its membership altered.
 
 =cut
 
 sub set_group_membership {
   my($self,$group,@members)=@_;
-  $self->_ensure_existence_of_group($group);
+  my $altered = $self->_ensure_existence_of_group($group);
   my @orig_members = $self->lg($group);
   if (@orig_members){
     if(none {$_ eq $self->_user} @orig_members) {carp "group $group does not contain user ".($self->_user).': authorization failure likely';}
   }else{
     $self->_op_g_u('atg',$group, $self->_user); #add this user to empty group (first) so admin rights to operate on it are retained
     push @orig_members, $self->_user;
+    $altered = 1;
   }
   my%members = map{$_=>1}@members,$self->_user;
   @orig_members = grep{ not delete $members{$_}} @orig_members; #make list to delete from orginal members if not in new list, leaves member to add in hash
   foreach my $m (@orig_members){ $self->_op_g_u('rfg',$group,$m); }
+  $altered ||= @orig_members;
   @members = keys %members;
   foreach my $m (@members) { $self->_op_g_u('atg',$group,$m); }
-  return;
+  $altered ||= @members;
+  return $altered;
 }
 
 sub BUILD {
