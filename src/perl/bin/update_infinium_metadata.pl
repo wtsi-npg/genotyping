@@ -89,11 +89,12 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my @infinium_data = find_objects_by_meta($publish_dest, [type => $type],
+  my @infinium_data = find_objects_by_meta($publish_dest,
+                                           [type => $type],
                                            @filter);
   my $total = scalar @infinium_data;
   my $updated = 0;

@@ -19,7 +19,7 @@ use Pod::Usage;
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -91,18 +91,21 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse_prod',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name   => 'snp',
      inifile => $config)->connect(RaiseError => 1);
 
-  my $irods = WTSI::NPG::iRODS2->new(logger => $log);
+  my $irods = WTSI::NPG::iRODS->new(logger => $log);
 
   my @sequenom_data =
-    $irods->find_objects_by_meta($publish_dest, [type => 'csv'],
+    $irods->find_objects_by_meta($publish_dest,
+                                 [sequenom_plate => '%', 'like'],
+                                 [sequenom_well  => '%', 'like'],
+                                 [type           => 'csv'],
                                  @filter);
   my $total = scalar @sequenom_data;
   my $updated = 0;
@@ -152,8 +155,6 @@ Options:
   --filter-value
   --help          Display help.
   --logconf       A log4perl configuration file. Optional.
-  --num-processes The number for forked processes to run. Optional,
-                  defaults to 1 (i.e. none forked).
   --verbose       Print messages while processing. Optional.
 
 =head1 DESCRIPTION

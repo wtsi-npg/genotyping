@@ -40,7 +40,7 @@ sub modify_collection_meta {
 
   $collection =~ m{^/} or
     $self->logconfess("An absolute collection path argument is required: ",
-                      "recieved '$collection'");
+                      "received '$collection'");
 
   defined $attribute or
     $self->logconfess('A defined attribute argument is required');
@@ -57,7 +57,7 @@ sub modify_collection_meta {
   }
 
   my $json = JSON->new->utf8->encode($spec);
-  my $result_parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $json;
@@ -65,10 +65,15 @@ sub modify_collection_meta {
 
   $self->debug("Sending JSON spec $json to ", $self->executable);
 
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-    $result = $result_parser->incr_parse(${$self->stdout});
+  eval {
+    # baton send JSON responses on a single line
+    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
+    $result = $parser->decode(${$self->stdout});
     ${$self->stdout} = '';
+  };
+
+  if ($@) {
+    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
   # TODO -- factor out JSON protocol handling into a Role
@@ -87,7 +92,7 @@ sub modify_object_meta {
 
   $object =~ m{^/} or
     $self->logconfess("An absolute object path argument is required: ",
-                      "recieved '$object'");
+                      "received '$object'");
 
   defined $attribute or
     $self->logconfess('A defined attribute argument is required');
@@ -106,7 +111,7 @@ sub modify_object_meta {
   }
 
   my $json = JSON->new->utf8->encode($spec);
-  my $result_parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $json;
@@ -116,7 +121,14 @@ sub modify_object_meta {
 
   while ($self->harness->pumpable && !defined $result) {
     $self->harness->pump;
-    $result = $result_parser->incr_parse(${$self->stdout});
+
+    eval { $result = $parser->incr_parse(${$self->stdout}) };
+
+    if ($@) {
+      $self->logwarn("JSON parse error on: '", ${$self->stdout}, "'");
+      $parser->incr_skip;
+    }
+
     ${$self->stdout} = '';
   }
 

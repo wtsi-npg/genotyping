@@ -29,7 +29,7 @@ sub list_collection_meta {
 
   $collection =~ m{^/} or
     $self->logconfess("An absolute object path argument is required: ",
-                      "recieved '$collection'");
+                      "received '$collection'");
 
   $collection = File::Spec->canonpath($collection);
 
@@ -47,7 +47,7 @@ sub list_object_meta {
 
   $object =~ m{^/} or
     $self->logconfess("An absolute object path argument is required: ",
-                      "recieved '$object'");
+                      "received '$object'");
 
   my ($volume, $collection, $data_name) = File::Spec->splitpath($object);
   $collection = File::Spec->canonpath($collection);
@@ -65,7 +65,7 @@ sub _list_path_meta {
   defined $path_spec or
     $self->logconfess('A defined JSON path spec argument is required');
 
-  my $parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $path_spec;
@@ -73,10 +73,15 @@ sub _list_path_meta {
 
   $self->debug("Sending JSON path spec $path_spec to ", $self->executable);
 
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-    $result = $parser->incr_parse(${$self->stdout});
+  eval {
+    # baton send JSON responses on a single line
+    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
+    $result = $parser->decode(${$self->stdout});
     ${$self->stdout} = '';
+  };
+
+  if ($@) {
+    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
   # TODO -- factor out JSON protocol handling into a Role
@@ -84,8 +89,10 @@ sub _list_path_meta {
     $self->logconfess($result->{error}->{message});
   }
 
-  exists $result->{avus} or
-    $self->logconfess('The returned path spec did not have an "avus" key');
+  if (!exists $result->{avus}) {
+    $self->logconfess('The returned path spec did not have an "avus" key: ',
+                      JSON->new->utf8->encode($result));
+  }
 
   return @{$result->{avus}};
 }

@@ -475,7 +475,7 @@ sub get_collection_meta {
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
 
-  $self->list_collection($collection);
+  # $self->list_collection($collection);
 
   return $self->meta_lister->list_collection_meta($collection);
 }
@@ -795,7 +795,7 @@ sub get_object_meta {
   $object eq '' and
     $self->logconfess('A non-empty object argument is required');
 
-  $self->list_object($object);
+  # $self->list_object($object);
 
   return $self->meta_lister->list_object_meta($object);
 }

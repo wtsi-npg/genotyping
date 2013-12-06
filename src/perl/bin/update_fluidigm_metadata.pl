@@ -13,7 +13,7 @@ use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
-use WTSI::NPG::iRODS2;
+use WTSI::NPG::iRODS;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -84,11 +84,11 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $irods = WTSI::NPG::iRODS2->new(logger => $log);
+  my $irods = WTSI::NPG::iRODS->new(logger => $log);
   my @fluidigm_data =
     $irods->find_objects_by_meta($publish_dest,
                                  [fluidigm_plate => '%', 'like'],

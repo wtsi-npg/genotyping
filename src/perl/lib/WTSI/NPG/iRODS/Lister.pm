@@ -11,6 +11,9 @@ with 'WTSI::NPG::Startable';
 
 has '+executable' => (default => 'json-list');
 
+ # iRODS error code for non-existance
+our $ITEM_DOES_NOT_EXIST = -310000;
+
 around [qw(list_collection list_object)] => sub {
   my ($orig, $self, @args) = @_;
 
@@ -39,17 +42,21 @@ sub list_object {
   my $spec = {collection  => $collection,
               data_object => $data_name};
   my $json = JSON->new->utf8->encode($spec);
-
-  my $parser = JSON->new->max_size(4096);
+  my $parser = JSON->new->utf8->max_size(4096);
   my $result;
 
   ${$self->stdin} .= $json;
   ${$self->stderr} = '';
 
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-    $result = $parser->incr_parse(${$self->stdout});
+  eval {
+    # baton send JSON responses on a single line
+    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
+    $result = $parser->decode(${$self->stdout});
     ${$self->stdout} = '';
+  };
+
+  if ($@) {
+    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
   unless (defined $result) {
@@ -64,8 +71,7 @@ sub list_object {
   my $path;
   # TODO -- factor out JSON protocol handling into a Role
   if (exists $result->{error}) {
-    # Code for non-existance
-    if ($result->{error}->{code} == -310000) {
+    if ($result->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
       # Continue to return undef
     }
     else {
@@ -88,13 +94,12 @@ sub list_collection {
 
   $collection =~ m{^/} or
     $self->logconfess("An absolute collection path argument is required: ",
-                      "recieved '$collection'");
+                      "received '$collection'");
 
   # TODO -- factor out JSON protocol handling into a Role
   my $spec = {collection => $collection};
   my $json = JSON->new->utf8->encode($spec);
-
-  my $parser = JSON->new->max_size(1024 *1024);
+  my $parser = JSON->new->utf8->max_size(1024 *1024);
   my $result;
 
   ${$self->stdin} .= $json;
@@ -102,10 +107,15 @@ sub list_collection {
 
   $self->debug("Sending JSON spec $json to ", $self->executable);
 
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-    $result = $parser->incr_parse(${$self->stdout});
+  eval {
+    # baton send JSON responses on a single line
+    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
+    $result = $parser->decode(${$self->stdout});
     ${$self->stdout} = '';
+  };
+
+  if ($@) {
+    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
   my @paths;
@@ -113,8 +123,7 @@ sub list_collection {
   # TODO -- factor out JSON protocol handling into a Role
   if (ref $result eq 'HASH') {
     if (exists $result->{error}) {
-      # Code for non-existance
-      if ($result->{error}->{code} == -310000) {
+      if ($result->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
         # Continue to return empty list
       }
       else {
