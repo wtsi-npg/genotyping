@@ -19,10 +19,16 @@ sub update_secondary_metadata {
     $ss_sample = $ssdb->find_infinium_gex_sample($plate_barcode, $well);
     my $expected_sanger_id = $ss_sample->{sanger_sample_id};
 
+    unless ($expected_sanger_id) {
+      $self->logcroak("Sample in plate '$plate_barcode' well '$well' ",
+                      "with sample ID '$sample_id' was not found in the ",
+                      "warehouse.");
+    }
+
     unless ($sample_id eq $expected_sanger_id) {
-      $self->logconfess("Sample in plate '$plate_barcode' well '$well' ",
-                        "has an incorrect Sanger sample ID '$sample_id' ",
-                        "(expected '$expected_sanger_id'");
+      $self->logcroak("Sample in plate '$plate_barcode' well '$well' ",
+                      "has an incorrect Sanger sample ID '$sample_id' ",
+                      "(expected '$expected_sanger_id'");
     }
   }
   else {
@@ -45,9 +51,9 @@ sub update_secondary_metadata {
     $self->grant_group_access('read', @groups);
   }
   else {
-    $self->logcarp("Failed to update metadata for '", $self->str,
-                   "': failed to find in the warehouse a sample ",
-                   "'$sample_id'");
+    $self->logcroak("Failed to update metadata for '", $self->str,
+                    "': failed to find in the warehouse a sample ",
+                    "'$sample_id'");
   }
 
   return $self;
