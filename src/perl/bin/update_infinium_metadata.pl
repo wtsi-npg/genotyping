@@ -12,8 +12,8 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
-use WTSI::NPG::Genotyping::Publication qw(update_infinium_metadata);
-use WTSI::NPG::iRODS qw(find_objects_by_meta);
+use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
+use WTSI::NPG::iRODS;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -34,7 +34,6 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
-  my $type;
   my $verbose;
   my @filter_key;
   my @filter_value;
@@ -47,16 +46,11 @@ sub run {
              'help'           => sub { pod2usage(-verbose => 2,
                                                  -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
-             'type=s'         => \$type,
              'verbose'        => \$verbose);
   $config ||= $DEFAULT_INI;
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type) {
-    pod2usage(-msg => "A --type argument is required\n",
               -exitval => 2);
   }
   unless (scalar @filter_key == scalar @filter_value) {
@@ -92,10 +86,13 @@ sub run {
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
+  my $irods = WTSI::NPG::iRODS->new(logger => $log);
 
-  my @infinium_data = find_objects_by_meta($publish_dest,
-                                           [type => $type],
-                                           @filter);
+  my @infinium_data =
+    $irods->find_objects_by_meta($publish_dest,
+                                 [infinium_plate => '%', 'like'],
+                                 [infinium_well  => '%', 'like'],
+                                 @filter);
   my $total = scalar @infinium_data;
   my $updated = 0;
 
@@ -103,7 +100,9 @@ sub run {
 
   foreach my $data_object (@infinium_data) {
     eval {
-      update_infinium_metadata($data_object, $ssdb);
+      my $ido = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
+        ($irods, $data_object);
+      $ido->update_secondary_metadata($ssdb);
       ++$updated;
     };
 
@@ -138,7 +137,6 @@ Options:
   --filter-value
   --help         Display help.
   --logconf      A log4perl configuration file. Optional.
-  --type         The data type to update. E.g. gtc, idat.
   --verbose      Print messages while processing. Optional.
 
 =head1 DESCRIPTION
