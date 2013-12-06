@@ -1,160 +1,182 @@
+
 use utf8;
 
 package WTSI::NPG::iRODS;
 
-use strict;
-use warnings;
-use Carp;
-use Cwd qw(abs_path);
-use File::Basename qw(basename fileparse);
-use File::Find;
-use File::stat;
-use Log::Log4perl;
+use English;
+use File::Basename qw(basename);
+use File::Spec;
+use JSON;
+use Moose;
 
-use base 'Exporter';
-our @EXPORT_OK = qw(
-                    add_collection
-                    add_collection_meta
-                    add_group
-                    add_object
-                    add_object_meta
-                    batch_object_meta
-                    calculate_checksum
-                    collect_dirs
-                    collect_files
-                    find_collections_by_meta
-                    find_objects_by_meta
-                    find_or_make_group
-                    find_zone_name
-                    get_collection_meta
-                    get_object_meta
-                    group_exists
-                    hash_path
-                    icd
-                    ipwd
-                    list_collection
-                    list_groups
-                    list_object
-                    make_collector
-                    make_group_name
-                    md5sum
-                    meta_exists
-                    modified_between
-                    move_object
-                    move_collection
-                    put_collection
-                    remove_collection
-                    remove_collection_meta
-                    remove_group
-                    remove_object
-                    remove_object_meta
-                    replace_object
-                    set_group_access
-                    validate_checksum_metadata
-);
+use WTSI::NPG::iRODS::Lister;
+use WTSI::NPG::iRODS::MetaLister;
+use WTSI::NPG::iRODS::MetaModifier;
+use WTSI::NPG::Runnable;
 
-# TODO: add mod_object_meta/mod_collection_meta
+with 'WTSI::NPG::Loggable';
 
-our $IADMIN = 'iadmin';
+has 'environment' =>
+  (is       => 'ro',
+   isa      => 'HashRef',
+   required => 1,
+   default  => sub { \%ENV });
+
+has 'working_collection' =>
+  (is        => 'rw',
+   isa       => 'Str',
+   predicate => 'has_working_collection',
+   clearer   => 'clear_working_collection');
+
+has 'lister' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::Lister',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::Lister->new
+       (environment => $self->environment)->start;
+   });
+
+has 'meta_lister' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaLister',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaLister->new
+       (environment => $self->environment)->start;
+   });
+
+has 'meta_adder' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaModifier->new
+       (arguments   => ['--operation', 'add'],
+        environment => $self->environment)->start;
+   });
+
+has 'meta_remover' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::MetaModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::MetaModifier->new
+       (arguments   => ['--operation', 'rem'],
+        environment => $self->environment)->start;
+   });
+
 our $IGROUPADMIN = 'igroupadmin';
 our $ICD = 'icd';
 our $ICHKSUM = 'ichksum';
-our $IMETA = 'mimeta'; # Customised client
+our $IMETA = 'imeta';
 our $IMKDIR = 'imkdir';
 our $IMV = 'imv';
 our $IPUT = 'iput';
-our $IQUEST = 'iquest';
 our $IRM = 'irm';
 our $IPWD = 'ipwd';
 our $ICHMOD = 'ichmod';
+our $MD5SUM = 'md5sum';
 
-our $log = Log::Log4perl->get_logger('npg.irods.publish');
+around 'working_collection' => sub {
+  my ($orig, $self, @args) = @_;
+
+  if (@args) {
+    my $collection = $args[0];
+    $collection eq '' and
+      $self->logconfess('A non-empty collection argument is required');
+
+    $collection = File::Spec->canonpath($collection);
+    $collection = $self->_ensure_absolute_path($collection);
+    $self->debug("Changing working_collection to '$collection'");
+
+    WTSI::NPG::Runnable->new(executable  => $ICD,
+                             arguments   => [$collection],
+                             environment => $self->environment)->run;
+    $self->$orig($collection);
+  }
+  elsif (!$self->has_working_collection) {
+    my ($wc) = WTSI::NPG::Runnable->new(executable  => $IPWD,
+                                        environment => $self->environment)->run;
+    $self->$orig($wc);
+  }
+
+  return $self->$orig;
+};
 
 =head2 find_zone_name
 
   Arg [1]    : An absolute iRODS path.
-  Example    : find_zone('/zonename/path')
+
+  Example    : $irods->find_zone('/zonename/path')
   Description: Return an iRODS zone name given a path.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub find_zone_name {
-  my ($path) = @_;
+  my ($self, $path) = @_;
 
-  defined $path or $log->logconfess('A defined path argument is required');
+  defined $path or $self->logconfess('A defined path argument is required');
 
-  my $abs_path = _ensure_absolute($path);
+  $path = File::Spec->canonpath($path);
+  my $abs_path = $self->_ensure_absolute_path($path);
   $abs_path =~ s/^\///;
-  my @path = split('/', $abs_path);
-  my $zone = shift @path;
 
-  unless ($zone) {
-    $log->logconfess("Failed to parse iRODS zone from path '$path'");
+  my @path = File::Spec->splitdir($abs_path);
+  unless (@path) {
+    $self->logconfess("Failed to parse iRODS zone from path '$path'");
   }
 
+  my $zone = shift @path;
   return $zone;
 }
 
 =head2 make_group_name
 
   Arg [1]    : A SequenceScape study ID.
-  Example    : make_group_name(1234)
+
+  Example    : $irods->make_group_name(1234)
   Description: Return an iRODS group name given a SequenceScape study ID.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub make_group_name {
-  my ($study_id) = @_;
+  my ($self, $study_id) = @_;
 
   return "ss_" . $study_id;
-}
-
-=head2 find_or_make_group
-
-  Arg [1]    : iRODS group name
-  Example    : find_or_create_group($name)
-  Description: Create a new iRODS group if it does not exist. Returns
-               the group name.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub find_or_make_group {
-  my ($group_name) = @_;
-
-  my $group;
-
-  $log->debug("Checking for iRODS group '$group_name'");
-
-  if (group_exists($group_name)) {
-    $group = $group_name;
-    $log->debug("An iRODS group '$group' exists; a new group will not be added");
-  }
-  else {
-    $group = add_group($group_name);
-    $log->info("Added a new iRODS group '$group'");
-  }
-
-  return $group;
 }
 
 =head2 list_groups
 
   Arg [1]    : None
-  Example    : list_groups()
+
+  Example    : $irods->list_groups
   Description: Returns a list of iRODS groups
-  Returntype : array
-  Caller     : general
+  Returntype : Array
 
 =cut
 
 sub list_groups {
-  return _run_command($IGROUPADMIN, 'lg');
+  my ($self, @args) = @_;
+
+  my @groups = WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                                        arguments   => ['lg'],
+                                        environment => $self->environment)->run;
+  return @groups;
 }
 
 =head2 group_exists
@@ -162,38 +184,37 @@ sub list_groups {
   Arg [1]    : iRODS group name
   Example    : group_exists($name)
   Description: Return true if the group exists, or false otherwise
-  Returntype : boolean
-  Caller     : general
+  Returntype : Bool
 
 =cut
 
 sub group_exists {
-  my ($name) = @_;
+  my ($self, $name) = @_;
 
-  grep { /^$name$/ } list_groups();
+  return grep { /^$name$/ } $self->list_groups;
 }
 
 =head2 add_group
 
   Arg [1]    : new iRODS group name
-  Example    : add_group($name)
+  Example    : $irods->add_group($name)
   Description: Create a new group. Raises an error if the group exists
                already. Returns the group name. The group name is not escaped
-               in nay way.
-  Returntype : string
-  Caller     : general
+               in any way.
+  Returntype : Str
 
 =cut
 
 sub add_group {
-  my ($name) = @_;
+  my ($self, $name) = @_;
 
-  if (group_exists($name)) {
-    $log->logconfess("Failed to create iRODS group '$name' because it exists already");
+  if ($self->group_exists($name)) {
+    $self->logconfess("Failed to create iRODS group '$name' because it exists");
   }
 
-  _run_command($IADMIN, 'mkgroup', $name);
-
+  WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                           arguments   => ['mkgroup', $name],
+                           environment => $self->environment)->run;
   return $name;
 }
 
@@ -204,20 +225,21 @@ sub add_group {
   Description: Remove a group. Raises an error if the group does not exist.
                already. Returns the group name. The group name is not escaped
                in any way.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub remove_group {
-  my ($name) = @_;
+  my ($self, $name) = @_;
 
-  if (!group_exists($name)) {
-    $log->logconfess("Unable to remove group '$name' because it doesn't exist");
+  unless (group_exists($name)) {
+    $self->logconfess("Unable to remove group '$name' because ",
+                      "it doesn't exist");
   }
 
-  _run_command($IADMIN, 'rmgroup', $name);
-
+  WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
+                           arguments   => ['rmgroup', $name],
+                           environment => $self->environment)->run;
   return $name;
 }
 
@@ -226,95 +248,737 @@ sub remove_group {
   Arg [1]    : A permission string, 'read', 'write', 'own' or undef ('null')
   Arg [2]    : An iRODS group name.
   Arg [3]    : One or more data objects or collections
-  Example    : set_group_access('read', 'public', $object1, $object2)
+
+  Example    : $irods->set_group_access('read', 'public', $object1, $object2)
   Description: Set the access rights on one or more objects for a group,
                returning the objects.
-  Returntype : array
-  Caller     : general
+  Returntype : Array
 
 =cut
 
 sub set_group_access {
-  my ($permission, $group, @objects) = @_;
+  my ($self, $permission, $group, @objects) = @_;
 
-  my $perm_str;
-  if (defined $permission) {
-    $perm_str = $permission;
-  }
-  else {
-    $perm_str = 'null';
-  }
+  my $perm_str = defined $permission ? $permission : 'null';
 
-  _run_command($ICHMOD, $perm_str, $group, map { qq("$_") } @objects);
+  my @args = ($perm_str, $group, @objects);
+  WTSI::NPG::Runnable->new(executable  => $ICHMOD,
+                           arguments   => \@args,
+                           environment => $self->environment)->run;
 
   return @objects;
 }
 
-=head2 icd
-
-  Arg [1]    : An iRODS path
-  Example    : $dir = icd($path)
-  Description: Set and return the current iRODS working directory.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub icd {
-  my ($collection) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-  my @wd = _run_command($ICD, qq{"$collection"});
-
-  return shift @wd;
-}
-
-=head2 ipwd
+=head2 reset_working_collection
 
   Arg [1]    : None
-  Example    : $dir = ipwd()
-  Description: Return the current iRODS working directory.
-  Returntype : string
-  Caller     : general
+
+  Example    : $irods->reset_working_collection
+  Description: Reset the current iRODS working collection to the home
+               collection and return self.
+  Returntype : WTSI::NPG::iRODS
 
 =cut
 
-sub ipwd {
-  my @wd = _run_command($IPWD);
+sub reset_working_collection {
+  my ($self) = @_;
 
-  return shift @wd;
+  WTSI::NPG::Runnable->new(executable  => $ICD,
+                           environment => $self->environment)->run;
+  $self->clear_working_collection;
+
+  return $self;
+}
+
+=head2 list_collection
+
+  Arg [1]    : iRODS collection name
+
+  Example    : $dir = $irods->list_collection($coll)
+  Description: Return the contents of the collection as two arrayrefs,
+               the first listing data objects, the second listing nested
+               collections.
+  Returntype : Array
+
+=cut
+
+sub list_collection {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq ''
+    and $self->logconfess('A non-empty collection argument is required');
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+  $self->debug("Listing collection '$collection'");
+
+  return $self->lister->list_collection($collection);
+}
+
+=head2 add_collection
+
+  Arg [1]    : iRODS collection name
+
+  Example    : $irods->add_collection('/my/path/foo')
+  Description: Make a new collection in iRODS. Return the new collection.
+  Returntype : Str
+
+=cut
+
+sub add_collection {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq ''
+    and $self->logconfess('A non-empty collection argument is required');
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+  $self->debug("Adding collection '$collection'");
+
+  WTSI::NPG::Runnable->new(executable  => $IMKDIR,
+                           arguments   => ['-p', $collection],
+                           environment => $self->environment)->run;
+  return $collection;
+}
+
+=head2 put_collection
+
+  Arg [1]    : Local directory name
+  Arg [2]    : iRODS collection name
+
+  Example    : $irods->put_collection('/my/path/foo', '/archive')
+  Description: Make a new collection in iRODS. Return the new collection.
+  Returntype : Str
+
+=cut
+
+sub put_collection {
+  my ($self, $dir, $target) = @_;
+
+  defined $dir or
+    $self->logconfess('A defined directory argument is required');
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $dir eq '' and
+    $self->logconfess('A non-empty directory argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  # iput does not accept trailing slashes on directories
+  $dir = File::Spec->canonpath($dir);
+  $target = File::Spec->canonpath($target);
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Putting directory '$dir' into collection '$target'");
+
+  my @args = ('-r', $dir, $target);
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => \@args,
+                           environment => $self->environment)->run;
+
+  # FIXME - this is handling a case where the target collection exists
+  return $target . '/' . basename($dir);
+}
+
+=head2 move_collection
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : iRODS collection name
+
+  Example    : $irods->move_collection('/my/path/lorem.txt',
+                                       '/my/path/ipsum.txt')
+  Description: Move a collection.
+  Returntype : Str
+
+=cut
+
+sub move_collection {
+  my ($self, $source, $target) = @_;
+
+  defined $source or
+    $self->logconfess('A defined source (collection) argument is required');
+  defined $target or
+    $self->logconfess('A defined target (collection) argument is required');
+
+  $source eq '' and
+    $self->logconfess('A non-empty source (collection) argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (collection) argument is required');
+
+  $source = File::Spec->canonpath($source);
+  $source = $self->_ensure_absolute_path($source);
+  $target = File::Spec->canonpath($target);
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Moving collection from '$source' to '$target'");
+
+  WTSI::NPG::Runnable->new(executable  => $IMV,
+                           arguments   => [$source, $target],
+                           environment => $self->environment)->run;
+  return $target;
+}
+
+=head2 remove_collection
+
+  Arg [1]    : iRODS collection name
+
+  Example    : $irods->remove_collection('/my/path/foo')
+  Description: Remove a collection and contents, recursively, and return
+               self.
+  Returntype : WTSI::NPG::iRODS
+
+=cut
+
+sub remove_collection {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+  $self->debug("Removing collection '$collection'");
+
+  WTSI::NPG::Runnable->new(executable  => $IRM,
+                           arguments   => ['-r', '-f', $collection],
+                           environment => $self->environment)->run;
+  return $collection;
+}
+
+=head2 get_collection_meta
+
+  Arg [1]    : iRODS data collection name
+
+  Example    : $irods->get_collection_meta('/my/path/')
+  Description: Get metadata on a collection as an array of AVUs
+  Returntype : Array[HashRef]
+
+=cut
+
+sub get_collection_meta {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+
+  # $self->list_collection($collection);
+
+  return $self->meta_lister->list_collection_meta($collection);
+}
+
+=head2 add_collection_avu
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : attribute
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+
+  Example    : $irods->add_collection_avu('/my/path/foo', 'id', 'ABCD1234')
+  Description: Add metadata to a collection. Return an array of
+               the new attribute, value and units.
+  Returntype : Array
+
+=cut
+
+sub add_collection_avu {
+  my ($self, $collection, $attribute, $value, $units) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+  defined $attribute or
+    $self->logconfess('A defined attribute argument is required');
+  defined $value or
+    $self->logconfess('A defined value argument is required');
+
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+  $attribute eq '' and
+    $self->logconfess('A non-empty attribute argument is required');
+  $value eq '' and
+    $self->logconfess('A non-empty value argument is required');
+
+  my $units_str = defined $units ? "'$units'" : "'undef'";
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+
+  $self->debug("Adding AVU ['$attribute', '$value', $units_str] ",
+               "to '$collection'");
+
+  my @current_meta = $self->get_collection_meta($collection);
+  if ($self->_meta_exists($attribute, $value, $units, \@current_meta)) {
+    $self->logconfess("AVU ['$attribute', '$value', $units_str] ",
+                      "already exists for '$collection'");
+  }
+
+  return $self->meta_adder->modify_collection_meta($collection, $attribute,
+                                                   $value, $units);
+}
+
+=head2 remove_collection_avu
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : attribute
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+
+  Example    : $irods->remove_collection_avu('/my/path/foo', 'id', 'ABCD1234')
+  Description: Removes metadata from a collection object. Return an array of
+               the removed attribute, value and units.
+  Returntype : Array
+
+=cut
+
+sub remove_collection_avu {
+  my ($self, $collection, $attribute, $value, $units) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+  defined $attribute or
+    $self->logconfess('A defined attribute argument is required');
+  defined $value or
+    $self->logconfess('A defined value argument is required');
+
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+  $attribute eq '' and
+    $self->logconfess('A non-empty attribute argument is required');
+  $value eq '' and
+    $self->logconfess('A non-empty value argument is required');
+
+  my $units_str = defined $units ? "'$units'" : "'undef'";
+
+  $collection = File::Spec->canonpath($collection);
+  $collection = $self->_ensure_absolute_path($collection);
+
+  $self->debug("Removing AVU ['$attribute', '$value', $units_str] ",
+               "from '$collection'");
+
+  my @current_meta = $self->get_collection_meta($collection);
+  if (!$self->_meta_exists($attribute, $value, $units, \@current_meta)) {
+    $self->logcluck("AVU ['$attribute', '$value', $units_str] ",
+                    "does not exist for '$collection'");
+  }
+
+  return $self->meta_remover->modify_collection_meta($collection, $attribute,
+                                                     $value, $units);
+}
+
+=head2 find_collections_by_meta
+
+  Arg [1]    : iRODS collection
+  Arg [2]    : ArrayRef attribute value tuples
+
+  Example    : $irods->find_collections_by_meta('/my/path/foo',
+                                                ['id' => 'ABCD1234'])
+  Description: Find collections by their metadata, restricted to a parent
+               collection.
+               Return a list of collections.
+  Returntype : Array
+
+=cut
+
+sub find_collections_by_meta {
+  my ($self, $root, @query_specs) = @_;
+
+  defined $root or $self->logconfess('A defined root argument is required');
+  $root eq '' and $self->logconfess('A non-empty root argument is required');
+
+  $root = File::Spec->canonpath($root);
+  $root = $self->_ensure_absolute_path($root);
+
+  my $zone = $self->find_zone_name($root);
+  my @query = $self->_make_imeta_query(@query_specs);
+
+  my @args = ('-z', $zone, 'qu', '-C', @query);
+  my @raw_results =
+    WTSI::NPG::Runnable->new(executable  => $IMETA,
+                             arguments   => \@args,
+                             environment => $self->environment)->run;
+
+  my @results;
+  foreach my $row (@raw_results) {
+    if ($row =~ m{^----$}) {
+      next;
+    }
+    elsif ($row =~ m{^collection:\s(\S*)}) {
+      my $coll = $1;
+      push @results, $coll;
+    }
+  }
+
+  # imeta doesn't permit filtering by path, natively.
+  return grep { /^$root/ } @results;
+}
+
+=head2 list_object
+
+  Arg [1]    : iRODS data object name
+
+  Example    : $obj = $irods->list_object($object)
+  Description: Return the full path of the object.
+  Returntype : Str
+
+=cut
+
+sub list_object {
+  my ($self, $object) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  $object = $self->_ensure_absolute_path($object);
+  $self->debug("Listing object '$object'");
+
+  return $self->lister->list_object($object);
+}
+
+=head2 add_object
+
+  Arg [1]    : Name of file to add to iRODs
+  Arg [2]    : iRODS data object name
+
+  Example    : $irods->add_object('lorem.txt', '/my/path/lorem.txt')
+  Description: Add a file to iRODS.
+  Returntype : Str
+
+=cut
+
+sub add_object {
+  my ($self, $file, $target) = @_;
+
+  defined $file or
+    $self->logconfess('A defined file argument is required');
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $file eq '' and
+    $self->logconfess('A non-empty file argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Adding '$file' as new object '$target'");
+
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => [$file, $target],
+                           environment => $self->environment)->run;
+  return $target;
+}
+
+=head2 replace_object
+
+  Arg [1]    : Name of file to add to iRODs
+  Arg [2]    : iRODS data object name
+
+  Example    : $irods->add_object('lorem.txt', '/my/path/lorem.txt')
+  Description: Replace a file in iRODS.
+  Returntype : Str
+
+=cut
+
+sub replace_object {
+  my ($self, $file, $target) = @_;
+
+  defined $file or
+    $self->logconfess('A defined file argument is required');
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $file eq '' and
+    $self->logconfess('A non-empty file argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Replacing object '$target' with '$file'");
+
+  WTSI::NPG::Runnable->new(executable  => $IPUT,
+                           arguments   => ['-f', $file, $target],
+                           environment => $self->environment)->run;
+  return $target;
+}
+
+=head2 move_object
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : iRODS data object name
+
+  Example    : $irods->move_object('/my/path/lorem.txt', '/my/path/ipsum.txt')
+  Description: Move a data object.
+  Returntype : Str
+
+=cut
+
+sub move_object {
+  my ($self, $source, $target) = @_;
+
+  defined $source or
+    $self->logconfess('A defined source (object) argument is required');
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $source eq '' and
+    $self->logconfess('A non-empty source (object) argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $source = $self->_ensure_absolute_path($source);
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Moving object from '$source' to '$target'");
+
+  WTSI::NPG::Runnable->new(executable  => $IMV,
+                           arguments   => [$source, $target],
+                           environment => $self->environment)->run;
+  return $target
+}
+
+=head2 remove_object
+
+  Arg [1]    : iRODS data object name
+
+  Example    : $irods->remove_object('/my/path/lorem.txt')
+  Description: Remove a data object.
+  Returntype : Str
+
+=cut
+
+sub remove_object {
+  my ($self, $target) = @_;
+
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $self->debug("Removing object '$target'");
+
+  WTSI::NPG::Runnable->new(executable  => $IRM,
+                           arguments   => [$target],
+                           environment => $self->environment)->run;
+  return $target;
+}
+
+=head2 get_object_meta
+
+  Arg [1]    : iRODS data object name
+
+  Example    : $irods->get_object_meta('/my/path/lorem.txt')
+  Description: Get metadata on a data object as an array of AVUs
+  Returntype : Array[HashRef]
+
+=cut
+
+sub get_object_meta {
+  my ($self, $object) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  # $self->list_object($object);
+
+  return $self->meta_lister->list_object_meta($object);
+}
+
+=head2 add_object_avu
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : attribute
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+
+  Example    : add_object_avu('/my/path/lorem.txt', 'id', 'ABCD1234')
+  Description: Add metadata to a data object. Return an array of
+               the new attribute, value and units.
+  Returntype : array
+
+=cut
+
+sub add_object_avu {
+  my ($self, $object, $attribute, $value, $units) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+  defined $attribute or
+    $self->logconfess('A defined attribute argument is required');
+  defined $value or
+    $self->logconfess('A defined value argument is required');
+
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+  $attribute eq '' and
+    $self->logconfess('A non-empty attribute argument is required');
+  $value eq '' and
+    $self->logconfess('A non-empty value argument is required');
+
+  my $units_str = defined $units ? "'$units'" : "'undef'";
+
+  $self->debug("Adding AVU {'$attribute', '$value', $units_str} to '$object'");
+
+  my @current_meta = $self->get_object_meta($object);
+  if ($self->_meta_exists($attribute, $value, $units, \@current_meta)) {
+    $self->logconfess("AVU {'$attribute', '$value', $units_str} ",
+                      "already exists for '$object'");
+  }
+
+  return $self->meta_adder->modify_object_meta($object, $attribute,
+                                               $value, $units);
+}
+
+=head2 remove_object_avu
+
+  Arg [1]    : iRODS data object path
+  Arg [2]    : attribute
+  Arg [3]    : value
+  Arg [4]    : units (optional)
+
+  Example    : $irods->remove_object_avu('/my/path/lorem.txt', 'id',
+               'ABCD1234')
+  Description: Remove metadata from a data object. Return an array of
+               the removed attribute, value and units.
+  Returntype : Array
+
+=cut
+
+sub remove_object_avu {
+  my ($self, $object, $attribute, $value, $units) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+  defined $attribute or
+    $self->logconfess('A defined attribute argument is required');
+  defined $value or
+    $self->logconfess('A defined value argument is required');
+
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+  $attribute eq '' and
+    $self->logconfess('A non-empty attribute argument is required');
+  $value eq '' and
+    $self->logconfess('A non-empty value argument is required');
+
+  my $units_str = defined $units ? "'$units'" : "'undef'";
+
+  $self->debug("Removing AVU {'$attribute', '$value', $units_str} ",
+               "from '$object'");
+
+  my @current_meta = $self->get_object_meta($object);
+  if (!$self->_meta_exists($attribute, $value, $units, \@current_meta)) {
+    $self->logconfess("AVU {'$attribute', '$value', $units_str} ",
+                      "does not exist exists for '$object'");
+  }
+
+  return $self->meta_remover->modify_object_meta($object, $attribute,
+                                                 $value, $units);
+}
+
+=head2 find_objects_by_meta
+
+  Arg [1]    : iRODS collection
+  Arg [2]    : ArrayRefs of attribute value tuples
+
+  Example    : $irods->find_objects_by_meta('/my/path/foo',
+                                            ['id' => 'ABCD1234'])
+  Description: Find objects by their metadata, restricted to a parent
+               collection.
+               Return a list of collections.
+  Returntype : Array
+
+=cut
+
+sub find_objects_by_meta {
+  my ($self, $root, @query_specs) = @_;
+
+  defined $root or $self->logconfess('A defined root argument is required');
+  $root eq '' and $self->logconfess('A non-empty root argument is required');
+
+  $root = File::Spec->canonpath($root);
+  $root = $self->_ensure_absolute_path($root);
+
+  my $zone = $self->find_zone_name($root);
+  my @query = $self->_make_imeta_query(@query_specs);
+
+  my @args = ('-z', $zone, 'qu', '-d', @query);
+  my @raw_results =
+    WTSI::NPG::Runnable->new(executable  => $IMETA,
+                             arguments   => \@args,
+                             environment => $self->environment)->run;
+
+  my @results;
+  my $coll;
+  my $obj;
+  foreach my $row (@raw_results) {
+    if ($row =~ m{^----$}) {
+      next;
+    }
+    elsif ($row =~ m{^collection:\s(\S*)}) {
+      $coll = $1;
+    }
+    elsif ($row =~ m{^dataObj:\s(\S*)}) {
+      $obj = $1;
+
+      unless ($coll) {
+        $self->logconfess("Failed to parse imeta output; missing collection ",
+                          "in [", join(', ', @raw_results), "]");
+      }
+
+      push @results, "$coll/$obj";
+      undef $coll;
+      undef $row;
+    }
+  }
+
+  # imeta doesn't permit filtering by path, natively.
+  return grep { /^$root/ } @results;
 }
 
 =head2 calculate_checksum
 
   Arg [1]    : iRODS data object name
-  Example    : $cs = calculate_checksum('/my/path/lorem.txt')
+
+  Example    : $cs = $irods->calculate_checksum('/my/path/lorem.txt')
   Description: Return the MD5 checksum of an iRODS data object.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub calculate_checksum {
-  my ($object) = @_;
+  my ($self, $object) = @_;
 
-  defined $object or $log->logconfess('A defined object argument is required');
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
+  defined $object or
+    $self->logconfess('A defined object argument is required');
 
-  my ($data_name, $collection) = fileparse($object);
-  $collection =~ s!/$!!;
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
 
-  if ($collection eq '.') {
-    $collection = ipwd();
-  }
+  $object = $self->_ensure_absolute_path($object);
 
-  my @raw_checksum = _run_command($ICHKSUM, qq('$object'));
+  my @raw_checksum =
+    WTSI::NPG::Runnable->new(executable  => $ICHKSUM,
+                             arguments   => [$object],
+                             environment => $self->environment)->run;
   unless (@raw_checksum) {
-    $log->logconfess("Failed to get iRODS checksum for '$object'");
+    $self->logconfess("Failed to get iRODS checksum for '$object'");
   }
 
   my $checksum = shift @raw_checksum;
@@ -325,677 +989,65 @@ sub calculate_checksum {
 
 =head2 validate_checksum_metadata
 
-  Arg [1]    : iRODS data object name
-  Example    : validate_checksum_metadata('/my/path/lorem.txt')
+  Arg [1]    : iRODS data object path
+
+  Example    : $irods->validate_checksum_metadata('/my/path/lorem.txt')
   Description: Return true if the MD5 checksum in the metadata of an iRODS
                object is identical to the MD5 caluclated by iRODS.
   Returntype : boolean
-  Caller     : general
 
 =cut
 
 sub validate_checksum_metadata {
-  my ($object) = @_;
+  my ($self, $object) = @_;
 
   my $identical = 0;
-  my %meta = get_object_meta($object);
+  my @md5 = grep { $_->{attribute} eq 'md5' } $self->get_object_meta($object);
 
-  if (exists $meta{md5}) {
-    my $irods_md5 = calculate_checksum($object);
-    my $md5 = shift @{$meta{md5}};
+  unless (@md5) {
+    $self->logconfess("Failed to validate MD5 metadata for '$object' ",
+                      "because it is missing");
+  }
 
-    if ($md5 eq $irods_md5) {
-      $log->debug("Confirmed '$object' MD5 as ", $md5);
-      $identical = 1;
-    }
-    else {
-      $log->warn("Expected MD5 of $irods_md5 but found $md5 for '$object'");
-    }
+  if (scalar @md5 > 1) {
+    $self->logconfess("Failed to validate MD5 metadata for '$object' ",
+                      "because it has multiple values");
+  }
+
+  my $avu = $md5[0];
+  my $irods_md5 = $self->calculate_checksum($object);
+  my $md5 = $avu->{value};
+
+  if ($md5 eq $irods_md5) {
+    $self->debug("Confirmed '$object' MD5 as ", $md5);
+    $identical = 1;
   }
   else {
-    $log->warn("MD5 metadata is missing from '$object'");
+    $self->debug("Expected MD5 of $irods_md5 but found $md5 for '$object'");
   }
 
   return $identical;
 }
 
-=head2 list_object
-
-  Arg [1]    : iRODS data object name
-  Example    : $obj = list_object($object)
-  Description: Return the full path of the object.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub list_object {
-  my ($object) = @_;
-
-  defined $object or $log->logconfess('A defined object argument is required');
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
-
-  $object = _ensure_absolute($object);
-  my ($data_name, $collection) = fileparse($object);
-
-  $collection =~ s!/$!!;
-
-  my $command = join(' ', $IQUEST, '"%s"',
-                     qq("SELECT DATA_NAME
-                         WHERE DATA_NAME = '$data_name'
-                         AND COLL_NAME = '$collection'"));
-
-  my $name = `$command 2> /dev/null`;
-  chomp($name);
-
-  my $listed = "";
-  if ($name) {
-    $listed = _ensure_absolute($name);
-  }
-
-  return $listed;
-}
-
-=head2 add_object
-
-  Arg [1]    : Name of file to add to iRODs
-  Arg [2]    : iRODS data object name
-  Example    : add_object('lorem.txt', '/my/path/lorem.txt')
-  Description: Add a file to iRODS.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub add_object {
-  my ($file, $target) = @_;
-
-  defined $file or $log->logconfess('A defined file argument is required');
-  defined $target or $log->logconfess('A defined target (object) argument is required');
-  $file eq '' and $log->logconfess('A non-empty file argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
-
-  $target = _ensure_absolute($target);
-  $log->debug("Adding object '$target'");
-
-  _run_command($IPUT, qq("$file"), qq("$target"));
-
-  return $target;
-}
-
-=head2 replace_object
-
-  Arg [1]    : Name of file to add to iRODs
-  Arg [2]    : iRODS data object name
-  Example    : add_object('lorem.txt', '/my/path/lorem.txt')
-  Description: Replace a file in iRODS.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub replace_object {
-  my ($file, $target) = @_;
-
-  defined $file or $log->logconfess('A defined file argument is required');
-  defined $target or $log->logconfess('A defined target (object) argument is required');
-  $file eq '' and $log->logconfess('A non-empty file argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
-
-  $target = _ensure_absolute($target);
-  $log->debug("Replacing object '$target'");
-
-  _run_command($IPUT, '-f', qq("$file"), qq("$target"));
-
-  return $target;
-}
-
-=head2 move_object
-
-  Arg [1]    : iRODS data object name
-  Arg [2]    : iRODS data object name
-  Example    : move_object('/my/path/lorem.txt', '/my/path/ipsum.txt')
-  Description: Move a data object.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub move_object {
-  my ($source, $target) = @_;
-
-  defined $source or $log->logconfess('A defined source (object) argument is required');
-  $source eq '' and $log->logconfess('A non-empty source (object) argument is required');
-  defined $target or $log->logconfess('A defined target (object) argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
-
-  $source = _ensure_absolute($source);
-  $target = _ensure_absolute($target);
-
-  $log->debug("Moving object from '$source' to '$target'");
-
-  _run_command($IMV, qq("$source"), qq("$target"));
-
-  return $target
-}
-
-=head2 remove_object
-
-  Arg [1]    : iRODS data object name
-  Example    : remove_object('/my/path/lorem.txt')
-  Description: Remove a data object.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub remove_object {
-  my ($target) = @_;
-
-  defined $target or $log->logconfess('A defined target (object) argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
-
-  $log->debug("Removing object '$target'");
-  return _irm(qq("$target"));
-}
-
-=head2 get_object_meta
-
-  Arg [1]    : iRODS data object name
-  Example    : get_object_meta('/my/path/lorem.txt')
-  Description: Get metadata on a data object. Where there are multiple
-               values for one key, the values are contained in an array under
-               that key.
-  Returntype : hash
-  Caller     : general
-
-=cut
-
-sub get_object_meta {
-  my ($object) = @_;
-
-  defined $object or $log->logconfess('A defined object argument is required');
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
-
-  list_object($object) or $log->logconfess("Object '$object' does not exist");
-
-  return _parse_raw_meta(_run_command($IMETA, 'ls', '-d', qq("$object")))
-}
-
-=head2 add_object_meta
-
-  Arg [1]    : iRODS data object name
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units (optional)
-  Example    : add_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
-  Description: Add metadata to a data object. Return an array of
-               the new key, value and units.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub add_object_meta {
-  my ($object, $key, $value, $units) = @_;
-
-  defined $object or $log->logconfess('A defined object argument is required');
-  defined $key or $log->logconfess('A defined key argument is required');
-  defined $value or $log->logconfess('A defined value argument is required');
-
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
-  $key eq '' and $log->logconfess('A non-empty key argument is required');
-  $value eq '' and $log->logconfess('A non-empty value argument is required');
-
-  $units ||= '';
-
-  $log->debug("Adding metadata pair '$key' -> '$value' to '$object'");
-  if (meta_exists($key, $value, get_object_meta($object))) {
-    $log->logconfess("Metadata pair '$key' -> '$value' ",
-                     "already exists for $object");
-  }
-
-  _run_command($IMETA, 'add', '-d', qq("$object" "$key" "$value" "$units"));
-
-  return ($key, $value, $units);
-}
-
-sub batch_object_meta {
-  my ($object, $meta_tuples) = @_;
-
-  defined $object or $log->logconfess('A defined object argument is required');
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
-
-  open(my $imeta, '|', "$IMETA > /dev/null")
-    or $log->logconfess("Failed open pipe to command '$IMETA': $!");
-  foreach my $tuple (@$meta_tuples) {
-    my ($key, $value, $units) = @$tuple;
-    $units ||= '';
-
-    $log->debug("Adding metadata pair '$key' -> '$value' to '$object'");
-    print $imeta qq(add -d $object "$key" "$value" "$units"), "\n";
-  }
-  close($imeta) or warn "Failed to close pipe to command '$IMETA'\n";
-
-  # WARNING: imeta exits with the error code for the last operation in
-  # the batch. An error followed by a success will be reported as a
-  # success.
-
-  if ($?) {
-    $log->logconfess("Execution of '$IMETA' failed with exit code: " . ($? >> 8));
-  }
-
-  return $object;
-}
-
-=head2 remove_object_meta
-
-  Arg [1]    : iRODS data object name
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units (optional)
-  Example    : remove_object_meta('/my/path/lorem.txt', 'id', 'ABCD1234')
-  Description: Remove metadata from a data object. Return an array of
-               the removed key, value and units.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub remove_object_meta {
-  my ($object, $key, $value, $units) = @_;
-
-  defined $object or $log->logconfess('A defined object argument is required');
-  defined $key or $log->logconfess('A defined key argument is required');
-  defined $value or $log->logconfess('A defined value argument is required');
-
-  $object eq '' and $log->logconfess('A non-empty object argument is required');
-  $key eq '' and $log->logconfess('A non-empty key argument is required');
-  $value eq '' and $log->logconfess('A non-empty value argument is required');
-
-  $units ||= '';
-
-  $log->debug("Removing metadata pair '$key' -> '$value' from $object");
-  if (!meta_exists($key, $value, get_object_meta($object))) {
-    $log->logcluck("Metadata pair '$key' -> '$value' ",
-                   "does not exist for $object");
-  }
-
-  _run_command($IMETA, 'rm', '-d', qq($object "$key" "$value" "$units"));
-
-  return ($key, $value, $units);
-}
-
-
-=head2 find_objects_by_meta
-
-  Arg [1]    : iRODS collection
-  Arg [2]    : arrayref key value tuples
-  Example    : find_objects_by_meta('/my/path/foo', ['id' => 'ABCD1234'])
-  Description: Find objects by their metadata, restricted to a parent
-               collection.
-               Return a list of collections.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-
-sub find_objects_by_meta {
-  my ($root, @query_specs) = @_;
-
-  defined $root or $log->logconfess('A defined root argument is required');
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
-
-  $root = _ensure_absolute($root);
-  my $zone = find_zone_name($root);
-  my $query = _make_imeta_query(@query_specs);
-  my @results = _run_command($IMETA, '-z', $zone, 'qu', '-d', $query);
-
-  return grep { /^$root/ } @results;
-}
-
-
-=head2 list_collection
-
-  Arg [1]    : iRODS collection name
-  Example    : $dir = list_collection($coll)
-  Description: Return the contents of the collection as two arrayrefs,
-               the first listing data objects, the second listing nested
-               collections.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub list_collection {
-  my ($collection) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-
-  my @root = _safe_select('"%s"',
-                          qq("SELECT COUNT(COLL_NAME)
-                              WHERE COLL_NAME = '$collection'"),
-                          '"%s"',
-                          qq("SELECT COLL_NAME
-                              WHERE COLL_NAME = '$collection'"));
-
-  $log->debug("Listing collection '$collection'");
-
-  if (@root) {
-    $log->debug("Collection '$collection' exists");
-    my @objs = _safe_select('"%s"', qq("SELECT COUNT(DATA_NAME)
-                                        WHERE COLL_NAME = '$collection'"),
-                            '"%s"', qq("SELECT DATA_NAME
-                                        WHERE COLL_NAME = '$collection'"));
-    my @colls = _safe_select('"%s"', qq("SELECT COUNT(COLL_NAME)
-                                         WHERE COLL_PARENT_NAME = '$collection'"),
-                             '"%s"', qq("SELECT COLL_NAME
-                                         WHERE COLL_PARENT_NAME = '$collection'"));
-
-    $log->debug("Collection '$collection' contains ", scalar @objs,
-                " data objects and ", scalar @colls, " collections");
-
-    return (\@objs, \@colls);
-  }
-  else {
-    $log->debug("Collection '$collection' does not exist");
-    return;
-  }
-}
-
-=head2 add_collection
-
-  Arg [1]    : iRODS collection name
-  Example    : add_collection('/my/path/foo')
-  Description: Make a new collection in iRODS. Return the new collection.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub add_collection {
-  my ($collection) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-  $collection = _ensure_absolute($collection);
-
-  $log->debug("Adding collection '$collection'");
-  _run_command($IMKDIR, '-p', qq("$collection"));
-
-  return $collection;
-}
-
-=head2 put_collection
-
-  Arg [2]    : iRODS collection name
-  Example    : put_collection('/my/path/foo', '/archive')
-  Description: Make a new collection in iRODS. Return the new collection.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub put_collection {
-  my ($dir, $target) = @_;
-
-  defined $dir or $log->logconfess('A defined directory argument is required');
-  defined $target or $log->logconfess('A defined target (object) argument is required');
-
-  $dir eq '' and $log->logconfess('A non-empty directory argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (object) argument is required');
-
-  # iput does not accept trailing slashes on directories
-  $dir =~ s!/$!!;
-
-  $target = _ensure_absolute($target);
-  $target =~ s!/$!!;
-
-  $log->debug("Putting collection '$dir' into '$target'");
-  _run_command($IPUT, '-r', qq("$dir"), qq("$target"));
-
-  return $target . '/' . basename($dir);
-}
-
-=head2 move_collection
-
-  Arg [1]    : iRODS collection name
-  Arg [2]    : iRODS collection name
-  Example    : move_collection('/my/path/lorem.txt', '/my/path/ipsum.txt')
-  Description: Move a collection.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub move_collection {
-  my ($source, $target) = @_;
-
-  defined $source or $log->logconfess('A defined source (collection) argument is required');
-  $source eq '' and $log->logconfess('A non-empty source (collection) argument is required');
-  defined $target or $log->logconfess('A defined target (collection) argument is required');
-  $target eq '' and $log->logconfess('A non-empty target (collection) argument is required');
-
-  $source = _ensure_absolute($source);
-  $target = _ensure_absolute($target);
-  $source =~ s!/$!!;
-  $target =~ s!/$!!;
-
-  $log->debug("Moving collection from '$source' to '$target'");
-
-  _run_command($IMV, qq("$source"), qq("$target"));
-
-  return $target
-}
-
-=head2 remove_collection
-
-  Arg [1]    : iRODS collection name
-  Example    : remove_collection('/my/path/foo')
-  Description: Remove a collection and contents, recursively.
-  Returntype : string
-  Caller     : general
-
-=cut
-
-sub remove_collection {
-  my ($collection) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-
-  $log->debug("Removing collection '$collection'");
-  return _irm(qq("$collection"));
-}
-
-=head2 get_collection_meta
-
-  Arg [1]    : iRODS data collection name
-  Example    : get_collection_meta('/my/path/lorem.txt')
-  Description: Get metadata on a collection. Where there are multiple
-               values for one key, the values are contained in an array under
-               that key.
-  Returntype : hash
-  Caller     : general
-
-=cut
-
-sub get_collection_meta {
-  my ($collection) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-
-  return _parse_raw_meta(_run_command($IMETA, 'ls', '-C', qq("$collection")))
-}
-
-=head2 add_collection_meta
-
-  Arg [1]    : iRODS collection name
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units (optional)
-  Example    : add_collection_meta('/my/path/foo', 'id', 'ABCD1234')
-  Description: Add metadata to a collection. Return an array of
-               the new key, value and units.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub add_collection_meta {
-  my ($collection, $key, $value, $units) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  defined $key or $log->logconfess('A defined key argument is required');
-  defined $value or $log->logconfess('A defined value argument is required');
-
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-  $key eq '' and $log->logconfess('A non-empty key argument is required');
-  $value eq '' and $log->logconfess('A non-empty value argument is required');
-
-  $units ||= '';
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-
-  $log->debug("Adding metadata pair '$key' -> '$value' to '$collection'");
-  if (meta_exists($key, $value, get_collection_meta($collection))) {
-    $log->logconfess("Metadata pair '$key' -> '$value' ",
-                     "already exists for '$collection'");
-  }
-
-  _run_command($IMETA, 'add', '-C', qq("$collection" "$key" "$value" "$units"));
-
-  return ($key, $value, $units);
-}
-
-=head2 remove_collection_meta
-
-  Arg [1]    : iRODS collection name
-  Arg [2]    : key
-  Arg [3]    : value
-  Arg [4]    : units (optional)
-  Example    : remove_collection_meta('/my/path/foo', 'id', 'ABCD1234')
-  Description: Removes metadata from a collection object. Return an array of
-               the removed key, value and units.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub remove_collection_meta {
-  my ($collection, $key, $value, $units) = @_;
-
-  defined $collection or $log->logconfess('A defined collection argument is required');
-  defined $key or $log->logconfess('A defined key argument is required');
-  defined $value or $log->logconfess('A defined value argument is required');
-
-  $collection eq '' and $log->logconfess('A non-empty collection argument is required');
-  $key eq '' and $log->logconfess('A non-empty key argument is required');
-  $value eq '' and $log->logconfess('A non-empty value argument is required');
-
-  $units ||= '';
-  $collection = _ensure_absolute($collection);
-  $collection =~ s!/$!!;
-
-  $log->debug("Removing metadata pair '$key' -> '$value' from '$collection'");
-  if (!meta_exists($key, $value, get_collection_meta($collection))) {
-    $log->logcluck("Metadata pair '$key' -> '$value' ",
-                   "does not exist for '$collection'");
-  }
-
-  _run_command($IMETA, 'rm', '-C', qq($collection "$key" "$value" "$units"));
-
-  return ($key, $value, $units);
-}
-
-=head2 find_collections_by_meta
-
-  Arg [1]    : iRODS collection
-  Arg [2]    : arrayref key value tuples
-  Example    : find_collections_by_meta('/my/path/foo', ['id' => 'ABCD1234'])
-  Description: Find collections by their metadata, restricted to a parent
-               collection.
-               Return a list of collections.
-  Returntype : array
-  Caller     : general
-
-=cut
-
-sub find_collections_by_meta {
-  my ($root, @query_specs) = @_;
-
-  defined $root or $log->logconfess('A defined root argument is required');
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
-
-  $root = _ensure_absolute($root);
-
-  my $zone = find_zone_name($root);
-  my $query = _make_imeta_query(@query_specs);
-  my @results = _run_command($IMETA, '-z', $zone, 'qu', '-C', $query);
-
-  # imeta doesn't permit filtering by path, natively.
-  return grep { /^$root/ } @results;
-}
-
-=head2 meta_exists
-
-  Arg [1]    : string key
-  Arg [2]    : string value
-  Arg [3]    : hash metadata
-  Example    : meta_exists('foo', 99, %meta)
-  Description: Return true if hash %meta contains a key with a specific
-               value
-  Returntype : boolean
-  Caller     : general
-
-=cut
-
-
-sub meta_exists {
-  my ($key, $value, %meta) = @_;
-
-  my $exists = 0;
-  if (exists $meta{$key}) {
-    foreach my $meta_value (@{$meta{$key}}) {
-      if ($value eq $meta_value) {
-        $exists = 1;
-        last;
-      }
-    }
-  }
-
-  return $exists;
-}
-
 =head2 md5sum
 
   Arg [1]    : string path to a file
+
   Example    : my $md5 = md5sum($filename)
   Description: Calculate the MD5 checksum of a file.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub md5sum {
-  my ($file) = @_;
+  my ($self, $file) = @_;
 
-  defined $file or $log->logconfess('A defined file argument is required');
-  $file eq '' and $log->logconfess('A non-empty file argument is required');
+  defined $file or $self->logconfess('A defined file argument is required');
+  $file eq '' and $self->logconfess('A non-empty file argument is required');
 
-  my @result = _run_command("md5sum '$file'");
+  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
+                                        arguments   => [$file],
+                                        environment => $self->environment)->run;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;
@@ -1007,23 +1059,22 @@ sub md5sum {
 
   Arg [1]    : string path to a file
   Arg [2]    : MD5 checksum (optional)
-  Example    : my $path = hash_path($filename)
+
+  Example    : my $path = $irods->hash_path($filename)
   Description: Return a hashed path 3 directories deep, each level having
                a maximum of 256 subdirectories, calculated from the file's
                MD5. If the optional MD5 argument is supplied, the MD5
                calculation is skipped and the provided value is used instead.
-  Returntype : string
-  Caller     : general
+  Returntype : Str
 
 =cut
 
 sub hash_path {
-  my ($file, $md5sum) = @_;
+  my ($self, $file, $md5sum) = @_;
 
-  $md5sum ||= md5sum($file);
-
+  $md5sum ||= $self->md5sum($file);
   unless ($md5sum) {
-    $log->logconfess("Failed to caculate an MD5 for $file");
+    $self->logconfess("Failed to caculate an MD5 for $file");
   }
 
   my @levels = $md5sum =~ m{\G(..)}gmsx;
@@ -1031,329 +1082,128 @@ sub hash_path {
   return join('/', @levels[0..2]);
 }
 
-=head2 collect_files
-
-  Arg [1]    : Root directory
-  Arg [2]    : coderef of a function that accepts a single argument and
-               returns true if that object is to be collected.
-  Arg [3]    : Maximum depth to search below the starting directory.
-               Optional (undef for unlimited depth).
-  Arg [4]    : A file matching regex that is applied in addition to to
-               the test. Optional.
-  Example    : @files = collect_files('/home', $modified, 3, qr/.txt$/i)
-  Description: Returns an array of file names present under the specified
-               root, for which the test predicate returns true, up to the
-               specified depth.
-  Returntype : array of strings (file names)
-  Caller     : general
-
-=cut
-
-sub collect_files {
-  my ($root, $test, $depth, $regex) = @_;
-
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
-
-  my @files;
-  my $collector = make_collector($test, \@files);
-
-  my $start_depth = $root =~ tr[/][];
-  my $stop_depth;
-  if (defined $depth) {
-    $stop_depth = $start_depth + $depth;
-  }
-
-  find({preprocess => sub {
-          my $current_depth = $File::Find::dir =~ tr[/][];
-
-          my @elts;
-          if (!defined $stop_depth || $current_depth < $stop_depth) {
-            # Remove any dirs except . and ..
-            @elts = grep { ! /^\.+$/ } @_;
-          }
-
-          return @elts;
-        },
-        wanted => sub {
-          my $current_depth = $File::Find::dir =~ tr[/][];
-
-          if (!defined $stop_depth || $current_depth < $stop_depth) {
-            if (-f) {
-              if ($regex) {
-                $collector->($File::Find::name) if $_ =~ $regex;
-              }
-              else {
-                $collector->($File::Find::name)
-              }
-            }
-          }
-        }
-       }, $root);
-
-  return @files;
-}
-
-=head2 collect_dirs
-
-  Arg [1]    : Root directory
-  Arg [2]    : coderef of a function that accepts a single argument and
-               returns true if that object is to be collected.
-  Arg [3]    : Maximum depth to search below the starting directory.
-  Arg [4]    : A file matching regex that is applied in addition to to
-               the test. Optional.
-
-  Example    : @dirs = collect_dirs('/home', $modified, 2)
-  Description: Return an array of directory names present under the specified
-               root, for which the test predicate returns true, up to the
-               specified depth.
-  Returntype : array of strings (dir names)
-  Caller     : general
-
-=cut
-
-sub collect_dirs {
-  my ($root, $test, $depth, $regex) = @_;
-
-  $root eq '' and $log->logconfess('A non-empty root argument is required');
-
-  my @dirs;
-  my $collector = make_collector($test, \@dirs);
-
-  my $start_depth = $root =~ tr[/][];
-  my $stop_depth;
-  if (defined $depth) {
-    $stop_depth = $start_depth + $depth;
-  }
-
-  find({preprocess => sub {
-          my $current_depth = $File::Find::name =~ tr[/][];
-
-          my @dirs;
-          if (!defined $stop_depth || $current_depth < $stop_depth) {
-            @dirs = grep { -d && ! /^\.+$/ } @_;
-          }
-
-          return @dirs;
-        },
-        wanted => sub {
-          my $current_depth = $File::Find::name =~ tr[/][];
-
-          if (!defined $stop_depth || $current_depth < $stop_depth) {
-
-            if ($regex) {
-              $collector->($File::Find::name) if $_ =~ $regex;
-            }
-            else {
-              $collector->($File::Find::name);
-            }
-          }
-        }
-       }, $root);
-
-  return @dirs;
-}
-
-=head2 make_collector
-
-  Arg [1]    : coderef of a function that accepts a single argument and
-               returns true if that object is to be collected.
-  Arg [2]    : arrayref of an array into which matched object will be pushed
-               if the test returns true.
-  Example    : $collector = make_collector(sub { ... }, \@found);
-  Description: Returns a function that will push matched objects onto a
-               specified array.
-  Returntype : coderef
-  Caller     : general
-
-=cut
-
-sub make_collector {
-  my ($test, $listref) = @_;
-
-  return sub {
-    my ($arg) = @_;
-
-    my $collect = $test->($arg);
-    push(@{$listref}, $arg) if $collect;
-
-    return $collect;
-  }
-}
-
-=head2 modified_between
-
-  Arg [1]    : time in seconds since the epoch
-  Arg [2]    : time in seconds since the epoch
-  Example    : $test = modified_between($start_time, $end_time)
-  Description: Return a function that accepts a single argument (a
-               file name string) and returns true if that file has
-               last been modified between the two specified times in
-               seconds (inclusive).
-  Returntype : coderef
-  Caller     : general
-
-=cut
-
-sub modified_between {
-  my ($start, $finish) = @_;
-
-  return sub {
-    my ($file) = @_;
-
-    my $stat = stat($file);
-    unless (defined $stat) {
-      my $wd = `pwd`;
-      $log->logconfess("Failed to stat file '$file' in $wd: $!");
-    }
-
-    my $mtime = $stat->mtime;
-
-    return ($start <= $mtime) && ($mtime <= $finish);
-  }
-}
-
-sub _run_command {
-  my @command = @_;
-
-  my $command = join(' ', @command);
-
-  open(my $exec, '-|', "$command 2>/dev/null")
-    or $log->logconfess("Failed open pipe to command '$command': $!");
-  binmode($exec, ':utf8');
-
-  my $logformat_command = $command;
-  $logformat_command =~ s/\n//g;
-  $logformat_command =~ s/\s+/ /g;
-  $log->debug("Running child '$logformat_command'");
-
-  my @result;
-  while (<$exec>) {
-    chomp;
-    push(@result, $_);
-  }
-
-  close($exec);
-
-  my $returned = $?;
-  if ($returned) {
-    my $signal = $returned & 127;
-    my $exit = $returned >> 8;
-
-    if ($signal) {
-      $log->logconfess("Execution of '$command' died from signal: $signal");
-    }
-    else {
-      $log->logconfess("Execution of '$command' failed with exit code: $exit");
-    }
-  }
-
-  return @result;
-}
-
-sub _ensure_absolute {
-  my ($target) = @_;
+sub _ensure_absolute_path {
+  my ($self, $target) = @_;
 
   my $absolute = $target;
-  unless ($target =~ m/^\//) {
-    $absolute = ipwd() . '/' . $absolute;
+  unless ($target =~ m{^/}) {
+    $absolute = $self->working_collection . '/' . $absolute;
   }
 
   return $absolute;
 }
 
+sub _meta_exists {
+  my ($self, $attribute, $value, $units, $current_meta) = @_;
 
-# To be replaced by natice JSON output from mimeta
-sub _parse_raw_meta {
-  my @raw_meta = @_;
+  ref $current_meta eq 'ARRAY' or
+    $self->logconfess("current_meta argument must be an ArrayRef");
 
-  @raw_meta = grep { m/^[attribute|value|units]/ } @raw_meta;
-  my $n = scalar @raw_meta;
-  unless ($n % 3 == 0) {
-    $log->logconfess("Expected imeta triples, but found $n elements");
+  if ($units) {
+    return grep { $_->{attribute} eq $attribute &&
+                  $_->{value}     eq $value &&
+                  $_->{units}     eq $units } @$current_meta;
   }
-
-  my %meta;
-  for (my $i = 0; $i < $n; $i += 3) {
-    my ($str0, $str1, $str2) = @raw_meta[$i .. $i + 2];
-
-    my ($attribute) = $str0 =~ m/^attribute: (.*)/ or
-      $log->logconfess("Invalid triple $i: expected an attribute but found ",
-                     "'$str0'");
-
-    my ($value) = $str1 =~ m/^value: (.*)/ or
-      $log->logconfess("Invalid triple $i: expected a value but found '$str1'");
-
-    my ($units) = $str2 =~ m/^units: (.*)/ or
-      $log->logconfess("Invalid triple $i: expected units but found '$str2'");
-
-    if (exists $meta{$attribute}) {
-      push(@{$meta{$attribute}}, $value);
-    }
-    else {
-      $meta{$attribute} = [$value];
-    }
+  else {
+    return grep { $_->{attribute} eq $attribute &&
+                  $_->{value}     eq $value} @$current_meta;
   }
-
-  return %meta;
 }
 
 sub _make_imeta_query {
-  my @query_specs = @_;
+  my ($self, @query_specs) = @_;
 
   scalar @query_specs or
-    $log->logconfess('At least one query_spec argument is required');
+    $self->logconfess('At least one query_spec argument is required');
 
   my @query_clauses;
+  my $i = 0;
   foreach my $spec (@query_specs) {
     unless (ref $spec eq 'ARRAY') {
-      $log->logconfess("The query_spec '$spec' was not an array reference");
+      $self->logconfess("The query_spec '$spec' was not an array reference");
     }
 
-    my ($key, $value, $operator) = @$spec;
+    my ($attribute, $value, $operator) = @$spec;
     if (defined $operator) {
-      unless ($operator eq '=' ||
+      unless ($operator eq '='    ||
               $operator eq 'like' ||
-              $operator eq '<' ||
+              $operator eq '<'    ||
               $operator eq '>') {
-        $log->logconfess("Invalid query operator '$operator' in query spec ",
-                         "[$key, $value, $operator]");
+        $self->logconfess("Invalid query operator '$operator' in query spec ",
+                         "[$attribute, $value, $operator]");
       }
     }
     else {
       $operator = '=';
     }
 
-    push(@query_clauses, "$key $operator $value");
+    if ($i > 0) {
+      push(@query_clauses, 'and')
+    }
+    $i++;
+
+    push(@query_clauses, $attribute, $operator, $value);
   }
 
-  return join(' and ', @query_clauses);
+  return @query_clauses;
 }
 
-sub _safe_select {
-  my ($ctemplate, $icount, $qtemplate, $iquery) = @_;
-
-  my @result;
-
-  my @count = _run_command($IQUEST, $ctemplate, $icount);
-  if (@count && $count[0] > 0) {
-    push(@result, _run_command($IQUEST, '--no-page', $qtemplate, $iquery));
-  }
-
-  return @result;
-}
-
-sub _irm {
-  my @args = @_;
-
-  _run_command($IRM, '-r', '-f', join(' ', @args));
-
-  return @args;
-}
-
+no Moose;
 
 1;
 
 __END__
+
+=head1 NAME
+
+WTSI::NPG::iRODS
+
+=head1 SYNOPSIS
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my $rods_path = $irods->add_object("file.txt", "irods/path");
+  print $irods->list_object($rods_path), "\n";
+
+  $irods->add_object_avu(rods_path, 'a', 'b', 'c');
+  $irods->add_object_avu(rods_path, 'x', 'y1', 'z');
+  $irods->add_object_avu(rods_path, 'x', 'y2', 'z');
+
+  my @objs = $irods->find_objects_by_meta('/',
+                                          [a => 'b'],
+                                          [y => 'z%', 'like']);
+
+=head1 DESCRIPTION
+
+This class provides access to iRODS operations on data objects,
+collections and metadata. It does so by launching several client
+programs in the background, each of which holds open a connection
+
+On creation, an instance captures a copy of %ENV which it uses for all
+its child processes.
+
+iRODS paths to data objects and collections are represented as
+strings. AVUs are represented as HashRefs of the form
+
+  { attribute => <attribute name>,
+    value     => <attribute value>,
+    units     => <attribute units> }
+
+Units are optional.
+
+Query clauses are represented as ArrayRefs of the form
+
+  [ <attribute name>, <attribute value> <operator> ]
+
+The operator is optional, defaulting to '='. Valid operators are '=',
+'like', '<' and '>'.
+
+e.g. The query
+
+  [x => 'a'], [y => 'b'], [z => 'c%', 'like']
+
+is translated to the iRODS imeta query
+
+  x = a and y = b and x like c%
 
 =head1 AUTHOR
 
@@ -1361,7 +1211,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -10,7 +10,7 @@ use Exporter;
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/version_text write_version_log/;
 
-$VERSION = '0.9.1';
+$VERSION = '1.0.0';
 $YEAR = '2013'; # year of last update
 
 sub version_text {

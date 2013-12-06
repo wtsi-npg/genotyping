@@ -12,12 +12,8 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
-use WTSI::NPG::iRODS qw(find_objects_by_meta);
-use WTSI::NPG::Metadata qw(make_sample_metadata);
-
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
-use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
-                                       $FLUIDIGM_PLATE_WELL_META_KEY);
+use WTSI::NPG::iRODS;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -88,15 +84,17 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my @fluidigm_data = find_objects_by_meta($publish_dest,
-                                           [fluidigm_plate => '%', 'like'],
-                                           [fluidigm_well => '%', 'like'],
-                                           [type => 'csv'],
-                                           @filter);
+  my $irods = WTSI::NPG::iRODS->new(logger => $log);
+  my @fluidigm_data =
+    $irods->find_objects_by_meta($publish_dest,
+                                 [fluidigm_plate => '%', 'like'],
+                                 [fluidigm_well  => '%', 'like'],
+                                 [type           => 'csv'],
+                                 @filter);
   my $total = scalar @fluidigm_data;
   my $updated = 0;
 
@@ -105,8 +103,7 @@ sub run {
   foreach my $data_object (@fluidigm_data) {
     eval {
       my $fdo = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-        ($data_object);
-      $fdo->logger($log);
+        ($irods, $data_object);
       $fdo->update_secondary_metadata($ssdb);
       ++$updated;
     };

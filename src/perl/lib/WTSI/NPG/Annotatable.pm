@@ -3,14 +3,23 @@ package WTSI::NPG::Annotatable;
 
 use Moose::Role;
 
-has 'metadata' => (is => 'rw',
-                   isa => 'ArrayRef');
+has 'metadata' =>
+  (is  => 'rw',
+   isa => 'ArrayRef');
 
 no Moose;
 
 1;
 
 __END__
+
+=head1 NAME
+
+Annotatable - a role which provides annotation or metadata.
+
+=head1 DESCRIPTION
+
+Provides a place to store metadata about an entity.
 
 =head1 AUTHOR
 
