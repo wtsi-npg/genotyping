@@ -103,9 +103,7 @@ sub run {
 
   foreach my $plate_name (@$plate_names) {
     my $publisher = WTSI::NPG::Genotyping::Sequenom::Publisher->new
-    (creator_uri      => $creator_uri,
-     publisher_uri    => $publisher_uri,
-     publication_time => $now,
+    (publication_time => $now,
      plate_name       => $plate_name,
      sequenom_db      => $sqdb,
      logger           => $log);
