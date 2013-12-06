@@ -8,8 +8,6 @@ use strict;
 use warnings;
 use Cwd qw(abs_path);
 use DateTime;
-use File::Basename;
-use File::Find;
 use Getopt::Long;
 use List::MoreUtils qw(natatime);
 use Log::Log4perl;
@@ -90,7 +88,7 @@ sub run {
   }
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse_prod',
+    (name   => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
