@@ -8,7 +8,7 @@ use Carp;
 use File::Basename;
 use UUID;
 
-use WTSI::NPG::iRODS qw(md5sum);
+use WTSI::NPG::Utilities qw(md5sum);
 
 use base 'Exporter';
 our @EXPORT_OK = qw(
@@ -22,6 +22,7 @@ our @EXPORT_OK = qw(
                     $SAMPLE_SUPPLIER_NAME_META_KEY
                     $STUDY_ID_META_KEY
                     $STUDY_TITLE_META_KEY
+                    $TICKET_META_KEY
 
                     has_consent
                     make_creation_metadata
@@ -30,6 +31,10 @@ our @EXPORT_OK = qw(
                     make_modification_metadata
                     make_type_metadata
                     make_sample_metadata
+);
+
+our @DEFAULT_FILE_SUFFIXES = qw(
+ .idat .gtc .xml .txt .csv .tif
 );
 
 our $SAMPLE_NAME_META_KEY             = 'sample';
@@ -44,53 +49,55 @@ our $SAMPLE_CONSENT_META_KEY          = 'sample_consent';
 our $STUDY_ID_META_KEY                = 'study_id';
 our $STUDY_TITLE_META_KEY             = 'study_title';
 
+our $TICKET_META_KEY                  = 'rt_ticket';
+
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
 =head2 make_creation_metadata
 
   Arg [1]    : DateTime creation time
   Arg [2]    : string publisher (LDAP URI of publisher)
+
   Example    : my @meta = make_creation_metadata($time, $publisher)
   Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
 sub make_creation_metadata {
   my ($creator, $creation_time, $publisher) = @_;
 
-  return (['dcterms:creator'   => $creator],
+  return (['dcterms:creator'   => $creator->as_string],
           ['dcterms:created'   => $creation_time->iso8601],
-          ['dcterms:publisher' => $publisher]);
+          ['dcterms:publisher' => $publisher->as_string]);
 }
 
 =head2 make_modification_metadata
 
   Arg [1]    : DateTime modification time
+
   Example    : my @meta = make_modification_metadata($time)
   Description: Return a list of metadata key/value pairs describing the
                creation of an item.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
 sub make_modification_metadata {
   my ($modification_time) = @_;
 
-  return (['dcterms:modified' => $modification_time]);
+  return (['dcterms:modified' => $modification_time->iso8601]);
 }
 
 =head2 make_sample_metadata
 
   Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
+
   Example    : my @meta = make_sample_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -160,31 +167,35 @@ sub make_sample_metadata {
 
   Arg [1]    : string filename
   Arg [2]    : array of valid file suffix strings
+
   Example    : my @meta = make_type_metadata($sample, '.txt', '.csv')
   Description: Return a list of metadata key/value pairs describing
                the file 'type' (suffix).
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
 sub make_type_metadata {
   my ($file, @suffixes) = @_;
 
+  unless (@suffixes) {
+    @suffixes = @DEFAULT_FILE_SUFFIXES;
+  }
+
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
   $suffix =~ s{^\.?}{}msxi;
 
-  return (['type' => $suffix]);
+  return ([type => $suffix]);
 }
 
 =head2 make_md5_metadata
 
   Arg [1]    : string filename
+
   Example    : my @meta = make_md5_metadata($sample)
   Description: Return a list of metadata key/value pairs describing the
                file MD5 checksum.
   Returntype : array of arrayrefs
-  Caller     : general
 
 =cut
 
@@ -194,14 +205,31 @@ sub make_md5_metadata {
   return ([md5 => md5sum($file)]);
 }
 
+=head2 make_ticket_metadata
+
+  Arg [1]    : string filename
+
+  Example    : my @meta = make_ticket_metadata($ticket_number)
+  Description: Return a list of metadata key/value pairs describing a
+               ticket relating to the file
+  Returntype : array of arrayrefs
+
+=cut
+
+sub make_ticket_metadata {
+  my ($ticket_number) = @_;
+
+  return ([$TICKET_META_KEY => $ticket_number]);
+}
+
 =head2 has_consent
 
   Arg [1]    : metadata array
+
   Example    : My $consent = has_consent(@meta);
   Description: Return true if the sample metadata contains an indication that
                consent has been given.
   Returntype : boolean
-  Caller     : general
 
 =cut
 

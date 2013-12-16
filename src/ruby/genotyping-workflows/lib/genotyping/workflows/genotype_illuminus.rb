@@ -84,7 +84,8 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size, :gender_method)
+                               :select, :chunk_size, :gender_method,
+                               :filterconfig, :nofilter)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -123,21 +124,13 @@ Returns:
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
-      siargs = {:config => gtconfig,
-        :gender_method => gender_method}.merge(args)
-      sjson = sample_intensities(dbfile, run_name, sjname, siargs)
-      smargs = {:normalize => true }.merge(args)
-      smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
-
       ## run gencall QC to apply gencall CR filter and find genders
-      gcquality = nil
-      if smfile
-        gcqcargs = {:run => run_name, :sim => smfile }.merge(args)
-        gcqcdir = File.join(work_dir, 'gencall_qc')
-        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                    async, true)
-      end
+      gcqcargs = {:run => run_name}.merge(args)
+      gcqcdir = File.join(work_dir, 'gencall_qc')
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                  async, true)
 
+      ## apply filtering to pipeline DB, if required
       filtered = nil
       if gcquality
         if nofilter
@@ -152,17 +145,16 @@ Returns:
         end
       end
 
+      ## use post-filter pipeline DB to generate sample JSON and .sim file
+      ## also parse manifest
+      siargs = {:config => gtconfig,
+        :gender_method => gender_method}.merge(args)
       smfile = nil
+      cjson = nil
       if filtered
-        siargs = {:config => gtconfig,
-                  :gender_method => gender_method}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
-      end
-
-      cjson = nil
-      if filtered
         njson, cjson = parse_manifest(manifest, njname, cjname, args)
       end
 
@@ -173,7 +165,7 @@ Returns:
       
       ilchunks = nil
 
-      if cjson
+      if cjson and smfile
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec['chromosome']
           pargs = {:chromosome => chr,
@@ -192,10 +184,9 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      qcargs = {:run => run_name,
-                :sim => smfile}.merge(args)
-
-      ilquality = quality_control(dbfile, ilfile, 'illuminus_qc', qcargs, async)
+      output = 'illuminus_qc'
+      qcargs = {:run => run_name, :sim => smfile}.merge(args)
+      ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]

@@ -35,20 +35,19 @@ my $largeInputRef = "$inputDir/benchmark_gender_large.json";
 my %refGenders = readBenchmark($refFile);
 my @names = keys(%refGenders);
 
-foreach my $format qw(plink json text) {
+foreach my $format (qw/plink json text/) {
     foreach my $jsonOut ((0,1)) {
-        system('rm -f $outDir/*.png $outDir/*.log $outDir/sample_*.txt'); 
         my ($input, $outPath, $outType);
-        if ($format eq 'json') { $input = "$inputDir/input_xhet.json"; } 
-        elsif ($format eq 'text') { $input = "$inputDir/input_xhet.txt"; } 
-        elsif ($format eq 'plink') { $input = $plink; } 
+        if ($format eq 'json') { $input = "$inputDir/input_xhet.json"; }
+        elsif ($format eq 'text') { $input = "$inputDir/input_xhet.txt"; }
+        elsif ($format eq 'plink') { $input = $plink; }
         my $cmd = "perl $script --input=$input ".
             "--input-format=$format --output-dir=$outDir";
-         if ($jsonOut) { 
-            $cmd .= " --json"; 
+         if ($jsonOut) {
+            $cmd .= " --json";
             $outPath = "$outDir/sample_xhet_gender.json";
             $outType = 'json';
-        } else { 
+        } else {
             $outPath = "$outDir/sample_xhet_gender.txt";
             $outType = 'text';
         }
@@ -56,11 +55,11 @@ foreach my $format qw(plink json text) {
         ## start tests
         is($status, 0, "gendermix_standalone.pl exit status, ".
            "input $format, output type $outType");
-        is(diffGenders(\%refGenders, $outPath), 0, 
+        is(diffGenders(\%refGenders, $outPath), 0,
            "Verify $outType output vs. benchmark");
+        system("rm -f $outDir/*.png $outDir/*.log $outDir/sample_*.txt");
     }
 }
 
 my $duration = time() - $start;
 print "Standalone gender check test finished.  Duration: $duration s\n";
-

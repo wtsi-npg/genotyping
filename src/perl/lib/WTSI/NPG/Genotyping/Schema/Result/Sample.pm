@@ -78,13 +78,23 @@ sub include_from_state {
   my ($self) = @_;
 
   my @states = $self->states;
-  if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) }
-  elsif (grep { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
-  elsif (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
-  else                                                  { $self->include(0) }
 
-  # If the data are unavailable, we cannot analyse
-  if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) }
+  # Default is to exclude
+  $self->include(0);
+
+  # An autocall_pass flips the sample to included
+  if (grep { $_->name eq 'autocall_pass' }     @states) { $self->include(1) };
+
+  # withdrawn flips the sample to excluded, even if autocall_pass
+  if (grep { $_->name eq 'withdrawn' }         @states) { $self->include(0) };
+
+  # pi_approved overrides any of the above
+  if (grep { $_->name eq 'pi_approved' }       @states) { $self->include(1) };
+
+  # Consent withdrawn overrides everything above
+  if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) };
+  # Also, if the data are unavailable, we cannot analyse
+  if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) };
 
   return $self->include;
 }

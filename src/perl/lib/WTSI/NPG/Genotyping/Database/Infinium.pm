@@ -15,7 +15,6 @@ use base 'WTSI::NPG::Database';
   Description: Returns Infinium chip design (product name) for a project
                name
   Returntype : list of strings
-  Caller     : general
 
 =cut
 
@@ -75,7 +74,6 @@ sub find_project_chip_design {
                  idat_grn_path => <path string of IDAT format result file>,
                  idat_red_path => <path string of IDAT format result file> }
   Returntype : arrayref of hashrefs
-  Caller     : general
 
 =cut
 
@@ -232,7 +230,6 @@ sub find_project_samples {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file> }
   Returntype : hashref
-  Caller     : general
 
 =cut
 
@@ -384,7 +381,6 @@ sub find_scanned_sample {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file> }
   Returntype : hashref
-  Caller     : general
 
 =cut
 

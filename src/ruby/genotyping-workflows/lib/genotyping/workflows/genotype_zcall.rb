@@ -116,10 +116,8 @@ Returns:
 
       run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
-      gciname = run_name + '.gencall.imajor.bed'
-      gcsname = run_name + '.gencall.smajor.bed'
-      smname =  run_name + '.gencall.sim'
-      fname = run_name + '.prefilter_results.json'
+      gcsimname = run_name + '.gencall.sim'
+      ilsimname = run_name + '.illuminus.sim'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
@@ -128,66 +126,36 @@ Returns:
       njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
-      gcsfile = transpose_bed(gcifile, gcsname, args, async)
+
+      ## create GenCall .sim intensity file, if needed
+      gcsimfile = nil
+      smargs = {:normalize => true }.merge(args)
+      unless nosim
+        gcsimfile = gtc_to_sim(gcsjson, manifest, gcsimname, smargs, async)
+      end
 
       ## prefilter on QC metrics and thresholds to exclude bad samples
       filtered = nil
-      if nofilter # prefilter cancellation in effect
+      if nofilter
         filtered = true
       else
-        ## run plinktools to find maf/het on transposed .bed output
-        hmjson = het_by_maf(gcsfile, work_dir, run_name, args, async)
-
-        gcqcargs = nil
-        if nosim
-          gcqcargs = {:run => run_name}.merge(args)
-        else
-          ## get .sim file from GTC files for intensity metrics
-          smargs = {:normalize => true }.merge(args)
-          smfile = gtc_to_sim(gcsjson, manifest, smname, smargs, async)
-          if smfile
-            gcqcargs = {:run => run_name, :sim => smfile}.merge(args)
-          end
-        end
-        ## run gencall QC to get metrics for prefiltering
-        gcquality = nil
-        if gcqcargs
-          gcqcdir = File.join(work_dir, 'gencall_qc')
-          gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                      async, true)
-        end
-        mqcjson = nil
-        if gcquality and hmjson
-          ## merge results from plinktools MAF/het and generic QC
-          gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
-          mqcpath = File.join(work_dir, 'run1.gencall.merged_qc.json')
-          mqcjson = merge_qc_results([gcqcjson, hmjson], mqcpath, args)
-        end
-        if mqcjson
-          ## apply prefilter to exclude samples from zcall input
-          if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-          else fargs = {:zcall => true}.merge(args)
-          end
-          fargs[:out] = File.join(work_dir, fname)
-          filtered = filter_samples(mqcjson, dbfile, fargs)
-        end
+        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
+                             gcsimfile, manifest, args, async)
       end
 
+      ## find sample intensity data
       sjson = nil
       if filtered
-        ## find sample intensity data
         siargs = {:config => gtconfig}.merge(args)
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
       end
 
-      num_samples = count_samples(sjson)
-
+      ## prepare thresholds, and evaluate if required
       tresult = nil
       if sjson
         tresult = prepare_thresholds(egt_file, zstart, ztotal, args, async)
       end
-
+      num_samples = count_samples(sjson)
       best_t = nil
       if tresult
         if ztotal == 1  # skip evaluation if only one Z value given
@@ -224,12 +192,27 @@ Returns:
                                         transpose_args, async)
       end
       
-
       zfile = update_annotation(merge_bed(zchunks_t, zname, args, async),
                                  sjson, njson, args, async)
-      qcargs = {:run => run_name}.merge(args)
-      zquality = quality_control(dbfile, zfile, 'zcall_qc', qcargs, async)
 
+      ## run zcall QC
+      zqc = 'zcall_qc'
+      qcargs = nil
+      if nosim
+        # no sim file, therefore no intensity metrics
+        qcargs = {:run => run_name}.merge(args)
+      else
+        # generate new .sim file to reflect sample exclusions
+        ilsimfile = gtc_to_sim(sjson, manifest, ilsimname, smargs, async)
+        if ilsimfile
+          qcargs = {:run => run_name, :sim => ilsimfile}.merge(args)
+        end
+      end
+      if qcargs
+        zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
+      end
+      # .sim files are large; delete gencall .sim on successful completion
+      if zquality and gcsimfile then File.delete(gcsimfile) end
       [zfile, zquality] if [zfile, zquality].all?
     end
 
@@ -243,6 +226,49 @@ Returns:
       return metrics['BEST_THRESHOLDS']
     end
     
+    def prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
+                  gcsimfile, manifest, args, async)
+      # Run GenCall QC and apply prefilter to remove failing samples
+      filtered = nil
+      fname = run_name + '.prefilter_results.json'
+      gciname = run_name + '.gencall.imajor.bed'
+      gcsname = run_name + '.gencall.smajor.bed'
+
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      gcsfile = transpose_bed(gcifile, gcsname, args, async)
+
+      ## run plinktools to find maf/het on transposed .bed output
+      hmjson = het_by_maf(gcsfile, work_dir, run_name, args, async)
+
+      if gcsimfile
+        gcqcargs = {:run => run_name, :sim => gcsimfile}.merge(args)
+      else
+        gcqcargs = {:run => run_name}.merge(args)
+      end
+      ## run gencall QC to get metrics for prefiltering
+      gcqcdir = File.join(work_dir, 'gencall_qc')
+      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                  async, true)
+
+      mqcjson = nil
+      if gcquality and hmjson
+        ## merge results from plinktools MAF/het and generic QC
+        gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
+        mqcpath = File.join(work_dir, 'run1.gencall.merged_qc.json')
+        mqcjson = merge_qc_results([gcqcjson, hmjson], mqcpath, args)
+      end
+      if mqcjson
+        ## apply prefilter to exclude samples from zcall input
+        if fconfig then fargs = {:thresholds => fconfig}.merge(args)
+        else fargs = {:zcall => true}.merge(args)
+        end
+        fargs[:out] = File.join(work_dir, fname)
+        filtered = filter_samples(mqcjson, dbfile, fargs)
+      end
+      return filtered
+
+    end # def prefilter
+
   end # end of class
 
 end # end of module

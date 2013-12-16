@@ -30,13 +30,13 @@ our $states_ini = 'states.ini';
   Arg [2]    : inifile => string
   Arg [3]    : dbfile => string
   Arg [3]    : overwrite => boolean
+
   Example    : WTSI::NPG::Genotyping::Database::Pipeline->new
                  (name => 'my_database', inifile => 'my_database.ini',
                   dbfile => 'pipeline.db', overwrite => 1)
   Description: Returns a new database handle configured from an
                .ini-style file.
   Returntype : WTSI::NPG::Genotyping::Database
-  Caller     : general
 
 =cut
 
@@ -91,12 +91,12 @@ sub initialize {
 
   Arg [1]    : Database file
   Arg [2]    : Config::IniFiles ini file
+
   Example    : $db->create($file, $ini)
   Description: Writes the SQLite database file. This is called automatically
                by the constructor, but may be called at any time to re-write
                the database file.
   Returntype : WTSI::NPG::Genotyping::Database::Pipeline
-  Caller     : constructor, general
 
 =cut
 
@@ -128,6 +128,7 @@ sub create {
 =head2 populate
 
   Arg [1]    : None
+
   Example    : $db->populate
   Description: Populates the dictionary tables of a database from the
                default .ini files located in the 'inipath' path given
@@ -135,7 +136,6 @@ sub create {
                WTSI::NPG::Genotyping::Database::configure). May be called
                safely multiple times on the same .ini data.
   Returntype : WTSI::NPG::Genotyping::Database::Pipeline
-  Caller     : general
 
 =cut
 
@@ -233,10 +233,10 @@ sub dbh {
 =head2 dbfile
 
   Arg [1]    : None
+
   Example    : $db->dbfile
   Description: Returns the current database file.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -249,6 +249,7 @@ sub dbfile {
 
   Arg [1]    : Subroutine reference
   Arg [n]    : Subroutine arguments
+
   Example    : $db->in_transaction(sub {  my $ds = shift;
                                           my @sm = @_;
                                           foreach (@sm) {
@@ -258,7 +259,6 @@ sub dbfile {
   Description: Executes a subroutine in the context of a transaction
                which will rollback on error.
   Returntype : As subroutine.
-  Caller     : general
 
 =cut
 
@@ -288,10 +288,10 @@ sub in_transaction {
 =head2 schema
 
   Arg [1]    : None
+
   Example    : $db->schema
   Description: Returns the current database schema object.
   Returntype : WTSI::NPG::Genotyping::Schema
-  Caller     : general
 
 =cut
 

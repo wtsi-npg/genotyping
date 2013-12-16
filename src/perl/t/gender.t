@@ -24,7 +24,7 @@ my $dbWorkDir = "$Bin/.."; # must change dir to genoytping/src/perl for default 
 chdir($dbWorkDir);
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $plink = "$Bin/gender/alpha";
-my $outDir = "$Bin/gender/";
+my $outDir = "$Bin/gender";
 my $inputDir = $outDir;
 my $title = "Alpha";
 my $script = "$bin/check_xhet_gender.pl";
@@ -41,9 +41,8 @@ $ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 my %refGenders = readBenchmark($refFile);
 my @names = keys(%refGenders);
 
-foreach my $format qw(plink json text) {
+foreach my $format (qw/plink json text/) {
     foreach my $jsonOut ((0,1)) {
-        system('rm -f $outDir/*.png $outDir/*.log $outDir/sample_*.txt');
         my ($input, $outPath, $outType);
         my $dbfile = createTestDatabase(\@names);
         print "\tCreated temporary database in $dbfile\n";
@@ -73,6 +72,7 @@ foreach my $format qw(plink json text) {
         is(diffGenders(\%dbGenders, $outPath), 0, 
            "Verify $outType output vs. database");
         system("rm -f $dbfile");
+        system("rm -f $outDir/*.png $outDir/*.log $outDir/sample_*.txt");
     }
 }
 

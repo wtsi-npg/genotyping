@@ -1,7 +1,5 @@
-family_small_test urn:wtsi:plate0001_A01_sample000000 0 0 1 -9
 family_small_test urn:wtsi:plate0001_B01_sample000001 0 0 1 -9
 family_small_test urn:wtsi:plate0001_C01_sample000002 0 0 1 -9
-family_small_test urn:wtsi:plate0001_D01_sample000003 0 0 1 -9
 family_small_test urn:wtsi:plate0001_E01_sample000004 0 0 2 -9
 family_small_test urn:wtsi:plate0001_F01_sample000005 0 0 2 -9
 family_small_test urn:wtsi:plate0001_G01_sample000006 0 0 2 -9
@@ -20,7 +18,6 @@ family_small_test urn:wtsi:plate0001_C03_sample000018 0 0 1 -9
 family_small_test urn:wtsi:plate0001_D03_sample000019 0 0 1 -9
 family_small_test urn:wtsi:plate0001_E03_sample000020 0 0 1 -9
 family_small_test urn:wtsi:plate0001_F03_sample000021 0 0 1 -9
-family_small_test urn:wtsi:plate0001_G03_sample000022 0 0 2 -9
 family_small_test urn:wtsi:plate0001_H03_sample000023 0 0 1 -9
 family_small_test urn:wtsi:plate0001_A04_sample000024 0 0 2 -9
 family_small_test urn:wtsi:plate0001_B04_sample000025 0 0 2 -9
@@ -42,7 +39,6 @@ family_small_test urn:wtsi:plate0001_A06_sample000040 0 0 1 -9
 family_small_test urn:wtsi:plate0001_B06_sample000041 0 0 2 -9
 family_small_test urn:wtsi:plate0001_C06_sample000042 0 0 1 -9
 family_small_test urn:wtsi:plate0001_D06_sample000043 0 0 1 -9
-family_small_test urn:wtsi:plate0001_E06_sample000044 0 0 2 -9
 family_small_test urn:wtsi:plate0001_F06_sample000045 0 0 2 -9
 family_small_test urn:wtsi:plate0001_G06_sample000046 0 0 1 -9
 family_small_test urn:wtsi:plate0001_H06_sample000047 0 0 2 -9

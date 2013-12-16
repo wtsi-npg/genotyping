@@ -11,8 +11,11 @@ use Cwd qw/abs_path/;
 use Digest::MD5;
 use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
-use Test::More tests => 52;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults/;
+use JSON;
+
+use Test::More tests => 51;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults 
+  readFileToString readSampleInclusion/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
@@ -25,6 +28,7 @@ my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
+my $inclusionMaster = "$Bin/qc_test_data/sample_inclusion.json";
 my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
 my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
@@ -33,6 +37,10 @@ my ($cmd, $status);
 
 # The directories contains the R scripts and Perl scripts
 $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
+
+# FIXME - hacked this in because scripts are calling scripts here
+# The code being reused this way should be factored out into modules.
+$ENV{PERL5LIB} = join(':', "$Bin/../blib/lib", $ENV{PERL5LIB});
 
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);
@@ -66,11 +74,11 @@ is($status, 0, "check_duplicates_bed.pl exit status");
 $status = system("$bin/check_xhet_gender.pl --input=$plink");
 is($status, 0, "check_xhet_gender.pl exit status");
 
-## test xydiff computation
-$status = system("$bin/intensity_metrics.pl --input=$sim --magnitude=magnitude.txt --xydiff=xydiff.txt");
-is($status, 0, "intensity_metrics.pl exit status");
-
 ## test collation into summary
+## first, generate intensity metrics using simtools
+$cmd = "simtools qc --infile $sim --magnitude magnitude.txt ".
+    "--xydiff xydiff.txt";
+system($cmd);
 $status = system("$bin/write_qc_status.pl --dbpath=$dbfile --inipath=$iniPath");
 is($status, 0, "write_qc_status.pl exit status");
 ## test output
@@ -133,13 +141,10 @@ foreach my $png (@png) {
 $cmd = "$bin/filter_samples.pl --thresholds $filterConfig --in ".
     "qc_merged.json --db $dbfile";
 is(system($cmd), 0, "Exit status of pre-filter script");
-my $md5 = Digest::MD5->new;
-open my $fh, "<", $dbfile || croak "Cannot open pipeline DB $dbfile";
-binmode($fh);
-while (<$fh>) { $md5->add($_); }
-close $fh || croak "Cannot close pipeline DB $dbfile";
-is($md5->hexdigest, '563039775c9c104fc725d924aa073e9e', 
-   "MD5 checksum of database after filtering");
+my $incMasterRef = decode_json(readFileToString($inclusionMaster));
+my $incResultRef = readSampleInclusion($dbfile);
+is_deeply($incResultRef, $incMasterRef, 
+	  "Check sample inclusion status against master file");
 
 system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
 system("cp $dbfileMasterA $tempdir");
@@ -183,3 +188,4 @@ print "\tTest dataset $testName finished.\n";
 
 my $duration = time() - $start;
 print "QC test $testName finished.  Duration: $duration s\n";
+
