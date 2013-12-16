@@ -8,8 +8,6 @@ use Carp;
 use File::Basename;
 use UUID;
 
-use WTSI::NPG::iRODS qw(md5sum);
-
 use WTSI::NPG::Metadata qw(make_fingerprint);
 
 use base 'Exporter';
@@ -23,9 +21,13 @@ our @EXPORT_OK = qw($GENOTYPING_ANALYSIS_UUID_META_KEY
                     $INFINIUM_SAMPLE_NAME
                     $SEQUENOM_PLATE_NAME_META_KEY
                     $SEQUENOM_PLATE_WELL_META_KEY
+                    $FLUIDIGM_PLATE_NAME_META_KEY
+                    $FLUIDIGM_PLATE_WELL_META_KEY
 
+                    fluidigm_fingerprint
                     infinium_fingerprint
                     make_analysis_metadata
+                    make_fluidigm_metadata
                     make_infinium_metadata
                     make_sequenom_metadata
                     sequenom_fingerprint
@@ -43,6 +45,9 @@ our $INFINIUM_PLATE_WELL_META_KEY = 'infinium_well';
 
 our $SEQUENOM_PLATE_NAME_META_KEY = 'sequenom_plate';
 our $SEQUENOM_PLATE_WELL_META_KEY = 'sequenom_well';
+
+our $FLUIDIGM_PLATE_NAME_META_KEY = 'fluidigm_plate';
+our $FLUIDIGM_PLATE_WELL_META_KEY = 'fluidigm_well';
 
 our $log = Log::Log4perl->get_logger('npg.irods.publish');
 
@@ -74,6 +79,13 @@ sub make_sequenom_metadata {
 
   return ([$SEQUENOM_PLATE_NAME_META_KEY => $well->{plate}],
           [$SEQUENOM_PLATE_WELL_META_KEY => $well->{well}]);
+}
+
+sub make_fluidigm_metadata {
+  my ($well) = @_;
+
+  return ([$FLUIDIGM_PLATE_NAME_META_KEY => $well->{plate}],
+          [$FLUIDIGM_PLATE_WELL_META_KEY => $well->{well}]);
 }
 
 =head2 make_analysis_metadata
@@ -122,6 +134,14 @@ sub sequenom_fingerprint {
 
   return make_fingerprint([$SEQUENOM_PLATE_NAME_META_KEY,
                            $SEQUENOM_PLATE_WELL_META_KEY],
+                          \@meta);
+}
+
+sub fluidigm_fingerprint {
+  my @meta = @_;
+
+  return make_fingerprint([$FLUIDIGM_PLATE_NAME_META_KEY,
+                           $FLUIDIGM_PLATE_WELL_META_KEY],
                           \@meta);
 }
 

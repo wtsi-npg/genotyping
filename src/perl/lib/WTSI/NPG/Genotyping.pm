@@ -18,10 +18,10 @@ our @EXPORT_OK = qw(base_dir
 =head2 base_dir
 
   Arg [1]    : None.
+
   Example    : my $base = base_dir();
   Description: Return the installed base directory.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -43,10 +43,10 @@ sub base_dir {
 =head2 config_dir
 
   Arg [1]    : None.
+
   Example    : my $dir = config_dir);
   Description: Return the installed configuration file directory.
   Returntype : string
-  Caller     : general
 
 =cut
 
@@ -59,10 +59,10 @@ sub config_dir {
 =head2 read_sample_json
 
   Arg [1]    : filename
+
   Example    : @samples = read_sample_json($file)
   Description: Return sample metadata hashes, one per sample, from a JSON file.
   Returntype : array
-  Caller     : general
 
 =cut
 
@@ -82,10 +82,10 @@ sub read_sample_json {
 =head2 read_snp_json
 
   Arg [1]    : filename
+
   Example    : @snps = read_snp_json($file)
   Description: Return SNP metadata hashes, one per SNP, from a JSON file.
   Returntype : array
-  Caller     : general
 
 =cut
 

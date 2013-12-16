@@ -425,6 +425,174 @@ sub find_infinium_gex_sample_by_sanger_id {
   return shift @samples;
 }
 
+=head2 find_fluidigm_plate
+
+  Arg [1]    : string
+  Example    : $db->find_fluidigm_plate('Fluidigm plate barcode')
+  Description: Return plate details for an Infinium LIMS plate barcode
+               as a hashref with plate addresses as keys and values being
+               a further hashref for each sample having the following keys
+               and values:
+               { internal_id,      => <SequenceScape plate id>,
+                 sanger_sample_id  => <WTSI sample name string>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 uuid              => <SequenceScape UUID blob as hexidecimal>,
+                 name              => <SequenceScape sample name>,
+                 common_name       => <SequenceScape sample common name>,
+                 supplier_name     => <Supplier provided name, may be undef>,
+                 gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
+                 barcode_prefix    => <SequenceScape barcode prefix string>,
+                 barcode           => <SequenceScape barcode integer>,
+                 map               => <SequenceScape well address string
+                                       without 0-pad e.g A1> }
+  Returntype : hashref
+  Caller     : general
+
+=cut
+
+sub find_fluidigm_plate {
+  my ($self, $fluidigm_barcode) = @_;
+
+  unless (defined $fluidigm_barcode) {
+    confess "The fluidigm_barcode argument was undefined\n";
+  }
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT
+         sm.internal_id,
+         sm.sanger_sample_id,
+         sm.consent_withdrawn,
+         HEX(sm.uuid),
+         sm.name,
+         sm.common_name,
+         sm.supplier_name,
+         sm.accession_number,
+         sm.gender,
+         sm.cohort,
+         sm.control,
+         aq.study_internal_id AS study_id,
+         pl.barcode_prefix,
+         pl.barcode,
+         pl.plate_purpose_name,
+         wl.map
+       FROM
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
+       WHERE
+         pl.fluidigm_barcode = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
+
+  $self->log->trace("Executing: '$query' with args [$fluidigm_barcode]");
+
+  my $sth = $dbh->prepare($query);
+  $sth->execute($fluidigm_barcode);
+
+  my %plate;
+  while (my $row = $sth->fetchrow_hashref) {
+    $plate{$row->{map}} = $row;
+  }
+
+  return \%plate;
+}
+
+=head2 find_fluidigm_sample_by_plate
+
+  Arg [1]    : string plate barcode
+  Arg [2]    : string well map
+  Example    : $db->find_sample_by_fluidigm_plate('Fluidigm plate barcode', )
+  Description: Return plate details for an Infinium LIMS plate barcode
+               as a hashref with plate addresses as keys and values being
+               a further hashref for each sample having the following keys
+               and values:
+               { internal_id,      => <SequenceScape plate id>,
+                 sanger_sample_id  => <WTSI sample name string>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 uuid              => <SequenceScape UUID blob as hexidecimal>,
+                 name              => <SequenceScape sample name>,
+                 common_name       => <SequenceScape sample common name>,
+                 supplier_name     => <Supplier provided name, may be undef>,
+                 gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
+                 barcode_prefix    => <SequenceScape barcode prefix string>,
+                 barcode           => <SequenceScape barcode integer>,
+                 map               => <SequenceScape well address string
+                                       without 0-pad e.g A1> }
+  Returntype : hashref
+  Caller     : general
+
+=cut
+
+sub find_fluidigm_sample_by_plate {
+  my ($self, $fluidigm_barcode, $map) = @_;
+
+  unless (defined $fluidigm_barcode) {
+    confess "The fluidigm_barcode argument was undefined\n";
+  }
+  unless (defined $map) {
+    confess "The map argument was undefined\n";
+  }
+
+  my $dbh = $self->dbh;
+  my $query =
+    qq(SELECT
+         sm.internal_id,
+         sm.sanger_sample_id,
+         sm.consent_withdrawn,
+         HEX(sm.uuid),
+         sm.name,
+         sm.common_name,
+         sm.supplier_name,
+         sm.accession_number,
+         sm.gender,
+         sm.cohort,
+         sm.control,
+         aq.study_internal_id AS study_id,
+         pl.barcode_prefix,
+         pl.barcode,
+         pl.plate_purpose_name,
+         wl.map
+       FROM
+         current_plates pl,
+         current_samples sm,
+         current_wells wl,
+         current_aliquots aq
+       WHERE
+         pl.fluidigm_barcode = ?
+         AND wl.map = ?
+         AND wl.plate_barcode = pl.barcode
+         AND wl.plate_barcode_prefix = pl.barcode_prefix
+         AND wl.internal_id = aq.receptacle_internal_id
+         AND aq.sample_internal_id = sm.internal_id);
+
+  $self->log->trace("Executing: '$query' with args [$fluidigm_barcode $map]");
+
+  my $sth = $dbh->prepare($query);
+  $sth->execute($fluidigm_barcode, $map);
+
+  my @samples;
+  while (my $row = $sth->fetchrow_hashref) {
+    push(@samples, $row);
+  }
+
+  my $n = scalar @samples;
+  if ($n > 1) {
+    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+  }
+
+  return shift @samples;
+}
+
 
 sub find_sample_studies {
   my ($self, $sample_id) = @_;

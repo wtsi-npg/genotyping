@@ -58,8 +58,7 @@ class TestWorkflows < Test::Unit::TestCase
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :chunk_size => 4,
-                                           :memory => 2048,
-                                           :select => 'lenny'}]
+                                           :memory => 2048}]
       timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeGenoSNP,
