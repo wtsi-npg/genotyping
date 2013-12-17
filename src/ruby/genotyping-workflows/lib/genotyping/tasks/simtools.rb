@@ -19,10 +19,15 @@
 module Genotyping::Tasks
 
   SIMTOOLS = 'simtools'
+  NORMALIZE_BPM = 'normalize_manifest'
   G2I = 'g2i'
 
   def simtools_available?()
     system("which #{SIMTOOLS} >/dev/null 2>&1")
+  end
+
+  def normalize_available?()
+    system("which #{NORMALIZE_BPM} >/dev/null 2>&1")
   end
 
   def g2i_available?()
@@ -75,6 +80,41 @@ module Genotyping::Tasks
                    :async => async)
       end
     end
+
+
+    # normalize the .bpm.csv manifest to Illumina TOP strand
+    #
+    # Arguments:
+    # - input (String): An un-normalized .bpm.csv manifest file
+    # - output (String): Filename for the normalized output .bpm.csv
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - The normalized file path
+    #
+    def normalize_manifest(input, output, args = {}, async = {})
+      args, work_dir, log_dir = process_task_args(args)
+      if args_available?(input, output, work_dir)
+        output = absolute_path?(output) ? output : absolute_path(output, work_dir)
+        expected = [output]
+        cli_args = {:infile => input,
+                    :outfile => output}
+        margs = [cli_args, input, work_dir]
+        task_id = task_identity(:normalize_manifest, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        
+        command = [NORMALIZE_BPM, 'create',
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda { ensure_files(expected, :error => false)},
+                   :result => lambda { output },
+                   :async => async)
+      end
+    end
+
+
 
     # Collates GenCall genotype call data from multiple GTC format files into a
     # single Plink BED format file.
