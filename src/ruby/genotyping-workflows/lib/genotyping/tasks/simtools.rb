@@ -104,7 +104,7 @@ module Genotyping::Tasks
         task_id = task_identity(:normalize_manifest, *margs)
         log = File.join(log_dir, task_id + '.log')
         
-        command = [NORMALIZE_BPM, 'create',
+        command = [NORMALIZE_BPM,
                    cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
 
         async_task(margs, command, work_dir, log,
