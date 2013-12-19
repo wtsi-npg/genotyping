@@ -111,4 +111,12 @@ module TestHelper
   def remove_work_dir(dir)
     FileUtils.rm_r(dir)
   end
+
+  def plink_equivalent(stem, master)
+    # check equivalence of two plink stems using plinktools diff
+    # use to verify that test output is equivalent to master
+    
+
+  end
+
 end
