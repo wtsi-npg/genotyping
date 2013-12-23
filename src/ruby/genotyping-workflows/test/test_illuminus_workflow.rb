@@ -49,8 +49,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
     manifest = ENV['BEADPOOL_MANIFEST']
     name = 'test_genotype_illuminus'
 
-    run_test_if(lambda { illuminus_available? && manifest },
-                "Skipping #{name}") do
+    run_test_if((lambda { illuminus_available? && manifest } and method(:plinktools_diff_available?)), "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
@@ -58,20 +57,31 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
 
       FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
-      args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :config => pipe_ini,
-                                           :filterconfig => fconfig,
-                                           :gender_method => 'Supplied',
-                                           :chunk_size => 10000,
-                                           :memory => 2048}]
+      args_hash = {:manifest => manifest,
+                   :config => pipe_ini,
+                   :filterconfig => fconfig,
+                   :gender_method => 'Supplied',
+                   :chunk_size => 10000,
+                   :memory => 2048}
+      args = [dbfile, run_name, work_dir, args_hash]
       timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
                              timeout, work_dir, log, args)
       assert(result)
 
+      plink_name = run_name+'.illuminus'
+      stem = File.join(work_dir, plink_name)
+      master = File.join('/nfs/gapi/data/genotype/pipeline_test', plink_name)
+      equiv = plink_equivalent?(stem, master, run_name, 
+                                {:work_dir => work_dir,
+                                 :log_dir => work_dir})
+      assert(equiv)
       Percolate.log.close
-      remove_work_dir(work_dir) if result
+
+      remove_work_dir(work_dir) if (result and equiv)
     end
   end
+
+
 end
