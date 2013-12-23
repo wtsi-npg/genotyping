@@ -49,7 +49,7 @@ class TestPlinkTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def test_merge_bed
+  def notest_merge_bed
     run_test_if(method(:plink_merge_available?), "Skipping test_merge_bed") do
       work_dir = make_work_dir('test_merge_bed', data_path)
 
@@ -66,5 +66,20 @@ class TestPlinkTasks < Test::Unit::TestCase
       remove_work_dir(work_dir)
     end
   end
+
+  def test_equiv
+    run_test_if(method(:plinktools_diff_available?), "Skipping test_equiv") do
+      work_dir = make_work_dir('test_equiv', data_path)
+      run_name = "mock_study"
+      study0 = File.join(data_path, "mock_study1.part.0")
+      assert(plink_equivalent(study0, study0, run_name, 
+                              {:work_dir => work_dir,
+                               :log_dir => work_dir}))
+
+    end
+
+
+  end
+
 
 end
