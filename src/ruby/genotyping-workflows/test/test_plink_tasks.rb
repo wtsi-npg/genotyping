@@ -49,7 +49,7 @@ class TestPlinkTasks < Test::Unit::TestCase
     File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
   end
 
-  def notest_merge_bed
+  def test_merge_bed
     run_test_if(method(:plink_merge_available?), "Skipping test_merge_bed") do
       work_dir = make_work_dir('test_merge_bed', data_path)
 
@@ -75,6 +75,7 @@ class TestPlinkTasks < Test::Unit::TestCase
       assert(plink_equivalent?(study0, study0, run_name, 
                               {:work_dir => work_dir,
                                :log_dir => work_dir}))
+      Percolate.log.close
       remove_work_dir(work_dir)
     end
 
