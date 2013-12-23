@@ -72,10 +72,10 @@ class TestPlinkTasks < Test::Unit::TestCase
       work_dir = make_work_dir('test_equiv', data_path)
       run_name = "mock_study"
       study0 = File.join(data_path, "mock_study1.part.0")
-      assert(plink_equivalent(study0, study0, run_name, 
+      assert(plink_equivalent?(study0, study0, run_name, 
                               {:work_dir => work_dir,
                                :log_dir => work_dir}))
-
+      remove_work_dir(work_dir)
     end
 
 

@@ -118,7 +118,7 @@ module TestHelper
     system("which #{PLINKTOOLS_DIFF} >/dev/null 2>&1")
   end
 
-  def plink_equivalent(stem, master, run_name, args = {})
+  def plink_equivalent?(stem, master, run_name, args = {})
     # check equivalence of two plink stems using plinktools diff
     # use to verify that test output is equivalent to master
     args, work_dir, log_dir = process_task_args(args)
@@ -136,15 +136,11 @@ module TestHelper
       command = [PLINKTOOLS_DIFF,
                  cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
       summary = out_stem+"_summary.json"
-      #output = [summary]
       task(margs, command, work_dir,
            :post => lambda { ensure_files([summary], :error => false) },
            :result => lambda { summary })
-      result = nil
-      if summary
-        summary_data = JSON.parse(File.read(summary))
-        result = summary_data[0]["EQUIVALENT"]
-      end
+      summary_data = JSON.parse(File.read(summary))
+      result = summary_data[0]["EQUIVALENT"]
       return result
     end
 
