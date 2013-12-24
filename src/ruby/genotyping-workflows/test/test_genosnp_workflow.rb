@@ -65,8 +65,16 @@ class TestWorkflows < Test::Unit::TestCase
                              timeout, work_dir, log, args)
       assert(result)
 
+      plink_name = run_name+'.genosnp'
+      stem = File.join(work_dir, plink_name)
+      master = File.join('/nfs/gapi/data/genotype/pipeline_test', plink_name)
+      equiv = plink_equivalent?(stem, master, run_name, 
+                                {:work_dir => work_dir,
+                                 :log_dir => work_dir})
+      assert(equiv)
+
       Percolate.log.close
-      remove_work_dir(work_dir) if result
+      remove_work_dir(work_dir) if (result and equiv)
     end
 
   end
