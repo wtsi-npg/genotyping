@@ -35,6 +35,7 @@ use JSON;
 
 Log::Log4perl->easy_init($ERROR);
 
+our $expected_fields = 9; # expected number of fields in .bpm.csv manifest
 
 sub byPositionName {
     # use to sort manifest into (position, name) order
@@ -118,6 +119,12 @@ sub splitManifest {
 	if ($i == 1) { next; } # first line is header
 	$_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
 	my @fields = split /,/;
+	my $fields_found = @fields;
+	if ($fields_found != $expected_fields) {
+	    my $msg = "Incorrect number of fields in $inPath line $i; ".
+		"expected ".$expected_fields.", found ".$fields_found;
+	    croak $msg;
+	}
 	my $chrom = $fields[$cindex];
 	# ensure chromosome ID is in numeric format
 	if ($chrom eq 'X') { $chrom = 23; }
@@ -134,6 +141,9 @@ sub splitManifest {
 	print { $outFiles{$chrom} } join(',', @fields)."\n";
     }
     close $in || croak "Cannot close input $inPath";
+    if ($i < 2) { # require header and at least one SNP
+	croak "No SNPs found in $inPath";
+    }
     foreach my $chrom (keys(%outFiles)) {
 	my $outPath = $outPaths{$chrom};
 	close $outFiles{$chrom} || croak "Cannot close output $outPath";

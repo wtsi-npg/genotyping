@@ -67,4 +67,20 @@ class TestPlinkTasks < Test::Unit::TestCase
     end
   end
 
+  def test_equiv
+    run_test_if(method(:plinktools_diff_available?), "Skipping test_equiv") do
+      work_dir = make_work_dir('test_equiv', data_path)
+      run_name = "mock_study"
+      study0 = File.join(data_path, "mock_study1.part.0")
+      assert(plink_equivalent?(study0, study0, run_name, 
+                              {:work_dir => work_dir,
+                               :log_dir => work_dir}))
+      Percolate.log.close
+      remove_work_dir(work_dir)
+    end
+
+
+  end
+
+
 end

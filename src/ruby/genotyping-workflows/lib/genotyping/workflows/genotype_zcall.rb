@@ -91,7 +91,7 @@ Returns:
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
-      manifest = args.delete(:manifest) 
+      manifest_raw = args.delete(:manifest) 
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
       gtconfig = args.delete(:config)
@@ -123,15 +123,19 @@ Returns:
       cjname = run_name + '.chr.json'
       zname = run_name + '.zcall.bed'
 
-      njson, cjson = parse_manifest(manifest, njname, cjname, args)
-
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
+
+
+      ## normalize manifest
+      manifest_name = File.basename(manifest_raw)
+      manifest = normalize_manifest(manifest_raw, manifest_name, args)
+      njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
       ## create GenCall .sim intensity file, if needed
       gcsimfile = nil
       smargs = {:normalize => true }.merge(args)
       unless nosim
-        gcsimfile = gtc_to_sim(gcsjson, manifest, gcsimname, smargs, async)
+        gcsimfile = gtc_to_sim(gcsjson, manifest_raw, gcsimname, smargs, async)
       end
 
       ## prefilter on QC metrics and thresholds to exclude bad samples
@@ -140,7 +144,7 @@ Returns:
         filtered = true
       else
         filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                             gcsimfile, manifest, args, async)
+                             gcsimfile, manifest_raw, args, async)
       end
 
       ## find sample intensity data
@@ -234,7 +238,7 @@ Returns:
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'
 
-      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async) # need raw manifest for gtc_to_bed
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
       ## run plinktools to find maf/het on transposed .bed output

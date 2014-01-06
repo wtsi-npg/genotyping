@@ -22,6 +22,8 @@ require 'timeout'
 module TestHelper
   include Genotyping
 
+  PLINKTOOLS_DIFF = 'plink_diff.py'
+
   def test_workflow(name, klass, timeout, path, log, args)
     ['in', 'pass', 'fail'].each do |dir|
       root = File.join(path, dir)
@@ -111,4 +113,37 @@ module TestHelper
   def remove_work_dir(dir)
     FileUtils.rm_r(dir)
   end
+
+  def plinktools_diff_available?()
+    system("which #{PLINKTOOLS_DIFF} >/dev/null 2>&1")
+  end
+
+  def plink_equivalent?(stem, master, run_name, args = {})
+    # check equivalence of two plink stems using plinktools diff
+    # use to verify that test output is equivalent to master
+    args, work_dir, log_dir = process_task_args(args)
+    if args_available?(run_name, work_dir)
+      unless plinktools_diff_available?()
+        raise "Cannot find Plinktools diff script; requires an installation of Plinktools >= 0.4.1 on the PATH"
+      end
+
+      out_stem = File.join(work_dir, run_name+'.plink_test')
+      cli_args = args.merge({:in1 => stem,
+                             :in2 => master,
+                             :out => out_stem})
+      margs = [cli_args, work_dir]
+
+      command = [PLINKTOOLS_DIFF,
+                 cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+      summary = out_stem+"_summary.json"
+      task(margs, command, work_dir,
+           :post => lambda { ensure_files([summary], :error => false) },
+           :result => lambda { summary })
+      summary_data = JSON.parse(File.read(summary))
+      result = summary_data[0]["EQUIVALENT"]
+      return result
+    end
+
+  end
+
 end
