@@ -80,7 +80,7 @@ class TestSimtoolsTasks < Test::Unit::TestCase
     end
   end
 
-    def test_gtc_to_bed
+  def test_gtc_to_bed
     run_test_if(method(:g2i_available?), "Skipping test_gtc_to_bed") do
       work_dir = make_work_dir('test_gtc_to_bed', data_path)
 
@@ -101,5 +101,28 @@ class TestSimtoolsTasks < Test::Unit::TestCase
       remove_work_dir(work_dir)
     end
   end
+
+  def test_normalize_manifest
+    run_test_if(method(:normalize_available?), "Skipping test_normalize_manifest") do
+      work_dir = make_work_dir('test_normalize_manifest', data_path)
+
+      input = File.join(data_path, 'example_manifest.bpm.csv')
+      output = File.join(work_dir, 'normalized.bpm.csv')
+      master = File.join(data_path, 'example_manifest_normalized.bpm.csv')
+
+      normalized = wait_for('test_normalize_manifest', 60, 5) do
+        normalize_manifest(input, output, 
+                           {:work_dir => work_dir, :log_dir => work_dir})
+      end
+
+      assert(File.exists?(normalized))
+      assert(FileUtils.compare_file(normalized, master))
+
+      Percolate.log.close
+      remove_work_dir(work_dir)
+      
+    end
+  end 
+
 
 end
