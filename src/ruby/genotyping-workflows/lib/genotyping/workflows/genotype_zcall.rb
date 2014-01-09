@@ -127,7 +127,8 @@ Returns:
 
 
       ## normalize manifest
-      manifest_name = File.basename(manifest_raw)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
       njson, cjson = parse_manifest(manifest, njname, cjname, args)
 

@@ -105,7 +105,8 @@ Returns:
       smname = run_name + '.genosnp.sim'
       gsname = run_name + '.genosnp.bed'
 
-      manifest_name = File.basename(manifest_raw)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
       siargs = {:config => gtconfig}.merge(args)
