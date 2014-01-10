@@ -133,7 +133,7 @@ Returns:
                                  sjson, njson, args, async)
 
       if smfile
-        qcargs = {:run => run_name, :sim => smfile }.merge(args)
+        qcargs = {:run => run_name }.merge(args)
         gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', 
                                     qcargs, async)
       end
