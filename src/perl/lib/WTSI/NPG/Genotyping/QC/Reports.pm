@@ -264,8 +264,7 @@ sub latexSectionInput {
     my ($qcName, $dbPath) = @_;
     my @lines = ();
     push @lines, "\\section{Input data}\n\n";
-    my @text = textForDatasets($dbPath, $qcName);
-	foreach my $table (latexTables(\@text)) { push(@lines, $table."\n"); }
+    push @lines, textForDatasets($dbPath, $qcName);
     return join("", @lines);
 }
 
@@ -509,23 +508,31 @@ sub textForCsv {
 }
 
 sub textForDatasets {
-    # text for datasets table; includes optional directory name
+    # text for dataset identification; includes optional directory name
+    # fields: run project data_supplier snpset directory
+    # print as nested unordered lists (not table rows) to handle long names
     my $dbPath = shift;
     my $qcDir = shift;
-    if ($qcDir && length($qcDir)>20) { # truncate long directory names
-        my @chars = split(//, $qcDir);
-        @chars = splice(@chars, 0, 20);
-        $qcDir = join('', @chars)."...";
-    }
     my @headers = @dbInfoHeaders[0..3];
     if ($qcDir) { push(@headers, "directory"); }
-    my @text = (\@headers, );
+    foreach my $header (@headers) { $header =~ s/_/\\_/g; }
     my @datasetInfo = dbDatasetInfo($dbPath);
+    my @text = ();
+    push(@text, "\\begin{itemize}\n");
     foreach my $ref (@datasetInfo) {
-        my @items = @$ref;
-        if ($qcDir) { push(@items, $qcDir); }
-        push(@text, \@items);
+        my @fields = @$ref;
+        if ($qcDir) { push(@fields, $qcDir); }
+	foreach my $field (@fields) { $field =~ s/_/\\_/g; }
+	my $item = "\\item \\textbf{".$headers[0].":} ".$fields[0]."\n";
+	push(@text, $item);
+	push(@text, "\\begin{itemize}\n"); # nested list with details
+	for (my $i=1;$i<@fields;$i++) {
+	    $item = "\\item \\textbf{".$headers[$i].":} ".$fields[$i]."\n";
+	    push(@text, $item);
+	}
+	push(@text, "\\end{itemize}\n");
     }
+    push(@text, "\\end{itemize}\n");
     return @text;
 }
 

@@ -121,9 +121,11 @@ Returns:
       ilname = run_name + '.illuminus.bed'
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-      gcifile, * = gtc_to_bed(gcsjson, manifest_raw, gciname, args, async) # must use raw manifest for g2i
+      gcifile, * = gtc_to_bed(gcsjson, manifest_raw, gciname, args, async) 
+      # Must use raw manifest for gtc_to_bed; manifest needs to be consistent with allele values encoded in GTC files. g2i requires an un-normalized manifest as input, carries out normalization itself, and writes normalized .bim files in output.
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
-      manifest_name = File.basename(manifest_raw)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
       ## run gencall QC to apply gencall CR filter and find genders

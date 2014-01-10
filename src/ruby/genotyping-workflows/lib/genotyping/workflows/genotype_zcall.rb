@@ -127,7 +127,8 @@ Returns:
 
 
       ## normalize manifest
-      manifest_name = File.basename(manifest_raw)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
       njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
@@ -145,6 +146,7 @@ Returns:
       else
         filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
                              gcsimfile, manifest_raw, args, async)
+        # must use raw manifest; see comment in prefilter method
       end
 
       ## find sample intensity data
@@ -238,7 +240,8 @@ Returns:
       gciname = run_name + '.gencall.imajor.bed'
       gcsname = run_name + '.gencall.smajor.bed'
 
-      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async) # need raw manifest for gtc_to_bed
+      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      # Must use raw manifest for gtc_to_bed; manifest needs to be consistent with allele values encoded in GTC files. g2i requires an un-normalized manifest as input, carries out normalization itself, and writes normalized .bim files in output.
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
       ## run plinktools to find maf/het on transposed .bed output

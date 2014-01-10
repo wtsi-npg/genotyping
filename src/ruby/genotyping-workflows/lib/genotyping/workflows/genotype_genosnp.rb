@@ -105,7 +105,8 @@ Returns:
       smname = run_name + '.genosnp.sim'
       gsname = run_name + '.genosnp.bed'
 
-      manifest_name = File.basename(manifest_raw)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
       siargs = {:config => gtconfig}.merge(args)
@@ -132,7 +133,7 @@ Returns:
                                  sjson, njson, args, async)
 
       if smfile
-        qcargs = {:run => run_name, :sim => smfile }.merge(args)
+        qcargs = {:run => run_name }.merge(args)
         gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', 
                                     qcargs, async)
       end
