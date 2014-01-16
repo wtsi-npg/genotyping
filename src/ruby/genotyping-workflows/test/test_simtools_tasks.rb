@@ -48,10 +48,6 @@ class TestSimtoolsTasks < Test::Unit::TestCase
     Percolate.asynchronizer = SystemAsynchronizer.new
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_gtc_to_sim
     run_test_if(method(:simtools_available?), "Skipping test_gtc_to_sim") do
       work_dir = make_work_dir('test_gtc_to_sim', data_path)
@@ -106,7 +102,7 @@ class TestSimtoolsTasks < Test::Unit::TestCase
   def test_g2i_normalize
     # test the normalization side effect of g2i (gtc-to-bed executable)
     # compare output of g2i with normalized and un-normalized manifests
-    manifest = ENV['BEADPOOL_MANIFEST']
+    manifest = manifest_path
     name = 'test_g2i_normalize'
     run_test_if((lambda { g2i_available? && manifest }), "Skipping test_g2i_normalize") do
       work_dir = make_work_dir(name, data_path)

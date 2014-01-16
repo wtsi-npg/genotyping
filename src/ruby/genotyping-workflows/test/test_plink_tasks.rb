@@ -45,10 +45,6 @@ class TestPlinkTasks < Test::Unit::TestCase
     Percolate.asynchronizer = SystemAsynchronizer.new
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_merge_bed
     run_test_if(method(:plink_merge_available?), "Skipping test_merge_bed") do
       work_dir = make_work_dir('test_merge_bed', data_path)
