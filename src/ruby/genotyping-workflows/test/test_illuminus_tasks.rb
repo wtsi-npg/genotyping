@@ -48,10 +48,6 @@ class TestIlluminusTasks < Test::Unit::TestCase
         LSFAsynchronizer.new(:job_arrays_dir => data_path)
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_call_from_sim_p
     run_test_if(method(:illuminus_available?), "Skipping test_call_from_sim_p") do
       work_dir = make_work_dir('test_call_from_sim_p', data_path)

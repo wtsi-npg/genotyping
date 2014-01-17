@@ -34,38 +34,31 @@ class TestZCallTasks < Test::Unit::TestCase
   include TestHelper
   include Genotyping
   include Genotyping::Tasks::ZCall
-
-  # TODO Create mock study with compatible EGT file
-  # EGT file format is undocumented
-  # Maybe start with 'real' EGT & BPM.CSV files and concoct fake GTC files
-  # Would replace mock_study function of genotype_call (LISP code)
-  #
-  # For now, just use test data for Python code
-  # These GTC files are *not* authorised for public release!
   
   def initialize(name)
+    # define paths to test data
+    # .bpm.csv and .egt files differ from test_zcall_workflow.rb
     super(name)
     @msg_host = Socket.gethostname
     @msg_port = 11300
-    data_dir = '/nfs/gapi/data/genotype/zcall_test/'
-    @egt = data_dir+'HumanExome-12v1.egt'
-    @manifest = data_dir+'HumanExome-12v1_A.bpm.csv'
-    @threshold_json = data_dir+'thresholds.json'
-    @thresholds_z6 = data_dir+'thresholds_HumanExome-12v1_z06.txt' 
-    @sample_json = data_dir+'gtc.json'
-    @merged_json = data_dir+'merged_z_evaluation.json'
+    @external_data = ENV['GENOTYPE_TEST_DATA']
+    if @external_data
+      data_dir = File.join(@external_data, 'zcall_test')
+      @egt = File.join(data_dir, 'HumanExome-12v1.egt')
+      @manifest = File.join(data_dir, 'HumanExome-12v1_A.bpm.csv')
+      @threshold_json = File.join(data_dir, 'thresholds.json')
+      @thresholds_z6 = File.join(data_dir, 'thresholds_HumanExome-12v1_z06.txt')
+      @sample_json = File.join(data_dir, 'gtc.json')
+      @merged_json = File.join(data_dir, 'merged_z_evaluation.json')
+    end
   end
 
   def setup
     Percolate.log = Logger.new(File.join(data_path, 'test_zcall_tasks.log'))
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_prepare_thresholds
-    run_test_if(method(:zcall_prepare_available?), 
+    run_test_if(lambda { zcall_prepare_available? && @external_data }, 
                 "Skipping test_zcall_prepare") do
       work_dir = make_work_dir('zcall_prepare', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
@@ -91,7 +84,7 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_evaluate_merge_thresholds
-    run_test_if(method(:zcall_evaluate_available?), 
+    run_test_if( lambda {zcall_evaluate_available? && @external_data }, 
                 "Skipping test_zcall_evaluate_merge") do
       work_dir = make_work_dir('zcall_evaluate_merge', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
@@ -116,7 +109,7 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_run_zcall
-    run_test_if(method(:zcall_available?), "Skipping test_run_zcall") do
+    run_test_if( lambda { zcall_available? && @external_data }, "Skipping test_run_zcall") do
       work_dir = make_work_dir('test_zcall_run', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run', 120, 5) do
@@ -132,7 +125,7 @@ class TestZCallTasks < Test::Unit::TestCase
   end
 
   def test_run_zcall_array
-    run_test_if(method(:zcall_available?), "Skipping test_run_zcall_array") do
+    run_test_if(lambda { zcall_available? && @external_data }, "Skipping test_run_zcall_array") do
       work_dir = make_work_dir('test_zcall_run_array', data_path)
       Percolate.asynchronizer = LSFAsynchronizer.new(:job_arrays_dir=>work_dir)
       result = wait_for('test_zcall_run_array', 120, 5) do

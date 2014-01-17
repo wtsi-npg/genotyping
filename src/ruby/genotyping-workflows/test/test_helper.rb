@@ -24,6 +24,22 @@ module TestHelper
 
   PLINKTOOLS_DIFF = 'plink_diff.py'
 
+  def data_path
+    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
+  end
+
+  def manifest_path
+    if ENV['GENOTYPE_TEST_DATA']
+      Dir.glob(ENV['GENOTYPE_TEST_DATA']+"/*.bpm.csv").first
+    end
+  end
+
+  def egt_path
+    if ENV['GENOTYPE_TEST_DATA']
+      Dir.glob(ENV['GENOTYPE_TEST_DATA']+"/*.egt").first
+    end
+  end
+
   def test_workflow(name, klass, timeout, path, log, args)
     ['in', 'pass', 'fail'].each do |dir|
       root = File.join(path, dir)
