@@ -37,15 +37,15 @@ sub run {
   my $verbose;
 
   GetOptions('chip_design=s' => \$chip_design,
-             'config=s' => \$config,
-             'dbfile=s'=> \$dbfile,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'maximum=i' => \$maximum,
-             'namespace=s' => \$namespace,
-             'project=s' => \$project_title,
-             'run=s' => \$run_name,
-             'supplier=s' => \$supplier_name,
-             'verbose' => \$verbose);
+             'config=s'      => \$config,
+             'dbfile=s'      => \$dbfile,
+             'help'          => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'maximum=i'     => \$maximum,
+             'namespace=s'   => \$namespace,
+             'project=s'     => \$project_title,
+             'run=s'         => \$run_name,
+             'supplier=s'    => \$supplier_name,
+             'verbose'       => \$verbose);
 
   $config ||= $DEFAULT_INI;
   $namespace ||= $WTSI_NAMESPACE;
@@ -75,9 +75,9 @@ sub run {
     (name => 'pipeline',
      inifile => $config,
      dbfile => $dbfile)->connect
-       (RaiseError => 1,
+       (RaiseError     => 1,
         sqlite_unicode => 1,
-        on_connect_do => 'PRAGMA foreign_keys = ON');
+        on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name   => 'infinium',
@@ -85,8 +85,8 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError => 1,
-                                   mysql_enable_utf8 => 1,
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
@@ -124,11 +124,11 @@ sub run {
   my $infinium = $pipedb->method->find({name => 'Infinium'});
   my $autocall = $pipedb->method->find({name => 'Autocall'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
-  my $autocall_pass = $pipedb->state->find({name => 'autocall_pass'});
-  my $autocall_fail = $pipedb->state->find({name => 'autocall_fail'});
+  my $autocall_pass    = $pipedb->state->find({name => 'autocall_pass'});
+  my $autocall_fail    = $pipedb->state->find({name => 'autocall_fail'});
   my $idat_unavailable = $pipedb->state->find({name => 'idat_unavailable'});
-  my $gtc_unavailable = $pipedb->state->find({name => 'gtc_unavailable'});
-  my $withdrawn = $pipedb->state->find({name => 'consent_withdrawn'});
+  my $gtc_unavailable  = $pipedb->state->find({name => 'gtc_unavailable'});
+  my $withdrawn        = $pipedb->state->find({name => 'consent_withdrawn'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_title})) {
@@ -151,9 +151,9 @@ sub run {
        my $run = $pipedb->piperun->find_or_create({name => $run_name});
        validate_snpset($run, $snpset);
 
-       my $dataset = $run->add_to_datasets({if_project => $project_title,
+       my $dataset = $run->add_to_datasets({if_project   => $project_title,
                                             datasupplier => $supplier,
-                                            snpset => $snpset});
+                                            snpset       => $snpset});
 
        print_pre_report($supplier, $project_title, $namespace, $snpset)
          if $verbose;
@@ -163,15 +163,15 @@ sub run {
 
      SAMPLE: foreach my $if_sample (@{$ifdb->find_project_samples
                                         ($project_title)}) {
-         my $if_chip = $if_sample->{beadchip};
-         my $grn_path = $if_sample->{idat_grn_path};
-         my $red_path = $if_sample->{idat_red_path};
-         my $gtc_path = $if_sample->{gtc_path};
+         my $if_chip    = $if_sample->{beadchip};
+         my $grn_path   = $if_sample->{idat_grn_path};
+         my $red_path   = $if_sample->{idat_red_path};
+         my $gtc_path   = $if_sample->{gtc_path};
          my $if_barcode = $if_sample->{'plate'};
-         my $if_well = $if_sample->{'well'};
-         my $if_name = $if_sample->{'sample'};
-         my $if_status = $if_sample->{'status'};
-         my $if_rowcol = $if_sample->{'beadchip_section'};
+         my $if_well    = $if_sample->{'well'};
+         my $if_name    = $if_sample->{'sample'};
+         my $if_status  = $if_sample->{'status'};
+         my $if_rowcol  = $if_sample->{'beadchip_section'};
 
          my $ss_plate;
          if (exists $cache{$if_sample->{'plate'}}) {
@@ -200,12 +200,13 @@ sub run {
          my $ss_consent_withdrawn = $ss_sample->{consent_withdrawn};
          my $gender = $pipedb->gender->find({name => $ss_gender}) || $gender_na;
          my $state = $autocall_pass;
-         my $sample = $dataset->add_to_samples({name => $if_name,
-                                                sanger_sample_id => $ss_id,
-                                                beadchip => $if_chip,
-                                                include => 0,
-                                                supplier_name => $ss_supply,
-                                                rowcol => $if_rowcol});
+         my $sample =
+           $dataset->add_to_samples({name             => $if_name,
+                                     sanger_sample_id => $ss_id,
+                                     beadchip         => $if_chip,
+                                     include          => 0,
+                                     supplier_name    => $ss_supply,
+                                     rowcol           => $if_rowcol});
 
          # If consent has been withdrawn, do not analyse and do not
          # look in SNP for Sequenom genotypes
@@ -231,11 +232,11 @@ sub run {
          $plate->add_to_wells({address => $address,
                                sample  => $sample});
          $sample->add_to_results({method => $autocall,
-                                  value => $gtc_path});
+                                  value  => $gtc_path});
          $sample->add_to_results({method => $infinium,
-                                  value => $grn_path});
+                                  value  => $grn_path});
          $sample->add_to_results({method => $infinium,
-                                  value => $red_path});
+                                  value  => $red_path});
 
          my $unix_gtc_path = $sample->gtc;
          unless (defined $unix_gtc_path and -e $unix_gtc_path) {
@@ -255,7 +256,7 @@ sub run {
 
          unless ($ss_consent_withdrawn) {
            my $result = $sample->add_to_results({method => $infinium,
-                                                 value => $gtc_path});
+                                                 value  => $gtc_path});
            push @samples, $sample;
          }
 

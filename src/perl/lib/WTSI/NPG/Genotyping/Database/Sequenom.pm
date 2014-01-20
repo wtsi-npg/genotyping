@@ -1,13 +1,12 @@
+
 use utf8;
 
 package WTSI::NPG::Genotyping::Database::Sequenom;
 
-use strict;
-use warnings;
 use Carp;
+use Moose;
 
-use base 'WTSI::NPG::Database';
-
+extends 'WTSI::NPG::Database';
 
 =head2 find_finished_plate_names
 
@@ -25,16 +24,14 @@ use base 'WTSI::NPG::Database';
 
 sub find_finished_plate_names {
   my ($self, $start_date, $end_date) = @_;
-  unless (defined $start_date) {
-    confess "The start_date argument was not defined\n";
-  }
+
+  defined $start_date or
+    $self->logconfess('The start_date argument was undefined');
 
   $end_date ||= $start_date;
 
   my $start = $start_date->clone->truncate(to => 'day');
   my $end = $end_date->clone->truncate(to => 'day');
-
-  my $dbh = $self->dbh;
 
   my $query = qq(SELECT
                    plate_id
@@ -46,11 +43,11 @@ sub find_finished_plate_names {
                  AND trunc(date_time_stamp) <= to_date(?, 'YYYY-MM-DD'));
 
   if ($start->compare($end) > 0) {
-    $self->log->logconfess("Start date '$start' was after end date '$end'");
+    $self->logconfess("Start date '$start' was after end date '$end'");
   }
 
-  $self->log->trace("Executing: '$query' with args [$start, $end]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$start, $end]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($start->ymd('-'), $end->ymd('-'));
 
   my @plates;
@@ -89,11 +86,9 @@ sub find_finished_plate_names {
 
 sub find_plate_results {
   my ($self, $plate_name) = @_;
-  unless (defined $plate_name) {
-    confess "The plate_name argument was not defined\n";
-  }
 
-  my $dbh = $self->dbh;
+  defined $plate_name or
+    $self->logconfess('The plate_name argument was undefined');
 
   my $query =
     qq(SELECT
@@ -119,8 +114,8 @@ sub find_plate_results {
        AND al.allele <> 'Pausing Peak'
        ORDER BY al.well, al.assay, al.mass);
 
-  $self->log->trace("Executing: '$query' with args [$plate_name]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$plate_name]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($plate_name);
 
   my %plate;
@@ -136,14 +131,18 @@ sub find_plate_results {
   }
 
   unless ($well_count > 0) {
-    $self->log->logconfess("No wells were found for plate '$plate_name'");
+    $self->logconfess("No wells were found for plate '$plate_name'");
   }
   unless ($well_count % 96 == 0) {
-    $self->log->warn("Found $well_count wells for plate '$plate_name'");
+    $self->warn("Found $well_count wells for plate '$plate_name'");
   }
 
   return \%plate;
 }
+
+__PACKAGE__->meta->make_immutable;
+
+no Moose;
 
 1;
 
