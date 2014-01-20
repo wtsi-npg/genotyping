@@ -117,7 +117,7 @@ Returns:
       run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
       gcsimname = run_name + '.gencall.sim'
-      ilsimname = run_name + '.illuminus.sim'
+      zsimname = run_name + '.zcall_qc.sim'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
@@ -207,11 +207,12 @@ Returns:
       if nosim
         # no sim file, therefore no intensity metrics
         qcargs = {:run => run_name}.merge(args)
-      else
+      elsif nofilter or filtered
+        # if prefilter is switched off, or has successfully completed
         # generate new .sim file to reflect sample exclusions
-        ilsimfile = gtc_to_sim(sjson, manifest, ilsimname, smargs, async)
-        if ilsimfile
-          qcargs = {:run => run_name, :sim => ilsimfile}.merge(args)
+        zsimfile = gtc_to_sim(sjson, manifest, zsimname, smargs, async)
+        if zsimfile
+          qcargs = {:run => run_name, :sim => zsimfile}.merge(args)
         end
       end
       if qcargs

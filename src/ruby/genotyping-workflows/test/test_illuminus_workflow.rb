@@ -52,7 +52,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       run_name = 'run1'
       pipe_ini = File.join(data_path, 'genotyping.ini')
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
       args_hash = {:manifest => manifest,
                    :config => pipe_ini,

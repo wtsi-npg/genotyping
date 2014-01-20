@@ -52,7 +52,7 @@ class TestWorkflows < Test::Unit::TestCase
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :chunk_size => 4,
                                            :memory => 2048}]
