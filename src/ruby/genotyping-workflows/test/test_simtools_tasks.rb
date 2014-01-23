@@ -104,6 +104,7 @@ class TestSimtoolsTasks < Test::Unit::TestCase
     # compare output of g2i with normalized and un-normalized manifests
     manifest = manifest_path
     name = 'test_g2i_normalize'
+    external_data = ENV['GENOTYPE_TEST_DATA']
     run_test_if((lambda { g2i_available? && manifest }), "Skipping test_g2i_normalize") do
       work_dir = make_work_dir(name, data_path)
       # create normalized and un-normalized copies of manifest
@@ -116,7 +117,7 @@ class TestSimtoolsTasks < Test::Unit::TestCase
       end    
       # generate sample json file from test pipeline DB
       dbfile = File.join(work_dir, name + '.db')
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       run_name = 'run1'
       sample_json = File.join(work_dir, name+'_sample.json')
       wait_for('sample_intensities', 60, 5) do
