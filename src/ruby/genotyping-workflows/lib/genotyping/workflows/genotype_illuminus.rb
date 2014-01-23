@@ -90,7 +90,7 @@ Returns:
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
-      manifest = args.delete(:manifest) # TODO: find manifest automatically
+      manifest_raw = args.delete(:manifest)
       chunk_size = args.delete(:chunk_size) || 2000
       gender_method = args.delete(:gender_method)
       gtconfig = args.delete(:config)
@@ -121,8 +121,12 @@ Returns:
       ilname = run_name + '.illuminus.bed'
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-      gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      gcifile, * = gtc_to_bed(gcsjson, manifest_raw, gciname, args, async) 
+      # Must use raw manifest for gtc_to_bed; manifest needs to be consistent with allele values encoded in GTC files. g2i requires an un-normalized manifest as input, carries out normalization itself, and writes normalized .bim files in output.
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
+      manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
       ## run gencall QC to apply gencall CR filter and find genders
       gcqcargs = {:run => run_name}.merge(args)
@@ -146,12 +150,11 @@ Returns:
       end
 
       ## use post-filter pipeline DB to generate sample JSON and .sim file
-      ## also parse manifest
       siargs = {:config => gtconfig,
         :gender_method => gender_method}.merge(args)
       smfile = nil
       cjson = nil
-      if filtered
+      if filtered and manifest
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
@@ -165,7 +168,7 @@ Returns:
       
       ilchunks = nil
 
-      if cjson and smfile
+      if cjson and smfile and manifest
         ilchunks = chromosome_bounds(cjson).collect { |cspec|
           chr = cspec['chromosome']
           pargs = {:chromosome => chr,

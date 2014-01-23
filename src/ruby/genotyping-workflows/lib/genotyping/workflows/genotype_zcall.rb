@@ -91,7 +91,7 @@ Returns:
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
-      manifest = args.delete(:manifest) 
+      manifest_raw = args.delete(:manifest) 
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
       gtconfig = args.delete(:config)
@@ -117,21 +117,26 @@ Returns:
       run_name = run_name.to_s;
       gcsjname = run_name + '.gencall.sample.json'
       gcsimname = run_name + '.gencall.sim'
-      ilsimname = run_name + '.illuminus.sim'
+      zsimname = run_name + '.zcall_qc.sim'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       zname = run_name + '.zcall.bed'
 
-      njson, cjson = parse_manifest(manifest, njname, cjname, args)
-
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
+
+
+      ## normalize manifest
+      manifest_name = File.basename(manifest_raw, '.bpm.csv')
+      manifest_name = manifest_name+'.normalized.bpm.csv'
+      manifest = normalize_manifest(manifest_raw, manifest_name, args)
+      njson, cjson = parse_manifest(manifest, njname, cjname, args)
 
       ## create GenCall .sim intensity file, if needed
       gcsimfile = nil
       smargs = {:normalize => true }.merge(args)
       unless nosim
-        gcsimfile = gtc_to_sim(gcsjson, manifest, gcsimname, smargs, async)
+        gcsimfile = gtc_to_sim(gcsjson, manifest_raw, gcsimname, smargs, async)
       end
 
       ## prefilter on QC metrics and thresholds to exclude bad samples
@@ -140,7 +145,8 @@ Returns:
         filtered = true
       else
         filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                             gcsimfile, manifest, args, async)
+                             gcsimfile, manifest_raw, args, async)
+        # must use raw manifest; see comment in prefilter method
       end
 
       ## find sample intensity data
@@ -201,11 +207,12 @@ Returns:
       if nosim
         # no sim file, therefore no intensity metrics
         qcargs = {:run => run_name}.merge(args)
-      else
+      elsif nofilter or filtered
+        # if prefilter is switched off, or has successfully completed
         # generate new .sim file to reflect sample exclusions
-        ilsimfile = gtc_to_sim(sjson, manifest, ilsimname, smargs, async)
-        if ilsimfile
-          qcargs = {:run => run_name, :sim => ilsimfile}.merge(args)
+        zsimfile = gtc_to_sim(sjson, manifest, zsimname, smargs, async)
+        if zsimfile
+          qcargs = {:run => run_name, :sim => zsimfile}.merge(args)
         end
       end
       if qcargs
@@ -235,6 +242,7 @@ Returns:
       gcsname = run_name + '.gencall.smajor.bed'
 
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
+      # Must use raw manifest for gtc_to_bed; manifest needs to be consistent with allele values encoded in GTC files. g2i requires an un-normalized manifest as input, carries out normalization itself, and writes normalized .bim files in output.
       gcsfile = transpose_bed(gcifile, gcsname, args, async)
 
       ## run plinktools to find maf/het on transposed .bed output

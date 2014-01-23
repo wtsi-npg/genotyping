@@ -41,12 +41,9 @@ class TestWorkflows < Test::Unit::TestCase
     @msg_port = 11300
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_genotype_genosnp
-    manifest = ENV['BEADPOOL_MANIFEST']
+    external_data = ENV['GENOTYPE_TEST_DATA']
+    manifest = manifest_path
     name = 'test_genotype_genosnp'
 
     run_test_if(lambda { genosnp_available? && manifest },
@@ -55,7 +52,7 @@ class TestWorkflows < Test::Unit::TestCase
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
                                            :chunk_size => 4,
                                            :memory => 2048}]
@@ -65,8 +62,16 @@ class TestWorkflows < Test::Unit::TestCase
                              timeout, work_dir, log, args)
       assert(result)
 
+      plink_name = run_name+'.genosnp'
+      stem = File.join(work_dir, plink_name)
+      master = File.join(external_data, plink_name)
+      equiv = plink_equivalent?(stem, master, run_name, 
+                                {:work_dir => work_dir,
+                                 :log_dir => work_dir})
+      assert(equiv)
+
       Percolate.log.close
-      remove_work_dir(work_dir) if result
+      remove_work_dir(work_dir) if (result and equiv)
     end
 
   end

@@ -1,5 +1,4 @@
-
-To run test workflow tests, the following steps must be performed:
+To run workflow tests, the following steps must be performed:
 
 Installation:
 
@@ -13,6 +12,8 @@ Installation:
 4) The format-shifting utility program genotype-call must be available on the
    PATH.
 
+5) The plinktools package (version >= 0.4.1) must be available on the PATH.
+
 Test data acquisition:
 
 5) A pipeline runtime database named 'genotyping.db' must be created using the
@@ -21,8 +22,17 @@ Test data acquisition:
 
    This file cannot be distributed for reasons of data confidentiality.
 
+6) Expected Plink output from the genotype callers Illuminus, GenoSNP and 
+   ZCall with input from the genotyping.db described in step 5 must be placed 
+   in an "external data" directory.
+
+   These files cannot be distributed for reasons of confidentiality.
+
+7) A .bpm.csv SNP manifest and .egt cluster file, corresponding to the given 
+   genotyping.db described in step 5, must be placed in the external data 
+   directory described in step 6.
+
 Shell environment setup:
 
-6) The environment variable BEADPOOL_MANIFEST must be set to the absolute path
-   of the Infinium BeadPool manifest (.bpm.csv) file corresponding to the data
-   described by the pipeline runtime database created in step 5.
+8) The environment variable GENOTYPE_TEST_DATA must be set to the absolute path
+   of the external data directory described in step 6 6.

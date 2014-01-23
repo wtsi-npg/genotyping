@@ -10,8 +10,8 @@ use Exporter;
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/version_text write_version_log/;
 
-$VERSION = '1.1.0';
-$YEAR = '2013'; # year of last update
+$VERSION = '1.2.0';
+$YEAR = '2014'; # year of last update
 
 sub version_text {
     my $text = "WTSI Genotyping Pipeline version $VERSION\n".
