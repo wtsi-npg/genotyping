@@ -41,12 +41,9 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
     @msg_port = 11300
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_genotype_illuminus
-    manifest = ENV['BEADPOOL_MANIFEST']
+    external_data = ENV['GENOTYPE_TEST_DATA']
+    manifest = manifest_path
     name = 'test_genotype_illuminus'
 
     run_test_if((lambda { illuminus_available? && manifest } and method(:plinktools_diff_available?)), "Skipping #{name}") do
@@ -55,7 +52,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       run_name = 'run1'
       pipe_ini = File.join(data_path, 'genotyping.ini')
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
       args_hash = {:manifest => manifest,
                    :config => pipe_ini,
@@ -72,7 +69,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
 
       plink_name = run_name+'.illuminus'
       stem = File.join(work_dir, plink_name)
-      master = File.join('/nfs/gapi/data/genotype/pipeline_test', plink_name)
+      master = File.join(external_data, plink_name)
       equiv = plink_equivalent?(stem, master, run_name, 
                                 {:work_dir => work_dir,
                                  :log_dir => work_dir})

@@ -16,9 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-##########################################################
-# test ground for development of the zcall workflow
-##########################################################
 
 devpath = File.expand_path(File.join(File.dirname(__FILE__), '..'))
 libpath = File.join(devpath, 'lib')
@@ -45,30 +42,25 @@ class TestWorkflowZCall < Test::Unit::TestCase
     @msg_port = 11300
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_genotype_zcall
-    manifest = ENV['BEADPOOL_MANIFEST']
-    egt_file = ENV['BEADPOOL_EGT']
-    unless egt_file
-      egt_file = '/nfs/gapi/data/genotype/zcall_test/'+
-        'Human670-QuadCustom_v1_A.egt'
-    end
+    
+    external_data = ENV['GENOTYPE_TEST_DATA']
+    manifest = manifest_path
+    egt = egt_path
+
     name = 'test_genotype_zcall'
 
-    run_test_if(lambda { zcall_available? && manifest },
+    run_test_if(lambda { zcall_available? && manifest && egt },
                 "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       # Only 1 zscore in range; faster but omits threshold evaluation
       # The evaluation is tested by test_zcall_tasks.rb
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :egt => egt_file,
+                                           :egt => egt,
                                            :chunk_size => 3,
                                            :zstart => 6,
                                            :ztotal => 1,
@@ -81,7 +73,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
 
       plink_name = run_name+'.zcall'
       stem = File.join(work_dir, plink_name)
-      master = File.join('/nfs/gapi/data/genotype/pipeline_test', plink_name)
+      master = File.join(external_data, plink_name)
       equiv = plink_equivalent?(stem, master, run_name, 
                                 {:work_dir => work_dir,
                                  :log_dir => work_dir})
