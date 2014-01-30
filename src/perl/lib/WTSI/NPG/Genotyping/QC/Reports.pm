@@ -325,11 +325,19 @@ sub latexSectionResults {
             push(@lines, "\\includepdf[landscape=true]{".$plotPath."}\n");
         }
     }
-    my @morePdf =  qw(failsIndividual.pdf failsCombined.pdf 
-  crHetDensityScatter.pdf failScatterPlot.pdf failScatterDetail.pdf);
+    my @morePdf =  qw(failsIndividual failsCombined
+                      crHetDensityScatter failScatterPlot failScatterDetail);
     foreach my $name (@morePdf) {
-        my $plotPath = $qcDir."/".$name;
-        push(@lines, "\\includepdf[pages={1}]{".$plotPath."}\n");
+        my $plotPath = $qcDir."/".$name.".pdf";
+	if (-e $plotPath) {
+	    push(@lines, "\\includepdf[pages={1}]{".$plotPath."}\n");
+	} elsif ($name eq 'crHetDensityScatter') {
+	    croak "CR/Het density scatter plot not found!";
+	} else {
+	    push(@lines, "\\begin{itemize}\n");
+	    push(@lines, "\\item No failed samples found. Omitted $name graph.\n");
+	    push(@lines, "\\end{itemize}\n"); 
+	}
     }
     return join("", @lines);
 }
