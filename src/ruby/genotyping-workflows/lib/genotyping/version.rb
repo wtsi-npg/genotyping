@@ -17,8 +17,8 @@
 #
 
 module Genotyping
-  VERSION = '1.1.0'
-  YEAR = '2013'
+  VERSION = '1.2.0'
+  YEAR = '2014'
   VERSION_LOG_NAME = 'version.log'
 
   def maybe_version_log(log_dir)

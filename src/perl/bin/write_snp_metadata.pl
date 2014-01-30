@@ -35,6 +35,7 @@ use JSON;
 
 Log::Log4perl->easy_init($ERROR);
 
+our $expected_fields = 9; # expected number of fields in .bpm.csv manifest
 
 sub byPositionName {
     # use to sort manifest into (position, name) order
@@ -64,8 +65,9 @@ sub readWriteManifest {
     # note that tempfile does *not* have a header line
     my ($inPath, $outPath, $verbose) = @_;
     $verbose ||= 0;
-    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
-    open my $out, ">", $outPath || croak "Cannot open output path $outPath";
+    my $log = Log::Log4perl->get_logger();
+    open my $in, "<", $inPath || $log->logcroak("Cannot open input path $inPath");
+    open my $out, ">", $outPath || $log->logcroak("Cannot open output path $outPath");
     print $out "["; # beginning of JSON list structure
     my $i = 0;
     my %indices = getIndices();
@@ -83,11 +85,11 @@ sub readWriteManifest {
         $alleles =~ s/\W//g; # remove nonword characters
         my @alleles = split('', $alleles);
         if (@alleles!=2) { 
-            croak "Failed to find 2 alleles at manifest line ".$i."\n"; 
+            $log->logcroak("Failed to find 2 alleles at manifest line ".$i."\n"); 
         }
         foreach my $allele (@alleles) {
             if ($allele !~ /[A-Z]/) { # may include letters other than ACGT
-                croak "Invalid allele character at manifest line ".$i."\n";
+                $log->logcroak("Invalid allele character at manifest line ".$i."\n");
             }
         }
         $snp{'allele_a'} = $alleles[0];
@@ -96,8 +98,8 @@ sub readWriteManifest {
 	if (!eof($in)) { print $out ","; }
     }
     print $out "]\n"; # end of JSON list structure
-    close $in || croak "Cannot close input path $inPath";
-    close $out || croak "Cannot close output path $outPath";
+    close $in || $log->logcroak("Cannot close input path $inPath");
+    close $out || $log->logcroak("Cannot close output path $outPath");
 }
 
 sub splitManifest {
@@ -106,18 +108,25 @@ sub splitManifest {
     my $inPath = shift;
     my $outDir = shift;
     my $verbose = shift;
+    my $log = Log::Log4perl->get_logger();
     my (%outPaths, %outFiles);
     my %indices = getIndices();
     my $cindex = $indices{'chromosome'};
     my $i = 0;
     if ($verbose) { print "Reading manifest $inPath for split\n"; }
-    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    open my $in, "<", $inPath || $log->logcroak("Cannot read input path $inPath");
     while (<$in>) {
         $i++;
         if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
 	if ($i == 1) { next; } # first line is header
 	$_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
 	my @fields = split /,/;
+	my $fields_found = @fields;
+	if ($fields_found != $expected_fields) {
+	    my $msg = "Incorrect number of fields in $inPath line $i; ".
+		"expected ".$expected_fields.", found ".$fields_found;
+	    $log->logcroak($msg);
+	}
 	my $chrom = $fields[$cindex];
 	# ensure chromosome ID is in numeric format
 	if ($chrom eq 'X') { $chrom = 23; }
@@ -128,15 +137,18 @@ sub splitManifest {
 	if (!$outPaths{$chrom}) {
 	    my $outPath = $outDir."/unsorted.".$chrom.".csv";
 	    $outPaths{$chrom} = $outPath;
-	    open my $out, '>', $outPath || croak "Cannot open output $outPath";
+	    open my $out, '>', $outPath || $log->logcroak("Cannot open output $outPath");
 	    $outFiles{$chrom} = $out;
 	}
 	print { $outFiles{$chrom} } join(',', @fields)."\n";
     }
-    close $in || croak "Cannot close input $inPath";
+    close $in || $log->logcroak("Cannot close input $inPath");
+    if ($i < 2) { # require header and at least one SNP
+	croak "No SNPs found in $inPath";
+    }
     foreach my $chrom (keys(%outFiles)) {
 	my $outPath = $outPaths{$chrom};
-	close $outFiles{$chrom} || croak "Cannot close output $outPath";
+	close $outFiles{$chrom} || $log->logcroak("Cannot close output $outPath");
     }
     return %outPaths;
 }
@@ -146,13 +158,14 @@ sub writeSortedByPosition {
     # two probes may share chromosome and position, eg. regular and cnv
     # return total number of inputs
     my ($inPath, $outPath) = @_;
+    my $log = Log::Log4perl->get_logger();
     my %indices = getIndices();
     my $nameIndex = $indices{'name'};
     my $posIndex = $indices{'position'};
     my @input;
     my @sortFields;
     my $i = 0;
-    open my $in, "<", $inPath || croak "Cannot read input path $inPath";
+    open my $in, "<", $inPath || $log->logcroak("Cannot read input path $inPath");
     while (<$in>) {
 	push @input, $_;
 	my @fields = split /,/;
@@ -165,12 +178,12 @@ sub writeSortedByPosition {
     }
     close $in || croak "Cannot close input $inPath";
     my @sorted = sort byPositionName @sortFields;
-    open my $out, ">", $outPath ||  croak "Cannot open output $outPath";
+    open my $out, ">", $outPath || $log->logcroak("Cannot open output $outPath");
     foreach my $snpRef (@sorted) {
 	my %snp = %{$snpRef};
 	print $out $input[$snp{'original_order'}];
     }
-    close $out || croak "Cannot close output $outPath";
+    close $out || $log->logcroak("Cannot close output $outPath");
     return $i;
 }
 
@@ -178,6 +191,7 @@ sub run {
     # sort manifest by (chromosome, position) and write as .json
     # also find chromosome boundaries wrt sorted manifest
     my ($manifest, $chrJson, $snpJson, $out, $verbose);
+    my $log = Log::Log4perl->get_logger();
     GetOptions('manifest=s' => \$manifest,
 	       'chromosomes=s' => \$chrJson,
                'snp=s'=> \$snpJson,
@@ -206,9 +220,9 @@ sub run {
 	$start = $end;
     }
     if ($chrJson) {
-	open $out, ">", $chrJson || croak "Cannot open output $chrJson";
+	open $out, ">", $chrJson || $log->logcroak("Cannot open output $chrJson");
         print $out to_json(\@bounds);
-        close $out || croak "Cannot close output $chrJson";
+        close $out || $log->logcroak("Cannot close output $chrJson");
     }
     if ($snpJson) {
 	my $sortedAll = $temp."/sorted.all.csv";

@@ -10,15 +10,15 @@ my $what_on_earth =<<'WOE';
 
 Script to update WTSI iRODS systems with groups corresponding to Sequencescape studies.
 
-Appropriate iRODS enviroment variables (e.g. irodsEnvFile) and files should be set and configured to allow access andupdate of the desired iRODS system.
+Appropriate iRODS environment variables (e.g. irodsEnvFile) and files should be set and configured to allow access and update of the desired iRODS system.
 
 The Sequencescape warehouse database is used to find the set of studies. iRODS groups are created for each study with names of the format ss_<study_id> when they do not already exist.
 
-The iRODS zone is taken to have a preexisting "public" group which is used to identify all available users.
+The iRODS zone is taken to have a pre-existing "public" group which is used to identify all available users.
 
 If a Sequencescape study has an entry for the "data_access_group" then the intersection of the members of the corresponding WTSI unix group and iRODS public group is used as the membership of the corresponding iRODS group.
 
-If no data_access_group is set on the study, then if the study is associated with sequencing the members of the iRODS group will be set to the public group, else if the study is not assocaited with sequencing the iRODS group will be left empty (except for the iRODS groupadmin user).
+If no data_access_group is set on the study, then if the study is associated with sequencing the members of the iRODS group will be set to the public group, else if the study is not associated with sequencing the iRODS group will be left empty (except for the iRODS groupadmin user).
 
 Script runs to perform such updates when no arguments are given.
 

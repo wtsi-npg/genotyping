@@ -46,10 +46,6 @@ class TestGenotypeCallTasks < Test::Unit::TestCase
     Percolate.asynchronizer = SystemAsynchronizer.new
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_mock_study
     run_test_if(method(:genotype_call_available?), "Skipping test_mock_study") do
       work_dir = make_work_dir('test_mock_study', data_path)

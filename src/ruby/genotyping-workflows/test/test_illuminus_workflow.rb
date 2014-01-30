@@ -41,37 +41,44 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
     @msg_port = 11300
   end
 
-  def data_path
-    File.expand_path(File.join(File.dirname(__FILE__), '..', 'data'))
-  end
-
   def test_genotype_illuminus
-    manifest = ENV['BEADPOOL_MANIFEST']
+    external_data = ENV['GENOTYPE_TEST_DATA']
+    manifest = manifest_path
     name = 'test_genotype_illuminus'
 
-    run_test_if(lambda { illuminus_available? && manifest },
-                "Skipping #{name}") do
+    run_test_if((lambda { illuminus_available? && manifest } and method(:plinktools_diff_available?)), "Skipping #{name}") do
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
       run_name = 'run1'
       pipe_ini = File.join(data_path, 'genotyping.ini')
 
-      FileUtils.copy(File.join(data_path, 'genotyping.db'), dbfile)
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
-      args = [dbfile, run_name, work_dir, {:manifest => manifest,
-                                           :config => pipe_ini,
-                                           :filterconfig => fconfig,
-                                           :gender_method => 'Supplied',
-                                           :chunk_size => 10000,
-                                           :memory => 2048}]
+      args_hash = {:manifest => manifest,
+                   :config => pipe_ini,
+                   :filterconfig => fconfig,
+                   :gender_method => 'Supplied',
+                   :chunk_size => 10000,
+                   :memory => 2048}
+      args = [dbfile, run_name, work_dir, args_hash]
       timeout = 1400
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
                              timeout, work_dir, log, args)
       assert(result)
 
+      plink_name = run_name+'.illuminus'
+      stem = File.join(work_dir, plink_name)
+      master = File.join(external_data, plink_name)
+      equiv = plink_equivalent?(stem, master, run_name, 
+                                {:work_dir => work_dir,
+                                 :log_dir => work_dir})
+      assert(equiv)
       Percolate.log.close
-      remove_work_dir(work_dir) if result
+
+      remove_work_dir(work_dir) if (result and equiv)
     end
   end
+
+
 end
