@@ -111,7 +111,8 @@ sub metricStatus {
         if (!$pass) {
             if ($metric eq $target) {
                 $failedTarget = 1;
-            } else {
+            } elsif ($metric ne 'xydiff') {
+		# xydiff is deprecated, do not use to flag pass/fail
                 $failedOther = 1;
             }
         }
