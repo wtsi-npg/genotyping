@@ -1,12 +1,12 @@
+
 use utf8;
 
 package WTSI::NPG::Database::Warehouse;
 
-use strict;
-use warnings;
 use Carp;
+use Moose;
 
-use base 'WTSI::NPG::Database';
+extends 'WTSI::NPG::Database';
 
 =head2 find_plate
 
@@ -39,11 +39,8 @@ use base 'WTSI::NPG::Database';
 sub find_plate {
   my ($self, $plate_id) = @_;
 
-  unless (defined $plate_id) {
-    confess "The plate_id argument was undefined\n";
-  }
+  defined $plate_id or $self->logconfess('The plate_id argument was undefined');
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -74,9 +71,9 @@ sub find_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$plate_id]");
+  $self->trace("Executing: '$query' with args [$plate_id]");
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($plate_id);
 
   my %plate;
@@ -90,17 +87,12 @@ sub find_plate {
 sub find_sample_by_plate {
   my ($self, $plate_id, $map) = @_;
 
-  unless (defined $plate_id) {
-    confess "The plate_id argument was undefined\n";
-  }
-  unless (defined $map) {
-    confess "The map argument was undefined\n";
-  }
+  defined $plate_id or $self->logconfess('The plate_id argument was undefined');
+  defined $map or $self->logconfess('The map argument was undefined');
 
   my $unpadded_map = $map;
   $unpadded_map =~ s/0//;
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -132,9 +124,10 @@ sub find_sample_by_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$plate_id, $unpadded_map]");
+  $self->trace("Executing: '$query' with args ",
+               "[$plate_id, $unpadded_map]");
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($plate_id, $unpadded_map);
 
   my @samples;
@@ -144,7 +137,7 @@ sub find_sample_by_plate {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+    $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
   return shift @samples;
@@ -181,11 +174,9 @@ sub find_sample_by_plate {
 sub find_infinium_plate {
   my ($self, $infinium_barcode) = @_;
 
-  unless (defined $infinium_barcode) {
-    confess "The infinium_barcode argument was undefined\n";
-  }
+  defined $infinium_barcode or
+    $self->logconfess('The infinium_barcode argument was undefined');
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -216,9 +207,9 @@ sub find_infinium_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$infinium_barcode]");
+  $self->trace("Executing: '$query' with args [$infinium_barcode]");
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($infinium_barcode);
 
   my %plate;
@@ -232,17 +223,13 @@ sub find_infinium_plate {
 sub find_infinium_sample_by_plate {
   my ($self, $infinium_barcode, $map) = @_;
 
-  unless (defined $infinium_barcode) {
-    confess "The infinium_barcode argument was undefined\n";
-  }
-  unless (defined $map) {
-    confess "The map argument was undefined\n";
-  }
+  defined $infinium_barcode or
+    $self->logconfess('The infinium_barcode argument was undefined');
+  defined $map or $self->logconfess('The map argument was undefined');
 
   my $unpadded_map = $map;
   $unpadded_map =~ s/0//;
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -274,8 +261,9 @@ sub find_infinium_sample_by_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->debug("Executing: '$query' with args [$infinium_barcode, $unpadded_map]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args ",
+               "[$infinium_barcode, $unpadded_map]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($infinium_barcode, $unpadded_map);
 
   my @samples;
@@ -285,7 +273,7 @@ sub find_infinium_sample_by_plate {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+    $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
   return shift @samples;
@@ -294,25 +282,20 @@ sub find_infinium_sample_by_plate {
 sub find_infinium_gex_sample {
   my ($self, $plate_barcode, $map) = @_;
 
-  unless (defined $plate_barcode) {
-    confess "The plate_barcode argument was undefined\n";
-  }
-  unless (defined $map) {
-    confess "The map argument was undefined\n";
-  }
+  defined $plate_barcode or
+    $self->logconfess("The plate_barcode argument was undefined");
+  defined $map or $self->logconfess("The map argument was undefined");
 
   my ($barcode_prefix, $barcode) =
     $plate_barcode =~ /^([A-Z]{2})([0-9]+)[A-Z]$/;
-  unless (defined $barcode_prefix) {
-     $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
-                            "failed to find the barcode prefix");
-  }
-  unless (defined $barcode) {
-    $self->log->logconfess("Invalid plate barcode '$plate_barcode': ",
-                           "failed to find the barcode");
-  }
 
-  my $dbh = $self->dbh;
+  defined $barcode_prefix or
+     $self->logconfess("Invalid plate barcode '$plate_barcode': ",
+                       "failed to find the barcode prefix");
+  defined $barcode or
+    $self->logconfess("Invalid plate barcode '$plate_barcode': ",
+                      "failed to find the barcode");
+
   my $query =
     qq(SELECT DISTINCT
           sm.internal_id,
@@ -347,10 +330,10 @@ sub find_infinium_gex_sample {
        AND pl.plate_purpose_internal_id = pp.internal_id
        AND pp.name like '%GEX%');
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
 
-  $self->log->trace("Executing: '$query' with args [",
-                    "$barcode, $barcode_prefix, $map]");
+  $self->trace("Executing: '$query' with args [",
+               "$barcode, $barcode_prefix, $map]");
   $sth->execute($barcode, $barcode_prefix, $map);
 
   my @samples;
@@ -360,8 +343,8 @@ sub find_infinium_gex_sample {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n records for sample '$plate_barcode' $map ",
-                           "were returned where 1 was expected");
+    $self->logconfess("$n records for sample '$plate_barcode' $map ",
+                      "were returned where 1 was expected");
   }
 
   return shift @samples;
@@ -370,11 +353,9 @@ sub find_infinium_gex_sample {
 sub find_infinium_gex_sample_by_sanger_id {
   my ($self, $sanger_sample_id) = @_;
 
-  unless (defined $sanger_sample_id) {
-    confess "The sanger_sample_id argument was undefined\n";
-  }
+  defined $sanger_sample_id or
+    $self->logconfess("The sanger_sample_id argument was undefined");
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT DISTINCT
           sm.internal_id,
@@ -407,9 +388,9 @@ sub find_infinium_gex_sample_by_sanger_id {
        AND pl.plate_purpose_internal_id = pp.internal_id
        AND pp.name like '%GEX%');
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
 
-  $self->log->trace("Executing: '$query' with arg [$sanger_sample_id]");
+  $self->trace("Executing: '$query' with arg [$sanger_sample_id]");
   $sth->execute($sanger_sample_id);
 
   my @samples;
@@ -419,7 +400,8 @@ sub find_infinium_gex_sample_by_sanger_id {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n records for sample '$sanger_sample_id' were returned where 1 was expected");
+    $self->logconfess("$n records for sample '$sanger_sample_id' ",
+                      "were returned where 1 was expected");
   }
 
   return shift @samples;
@@ -456,11 +438,9 @@ sub find_infinium_gex_sample_by_sanger_id {
 sub find_fluidigm_plate {
   my ($self, $fluidigm_barcode) = @_;
 
-  unless (defined $fluidigm_barcode) {
-    confess "The fluidigm_barcode argument was undefined\n";
-  }
+  defined $fluidigm_barcode or
+    $self->logconfess("The fluidigm_barcode argument was undefined");
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -491,9 +471,9 @@ sub find_fluidigm_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$fluidigm_barcode]");
+  $self->trace("Executing: '$query' with args [$fluidigm_barcode]");
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($fluidigm_barcode);
 
   my %plate;
@@ -536,14 +516,10 @@ sub find_fluidigm_plate {
 sub find_fluidigm_sample_by_plate {
   my ($self, $fluidigm_barcode, $map) = @_;
 
-  unless (defined $fluidigm_barcode) {
-    confess "The fluidigm_barcode argument was undefined\n";
-  }
-  unless (defined $map) {
-    confess "The map argument was undefined\n";
-  }
+  defined $fluidigm_barcode or
+    $self->logconfess("The fluidigm_barcode argument was undefined");
+  defined $map or $self->logconfess("The map argument was undefined");
 
-  my $dbh = $self->dbh;
   my $query =
     qq(SELECT
          sm.internal_id,
@@ -575,9 +551,9 @@ sub find_fluidigm_sample_by_plate {
          AND wl.internal_id = aq.receptacle_internal_id
          AND aq.sample_internal_id = sm.internal_id);
 
-  $self->log->trace("Executing: '$query' with args [$fluidigm_barcode $map]");
+  $self->trace("Executing: '$query' with args [$fluidigm_barcode $map]");
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($fluidigm_barcode, $map);
 
   my @samples;
@@ -587,17 +563,17 @@ sub find_fluidigm_sample_by_plate {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n samples were returned where 1 sample was expected");
+    $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
   return shift @samples;
 }
 
-
 sub find_sample_studies {
   my ($self, $sample_id) = @_;
 
-  my $dbh = $self->dbh;
+  $self->logwarn('Warehouse::find_sample_studies is deprecated');
+
   my $query =
     qq(SELECT DISTINCT
          st.internal_id,
@@ -614,8 +590,8 @@ sub find_sample_studies {
          AND ss.sample_internal_id = sm.internal_id
          AND st.internal_id = ss.study_internal_id);
 
-  $self->log->trace("Executing: '$query' with arg [$sample_id]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with arg [$sample_id]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($sample_id);
 
   my @studies;
@@ -629,11 +605,12 @@ sub find_sample_studies {
 sub find_study_title {
   my ($self, $study_id) = @_;
 
-  my $dbh = $self->dbh;
+  $self->logwarn('Warehouse::find_study_title is deprecated');
+
   my $query = qq(SELECT study_title
                  FROM current_studies
                  WHERE internal_id = ?);
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($study_id);
 
   my @titles;
@@ -643,11 +620,16 @@ sub find_study_title {
 
   my $n = scalar @titles;
   if ($n > 1) {
-    $self->log->logconfess("$n records for study '$study_id' were returned where 1 was expected");
+    $self->logconfess("$n records for study '$study_id' were ",
+                      "returned where 1 was expected");
   }
 
   return shift @titles;
 }
+
+no Moose;
+
+__PACKAGE__->meta->make_immutable;
 
 1;
 

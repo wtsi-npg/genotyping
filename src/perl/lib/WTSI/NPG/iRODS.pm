@@ -1148,6 +1148,8 @@ sub _make_imeta_query {
   return @query_clauses;
 }
 
+__PACKAGE__->meta->make_immutable;
+
 no Moose;
 
 1;
