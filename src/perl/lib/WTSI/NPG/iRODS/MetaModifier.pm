@@ -4,10 +4,9 @@ use utf8;
 package WTSI::NPG::iRODS::MetaModifier;
 
 use File::Spec;
-use JSON;
 use Moose;
 
-with 'WTSI::NPG::Startable';
+extends 'WTSI::NPG::iRODS::Communicator';
 
 our $META_ADD_OP = 'add';
 our $META_REM_OP = 'rem';
@@ -56,30 +55,9 @@ sub modify_collection_meta {
     $spec->{avus}->[0]->{units} = $units;
   }
 
-  my $json = JSON->new->utf8->encode($spec);
-  my $parser = JSON->new->utf8->max_size(4096);
-  my $result;
-
-  ${$self->stdin} .= $json;
-  ${$self->stderr} = '';
-
-  $self->debug("Sending JSON spec $json to ", $self->executable);
-
-  eval {
-    # baton send JSON responses on a single line
-    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
-    $result = $parser->decode(${$self->stdout});
-    ${$self->stdout} = '';
-  };
-
-  if ($@) {
-    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
-  }
-
-  # TODO -- factor out JSON protocol handling into a Role
-  if (exists $result->{error}) {
-    $self->logconfess($result->{error}->{message});
-  }
+  my $response = $self->communicate($spec);
+  $self->validate_response($response);
+  $self->report_error($response);
 
   return $collection;
 }
@@ -110,32 +88,9 @@ sub modify_object_meta {
     $spec->{avus}->[0]->{units} = $units;
   }
 
-  my $json = JSON->new->utf8->encode($spec);
-  my $parser = JSON->new->utf8->max_size(4096);
-  my $result;
-
-  ${$self->stdin} .= $json;
-  ${$self->stderr} = '';
-
-  $self->debug("Sending JSON spec $json to ", $self->executable);
-
-  while ($self->harness->pumpable && !defined $result) {
-    $self->harness->pump;
-
-    eval { $result = $parser->incr_parse(${$self->stdout}) };
-
-    if ($@) {
-      $self->logwarn("JSON parse error on: '", ${$self->stdout}, "'");
-      $parser->incr_skip;
-    }
-
-    ${$self->stdout} = '';
-  }
-
-  # TODO -- factor out JSON protocol handling into a Role
-  if (exists $result->{error}) {
-    $self->logconfess($result->{error}->{message});
-  }
+  my $response = $self->communicate($spec);
+  $self->validate_response($response);
+  $self->report_error($response);
 
   return $object;
 }

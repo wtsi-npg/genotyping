@@ -4,14 +4,13 @@ use utf8;
 package WTSI::NPG::iRODS::Lister;
 
 use File::Spec;
-use JSON;
 use Moose;
 
-with 'WTSI::NPG::Startable';
+extends 'WTSI::NPG::iRODS::Communicator';
 
 has '+executable' => (default => 'json-list');
 
- # iRODS error code for non-existance
+ # iRODS error code for non-existence
 our $ITEM_DOES_NOT_EXIST = -310000;
 
 around [qw(list_collection list_object)] => sub {
@@ -38,49 +37,22 @@ sub list_object {
   my ($volume, $collection, $data_name) = File::Spec->splitpath($object);
   $collection = File::Spec->canonpath($collection);
 
-  # TODO -- factor out JSON protocol handling into a Role
   my $spec = {collection  => $collection,
               data_object => $data_name};
-  my $json = JSON->new->utf8->encode($spec);
-  my $parser = JSON->new->utf8->max_size(4096);
-  my $result;
-
-  ${$self->stdin} .= $json;
-  ${$self->stderr} = '';
-
-  eval {
-    # baton send JSON responses on a single line
-    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
-    $result = $parser->decode(${$self->stdout});
-    ${$self->stdout} = '';
-  };
-
-  if ($@) {
-    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
-  }
-
-  unless (defined $result) {
-    $self->logconfess("Failed to get a result from '$json'");
-  }
-
-  unless (ref $result eq 'HASH' ) {
-    $self->logconfess("Failed to get a hash result from '$json'; got ",
-                      ref $result);
-  }
+  my $response = $self->communicate($spec);
+  $self->validate_response($response);
 
   my $path;
-  # TODO -- factor out JSON protocol handling into a Role
-  if (exists $result->{error}) {
-    if ($result->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
+  if (exists $response->{error}) {
+    if ($response->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
       # Continue to return undef
     }
     else {
-      $self->logconfess($result->{error}->{message}, " Error code: ",
-                        $result->{error}->{code});
+      $self->report_error($response);
     }
   }
   else {
-    $path = $self->_to_path_str($result);
+    $path = $self->_to_path_str($response);
   }
 
   return $path;
@@ -96,39 +68,17 @@ sub list_collection {
     $self->logconfess("An absolute collection path argument is required: ",
                       "received '$collection'");
 
-  # TODO -- factor out JSON protocol handling into a Role
   my $spec = {collection => $collection};
-  my $json = JSON->new->utf8->encode($spec);
-  my $parser = JSON->new->utf8->max_size(1024 *1024);
-  my $result;
-
-  ${$self->stdin} .= $json;
-  ${$self->stderr} = '';
-
-  $self->debug("Sending JSON spec $json to ", $self->executable);
-
-  eval {
-    # baton send JSON responses on a single line
-    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
-    $result = $parser->decode(${$self->stdout});
-    ${$self->stdout} = '';
-  };
-
-  if ($@) {
-    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
-  }
-
+  my $response = $self->communicate($spec);
   my @paths;
 
-  # TODO -- factor out JSON protocol handling into a Role
-  if (ref $result eq 'HASH') {
-    if (exists $result->{error}) {
-      if ($result->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
+  if (ref $response eq 'HASH') {
+    if (exists $response->{error}) {
+      if ($response->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
         # Continue to return empty list
       }
       else {
-        $self->logconfess($result->{error}->{message}, " Error code: ",
-                          $result->{error}->{code});
+        $self->report_error($response);
       }
     }
   }
@@ -136,7 +86,7 @@ sub list_collection {
     my @data_objects;
     my @collections;
 
-    foreach my $path_spec (@$result) {
+    foreach my $path_spec (@$response) {
       my $path = $self->_to_path_str($path_spec);
 
       if (exists $path_spec->{data_object}) {
@@ -147,13 +97,12 @@ sub list_collection {
       }
     }
 
-    @paths =  (\@data_objects, \@collections);
+    @paths = (\@data_objects, \@collections);
   }
 
   return @paths;
 }
 
-# TODO -- factor out JSON protocol handling into a Role
 sub _to_path_str {
   my ($self, $path_spec) = @_;
 

@@ -7,9 +7,10 @@ use strict;
 use warnings;
 use English;
 use File::Spec;
+use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 109;
+use Test::More tests => 115;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -107,7 +108,8 @@ sub list_collection : Test(3) {
   my ($objs, $colls) = $irods->list_collection("$irods_tmp_coll/irods");
 
   is_deeply($objs, ["$irods_tmp_coll/irods/lorem.txt",
-                    "$irods_tmp_coll/irods/test.txt"]) or diag explain $objs;
+                    "$irods_tmp_coll/irods/test.txt",
+                    "$irods_tmp_coll/irods/utf-8.txt"]) or diag explain $objs;
 
   is_deeply($colls, ["$irods_tmp_coll/irods/collect_files",
                      "$irods_tmp_coll/irods/md5sum",
@@ -529,6 +531,51 @@ sub hash_path : Test(2) {
 
   is($irods->hash_path("$data_path/md5sum/lorem.txt",
                        'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
+}
+
+sub round_trip_utf8_avu : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $attr  = "Τη γλώσσα μου έδωσαν ελληνική";
+  my $value = "το σπίτι φτωχικό στις αμμουδιές του Ομήρου";
+
+  my $test_object = "$irods_tmp_coll/irods/test.txt";
+  my @meta_before = $irods->get_object_meta($test_object);
+  cmp_ok(scalar @meta_before, '==', 0, 'No AVUs present');
+
+  my $expected_meta = [{attribute => $attr, value => $value}];
+  ok($irods->add_object_avu($test_object, $attr, $value), 'UTF-8 AVU added');
+
+  my @meta_after = $irods->get_object_meta($test_object);
+  cmp_ok(scalar @meta_after, '==', 1, 'One AVU added');
+
+  my $avu = $meta_after[0];
+  TODO : {
+    local $TODO = 'Temporarily disabled because of iRODS UTF-8 configuration';
+
+    ok(Unicode::Collate->new->eq($avu->{attribute}, $attr),
+       'Found UTF-8 attribute');
+    ok(Unicode::Collate->new->eq($avu->{value}, $value),
+       'Found UTF-8 value');
+  }
+}
+
+sub slurp_object : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $test_file = "$data_path/utf-8.txt";
+  my $test_object = "$irods_tmp_coll/irods/utf-8.txt";
+
+  my $data = $irods->slurp_object($test_object);
+
+  my $original = '';
+  open my $fin, '<:encoding(utf-8)', $test_file or die "Failed to open $!\n";
+  while (<$fin>) {
+    $original .= $_;
+  }
+  close $fin;
+
+  ok(Unicode::Collate->new->eq($data, $original), 'Slurped copy is identical');
 }
 
 1;
