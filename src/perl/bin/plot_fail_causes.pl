@@ -79,7 +79,8 @@ sub containsFailedSample {
 	my %results = %{$qcResults{$sample}};
 	foreach my $metric (keys(%results)) {
 	    my ($pass, $value) = @{$results{$metric}};
-	    if (int($pass) == 0) { $fail = 1; last; }
+	    # xydiff is a deprecated metric, do not count for failure
+	    if (int($pass) == 0 && $metric ne 'xydiff') { $fail = 1; last; }
 	}
 	if ($fail) { last; }
     }

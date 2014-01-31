@@ -2,65 +2,56 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Database::Pipeline;
 
-use strict;
-use warnings;
 use Carp;
+use Moose;
 
-use WTSI::NPG::Database;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Schema;
 
-use base 'WTSI::NPG::Database';
+extends 'WTSI::NPG::Database';
+
+has 'config_dir' =>
+  (is      => 'ro',
+   isa     => 'Str',
+   default => sub { return WTSI::NPG::Genotyping::config_dir() },
+   required => 1);
+
+has 'dbfile' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
+
+has 'overwrite' =>
+  (is       => 'ro',
+   isa      => 'Bool',
+   default  => 0,
+   required => 1);
+
+has 'schema' =>
+  (is       => 'rw',
+   isa      => 'WTSI::NPG::Genotyping::Schema',
+   required => 0);
+
 our $AUTOLOAD;
 
-our $default_sqlite = 'sqlite3';
+our $default_sqlite   = 'sqlite3';
 our $default_ddl_file = 'pipeline_ddl.sql';
 
-our $pipeline_ini = 'pipeline.ini';
-our $genders_ini = 'genders.ini';
-our $methods_ini = 'methods.ini';
+our $pipeline_ini  = 'pipeline.ini';
+our $genders_ini   = 'genders.ini';
+our $methods_ini   = 'methods.ini';
 our $relations_ini = 'relations.ini';
-our $snpsets_ini = 'snpsets.ini';
-our $states_ini = 'states.ini';
+our $snpsets_ini   = 'snpsets.ini';
+our $states_ini    = 'states.ini';
 
-
-=head2 new
-
-  Arg [1]    : name => string
-  Arg [2]    : inifile => string
-  Arg [3]    : dbfile => string
-  Arg [3]    : overwrite => boolean
-
-  Example    : WTSI::NPG::Genotyping::Database::Pipeline->new
-                 (name => 'my_database', inifile => 'my_database.ini',
-                  dbfile => 'pipeline.db', overwrite => 1)
-  Description: Returns a new database handle configured from an
-               .ini-style file.
-  Returntype : WTSI::NPG::Genotyping::Database
-
-=cut
-
-sub new {
-   my ($class, %args) = @_;
-
-   my $self = $class->SUPER::new(%args);
-   $self->{_dbfile} = $args{dbfile};
-   $self->{_overwrite} = $args{overwrite};
-   bless($self, $class);
-
-   return $self->initialize;
-}
-
-sub initialize {
+sub BUILD {
   my ($self) = @_;
-
-  my $ini = Config::IniFiles->new(-file => $self->inifile);
 
   my $ds = $self->data_source;
   my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
   unless ($base && $file) {
-    $self->log->logconfess("Failed to parse datasource string '$ds' in ",
-                           $self->inifile);
+    $self->logconfess("Failed to parse datasource string '$ds' in ",
+                      $self->inifile);
   }
 
   # Override the default data source if a database file was given in
@@ -69,23 +60,21 @@ sub initialize {
     $file = $self->dbfile;
     $self->data_source($base . $self->dbfile);
   }
-  else {
-    $self->{_dbfile} = $file;
-  }
 
   if (-e $file) {
-    if ($self->{_overwrite}) {
+    if ($self->overwrite) {
       unlink($file);
-      $self->create($file, $ini);
+      $self->create($file, $self->ini);
     }
   }
   else {
-    $self->create($file, $ini);
+    $self->create($file, $self->ini);
   }
+
+  $self->username(getpwent());
 
   return $self;
 }
-
 
 =head2 create
 
@@ -103,23 +92,24 @@ sub initialize {
 sub create {
   my ($self, $file, $ini) = @_;
 
-  my $config_dir = WTSI::NPG::Genotyping::config_dir();
+  my $config_dir = $self->config_dir;
   my $default_sql_path = "$config_dir/$default_ddl_file";
 
   my $sql_path = $ini->val($self->name, 'sqlpath', $default_sql_path);
   my $sqlite = $ini->val($self->name, 'sqlite', $default_sqlite);
-  my $log = $self->log;
 
   unless (-e $sql_path) {
-    $log->logconfess("Failed to create database: DDL file '$sql_path' is missing");
+    $self->logconfess("Failed to create database: ",
+                      "DDL file '$sql_path' is missing");
   }
 
   if (-e $file) {
-    $log->logconfess("Failed to create database: database '$file' already exists");
+    $self->logconfess("Failed to create database: ",
+                      "database '$file' already exists");
   }
   else {
     system("$sqlite $file < $sql_path") == 0
-      or $log->logconfess("Failed to create SQLite database '$file': $?");
+      or $self->logconfess("Failed to create SQLite database '$file': $?");
   }
 
   return $self;
@@ -142,14 +132,11 @@ sub create {
 sub populate {
   my $self = shift;
 
-  my $config_dir = WTSI::NPG::Genotyping::config_dir();
-  my $default_ini_path = $config_dir;
-
-  my $ini = Config::IniFiles->new(-file => $self->inifile);
-  my $ini_path = $ini->val($self->name, 'inipath', $default_ini_path);
+  my $default_ini_path = $self->config_dir;
+  my $ini_path = $self->ini->val($self->name, 'inipath', $default_ini_path);
 
   unless ($self->is_connected) {
-    $self->log->logconfess('Failed to populate database: not connected');
+    $self->logconfess('Failed to populate database: not connected');
   }
 
   $self->_populate_addresses;
@@ -162,42 +149,28 @@ sub populate {
   return $self;
 }
 
-
 =head2 connect
-
-  See WTSI::NPG::Genotyping::Database.
-
-=cut
-
-## no critic
-
-sub connect {
-  my ($self, %args) = @_;
-
-  unless ($self->is_connected) {
-    $self->log->info('Connecting to ', $self->data_source);
-    $self->{_schema} = WTSI::NPG::Genotyping::Schema->connect($self->data_source,
-                                                              $self->username,
-                                                              $self->password,
-                                                              \%args);
-  }
-
-  return $self;
-}
-
-## use critic
-
-=head2 is_connected
 
   See WTSI::NPG::Database.
 
 =cut
 
-sub is_connected {
-  my ($self) = @_;
-  return defined $self->dbh && $self->dbh->ping;
-}
+sub connect {
+  my ($self, %args) = @_;
 
+  unless ($self->is_connected) {
+    $self->info('Connecting to ', $self->data_source);
+
+    my $schema = WTSI::NPG::Genotyping::Schema->connect($self->data_source,
+                                                        $self->username,
+                                                        $self->password,
+                                                        \%args);
+    $self->schema($schema);
+    $self->dbh($self->schema->storage->dbh);
+  }
+
+  return $self;
+}
 
 =head2 disconnect
 
@@ -208,13 +181,28 @@ sub is_connected {
 sub disconnect {
   my ($self) = @_;
   if ($self->is_connected) {
-    $self->log->info('Disconnecting from ', $self->data_source);
+    $self->info('Disconnecting from ', $self->data_source);
     $self->schema->storage->disconnect;
+  }
+  else {
+    $self->warn("Attempted to disconnect when not connected");
   }
 
   return $self;
 }
 
+=head2 is_connected
+
+  See WTSI::NPG::Database.
+
+=cut
+
+sub is_connected {
+  my ($self) = @_;
+  if ($self->schema) {
+    return $self->schema->storage->connected;
+  }
+}
 
 =head2 dbh
 
@@ -227,22 +215,6 @@ sub dbh {
   if ($self->schema) {
     return $self->schema->storage->dbh;
   }
-}
-
-
-=head2 dbfile
-
-  Arg [1]    : None
-
-  Example    : $db->dbfile
-  Description: Returns the current database file.
-  Returntype : string
-
-=cut
-
-sub dbfile {
-  my ($self) = @_;
-  return $self->{_dbfile};
 }
 
 =head2 in_transaction
@@ -273,33 +245,17 @@ sub in_transaction {
 
   if ($@) {
     my $error = $@;
-    my $log = $self->log;
 
     if ($error =~ /Rollback failed/) {
-      $log->logconfess("$error.\nRollback failed!\nWARNING: data may be inconsistent.");
+      $self->logconfess("$error. Rollback failed! ",
+                        "WARNING: data may be inconsistent.");
     } else {
-      $log->logconfess("$error.\nRollback successful");
+      $self->logconfess("$error. Rollback successful");
     }
   };
 
   return wantarray ? @result : $result[0];
 }
-
-=head2 schema
-
-  Arg [1]    : None
-
-  Example    : $db->schema
-  Description: Returns the current database schema object.
-  Returntype : WTSI::NPG::Genotyping::Schema
-
-=cut
-
-sub schema {
- my ($self) = @_;
- return $self->{_schema};
-}
-
 
 =head2 address
 
@@ -383,7 +339,6 @@ Returns a DBIx::Class::ResultSet for the registered source 'well'.
 
 =cut
 
-
 # Populates plate well addresses dictionary with the two styles of
 # address label used.
 sub _populate_addresses {
@@ -434,7 +389,7 @@ sub _populate_states {
 sub _insert_list_from_ini {
   my ($self, $class, $inifile, $param) = @_;
 
-  $self->log->debug("Loading $class from INI file $inifile $param");
+  $self->debug("Loading list of '$class' from INI file '$inifile' '$param'");
 
   my @objects;
   my $ini = Config::IniFiles->new(-file => $inifile);
@@ -445,13 +400,16 @@ sub _insert_list_from_ini {
     }
   }
 
+  $self->debug("Loaded a list of ", scalar @objects,
+               " instances of '$class' from INI file '$inifile' '$param'");
+
   return \@objects;
 }
 
 sub _insert_from_ini {
   my ($self, $class, $inifile) = @_;
 
-  $self->log->debug("Loading $class from INI file $inifile");
+  $self->debug("Loading '$class' from INI file '$inifile'");
 
   my @objects;
   my $ini = Config::IniFiles->new(-file => $inifile);
@@ -464,9 +422,11 @@ sub _insert_from_ini {
     push @objects, $self->schema->resultset($class)->find_or_create(\%args);
   }
 
+  $self->debug("Loaded ", scalar @objects,
+               " instances of '$class' from INI file '$inifile'");
+
   return \@objects;
 }
-
 
 # Autoloads methods corresponding to the Schema->sources. By default,
 # you can do this if you have any Result instance. E.g.
@@ -485,12 +445,12 @@ sub _insert_from_ini {
 #
 sub AUTOLOAD {
   my ($self) = @_;
-  my $type = ref($self) or confess "$self is not an object\n";
+  my $type = ref($self) or confess "$self is not an object";
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
   unless ($self->is_connected) {
-    $self->log->logconfess("$self is not connected");
+    $self->logconfess("$self is not connected");
   }
 
   my $schema = $self->schema;
@@ -503,15 +463,13 @@ sub AUTOLOAD {
   my $method_name = $AUTOLOAD;
   $method_name =~ s/.*://;
   unless (exists $lookup{$method_name} ) {
-    $self->log->logconfess("An invalid method `$method_name' was called ",
-                           "on an object of $type. Permitted methods are [",
-                           join(", ", sort keys %lookup), "]");
+    $self->logconfess("An invalid method `$method_name' was called ",
+                      "on an object of $type. Permitted methods are [",
+                      join(", ", sort keys %lookup), "]");
   }
 
 
  SYMBOL_TABLE: {
-    ## no critic
-
     no strict qw(refs);
 
     *$AUTOLOAD = sub {
@@ -519,7 +477,6 @@ sub AUTOLOAD {
       return $self->schema->resultset($lookup{$method_name});
     };
 
-    ## use critic
   }
 
   unshift @_, $self;
