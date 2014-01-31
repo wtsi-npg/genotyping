@@ -19,13 +19,15 @@ has 'config_dir' =>
 has 'dbfile' =>
   (is       => 'ro',
    isa      => 'Str',
-   required => 1);
+   required => 1,
+   default  => 'genotyping.db',
+   lazy     => 1);
 
 has 'overwrite' =>
   (is       => 'ro',
    isa      => 'Bool',
-   default  => 0,
-   required => 1);
+   required => 1,
+   default  => 0);
 
 has 'schema' =>
   (is       => 'rw',

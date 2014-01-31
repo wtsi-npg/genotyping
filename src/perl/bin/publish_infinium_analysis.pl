@@ -116,13 +116,17 @@ sub run {
   $db ||= 'configured database';
   $log->debug("Using $db using config from $config");
 
+  my @init_args = (name    => 'pipeline',
+                   inifile => $config);
+  if ($dbfile) {
+    push @init_args, (dbfile => $dbfile);
+  }
+
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name    => 'pipeline',
-     inifile => $config,
-     dbfile  => $dbfile)->connect
-       (RaiseError     => 1,
-        sqlite_unicode => 1,
-        on_connect_do  => 'PRAGMA foreign_keys = ON');
+    (@init_args)->connect
+      (RaiseError     => 1,
+       sqlite_unicode => 1,
+       on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my $now = DateTime->now;
 
