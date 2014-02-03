@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use File::Basename qw(basename);
 use File::Spec;
 use File::Temp qw(tempdir);
-use List::AllUtils qw(each_array);
+use Set::Scalar;
 use Moose;
 use URI;
 
@@ -269,20 +269,20 @@ sub _find_resultset_snpset {
 
     $self->debug("Trying SNP set '", $snpset->str, "' of $num_snps SNPs");
 
-    if ($num_snps == $expected_num_snps) {
-      my $ea = each_array(@result_snp_names, @snp_names);
-      while (my ($name1, $name2) = $ea->()) {
-        if ($name1 ne $name2) {
-          $self->debug("Ignoring SNP set '", $snpset->str, "' because of SNP ",
-                       "difference '$name1' != '$name2'");
-        }
-      }
+    my $expected_names = Set::Scalar->new(@snp_names);
+    my $result_names = Set::Scalar->new(@result_snp_names);
 
+    if ($result_names == $expected_names) {
       push @matched, $snpset;
     }
     else {
-      $self->debug("Ignoring SNP set '", $snpset->str, "' because $num_snps ",
-                   "SNPs != $expected_num_snps SNPs");
+      $self->debug("Ignoring SNP set '", $snpset->str, "' because of SNP ",
+                   "differences. SNPS expected: ", $expected_names-> size,
+                   ", SNPS in result: ", $result_names->size,
+                   ". SNP set minus result set: ",
+                   $expected_names->difference($result_names),
+                   ", result set minus SNP set: ",
+                   $result_names->difference($expected_names));
     }
   }
 
