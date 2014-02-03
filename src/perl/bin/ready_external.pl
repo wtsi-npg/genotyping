@@ -34,14 +34,14 @@ sub run {
   my $verbose;
 
   GetOptions('chip-design=s' => \$chip_design,
-             'config=s' => \$config,
-             'dbfile=s'=> \$dbfile,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'input=s' => \$input,
-             'run=s' => \$run_name,
-             'namespace=s' => \$namespace,
-             'supplier=s' => \$supplier_name,
-             'verbose' => \$verbose);
+             'config=s'      => \$config,
+             'dbfile=s'      => \$dbfile,
+             'help'          => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'input=s'       => \$input,
+             'run=s'         => \$run_name,
+             'namespace=s'   => \$namespace,
+             'supplier=s'    => \$supplier_name,
+             'verbose'       => \$verbose);
 
   $config ||= $DEFAULT_INI;
 
@@ -69,13 +69,17 @@ sub run {
     print STDERR "Updating $db using config from $config\n";
   }
 
+  my @initargs = (name => 'pipeline',
+                  inifile => $config);
+  if ($dbfile) {
+    push @initargs, (dbfile => $dbfile);
+  }
+
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile)->connect
-       (RaiseError => 1,
-        sqlite_unicode => 1,
-        on_connect_do => 'PRAGMA foreign_keys = ON');
+    (@initargs)->connect
+      (RaiseError     => 1,
+       sqlite_unicode => 1,
+       on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my @valid_designs = map { $_->name } $pipedb->snpset->all;
   unless (grep { $chip_design eq $_ } @valid_designs ) {
