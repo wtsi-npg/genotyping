@@ -109,6 +109,23 @@ sub snp_names {
   return sort { $a cmp $b } uniq @snp_names;
 }
 
+sub filter_on_confidence {
+  my ($self, $confidence_threshold) = @_;
+
+  defined $confidence_threshold or
+    $self->logconfess('The confidence_threshold argument was not defined');
+
+  my @filtered_results;
+  foreach my $result (sort { $a->snp_assayed cmp
+                             $b->snp_assayed } @{$self->assay_results}) {
+    if ($result->confidence >= $confidence_threshold and !$result->is_control) {
+      push @filtered_results, $result;
+    }
+  }
+
+  return \@filtered_results;
+}
+
 sub str {
   my ($self) = @_;
 
