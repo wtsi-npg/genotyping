@@ -17,15 +17,28 @@ has 'config_dir' =>
    required => 1);
 
 has 'dbfile' =>
-  (is       => 'ro',
-   isa      => 'Str',
-   required => 1);
+  (is        => 'rw',
+   isa       => 'Str',
+   required  => 1,
+   lazy      => 1,
+   default   => sub {
+     my ($self) = @_;
+
+     my $ds = $self->data_source;
+     my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+     unless ($base && $file) {
+       $self->logconfess("Failed to parse datasource string '$ds' in ",
+                         $self->inifile);
+     }
+
+     return  $file;
+   });
 
 has 'overwrite' =>
   (is       => 'ro',
    isa      => 'Bool',
-   default  => 0,
-   required => 1);
+   required => 1,
+   default  => 0);
 
 has 'schema' =>
   (is       => 'rw',
@@ -54,21 +67,16 @@ sub BUILD {
                       $self->inifile);
   }
 
-  # Override the default data source if a database file was given in
-  # the constructor
-  if ($self->dbfile) {
-    $file = $self->dbfile;
-    $self->data_source($base . $self->dbfile);
-  }
+  $self->data_source($base . $self->dbfile);
 
-  if (-e $file) {
+  if (-e $self->dbfile) {
     if ($self->overwrite) {
-      unlink($file);
-      $self->create($file, $self->ini);
+      unlink($self->dbfile);
+      $self->create($self->dbfile, $self->ini);
     }
   }
   else {
-    $self->create($file, $self->ini);
+    $self->create($self->dbfile, $self->ini);
   }
 
   $self->username(getpwent());

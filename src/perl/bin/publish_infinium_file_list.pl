@@ -6,25 +6,17 @@ package main;
 
 use strict;
 use warnings;
-use Cwd qw(abs_path);
 use DateTime;
 use File::Basename;
-use File::Find;
 use Getopt::Long;
+use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
-use WTSI::NPG::Genotyping::Publication qw(publish_idat_files
-                                          publish_gtc_files);
-use WTSI::NPG::iRODS qw(collect_files
-                        collect_dirs
-                        modified_between);
-use WTSI::NPG::Publication qw(get_wtsi_uri
-                              get_publisher_uri
-                              get_publisher_name);
+use WTSI::NPG::Genotyping::Infinium::Publisher;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -53,19 +45,10 @@ sub run {
              'dest=s'     => \$publish_dest,
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
-             'type=s'     => \$type,
              'verbose'    => \$verbose);
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type) {
-    pod2usage(-msg => "A --type argument is required\n",
-              -exitval => 2);
-  }
-  unless ($type =~ m{^idat$}msxi or $type =~ m{^gtc$}msxi) {
-    pod2usage(-msg => "Invalid --type '$type'; expected one of [gtc, idat]\n",
               -exitval => 2);
   }
 
@@ -90,7 +73,7 @@ sub run {
     }
   }
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
@@ -99,44 +82,25 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError => 1,
-                                  mysql_enable_utf8 => 1,
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
                                   mysql_auto_reconnect => 1);
   # $ssdb->log($log);
 
-  my $uid = `whoami`;
-  chomp($uid);
-
-  my $creator_uri = get_wtsi_uri();
-  my $publisher_uri = get_publisher_uri($uid);
-  my $name = get_publisher_name($publisher_uri);
-
-  $log->info("Publishing to '$publish_dest' as ", $name);
-
   my @files = <>;
-  my %unique;
   foreach my $file (@files) {
     chomp($file);
     my ($filename, $directories, $suffix) = fileparse($file, $type);
-    if ($suffix eq $type) {
-      $unique{$file}++;
-    }
-    $log->error("Ignoring $file (not of expected type '$type')");
   }
 
-  my @unique = sort keys %unique;
+  @files = uniq(@files);
+  $log->debug("Found ", scalar @files, " unique files");
 
-  if ($type eq 'idat') {
-    publish_idat_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                       $ifdb, $ssdb, $now);
-  }
-  elsif ($type eq 'gtc') {
-    publish_gtc_files(\@unique, $creator_uri, $publish_dest, $publisher_uri,
-                      $ifdb, $ssdb, $now);
-  }
-  else {
-    $log->logcroak("Unable to publish unknown data type '$type'");
-  }
+  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+    (publication_time => $now,
+     data_files       => \@files,
+     infinium_db      => $ifdb);
+  $publisher->publish($publish_dest);
 
   return 0;
 }
@@ -145,13 +109,12 @@ __END__
 
 =head1 NAME
 
-publish_sample_data
+publish_infinium_file_list
 
 =head1 SYNOPSIS
 
 publish_infinium_file_list [--config <database .ini file>] \
-   --dest <irods collection> \
-   --type <data type>
+   --dest <irods collection> < <files>
 
 Options:
 
@@ -160,7 +123,6 @@ Options:
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
-  --type        The data type to publish. One of [idat, gtc].
   --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION

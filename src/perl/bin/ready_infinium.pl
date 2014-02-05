@@ -71,20 +71,24 @@ sub run {
     print STDERR "Updating $db using config from $config\n";
   }
 
+  my @initargs = (name => 'pipeline',
+                  inifile => $config);
+  if ($dbfile) {
+    push @initargs, (dbfile => $dbfile);
+  }
+
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile)->connect
-       (RaiseError     => 1,
-        sqlite_unicode => 1,
-        on_connect_do  => 'PRAGMA foreign_keys = ON');
+    (@initargs)->connect
+      (RaiseError     => 1,
+       sqlite_unicode => 1,
+       on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name   => 'infinium',
      inifile =>  $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
