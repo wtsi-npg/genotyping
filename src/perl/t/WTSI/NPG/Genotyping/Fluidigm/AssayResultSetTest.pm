@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 11;
+use Test::More tests => 12;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -131,6 +131,17 @@ sub snp_names : Test(1) {
 
   is_deeply(\@snp_names, \@expected_names,
             'Contains expected SNP names') or diag explain \@snp_names;
+}
+
+sub filter_on_confidence : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/1381735059/$data_file");
+  my $resultset = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
+    ($data_object);
+
+  cmp_ok(scalar @{$resultset->filter_on_confidence(100)}, '==', 23,
+         'Filter on confidence')
 }
 
 1;
