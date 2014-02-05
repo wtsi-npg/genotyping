@@ -186,7 +186,7 @@ sub _parse_snps {
 
     my $str = $csv->string;
     chomp $str;
-    $self->debug("Building a new result from '$str'");
+    $self->debug("Building a new SNP set record from '$str'");
 
     my $num_fields = scalar @$record;
     unless ($num_fields == 6) {
