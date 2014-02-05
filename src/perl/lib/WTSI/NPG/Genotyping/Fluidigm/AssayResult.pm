@@ -19,6 +19,32 @@ has 'x_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'y_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'str'            => (is => 'ro', isa => 'Str', required => 1);
 
+sub is_control {
+  my ($self) = @_;
+
+  # It is not clear how no-template controls are being
+  # represented. There seem to be several ways in play, currently:
+  #
+  # a) The snp_assayed column is empty
+  # b) The sample_name column contains the token '[ Empty ]'
+  # c) The type, auto, call and converted_call columns contain the token 'NTC'
+  #
+  # or some combination of the above.
+
+  return ($self->snp_assayed eq '' or
+          $self->sample_name eq '[ Empty ]' or
+          $self->type        eq 'NTC');
+}
+
+sub compact_call {
+  my ($self) = @_;
+
+  my $compact = $self->converted_call;
+  $compact =~ s/://;
+
+  return $compact;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
