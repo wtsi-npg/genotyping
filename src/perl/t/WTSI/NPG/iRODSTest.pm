@@ -10,7 +10,7 @@ use File::Spec;
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 115;
+use Test::More tests => 116;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -57,11 +57,13 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::iRODS');
 }
 
-sub find_zone_name : Test(2) {
+sub find_zone_name : Test(3) {
   my $irods = WTSI::NPG::iRODS->new;
 
   like($irods->find_zone_name('/Sanger1'), qr{^Sanger1});
   is($irods->find_zone_name('/no_such_zone'), 'no_such_zone');
+  ok($irods->find_zone_name('relative'),
+     'Falls back to current zone for relative paths');
 }
 
 sub working_collection : Test(4) {

@@ -148,7 +148,7 @@ sub find_zone_name {
     $abs_path = $self->working_collection;
   }
 
-  my @path = File::Spec->splitdir($abs_path);
+  my @path = grep { $_ ne '' } File::Spec->splitdir($abs_path);
   unless (@path) {
     $self->logconfess("Failed to parse iRODS zone from path '$path'");
   }
