@@ -37,7 +37,7 @@ sub make_fixture : Test(setup) {
   my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
     ($irods,"$irods_tmp_coll/$snpset_file" )->absolute;
   $snpset_obj->add_avu('fluidigm_plex', 'qc');
-  $snpset_obj->add_avu('reference_name', '1000Genomes');
+  $snpset_obj->add_avu('reference_name', 'Homo_sapiens (1000Genomes)');
 
   $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_directory);
@@ -166,3 +166,5 @@ sub publish_ambiguous_metadata : Test(1) {
   ok(!$publisher->publish($irods_tmp_coll, @addresses_to_publish),
      'Failed to publish with abmiguous SNP set metadata');
 }
+
+1;
