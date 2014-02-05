@@ -49,7 +49,7 @@ has 'reference_name' =>
    isa      => 'Str',
    required => 1,
    default  => sub {
-     return '1000Genomes'
+     return 'Homo_sapiens (1000Genomes)'
    });
 
 has 'resultset' =>
