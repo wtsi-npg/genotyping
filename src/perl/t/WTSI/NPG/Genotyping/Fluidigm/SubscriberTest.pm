@@ -8,7 +8,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 4;
+use Test::More tests => 6;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -21,7 +21,9 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
 my $data_path = './t/fluidigm_subscriber';
-my $assay_resultset_file = 'S01_1381735059.csv';
+my @assay_resultset_files = qw(S01_1381735059.csv S02_1381735059.csv);
+my @sample_identifiers = qw(ABC0123456789 XYZ0123456789);
+my $non_unique_identifier = 'ABCDEFGHI';
 my $snpset_file = 'qc.csv';
 
 my $irods_tmp_coll;
@@ -39,14 +41,17 @@ sub make_fixture : Test(setup) {
   $snpset_obj->add_avu('fluidigm_plex', 'qc');
   $snpset_obj->add_avu('reference_name', 'Homo_sapiens (1000Genomes)');
 
-  $irods->add_object("$data_path/$assay_resultset_file",
-                     "$irods_tmp_coll/$assay_resultset_file");
-  my $resultset_obj = WTSI::NPG::iRODS::DataObject->new
-    ($irods,"$irods_tmp_coll/$assay_resultset_file")->absolute;
-  $resultset_obj->add_avu('fluidigm_plex', 'qc');
-  $resultset_obj->add_avu('fluidigm_plate', '1381735059');
-  $resultset_obj->add_avu('fluidigm_well', 'S01');
-  $resultset_obj->add_avu('dcterms:identifier', 'ABC0123456789');
+  foreach my $i (0..1) {
+    my $file = $assay_resultset_files[$i];
+    $irods->add_object("$data_path/$file", "$irods_tmp_coll/$file");
+    my $resultset_obj = WTSI::NPG::iRODS::DataObject->new
+      ($irods,"$irods_tmp_coll/$file")->absolute;
+    $resultset_obj->add_avu('fluidigm_plex', 'qc');
+    $resultset_obj->add_avu('fluidigm_plate', '1381735059');
+    $resultset_obj->add_avu('fluidigm_well', 'S0' . $i);
+    $resultset_obj->add_avu('dcterms:identifier', $sample_identifiers[$i]);
+    $resultset_obj->add_avu('dcterms:identifier', $non_unique_identifier);
+  }
 }
 
 sub teardown : Test(teardown) {
@@ -68,9 +73,22 @@ sub constructor : Test(1) {
 sub get_assay_resultsets : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
   my @resultsets = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-    (irods => $irods)->get_assay_resultsets('qc', 'ABC0123456789');
+    (irods => $irods)->get_assay_resultsets('qc', $non_unique_identifier);
 
-  cmp_ok(scalar @resultsets, '==', 1, 'Assay resultsets');
+  cmp_ok(scalar @resultsets, '==', 2, 'Assay resultsets');
 }
+
+sub get_assay_resultset : Test(2) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $resultset = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+    (irods => $irods)->get_assay_resultset('qc', 'ABC0123456789');
+
+  ok($resultset, 'Assay resultsets');
+  dies_ok {
+    WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+        (irods => $irods)->get_assay_resultset('qc', $non_unique_identifier);
+  } 'Fails on matching multiple results';
+}
+
 
 1;

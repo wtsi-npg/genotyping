@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 7;
+use Test::More tests => 9;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -131,5 +131,36 @@ sub is_control : Test(4) {
       str            => '')->is_control, 'Is control 3');
 }
 
+sub is_call : Test(2) {
+  ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'No Call',
+      confidence     => 0.1,
+      call           => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is call');
+
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'No Call',
+      confidence     => 0.1,
+      call           => 'No Call',
+      converted_call => 'No Call',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is not call');
+}
 
 1;

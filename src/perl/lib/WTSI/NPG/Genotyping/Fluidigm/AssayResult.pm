@@ -19,6 +19,10 @@ has 'x_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'y_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'str'            => (is => 'ro', isa => 'Str', required => 1);
 
+our $EMPTY_NAME          = '[ Empty ]';
+our $NO_TEMPLATE_CONTROL = 'NTC';
+our $NO_CALL             = 'No Call';
+
 sub is_control {
   my ($self) = @_;
 
@@ -32,8 +36,14 @@ sub is_control {
   # or some combination of the above.
 
   return ($self->snp_assayed eq '' or
-          $self->sample_name eq '[ Empty ]' or
-          $self->type        eq 'NTC');
+          $self->sample_name eq $EMPTY_NAME or
+          $self->type        eq $NO_TEMPLATE_CONTROL);
+}
+
+sub is_call {
+  my ($self) = @_;
+
+  $self->call ne $NO_CALL;
 }
 
 sub compact_call {

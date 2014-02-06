@@ -137,7 +137,7 @@ sub publish_ambiguous_snpset : Test(1) {
   my $snpset_copy = WTSI::NPG::iRODS::DataObject->new
     ($irods,"$irods_tmp_coll/$snpset_file.2")->absolute;
   $snpset_copy->add_avu('fluidigm_plex', 'qc2');
-  $snpset_copy->add_avu('reference_name', '1000Genomes');
+  $snpset_copy->add_avu('reference_name', 'Homo_sapiens (1000Genomes)');
 
   my $publication_time = DateTime->now;
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
