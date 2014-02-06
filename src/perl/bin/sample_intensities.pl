@@ -31,14 +31,15 @@ sub run {
   my $run_name;
   my $verbose;
 
-  GetOptions('all' => \$all,
-             'config=s' => \$config,
-             'dbfile=s'=> \$dbfile,
+  GetOptions('all'             => \$all,
+             'config=s'        => \$config,
+             'dbfile=s'        => \$dbfile,
              'gender_method=s' => \$gender_method,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'output=s' => \$output,
-             'run=s' => \$run_name,
-             'verbose' => \$verbose);
+             'help'            => sub { pod2usage(-verbose => 2,
+                                                  -exitval => 0) },
+             'output=s'        => \$output,
+             'run=s'           => \$run_name,
+             'verbose'         => \$verbose);
 
   $config ||= $DEFAULT_INI;
   $gender_method ||= 'Supplied';
@@ -47,11 +48,15 @@ sub run {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
   }
 
+  my @initargs = (name => 'pipeline',
+                  inifile => $config);
+  if ($dbfile) {
+    push @initargs, (dbfile => $dbfile);
+  }
+
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile)->connect
-       (RaiseError => 1,
+    (@initargs)->connect
+       (RaiseError    => 1,
         on_connect_do => 'PRAGMA foreign_keys = ON');
 
   my $run = $pipedb->piperun->find({name => $run_name});
@@ -61,7 +66,7 @@ sub run {
   }
 
   my $where = {'piperun.name' => $run->name,
-               'method.name' => 'Autocall'};
+               'method.name'  => 'Autocall'};
   unless ($all) {
     $where->{'me.include'} = 1;
   }
@@ -73,19 +78,19 @@ sub run {
                                                order_by => 'me.id_sample'})) {
     my $gender = $pipedb->gender->find
       ({'sample.id_sample' => $sample->id_sample,
-        'method.name' => $gender_method},
-       {join => {'sample_genders' => ['method', 'sample']}},
-       {prefetch =>  {'sample_genders' => ['method', 'sample']} });
+        'method.name'      => $gender_method},
+       {join     => {'sample_genders' => ['method', 'sample']}},
+       {prefetch => {'sample_genders' => ['method', 'sample']} });
 
     my $gender_name = defined $gender ? $gender->name : undef;
     my $gender_code = defined $gender ? $gender->code : undef;
 
     push @samples, {sanger_sample_id => $sample->sanger_sample_id,
-                    uri => $sample->uri->as_string,
-                    result => $sample->gtc,
-                    gender =>  $gender_name,
-                    gender_code => $gender_code,
-                    gender_method => $gender_method};
+                    uri              => $sample->uri->as_string,
+                    result           => $sample->gtc,
+                    gender           =>  $gender_name,
+                    gender_code      => $gender_code,
+                    gender_method    => $gender_method};
   }
 
   my $fh = maybe_stdout($output);
