@@ -168,7 +168,7 @@ sub run {
      inifile => $config)->connect(RaiseError           => 1,
                                   mysql_enable_utf8    => 1,
                                   mysql_auto_reconnect => 1);
-  $ssdb->log($log);
+  # $ssdb->log($log);
 
   my @data_files = find_data_files($sample_source, $manifest);
   my $sample_publisher = WTSI::NPG::Expression::Publisher->new
