@@ -176,10 +176,10 @@ sub publish_overwrite : Test(5) {
 
   # Publish
   cmp_ok($publisher->publish($irods_tmp_coll), '==', 2,
-         'Number of files published');
+         'Number of files published 1');
   # Publishing again should be a no-op
   cmp_ok($publisher->publish($irods_tmp_coll), '==', 2,
-         'Number of files published');
+         'Number of files published 2');
 
   my $irods = WTSI::NPG::iRODS->new;
   my @idat_files = $irods->find_objects_by_meta

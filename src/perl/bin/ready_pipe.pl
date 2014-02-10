@@ -24,22 +24,26 @@ sub run {
   my $overwrite;
   my $verbose;
 
-  GetOptions('config=s' => \$config,
-             'dbfile=s'=> \$dbfile,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
+  GetOptions('config=s'  => \$config,
+             'dbfile=s'  => \$dbfile,
+             'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'overwrite' => \$overwrite,
-             'verbose' => \$verbose);
+             'verbose'   => \$verbose);
 
   $config ||= $DEFAULT_INI;
+  my @initargs = (name      => 'pipeline',
+                  inifile   => $config,
+                  overwrite => $overwrite);
+
+  if ($dbfile) {
+    push @initargs, (dbfile => $dbfile);
+  }
 
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile,
-     overwrite => $overwrite)->connect
-       (RaiseError => 1,
-        sqlite_unicode => 1,
-        on_connect_do => 'PRAGMA foreign_keys = ON')->populate->disconnect;
+    (@initargs)->connect
+      (RaiseError     => 1,
+       sqlite_unicode => 1,
+       on_connect_do  => 'PRAGMA foreign_keys = ON')->populate->disconnect;
 
   if ($verbose) {
     my $db = $dbfile;

@@ -1,11 +1,11 @@
+
 use utf8;
 
 package WTSI::NPG::Genotyping::Database::SNP;
 
-use strict;
-use warnings;
+use Moose;
 
-use base 'WTSI::NPG::Database';
+extends 'WTSI::NPG::Database';
 
 =head2 find_sequenom_plate_id
 
@@ -23,7 +23,8 @@ use base 'WTSI::NPG::Database';
 sub find_sequenom_plate_id {
   my ($self, $plate_name) = @_;
 
-  my $dbh = $self->dbh;
+  defined $plate_name or
+    $self->logconfess('The plate_name argument was undefined');
 
   my $query =
     qq(SELECT
@@ -47,8 +48,8 @@ sub find_sequenom_plate_id {
        AND dptd.description = 'mspec'
        ORDER BY dps.status_date DESC);
 
-  $self->log->trace("Executing: '$query' with args [$plate_name]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$plate_name]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($plate_name);
 
   my @plate_ids;
@@ -58,9 +59,8 @@ sub find_sequenom_plate_id {
 
   my $n = scalar @plate_ids;
   if ($n > 1) {
-    $self->log->logconfess("$n plate identifiers were returned ",
-                           "where 1 was expected: [",
-                           join(', ', @plate_ids), "]");
+    $self->logconfess("$n plate identifiers were returned ",
+                      "where 1 was expected: [", join(', ', @plate_ids), "]");
   }
 
   return shift @plate_ids;
@@ -95,8 +95,6 @@ sub find_sequenom_plate_id {
 sub insert_sequenom_calls {
   my ($self, $pipedb, $samples) = @_;
 
-  my $dbh = $self->dbh;
-
   my $query =
     qq(SELECT DISTINCT
          snp_name.snp_name,
@@ -123,18 +121,17 @@ sub insert_sequenom_calls {
          AND confidence <> 'A'
          AND individual.clonename = ?);
 
-  my $sth = $dbh->prepare($query);
+  my $sth = $self->dbh->prepare($query);
 
   my $snpset = $pipedb->snpset->find({name => 'Sequenom'});
   my $method = $pipedb->method->find({name => 'Sequenom'});
 
   my $count = 0;
   foreach my $sample (@$samples) {
-
     if ($sample->include && defined $sample->sanger_sample_id) {
       my $id = $sample->sanger_sample_id;
 
-      $self->log->trace("Executing: '$query' with args [$id]");
+      $self->trace("Executing: '$query' with args [$id]");
       $sth->execute($id);
 
       my $result = $sample->add_to_results({method => $method});
@@ -146,10 +143,10 @@ sub insert_sequenom_calls {
         my $snp = $pipedb->snp->find_or_create
           ({name => $name,
             chromosome => $chromosome,
-            position => $position,
-            snpset => $snpset});
+            position   => $position,
+            snpset     => $snpset});
 
-        $result->add_to_snp_results({snp => $snp,
+        $result->add_to_snp_results({snp   => $snp,
                                      value => $genotype});
         ++$count;
       }
@@ -174,11 +171,12 @@ sub insert_sequenom_calls {
 =cut
 
 sub find_sequenom_calls_by_sample {
-    my $self = shift;
-    my %sample_ids = %{ shift() };
-    my ($dbh, $sth, %sqnm_calls, %sqnm_snps, %missing_samples);
-    $dbh = $self->dbh;
-    $sth = $dbh->prepare(qq(
+  my $self = shift;
+
+  my %sample_ids = %{ shift() };
+  my (%sqnm_calls, %sqnm_snps, %missing_samples);
+
+  my $sth = $self->dbh->prepare(qq(
   SELECT DISTINCT
     well_assay.id_well,
     snp_name.snp_name,
@@ -201,29 +199,33 @@ sub find_sequenom_calls_by_sample {
   AND confidence <> 'A'
   AND individual.clonename = ?));
 
-    my $total_calls = 0;
-    foreach my $sample (keys(%sample_ids)) {
-      $sth->execute($sample_ids{$sample}); # query DB with sample ID
+  my $total_calls = 0;
+  foreach my $sample (keys(%sample_ids)) {
+    $sth->execute($sample_ids{$sample}); # query DB with sample ID
 
-      foreach my $row (@{$sth->fetchall_arrayref}) {
-        my ($well, $snp, $call, $conf, $disregard) = @{$row};
-        # $disregard==0 by construction of DB query
-        $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
-        next if $call =~ /[N]{2}/;              # skip 'NN' calls
+    foreach my $row (@{$sth->fetchall_arrayref}) {
+      my ($well, $snp, $call, $conf, $disregard) = @{$row};
+      # $disregard==0 by construction of DB query
+      $call .= $call if length($call) == 1;   # sqnm may have "A" ~ "AA"
+      next if $call =~ /[N]{2}/;              # skip 'NN' calls
 
-        $sqnm_calls{$sample}{$snp} = $call;
-        $sqnm_snps{$snp} = 1;
-        $total_calls += 1;
-      }
-
-      if (!$sqnm_calls{$sample}) {
-        $missing_samples{$sample} = 1;
-      }
+      $sqnm_calls{$sample}{$snp} = $call;
+      $sqnm_snps{$snp} = 1;
+      $total_calls += 1;
     }
-    $sth->finish;
-    $dbh->disconnect;
-    return (\%sqnm_calls, \%sqnm_snps, \%missing_samples, $total_calls);
+
+    if (!$sqnm_calls{$sample}) {
+      $missing_samples{$sample} = 1;
+    }
+  }
+  $sth->finish;
+
+  return (\%sqnm_calls, \%sqnm_snps, \%missing_samples, $total_calls);
 }
+
+__PACKAGE__->meta->make_immutable;
+
+no Moose;
 
 1;
 

@@ -100,16 +100,20 @@ sub publish {
   }
 
   $self->debug("Finding the project titles in the analysis database");
+  my $run = $pipedb->piperun->find({name => $self->run_name});
+  unless ($run) {
+    $self->logcroak("The analysis database does not contain a run called '",
+                    $self->run_name, "'");
+  }
 
   my @project_titles;
-  foreach my $dataset ($pipedb->piperun->find
-                       ({name => $self->run_name})->datasets) {
+  foreach my $dataset ($run->datasets) {
     push(@project_titles, $dataset->if_project);
   }
 
   unless (@project_titles) {
-    $self->logcroak("The analysis database contained no data for ",
-                    "run '", $self->run_name, "'")
+    $self->logcroak("The analysis database contained no data for run '",
+                    $self->run_name, "'")
   }
 
   my $analysis_coll;
