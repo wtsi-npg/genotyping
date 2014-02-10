@@ -30,15 +30,15 @@ sub run {
   my $output;
   my $verbose;
 
-  GetOptions('add=s' => \$add,
+  GetOptions('add=s'    => \$add,
              'config=s' => \$config,
-             'dbfile=s'=> \$dbfile,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'input=s' => \$input,
+             'dbfile=s' => \$dbfile,
+             'help'     => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'input=s'  => \$input,
              'select=s' => \$select,
              'remove=s' => \$remove,
              'output=s' => \$output,
-             'verbose' => \$verbose);
+             'verbose'  => \$verbose);
 
   $config ||= $DEFAULT_INI;
 
@@ -55,13 +55,17 @@ sub run {
               -exitval => 2);
   }
 
+  my @initargs = (name    => 'pipeline',
+                  inifile => $config);
+  if ($dbfile) {
+    push @initargs, (dbfile => $dbfile);
+  }
+
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile)->connect
-       (RaiseError => 1,
-        sqlite_unicode => 1,
-        on_connect_do => 'PRAGMA foreign_keys = ON');
+    (@initargs)->connect
+      (RaiseError     => 1,
+       sqlite_unicode => 1,
+       on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my $in = maybe_stdin($input);
   my $out = maybe_stdout($output);

@@ -2,11 +2,10 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Database::Infinium;
 
-use strict;
-use warnings;
 use Carp;
+use Moose;
 
-use base 'WTSI::NPG::Database';
+extends 'WTSI::NPG::Database';
 
 =head2 find_project_chip_design
 
@@ -21,7 +20,8 @@ use base 'WTSI::NPG::Database';
 sub find_project_chip_design {
   my ($self, $project_title) = @_;
 
-  my $dbh = $self->dbh;
+  defined $project_title or
+    $self->logconfess('The project_title argument was undefined');
 
   my $query =
     qq(SELECT DISTINCT
@@ -40,8 +40,8 @@ sub find_project_chip_design {
          AND project.project_id = pp.project_id
          AND pp.product_definition_id = pd.product_definition_id);
 
-  $self->log->trace("Executing: '$query' with args [$project_title]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$project_title]");
+  my $sth = $self->dbh->prepare($query);
   my $rc = $sth->execute($project_title);
 
   my @chip_designs;
@@ -50,7 +50,7 @@ sub find_project_chip_design {
   }
 
   unless (@chip_designs) {
-    $self->log->logconfess("No chip design was found for project '$project_title'");
+    $self->logconfess("No chip design was found for project '$project_title'");
   }
 
   return @chip_designs;
@@ -80,7 +80,8 @@ sub find_project_chip_design {
 sub find_project_samples {
   my ($self, $project_title) = @_;
 
-  my $dbh = $self->dbh;
+  defined $project_title or
+    $self->logconfess('The project_title argument was undefined');
 
   my $query =
     qq(SELECT
@@ -194,8 +195,8 @@ sub find_project_samples {
           right(well.alpha_coordinate,2),
           well.alpha_coordinate);
 
-  $self->log->trace("Executing: '$query' with args [$project_title]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$project_title]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($project_title);
 
   my @samples;
@@ -204,7 +205,7 @@ sub find_project_samples {
   }
 
   unless (@samples) {
-    $self->log->logconfess("No samples were found for project '$project_title'");
+    $self->logconfess("No samples were found for project '$project_title'");
   }
 
   return \@samples;
@@ -236,7 +237,8 @@ sub find_project_samples {
 sub find_scanned_sample {
   my ($self, $filename) = @_;
 
-  my $dbh = $self->dbh;
+   defined $filename or
+     $self->logconfess('The filename argument was undefined');
 
   my $query =
     qq(SELECT
@@ -345,8 +347,8 @@ sub find_scanned_sample {
           right(well.alpha_coordinate,2),
           well.alpha_coordinate);
 
-  $self->log->trace("Executing: '$query' with args [$filename]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$filename]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($filename);
 
   my @samples;
@@ -356,7 +358,7 @@ sub find_scanned_sample {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n samples were returned where 1 sample was expected.");
+    $self->logconfess("$n samples were returned where 1 sample was expected.");
   }
 
   return shift @samples;
@@ -387,7 +389,8 @@ sub find_scanned_sample {
 sub find_called_sample {
   my ($self, $filename) = @_;
 
-  my $dbh = $self->dbh;
+  defined $filename or
+    $self->logconfess('The filename argument was undefined');
 
   my $query =
     qq(SELECT
@@ -497,8 +500,8 @@ sub find_called_sample {
           right(well.alpha_coordinate,2),
           well.alpha_coordinate);
 
-  $self->log->trace("Executing: '$query' with args [$filename]");
-  my $sth = $dbh->prepare($query);
+  $self->trace("Executing: '$query' with args [$filename]");
+  my $sth = $self->dbh->prepare($query);
   $sth->execute($filename);
 
   my @samples;
@@ -508,11 +511,15 @@ sub find_called_sample {
 
   my $n = scalar @samples;
   if ($n > 1) {
-    $self->log->logconfess("$n samples were returned where 1 sample was expected.");
+    $self->logconfess("$n samples were returned where 1 sample was expected.");
   }
 
   return shift @samples;
 }
+
+__PACKAGE__->meta->make_immutable;
+
+no Moose;
 
 1;
 

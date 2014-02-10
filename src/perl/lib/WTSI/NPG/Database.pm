@@ -1,93 +1,72 @@
+
 use utf8;
 
 package WTSI::NPG::Database;
 
-use strict;
-use warnings;
 use Carp;
 use Config::IniFiles;
 use DBI;
-use Log::Log4perl;
+use Moose;
 
-=head2 new
+has 'name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
 
-  Arg [1]    : name => string
-  Arg [2]    : inifile => string
+has 'inifile' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
 
-  Example    : WTSI::NPG::Database::<some class>->new
-                 (name => 'my_database', inifile => 'my_database.ini')
-  Description: Return a new database handle configured from an
-               .ini-style file.
-  Returntype : WTSI::NPG::Database
+has 'ini' =>
+  (is       => 'rw',
+   isa      => 'Config::IniFiles',
+   required => 0);
 
-=cut
+has 'data_source' =>
+  (is       => 'rw',
+   isa      => 'Str',
+   default  =>  sub {
+     my ($self) = @_;
+     return $self->ini->val($self->name, 'data_source');
+   },
+   required => 1,
+   lazy     => 1);
 
-sub new {
-   my ($class, @args) = @_;
+has 'username' =>
+  (is       => 'rw',
+   isa      => 'Str',
+   default  => sub {
+     my ($self) = @_;
+     return $self->ini->val($self->name, 'username');
+   },
+   required => 1,
+   lazy     => 1);
 
-   my $self = {};
-   bless($self, $class);
-   $self->configure(@args);
-   return $self;
-}
+has 'password' =>
+  (is       => 'rw',
+   isa      => 'Str',
+   default  => sub {
+     my ($self) = @_;
+     return $self->ini->val($self->name, 'password');
+   },
+   required => 1,
+   lazy     => 1);
 
-=head2 configure
+has 'dbh' =>
+  (is       => 'rw',
+   isa      => 'Any',
+   required => 0);
 
-  Arg [1]    : name => string
-  Arg [2]    : inifile => string
+with 'WTSI::NPG::Loggable';
 
-  Example    : $db->configure(name => 'my_database',
-                              inifile => 'my_database.ini')
-  Description: Configure an exisiting database handle from an
-               .ini-style file.
-  Returntype : WTSI::NPG::Database
 
-=cut
-
-sub configure {
-  my ($self, %args) = @_;
-
-  $self->name($args{name});
-  $self->inifile($args{inifile});
-
-  unless ($self->name) {
-    $self->log->logconfess('The data source name was not defined.')
-  }
-  unless ($self->inifile) {
-    $self->log->logconfess('The ini file was not defined.')
-  }
+sub BUILD {
+  my ($self) = @_;
 
   my $ini = Config::IniFiles->new(-file => $self->inifile);
-  $self->data_source($ini->val($self->name, 'data_source'));
-  $self->username($ini->val($self->name, 'username'));
-  $self->password($ini->val($self->name, 'password'));
-
-  my $log = $ini->val($self->name, 'log') || 'npg';
-  $self->log(Log::Log4perl->get_logger($log));
-
-  return $self;
+  $self->ini($ini);
 }
-
-
-=head2 inifile
-
-  Arg [1]    : None
-
-  Example    : $db->inifile
-  Description: Return the current .ini-style file.
-  Returntype : string
-
-=cut
-
-sub inifile {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_inifile} = $args[0];
-  }
-
-  return $self->{_inifile};
-}
-
 
 =head2 connect
 
@@ -101,23 +80,19 @@ sub inifile {
 
 =cut
 
-## no critic
-
 sub connect {
   my ($self, %args) = @_;
 
-  unless ($self->{_dbh}) {
-    $self->log->info('Connecting to ', $self->data_source);
-    $self->{_dbh} = DBI->connect($self->data_source,
-                                 $self->username,
-                                 $self->password,
-                                 \%args);
+  unless ($self->dbh) {
+    $self->info('Connecting to ', $self->data_source);
+    $self->dbh(DBI->connect($self->data_source,
+                            $self->username,
+                            $self->password,
+                            \%args));
   }
 
   return $self;
 }
-
-## use critic
 
 =head2 disconnect
 
@@ -131,12 +106,16 @@ sub connect {
 
 sub disconnect {
   my ($self) = @_;
-  $self->log->info('Disconnecting from ', $self->data_source);
-  $self->dbh->disconnect;
+  if ($self->is_connected) {
+    $self->info('Disconnecting from ', $self->data_source);
+    $self->dbh->disconnect;
+  }
+  else {
+    $self->warn("Attempted to disconnect when not connected");
+  }
 
   return $self;
 }
-
 
 =head2 is_connected
 
@@ -153,129 +132,9 @@ sub is_connected {
   return defined $self->dbh && $self->dbh->ping;
 }
 
+__PACKAGE__->meta->make_immutable;
 
-=head2 dbh
-
-  Arg [1]    : None
-
-  Example    : $db->dbh
-  Description: Return the current database handle.
-  Returntype : DBI handle
-
-=cut
-
-sub dbh {
-  my ($self) = @_;
-  return $self->{_dbh};
-}
-
-
-=head2 name
-
-  Arg [1]    : None
-
-  Example    : $db->name
-  Description: Return the current database name.
-  Returntype : string
-
-=cut
-
-sub name {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_name} = $args[0];
-  }
-
-  return $self->{_name};
-}
-
-
-=head2 data_source
-
-  Arg [1]    : None
-
-  Example    : $db->data_source
-  Description: Return the current database data source.
-  Returntype : string
-
-=cut
-
-sub data_source {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_data_source} = $args[0];
-  }
-
-  return $self->{_data_source};
-}
-
-
-=head2 username
-
-  Arg [1]    : None
-
-  Example    : $db->username
-  Description: Return the current database user name.
-  Returntype : string
-
-=cut
-
-sub username {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_username} = $args[0];
-  }
-
-  return $self->{_username};
-}
-
-=head2 password
-
-  Arg [1]    : None
-
-  Example    : $db->password
-  Description: Return the current database password.
-  Returntype : string or undef
-
-=cut
-
-sub password {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_password} = $args[0];
-  }
-
-  return $self->{_password};
-}
-
-=head2 log
-
-  Arg [1]    : None
-
-  Example    : $db->log
-  Description: Return the current logger.
-  Returntype : Logger object
-
-=cut
-
-sub log {
-  my ($self, @args) = @_;
-  if (@args) {
-    $self->{_log} = $args[0];
-  }
-
-  my $log;
-  if ($self->{_log}) {
-    $log = $self->{_log};
-  }
-  else {
-    $log = Log::Log4perl->get_logger('npg');
-    $log->logcluck("Attempted to use a null Log4perl logger");
-  }
-
-  return $log;
-}
-
+no Moose;
 
 1;
 
