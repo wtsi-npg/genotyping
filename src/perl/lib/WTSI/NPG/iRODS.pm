@@ -3,6 +3,7 @@ use utf8;
 
 package WTSI::NPG::iRODS;
 
+use Encode qw(decode);
 use English;
 use File::Basename qw(basename);
 use File::Spec;
@@ -37,7 +38,8 @@ has 'lister' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::Lister->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        max_size    => 1024 * 1204)->start;
    });
 
 has 'meta_lister' =>
@@ -79,16 +81,17 @@ has 'meta_remover' =>
    });
 
 our $IGROUPADMIN = 'igroupadmin';
-our $ICD = 'icd';
+our $ICD     = 'icd';
 our $ICHKSUM = 'ichksum';
-our $IMETA = 'imeta';
-our $IMKDIR = 'imkdir';
-our $IMV = 'imv';
-our $IPUT = 'iput';
-our $IRM = 'irm';
-our $IPWD = 'ipwd';
-our $ICHMOD = 'ichmod';
-our $MD5SUM = 'md5sum';
+our $IGET    = 'iget';
+our $IMETA   = 'imeta';
+our $IMKDIR  = 'imkdir';
+our $IMV     = 'imv';
+our $IPUT    = 'iput';
+our $IRM     = 'irm';
+our $IPWD    = 'ipwd';
+our $ICHMOD  = 'ichmod';
+our $MD5SUM  = 'md5sum';
 
 around 'working_collection' => sub {
   my ($orig, $self, @args) = @_;
@@ -108,8 +111,10 @@ around 'working_collection' => sub {
     $self->$orig($collection);
   }
   elsif (!$self->has_working_collection) {
-    my ($wc) = WTSI::NPG::Runnable->new(executable  => $IPWD,
-                                        environment => $self->environment)->run;
+    my ($wc) = WTSI::NPG::Runnable->new
+      (executable  => $IPWD,
+       environment => $self->environment)->run->split_stdout;
+
     $self->$orig($wc);
   }
 
@@ -135,7 +140,15 @@ sub find_zone_name {
   my $abs_path = $self->_ensure_absolute_path($path);
   $abs_path =~ s/^\///;
 
-  my @path = File::Spec->splitdir($abs_path);
+  $self->debug("Determining zone from path '", $abs_path, "'");
+
+  # If no zone if given, assume the current zone
+  unless ($abs_path) {
+    $self->debug("Using '", $self->working_collection, "' to determine zone");
+    $abs_path = $self->working_collection;
+  }
+
+  my @path = grep { $_ ne '' } File::Spec->splitdir($abs_path);
   unless (@path) {
     $self->logconfess("Failed to parse iRODS zone from path '$path'");
   }
@@ -173,9 +186,10 @@ sub make_group_name {
 sub list_groups {
   my ($self, @args) = @_;
 
-  my @groups = WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
-                                        arguments   => ['lg'],
-                                        environment => $self->environment)->run;
+  my @groups = WTSI::NPG::Runnable->new
+    (executable  => $IGROUPADMIN,
+     arguments   => ['lg'],
+     environment => $self->environment)->run->split_stdout;
   return @groups;
 }
 
@@ -475,8 +489,6 @@ sub get_collection_meta {
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
 
-  # $self->list_collection($collection);
-
   return $self->meta_lister->list_collection_meta($collection);
 }
 
@@ -605,10 +617,10 @@ sub find_collections_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-C', @query);
-  my @raw_results =
-    WTSI::NPG::Runnable->new(executable  => $IMETA,
-                             arguments   => \@args,
-                             environment => $self->environment)->run;
+  my @raw_results = WTSI::NPG::Runnable->new
+    (executable  => $IMETA,
+     arguments   => \@args,
+     environment => $self->environment)->run->split_stdout;
 
   my @results;
   foreach my $row (@raw_results) {
@@ -777,6 +789,29 @@ sub remove_object {
   return $target;
 }
 
+sub slurp_object {
+  my ($self, $target) = @_;
+
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $self->debug("Slurping object '$target'");
+
+  my $iget = WTSI::NPG::Runnable->new(executable  => $IGET,
+                                      arguments   => [$target, '-']);
+
+  my $runnable = WTSI::NPG::Runnable->new
+    (executable  => $IGET,
+     arguments   => [$target, '-'])->run;
+
+  my $copy = decode('UTF-8', ${$runnable->stdout}, Encode::FB_CROAK);
+
+  return $copy;
+}
+
 =head2 get_object_meta
 
   Arg [1]    : iRODS data object name
@@ -794,8 +829,6 @@ sub get_object_meta {
     $self->logconfess('A defined object argument is required');
   $object eq '' and
     $self->logconfess('A non-empty object argument is required');
-
-  # $self->list_object($object);
 
   return $self->meta_lister->list_object_meta($object);
 }
@@ -919,10 +952,10 @@ sub find_objects_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-d', @query);
-  my @raw_results =
-    WTSI::NPG::Runnable->new(executable  => $IMETA,
-                             arguments   => \@args,
-                             environment => $self->environment)->run;
+  my @raw_results = WTSI::NPG::Runnable->new
+    (executable  => $IMETA,
+     arguments   => \@args,
+     environment => $self->environment)->run->split_stdout;
 
   my @results;
   my $coll;
@@ -973,10 +1006,10 @@ sub calculate_checksum {
 
   $object = $self->_ensure_absolute_path($object);
 
-  my @raw_checksum =
-    WTSI::NPG::Runnable->new(executable  => $ICHKSUM,
-                             arguments   => [$object],
-                             environment => $self->environment)->run;
+  my @raw_checksum = WTSI::NPG::Runnable->new
+    (executable  => $ICHKSUM,
+     arguments   => [$object],
+     environment => $self->environment)->run->split_stdout;
   unless (@raw_checksum) {
     $self->logconfess("Failed to get iRODS checksum for '$object'");
   }
@@ -1045,9 +1078,10 @@ sub md5sum {
   defined $file or $self->logconfess('A defined file argument is required');
   $file eq '' and $self->logconfess('A non-empty file argument is required');
 
-  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
-                                        arguments   => [$file],
-                                        environment => $self->environment)->run;
+  my @result = WTSI::NPG::Runnable->new
+    (executable  => $MD5SUM,
+     arguments   => [$file],
+     environment => $self->environment)->run->split_stdout;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;

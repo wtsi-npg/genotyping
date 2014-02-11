@@ -278,8 +278,9 @@ sub md5sum {
   defined $file or croak 'A defined file argument is required';
   $file eq '' and croak 'A non-empty file argument is required';
 
-  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
-                                        arguments   => [$file])->run;
+  my @result = WTSI::NPG::Runnable->new
+    (executable  => $MD5SUM,
+     arguments   => [$file])->run->split_stdout;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;

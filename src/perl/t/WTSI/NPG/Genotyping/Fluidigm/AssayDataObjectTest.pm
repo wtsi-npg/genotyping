@@ -36,7 +36,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 7;
+use Test::More tests => 9;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -118,4 +118,17 @@ sub update_secondary_metadata : Test(2) {
   my $meta = $data_object->metadata;
   is_deeply($meta, $expected_meta, 'Secondary metadata added')
     or diag explain $meta;
+}
+
+sub assay_resultset : Test(2) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/1381735059/$data_file");
+
+  my $resultset = $data_object->assay_resultset;
+
+  ok($resultset, 'Assay resultset');
+  cmp_ok(scalar @{$resultset->assay_results}, '==', 96,
+         'Contains expected number of assay results');
 }
