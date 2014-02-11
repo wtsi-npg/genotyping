@@ -116,6 +116,8 @@ def zcall_evaluate_available?()
 
     def write_sample_subsets(sample_ranges, sample_json, out_dir)
       # write sample .json files with subsets of main file
+      # zero-based, closed indices are used to denote subsets
+      # (same convention as simtools)
       samples = JSON.load(File.read(sample_json))
       out_paths = Array.new
       sample_ranges.each_with_index.collect do |range, i|
@@ -180,7 +182,7 @@ def zcall_evaluate_available?()
     # - threshold_json (String): Path to .json file containing a hash whose
     # keys are thresholds, values are threshold.txt paths
     # - sample_json (String): Path to .json file with sample data, eg.
-    # constructed by f
+    # constructed by sample_intensities.pl
     def evaluate_thresholds(threshold_json, sample_json, manifest, egt_file,
                             args = {}, async ={})
       args, work_dir, log_dir = process_task_args(args)
@@ -192,9 +194,10 @@ def zcall_evaluate_available?()
         # construct arguments for job array
         temp_dir = File.join(work_dir, 'evaluation_temp')
         Dir.mkdir(temp_dir) unless File.exist?(temp_dir)
+        # get_sample_ranges returns zero-based, closed indices (simtools convention). Add 1 to end index, to get zero-based, half-open indices (zcall convention).
         evaluation_args = sample_ranges.each_with_index.collect do |range, i|
           {:thresholds => threshold_json, :bpm => manifest, :egt => egt_file,
-            :gtc => sample_json, :start => range.begin, :end => range.end,
+            :gtc => sample_json, :start => range.begin, :end => range.end+1,
             :out => get_sample_subset_path(temp_dir, i)  
           }
         end
@@ -296,6 +299,7 @@ def zcall_evaluate_available?()
         end_sample = args[:end]
         chunk_size, sample_ranges = 
           get_sample_ranges(start_sample, end_sample, args)
+        # write_sample_subsets uses zero-based, closed indices (same convention as simtools)
         subset_paths = write_sample_subsets(sample_ranges, sample_json, 
                                             temp_dir)
         call_args = Array.new
