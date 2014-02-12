@@ -6,7 +6,7 @@ package WTSI::NPG::Database::Warehouse;
 use Carp;
 use Moose;
 
-use WTSI::NPG::Utilities qw(depad_map);
+use WTSI::NPG::Utilities qw(depad_well);
 
 extends 'WTSI::NPG::Database';
 
