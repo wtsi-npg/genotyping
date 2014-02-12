@@ -6,11 +6,14 @@ package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use File::Basename qw(basename);
 use File::Spec;
 use File::Temp qw(tempdir);
+use Set::Scalar;
 use Moose;
 use URI;
 
+use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
+use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
@@ -41,10 +44,25 @@ has 'publication_time' =>
    isa      => 'DateTime',
    required => 1);
 
+has 'reference_name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => sub {
+     return 'Homo_sapiens (1000Genomes)'
+   });
+
 has 'resultset' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
    required => 1);
+
+has 'snpsets' =>
+  (is       => 'ro',
+   isa      => 'ArrayRef[WTSI::NPG::Genotyping::SNPSet]',
+   required => 1,
+   lazy     => 1,
+   builder  => '_build_snpsets');
 
 sub BUILD {
   my ($self) = @_;
@@ -127,19 +145,31 @@ sub publish_samples {
   $self->debug("Publishing $total Fluidigm CSV data files ",
                "from a possible $possible");
 
+  my @snpsets = $self->snpsets;
+
   foreach my $address (@addresses) {
     eval {
       my $file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
                          $export_file->fluidigm_barcode);
       $current_file = $file;
 
-      my $record_count = $export_file->write_sample_assays($address, $file);
+      my $record_count = $export_file->write_assay_result_data($address, $file);
       $self->debug("Wrote $record_count records into '$file'");
 
       my @fingerprint = $export_file->fluidigm_fingerprint($address);
-      my $data_object = $publisher->publish_file($file, \@fingerprint,
-                                                 $publish_dest,
-                                                 $self->publication_time);
+      my $rods_path = $publisher->publish_file($file, \@fingerprint,
+                                               $publish_dest,
+                                               $self->publication_time);
+
+      # Build from local file to avoid and iRODS round trip with iget
+      my $resultset = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
+        ($file);
+      my $snpset = $self->_find_resultset_snpset($resultset);
+      my $snpset_name = $self->_find_snpset_name($snpset);
+
+      WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+          ($self->irods, $rods_path)->add_avu('fluidigm_plex', $snpset_name);
+
       ++$num_published;
     };
 
@@ -168,19 +198,19 @@ sub publish_samples {
 =cut
 
 sub publish_directory {
+
   my ($self, $publish_dest) = @_;
 
-  my $irods = $self->irods;
   my $export_file = $self->resultset->export_file;
-  my $md5 = $irods->md5sum($export_file);
-  my $hash_path = $irods->hash_path($export_file, $md5);
+  my $md5         = $self->irods->md5sum($export_file);
+  my $hash_path   = $self->irods->hash_path($export_file, $md5);
   $self->debug("Checksum of file '$export_file' is '$md5'");
 
   my $dest_collection = $publish_dest;
   $dest_collection = File::Spec->catdir($publish_dest, $hash_path);
 
   my $fluidigm_collection;
-  if ($irods->list_collection($dest_collection)) {
+  if ($self->irods->list_collection($dest_collection)) {
     $self->info("Skipping publication of Fluidigm data collection ",
                 "'$dest_collection': already exists");
 
@@ -189,13 +219,106 @@ sub publish_directory {
   }
   else {
     $self->info("Publishing new Fluidigm data collection '$dest_collection'");
-    $irods->add_collection($dest_collection);
-    $fluidigm_collection = $irods->put_collection($self->resultset->directory,
-                                                  $dest_collection);
+    $self->irods->add_collection($dest_collection);
+    $fluidigm_collection = $self->irods->put_collection
+      ($self->resultset->directory, $dest_collection);
   }
 
   return $fluidigm_collection;
 }
+
+sub _build_snpsets {
+  my ($self) = @_;
+
+  my @snpset_paths = $self->irods->find_objects_by_meta
+    ('/',
+     ['fluidigm_plex'  => '%', 'like'],
+     ['reference_name' => $self->reference_name]);
+
+  my @snpsets;
+  foreach my $rods_path (@snpset_paths) {
+    my $data_object = WTSI::NPG::iRODS::DataObject->new
+      ($self->irods, $rods_path);
+    push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($data_object);
+  }
+
+  unless (@snpsets) {
+    $self->logconfess("Failed to find any Fluidigm SNP sets for reference '",
+                      $self->reference_name, "' in iRODS");
+  }
+
+  return \@snpsets;
+}
+
+sub _find_resultset_snpset {
+  my ($self, $resultset) = @_;
+
+  my @result_snp_names = $resultset->snp_names;
+  my $expected_num_snps = scalar @result_snp_names;
+
+  $self->debug("Finding set of $expected_num_snps SNPs ",
+               "used by assay results in '",
+               $resultset->str, "'");
+
+  my @matched;
+  foreach my $snpset (@{$self->snpsets}) {
+    my @names = $snpset->data_object->find_in_metadata('fluidigm_plex');
+
+    my @snp_names = $snpset->snp_names;
+    my $num_snps = scalar @snp_names;
+
+    $self->debug("Trying SNP set '", $snpset->str, "' of $num_snps SNPs");
+
+    my $expected_names = Set::Scalar->new(@snp_names);
+    my $result_names = Set::Scalar->new(@result_snp_names);
+
+    if ($result_names == $expected_names) {
+      push @matched, $snpset;
+    }
+    else {
+      $self->debug("Ignoring SNP set '", $snpset->str, "' because of SNP ",
+                   "differences. SNPS expected: ", $expected_names-> size,
+                   ", SNPS in result: ", $result_names->size,
+                   ". SNP set minus result set: ",
+                   $expected_names->difference($result_names),
+                   ", result set minus SNP set: ",
+                   $result_names->difference($expected_names));
+    }
+  }
+
+  my $num_matched = scalar @matched;
+
+  unless ($num_matched > 0) {
+    $self->logconfess("Failed to find the set of $expected_num_snps SNPs ",
+                      "used by assay results in '", $resultset->str, "'");
+  }
+
+  if ($num_matched > 1) {
+    $self->logconfess("Found $num_matched sets of $expected_num_snps SNPs ",
+                      "for assay results in '", $resultset->str, "'. ",
+                      "Unable to determine which is correct.");
+  }
+
+  return shift @matched;
+}
+
+sub _find_snpset_name {
+  my ($self, $snpset) = @_;
+
+  my @snpset_names = map { $_->{value} }
+    $snpset->data_object->find_in_metadata('fluidigm_plex');
+  my $num_names = scalar @snpset_names;
+
+  $num_names > 0 or
+    $self->logconfess("No SNP set names defined in the metadata of '",
+                      $snpset->str, "'");
+  $num_names == 1 or
+    $self->logconfess("$num_names SNP set names defined in the metadata of '",
+                      $snpset->str, "': [", join(', ', @snpset_names), "]");
+
+  return shift @snpset_names;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

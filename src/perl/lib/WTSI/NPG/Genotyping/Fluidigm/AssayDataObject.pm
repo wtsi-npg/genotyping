@@ -5,11 +5,30 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
                                        $FLUIDIGM_PLATE_WELL_META_KEY);
 use WTSI::NPG::Metadata qw(make_sample_metadata);
 
 extends 'WTSI::NPG::iRODS::DataObject';
+
+
+=head2 assay_resultset
+
+  Arg [1]    : None
+
+  Example    : $resultset = $data_object->assay_resultset;
+  Description: Return a parsed ResultSet from the content of this iRODS
+               data object.
+  Returntype : WTSI::NPG::Genotyping::Fluidigm::AssayResultSet
+
+=cut
+
+sub assay_resultset {
+  my ($self) = @_;
+
+  return WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new($self);
+}
 
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
@@ -67,8 +86,9 @@ WTSI::NPG::Genotyping::Fluidigm::AssayDataObject
 
 =head1 DESCRIPTION
 
-A class which represents to result of a Fluidigm assay of one sample
-as an iRODS data object.
+A class which represents the result of a Fluidigm assay of one sample
+as an iRODS data object. This contains the raw data results for a
+number of SNPs.
 
 =head1 AUTHOR
 

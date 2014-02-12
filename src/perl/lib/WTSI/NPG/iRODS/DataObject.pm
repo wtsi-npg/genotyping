@@ -196,6 +196,17 @@ sub json {
   return JSON->new->utf8->encode($spec);
 }
 
+sub slurp {
+  my ($self) = @_;
+
+  my $content = $self->irods->slurp_object($self->str);
+
+  defined $content or
+    $self->logconfess("Slurped content of '", $self->str, "' was undefined");
+
+  return $content;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;

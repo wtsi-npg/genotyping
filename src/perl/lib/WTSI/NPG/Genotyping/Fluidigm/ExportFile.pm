@@ -10,7 +10,6 @@ use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
                                        $FLUIDIGM_PLATE_WELL_META_KEY);
 use WTSI::NPG::Utilities qw(trim);
 
-
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
 
@@ -84,23 +83,24 @@ sub _build_confidence_threshold {
   return $fields[$HEADER_CONF_THRESHOLD_COL];
 }
 
-=head2 sample_assays
+=head2 assay_result_data
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
-  Example    : my $assays = $export->sample_assays('S01')
-  Description: Return a copy of the assay results for this sample
+  Example    : my $assays = $export->assay_result_data('S01')
+  Description: Return a copy of the assay result data for this sample.
+               These are the raw output strings from the instrument.
   Returntype : ArrayRef
   Caller     : general
 
 =cut
 
-sub sample_assays {
+sub assay_result_data {
   my ($self, $address) = @_;
 
   return [@{$self->lookup($address)}];
 }
 
-=head2 write_sample_assays
+=head2 write_assay_result_data
 
   Arg [1]    : Sample address i.e. S01, S02 etc.
   Arg [2]    : File name
@@ -112,7 +112,7 @@ sub sample_assays {
 
 =cut
 
-sub write_sample_assays {
+sub write_assay_result_data {
   my ($self, $address, $file_name) = @_;
 
   defined $address or
@@ -132,10 +132,10 @@ sub write_sample_assays {
     or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
                        "for writing: $!");
 
-  my @assays = @{$self->sample_assays($address)};
-  foreach my $assay (@assays) {
-    $csv->print($out, $assay)
-      or $self->logcroak("Failed to write record [", join(", ", @$assay),
+  my @result_data = @{$self->assay_result_data($address)};
+  foreach my $record (@result_data) {
+    $csv->print($out, $record)
+      or $self->logcroak("Failed to write record [", join(", ", @$record),
                          "] to '$file_name': ", $csv->error_diag);
     ++$records_written;
   }

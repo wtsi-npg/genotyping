@@ -34,7 +34,7 @@ our @EXPORT_OK = qw(
 );
 
 our @DEFAULT_FILE_SUFFIXES = qw(
- .idat .gtc .xml .txt .csv .tif
+  .csv .gtc .idat .tif .tsv .txt .xml
 );
 
 our $SAMPLE_NAME_META_KEY             = 'sample';
@@ -202,7 +202,12 @@ sub make_type_metadata {
 sub make_md5_metadata {
   my ($file) = @_;
 
-  return ([md5 => md5sum($file)]);
+  my $md5 = md5sum($file);
+  unless ($md5) {
+    $log->logconfess("Failed to make MD5 for '$file'");
+  }
+
+  return ([md5 => $md5]);
 }
 
 =head2 make_ticket_metadata
