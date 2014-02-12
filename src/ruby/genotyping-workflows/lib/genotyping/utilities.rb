@@ -112,6 +112,11 @@ module Genotyping
   # Returns an Array of Ranges which are indices for chunked
   # data processing. Given a start index, end index and a chunk size,
   # returns the relevant indices.
+  # 
+  # Output ranges are zero-based, closed indices. 
+  # For example, with arguments (0,6,3), outputs are [(0,3), (4,6)].
+  # This is consistent with the indexing convention used by simtools.
+  # IMPORTANT: The evaluate_samples method in zcall.rb uses an alternative convention of zero-based, left-closed, right-open indices. So with arguments (0,6,3), the correct ranges for evaluate_samples are [(0,4), (4,7)]. Therefore, the evaluate_samples method adds 1 to the endpoint of each range.
   def make_ranges(from, to, chunk_size)
     unless to >= from
       raise ArgumentError, "'to' (#{to}) was not > 'from' (#{from})"

@@ -44,8 +44,8 @@ module Genotyping::Tasks
     #   :chromosome (String): The chromosome being worked on. Optional,
     #   used to indicate X, Y or mitochondrial chromosomes.
     #   :wga (boolean): Assume that the sample is whole-genome amplified.
-    #   :start (Fixnum): The 0-based, half-open SNP index at which to start.
-    #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
+    #   :start (Fixnum): The 0-based, closed SNP index at which to start.
+    #   :end (Fixnum): The 0-based, closed SNP index at which to finish.
     #   :size (Fixnum): The number of SNPs in the range to process in on job.
     #   :plink (Boolean): Enable Plink BED format output.
     #   :debug (Boolean): tee the Illuminus text input to a file while running.
