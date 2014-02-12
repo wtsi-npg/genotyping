@@ -6,6 +6,8 @@ package WTSI::NPG::Database::Warehouse;
 use Carp;
 use Moose;
 
+use WTSI::NPG::Utilities qw(depad_well);
+
 extends 'WTSI::NPG::Database';
 
 =head2 find_plate
@@ -90,8 +92,7 @@ sub find_sample_by_plate {
   defined $plate_id or $self->logconfess('The plate_id argument was undefined');
   defined $map or $self->logconfess('The map argument was undefined');
 
-  my $unpadded_map = $map;
-  $unpadded_map =~ s/0//;
+  my $unpadded_map = depad_well($map);
 
   my $query =
     qq(SELECT
@@ -227,8 +228,7 @@ sub find_infinium_sample_by_plate {
     $self->logconfess('The infinium_barcode argument was undefined');
   defined $map or $self->logconfess('The map argument was undefined');
 
-  my $unpadded_map = $map;
-  $unpadded_map =~ s/0//;
+  my $unpadded_map = depad_well($map);
 
   my $query =
     qq(SELECT
