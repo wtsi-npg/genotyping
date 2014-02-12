@@ -13,7 +13,7 @@ has 'sample_name'    => (is => 'ro', isa => 'Str', required => 1);
 has 'type'           => (is => 'ro', isa => 'Str', required => 1);
 has 'auto'           => (is => 'ro', isa => 'Str', required => 1);
 has 'confidence'     => (is => 'ro', isa => 'Num', required => 1);
-has 'call'           => (is => 'ro', isa => 'Str', required => 1);
+has 'final'          => (is => 'ro', isa => 'Str', required => 1);
 has 'converted_call' => (is => 'ro', isa => 'Str', required => 1);
 has 'x_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'y_intensity'    => (is => 'ro', isa => 'Num', required => 1);
@@ -43,7 +43,7 @@ sub is_control {
 sub is_call {
   my ($self) = @_;
 
-  $self->call ne $NO_CALL;
+  $self->final ne $NO_CALL;
 }
 
 sub compact_call {

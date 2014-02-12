@@ -94,6 +94,17 @@ sub snp_names {
   return sort { $a cmp $b } uniq @snp_names;
 }
 
+sub named_snp {
+  my ($self, $snp_name) = @_;
+
+  defined $snp_name or
+    $self->logconfess("A defined snp_name argument is required");
+  $snp_name or
+    $self->logconfess("A non-empty snp_name argument is required");
+
+  return grep { $snp_name eq $_->name } @{$self->snps};
+}
+
 sub write_snpset_data {
   my ($self, $file_name) = @_;
 

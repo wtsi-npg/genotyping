@@ -7,6 +7,7 @@ package main;
 use warnings;
 use strict;
 use Getopt::Long;
+use List::AllUtils;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
@@ -273,7 +274,7 @@ sub run {
          die "Failed to find any samples for project '$project_title'\n";
        }
 
-       $snpdb->insert_sequenom_calls($pipedb, \@samples);
+       insert_sequenom_calls($pipedb, $snpdb, \@samples);
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
@@ -293,6 +294,63 @@ sub validate_snpset {
   }
 
   return $snpset;
+}
+
+sub insert_fluidigm_calls {
+  my ($pipedb, $irods, $samples) = @_;
+
+  my $method = $pipedb->method->find({name => 'Fluidigm'});
+  my $snpset = $pipedb->snpset->find({name => 'qc'});
+
+  my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+    (irods => $irods);
+
+  foreach my $sample (@$samples) {
+    my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', 'qc',
+                                       $sample->sanger_sample_id);
+    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+  }
+}
+
+sub insert_sequenom_calls {
+  my ($pipedb, $snpdb, $samples) = @_;
+
+  my $method = $pipedb->method->find({name => 'Sequenom'});
+  my $snpset = $pipedb->snpset->find({name => 'W30467'});
+
+  my @sample_names;
+  foreach my $sample (@$samples) {
+    if ($sample->include and defined $sample->sanger_sample_id) {
+      push @sample_names, $sample->sanger_sample_id;
+    }
+  }
+
+  my $sequenom_results = $snpdb->find_sequenom_calls($snpset, \@sample_names);
+
+  foreach my $sample (@$samples) {
+    my $calls = $sequenom_results->{$sample->sanger_sample_id};
+
+    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+  }
+}
+
+sub insert_qc_calls {
+  my ($pipedb, $snpset, $method, $sample, $calls) = @_;
+
+  my $result = $sample->add_to_results({method => $method});
+
+  foreach my $call (@$calls) {
+    my $snp = $pipedb->snp->find_or_create
+      ({name       => $call->snp->name,
+        chromosome => $call->snp->chromosome,
+        position   => $call->snp->position,
+        snpset     => $snpset});
+
+    $result->add_to_snp_results({snp   => $snp,
+                                 value => $call->genotype});
+  }
+
+  return $result;
 }
 
 sub print_pre_report {
