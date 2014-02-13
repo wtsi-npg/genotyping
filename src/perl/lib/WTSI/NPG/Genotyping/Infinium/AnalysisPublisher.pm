@@ -7,7 +7,8 @@ use File::Spec;
 use Moose;
 
 use WTSI::NPG::Genotyping::Metadata qw($GENOTYPING_ANALYSIS_UUID_META_KEY
-                                       $INFINIUM_SAMPLE_NAME
+                                       $INFINIUM_BEADCHIP_META_KEY
+                                       $INFINIUM_BEADCHIP_SECTION_META_KEY
                                        make_analysis_metadata);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
@@ -162,14 +163,17 @@ sub publish {
       my %studies_seen;
 
       foreach my $included_sample_name (sort keys %included_samples) {
+        my $sample = $included_samples{$included_sample_name};
+
         my @sample_objects = $irods->find_objects_by_meta
           ($self->sample_archive,
-           ['dcterms:title'       => $project_title],
-           [$INFINIUM_SAMPLE_NAME => $included_sample_name]);
+           ['dcterms:title'                     => $project_title],
+           [$INFINIUM_BEADCHIP_META_KEY         => $sample->beadchip],
+           [$INFINIUM_BEADCHIP_SECTION_META_KEY => $sample->rowcol]);
 
         unless (@sample_objects) {
           $self->logconfess("Failed to find data in iRODS in sample archive '",
-                             $self->sample_archive, "' for sample ",
+                            $self->sample_archive, "' for sample ",
                             "'$included_sample_name' in project ",
                             "'$project_title'");
         }
