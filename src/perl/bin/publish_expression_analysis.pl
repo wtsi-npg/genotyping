@@ -99,6 +99,10 @@ sub run {
     pod2usage(-msg => "A --sample-dest argument is required\n",
               -exitval => 3);
   }
+  unless ($manifest_path) {
+    pod2usage(-msg => "A --manifest argument is required\n",
+              -exitval => 3);
+  }
 
   unless (-e $analysis_source) {
     pod2usage(-msg => "No such analysis source as '$analysis_source'\n",
@@ -116,6 +120,10 @@ sub run {
   unless (-d $sample_source) {
     pod2usage(-msg => "The --sample-source argument was not a directory\n",
               -exitval => 4);
+  }
+  unless (-e $manifest_path) {
+    pod2usage(-msg => "No such manifest as '$manifest_path'\n",
+              -exitval => 3);
   }
 
   if ($log4perl_config) {
