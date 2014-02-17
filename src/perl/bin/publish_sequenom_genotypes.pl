@@ -92,7 +92,8 @@ sub run {
 
    my $sqdb = WTSI::NPG::Genotyping::Database::Sequenom->new
      (name    => 'mspec2',
-      inifile => $config)->connect(RaiseError => 1);
+      inifile => $config,
+      logger  => $log)->connect(RaiseError => 1);
 
   $log->info("Publishing from '", $sqdb->name, "' to '$publish_dest' ",
              "Sequenom results finished between ",

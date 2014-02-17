@@ -99,8 +99,8 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config)->connect(RaiseError => 1);
-  # $ifdb->log($log);
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
 
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
