@@ -149,6 +149,72 @@ sub remove_avu {
   return $self;
 }
 
+sub supersede_avus {
+  my ($self, $attribute, $value, $units) = @_;
+
+  defined $attribute or
+    $self->logcroak("A defined attribute argument is required");
+  defined $value or
+    $self->logcroak("A defined value argument is required");
+
+  $self->debug("Superseding all '$attribute' metadata on '", $self->str, "'");
+
+  my @matching = $self->find_in_metadata($attribute);
+  $self->debug("Found ", scalar @matching, " '$attribute' AVUs to supersede");
+
+  if (@matching) {
+    # There are some AVUs present for this attribute, so remove them,
+    # except in the case where one happens to be the same as we are
+    # trying to add (to avoid removing it and immediately adding it
+    # back).
+    foreach my $avu (@matching) {
+      my $old_attribute = $avu->{attribute};
+      my $old_value     = $avu->{value};
+      my $old_units     = $avu->{units};
+
+      if (defined $units && defined $old_units &&
+          $old_attribute eq $attribute &&
+          $old_value     eq $value &&
+          $old_units     eq $units) {
+        $self->debug("Not superseding (leaving in place) AVU ",
+                     "{'$old_attribute', '$old_value', '$old_units'} on '",
+                     $self->str, "'");
+      }
+      elsif (!defined $units && !defined $old_units &&
+             $old_attribute eq $attribute &&
+             $old_value     eq $value) {
+        $self->debug("Not superseding (leaving in place) AVU ",
+                     "{'$old_attribute', '$old_value', ''} on '",
+                     $self->str, "'");
+      }
+      else {
+        my $old_units_str = defined $old_units ? "'$old_units'" : 'undef';
+        $self->debug("Superseding AVU {'$old_attribute', '$old_value', ",
+                     "$old_units_str} on '", $self->str, "'");
+
+        $self->remove_avu($old_attribute, $old_value, $old_units);
+
+        my $units_str = defined $units ? "'$units'" : 'undef';
+        $self->debug("Superseding with AVU {'$attribute', '$value', ",
+                     "$units_str} on '", $self->str, "'");
+
+        $self->add_avu($attribute, $value, $units);
+      }
+    }
+  }
+  else {
+    # There are no AVUs present for this attribute, so just add it
+    my $units_str = defined $units ? "'$units'" : 'undef';
+    $self->debug("Not superseding with AVU (none currently with this) ",
+                 "attribute {'$attribute', '$value', $units_str} on '",
+                 $self->str, "'");
+
+    $self->add_avu($attribute, $value, $units);
+  }
+
+  return $self;
+}
+
 sub grant_group_access {
   my ($self,  $permission, @groups) = @_;
 

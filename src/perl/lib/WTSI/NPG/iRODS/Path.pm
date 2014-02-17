@@ -154,9 +154,6 @@ sub expected_irods_groups {
   my ($self) = @_;
 
   my @ss_study_avus = $self->find_in_metadata($STUDY_ID_META_KEY);
-  unless (@ss_study_avus) {
-    $self->logwarn("Did not find any study information in metadata");
-  }
 
   my @groups;
   foreach my $avu (@ss_study_avus) {

@@ -8,7 +8,7 @@ use warnings;
 use File::Spec;
 
 use base qw(Test::Class);
-use Test::More tests => 37;
+use Test::More tests => 42;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -193,6 +193,30 @@ sub remove_avu : Test(5) {
   $meta = $obj->metadata;
   is_deeply($meta, $expected_meta,
             'DataObject metadata AVUs removed 2') or diag explain $meta;
+}
+sub supersede_avus : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $expected_meta = [{attribute => 'a', value => 'new_a'},
+                       {attribute => 'b', value => 'new_b', units => 'km'},
+                       {attribute => 'c', value => 'x', units => 'cm'},
+                       {attribute => 'c', value => 'y'}];
+
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  ok($obj->supersede_avus('a' => 'new_a'));
+  ok($obj->supersede_avus('b' => 'new_b', 'km'));
+
+  my $meta = $obj->metadata;
+  is_deeply($meta, $expected_meta,
+            'DataObject metadata AVUs superseded 1') or diag explain $meta;
+
+  # Flush the cache to re-read from iRODS
+  $obj->clear_metadata;
+
+  $meta = $obj->metadata;
+  is_deeply($meta, $expected_meta,
+            'DataObject metadata AVUs superseded 2') or diag explain $meta;
 }
 
 sub str : Test(1) {

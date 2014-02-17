@@ -6,17 +6,23 @@ use utf8;
 
   use strict;
   use warnings;
+  use Carp;
 
   use base 'WTSI::NPG::Database';
 
   sub find_infinium_sample_by_plate {
+    my ($self, $infinium_barcode, $map) = @_;
+
+    $map eq 'A10' or
+       confess "WarehouseStub expected map argument 'A10' but got '$map'";
+
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
-            supplier_name      => 'WTSI',
+            supplier_name      => 'aaaaaaaaaa',
             accession_number   => 'A0123456789',
             gender             => 'Female',
             cohort             => 'AAA111222333',
@@ -25,7 +31,7 @@ use utf8;
             barcode_prefix     => 'DN',
             barcode            => '0987654321',
             plate_purpose_name => 'Infinium',
-            map                => 'A01'};
+            map                => 'A10'};
   }
 }
 
@@ -62,8 +68,14 @@ sub make_fixture : Test(setup) {
   $irods->add_object("$data_path/$gtc_file", $gtc_irods_path);
 
   $irods->add_object_avu($gtc_irods_path, 'infinium_plate', 'plate1');
-  $irods->add_object_avu($gtc_irods_path, 'infinium_well', 'A01');
+  $irods->add_object_avu($gtc_irods_path, 'infinium_well', 'A10');
   $irods->add_object_avu($gtc_irods_path, 'type', 'gtc');
+
+  # Add some existing secondary metadata to be superseded
+  $irods->add_object_avu($gtc_irods_path, 'dcterms:identifier',   '9999999999');
+  $irods->add_object_avu($gtc_irods_path, 'study_id',             '10');
+  $irods->add_object_avu($gtc_irods_path, 'sample_consent',       '1');
+  $irods->add_object_avu($gtc_irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
 }
 
 sub teardown : Test(teardown) {
@@ -86,7 +98,7 @@ sub metadata : Test(3) {
   is($infinium_plate->{value}, 'plate1', 'Plate metadata is present');
 
   my $infinium_well = $data_object->get_avu('infinium_well');
-  is($infinium_well->{value}, 'A01', 'Well metadata is present');
+  is($infinium_well->{value}, 'A10', 'Well metadata is present');
 }
 
 sub update_secondary_metadata : Test(2) {
@@ -105,7 +117,7 @@ sub update_secondary_metadata : Test(2) {
   my $expected_meta =
     [{attribute => 'dcterms:identifier',      value => '0123456789'},
      {attribute => 'infinium_plate',          value => 'plate1'},
-     {attribute => 'infinium_well',           value => 'A01'},
+     {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'sample',                  value => 'sample1' },
      {attribute => 'sample_accession_number', value => 'A0123456789'},
      {attribute => 'sample_cohort',           value => 'AAA111222333'},
@@ -113,11 +125,11 @@ sub update_secondary_metadata : Test(2) {
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
      {attribute => 'sample_id',               value => '123456789'},
-     {attribute => 'sample_supplier_name',    value => 'WTSI'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'gtc'}];
 
   my $meta = $data_object->metadata;
-  is_deeply($meta, $expected_meta, 'Secondary metadata added')
+  is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 }
