@@ -918,7 +918,7 @@ sub remove_object_avu {
   my @current_meta = $self->get_object_meta($object);
   if (!$self->_meta_exists($attribute, $value, $units, \@current_meta)) {
     $self->logconfess("AVU {'$attribute', '$value', $units_str} ",
-                      "does not exist exists for '$object'");
+                      "does not exist for '$object'");
   }
 
   return $self->meta_remover->modify_object_meta($object, $attribute,

@@ -160,14 +160,21 @@ sub supersede_avus {
   $self->debug("Superseding all '$attribute' metadata on '", $self->str, "'");
 
   my @matching = $self->find_in_metadata($attribute);
-  $self->debug("Found ", scalar @matching, " '$attribute' AVUs to supersede");
+  my $num_matching = scalar @matching;
 
-  if (@matching) {
+  $self->debug("Found $num_matching '$attribute' AVUs to supersede");
+
+  my $num_processed = 0;
+  if ($num_matching > 0) {
     # There are some AVUs present for this attribute, so remove them,
     # except in the case where one happens to be the same as we are
     # trying to add (to avoid removing it and immediately adding it
     # back).
     foreach my $avu (@matching) {
+      ++$num_processed;
+      $self->debug("Attempting to supersede $num_processed of ",
+                   "$num_matching AVUs");
+
       my $old_attribute = $avu->{attribute};
       my $old_value     = $avu->{value};
       my $old_units     = $avu->{units};
@@ -176,29 +183,47 @@ sub supersede_avus {
           $old_attribute eq $attribute &&
           $old_value     eq $value &&
           $old_units     eq $units) {
+        # Units were defined in both and everything matches
         $self->debug("Not superseding (leaving in place) AVU ",
                      "{'$old_attribute', '$old_value', '$old_units'} on '",
-                     $self->str, "'");
+                     $self->str, "' [$num_processed / $num_matching]");
       }
       elsif (!defined $units && !defined $old_units &&
              $old_attribute eq $attribute &&
              $old_value     eq $value) {
+        # Units were undefined in both and everything else matches
         $self->debug("Not superseding (leaving in place) AVU ",
                      "{'$old_attribute', '$old_value', ''} on '",
-                     $self->str, "'");
+                     $self->str, "' [$num_processed / $num_matching]");
       }
       else {
+        # There were some differences
         my $old_units_str = defined $old_units ? "'$old_units'" : 'undef';
-        $self->debug("Superseding AVU {'$old_attribute', '$old_value', ",
-                     "$old_units_str} on '", $self->str, "'");
+        $self->debug("Superseding AVU (removing) ",
+                     "{'$old_attribute', '$old_value', ",
+                     "$old_units_str} on '", $self->str, "' ",
+                     "[$num_processed / $num_matching]");
 
         $self->remove_avu($old_attribute, $old_value, $old_units);
 
         my $units_str = defined $units ? "'$units'" : 'undef';
-        $self->debug("Superseding with AVU {'$attribute', '$value', ",
-                     "$units_str} on '", $self->str, "'");
+        $self->debug("Superseding with AVU (now adding) ",
+                     "{'$attribute', '$value', ",
+                     "$units_str} on '", $self->str, "' ",
+                     "[$num_processed / $num_matching]");
 
-        $self->add_avu($attribute, $value, $units);
+        if ($self->get_avu($attribute, $value, $units)) {
+          $self->debug("The superseding AVU ",
+                       "{'$attribute', '$value', $units_str} ",
+                       "is already in place on '",
+                       $self->str, "' [$num_processed / $num_matching]");
+        }
+        else {
+          $self->debug("Superseding with AVU {'$attribute', '$value', ",
+                       "$units_str} on '", $self->str, "' ",
+                       "[$num_processed / $num_matching]");
+          $self->add_avu($attribute, $value, $units);
+        }
       }
     }
   }
