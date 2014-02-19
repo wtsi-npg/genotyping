@@ -13,7 +13,8 @@ has '+executable' => (default => 'json-list');
  # iRODS error code for non-existence
 our $ITEM_DOES_NOT_EXIST = -310000;
 
-around [qw(list_collection list_object)] => sub {
+around [qw(list_collection list_object
+           get_collection_acl get_object_acl)] => sub {
   my ($orig, $self, @args) = @_;
 
   unless ($self->started) {
@@ -25,6 +26,77 @@ around [qw(list_collection list_object)] => sub {
 };
 
 sub list_object {
+  my ($self, $object) = @_;
+
+  my $response = $self->_list_object($object);
+  my $path;
+
+  if (exists $response->{error}) {
+    if ($response->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
+      # Continue to return undef
+    }
+    else {
+      $self->report_error($response);
+    }
+  }
+  else {
+    $path = $self->_to_path_str($response);
+  }
+
+  return $path;
+}
+
+sub list_collection{
+  my ($self, $collection) = @_;
+
+  my ($object_specs, $collection_specs) = $self->_list_collection($collection);
+
+  my @paths;
+  if ($object_specs and $collection_specs) {
+    my @data_objects = map { $self->_to_path_str($_) } @$object_specs;
+    my @collections  = map { $self->_to_path_str($_) } @$collection_specs;
+    @paths = (\@data_objects, \@collections);
+  }
+
+  return @paths;
+}
+
+sub get_object_acl {
+  my ($self, $object) = @_;
+
+  my $response = $self->_list_object($object);
+  my $acl;
+
+  if (exists $response->{error}) {
+    if ($response->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
+      # Continue to return undef
+    }
+    else {
+      $self->report_error($response);
+    }
+  }
+  else {
+    $acl = $self->_to_acl($response);
+  }
+
+  return @$acl;
+}
+
+sub get_collection_acl {
+  my ($self, $collection) = @_;
+
+  my ($object_specs, $collection_specs) = $self->_list_collection($collection);
+
+  my @acl;
+  if ($collection_specs) {
+    my $collection = shift @$collection_specs;
+     @acl = @{$self->_to_acl($collection)};
+  }
+
+  return @acl;
+}
+
+sub _list_object {
   my ($self, $object) = @_;
 
   defined $object or
@@ -42,23 +114,10 @@ sub list_object {
   my $response = $self->communicate($spec);
   $self->validate_response($response);
 
-  my $path;
-  if (exists $response->{error}) {
-    if ($response->{error}->{code} == $ITEM_DOES_NOT_EXIST) {
-      # Continue to return undef
-    }
-    else {
-      $self->report_error($response);
-    }
-  }
-  else {
-    $path = $self->_to_path_str($response);
-  }
-
-  return $path;
+  return $response;
 }
 
-sub list_collection {
+sub _list_collection {
   my ($self, $collection) = @_;
 
   defined $collection or
@@ -67,6 +126,7 @@ sub list_collection {
   $collection =~ m{^/} or
     $self->logconfess("An absolute collection path argument is required: ",
                       "received '$collection'");
+  $collection = File::Spec->canonpath($collection);
 
   my $spec = {collection => $collection};
   my $response = $self->communicate($spec);
@@ -83,21 +143,19 @@ sub list_collection {
     }
   }
   else {
-    my @data_objects;
-    my @collections;
+    my @object_specs;
+    my @collection_specs;
 
-    foreach my $path_spec (@$response) {
-      my $path = $self->_to_path_str($path_spec);
-
-      if (exists $path_spec->{data_object}) {
-        push @data_objects, $path;
+    foreach my $path (@$response) {
+      if (exists $path->{data_object}) {
+        push @object_specs, $path;
       }
       else {
-        push @collections, $path;
+        push @collection_specs, $path;
       }
     }
 
-    @paths = (\@data_objects, \@collections);
+    @paths = (\@object_specs, \@collection_specs);
   }
 
   return @paths;
@@ -121,6 +179,21 @@ sub _to_path_str {
   }
 
   return $path;
+}
+
+sub _to_acl {
+  my ($self, $path_spec) = @_;
+
+  defined $path_spec or
+    $self->logconfess('A defined path_spec argument is required');
+
+  ref $path_spec eq 'HASH' or
+    $self->logconfess('A defined path_spec argument is required');
+
+  exists $path_spec->{access} or
+    $self->logconfess('The path_spec argument did not have an "access" key');
+
+  return $path_spec->{access};
 }
 
 __PACKAGE__->meta->make_immutable;
