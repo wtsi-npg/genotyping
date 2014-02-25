@@ -8,7 +8,7 @@ use warnings;
 use File::Spec;
 
 use base qw(Test::Class);
-use Test::More tests => 34;
+use Test::More tests => 40;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -196,9 +196,45 @@ sub remove_avu : Test(5) {
 sub str : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
   my $coll_path = "$irods_tmp_coll/irods_path_test/test_dir";
-
   my $coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
+
   is($coll->str, $coll_path, 'Collection string');
+}
+
+sub get_permissions : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll_path = "$irods_tmp_coll/irods_path_test/test_dir";
+  my $coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
+
+  my $perms = all { exists $_->{owner} &&
+                    exists $_->{level} }
+   $coll->get_permissions;
+  ok($perms, 'Permissions obtained');
+}
+
+sub set_permissions : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll_path = "$irods_tmp_coll/irods_path_test/test_dir";
+  my $coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
+
+  my $r0 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $coll->get_permissions;
+  ok($r0, 'No public read access');
+
+  ok($coll->set_permissions('read', 'public'));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $coll->get_permissions;
+  ok($r1, 'Added public read access');
+
+  ok($coll->set_permissions(undef, 'public'));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $coll->get_permissions;
+  ok($r2, 'Removed public read access');
 }
 
 1;

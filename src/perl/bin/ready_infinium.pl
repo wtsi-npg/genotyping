@@ -50,6 +50,9 @@ sub run {
   $config ||= $DEFAULT_INI;
   $namespace ||= $WTSI_NAMESPACE;
 
+  unless ($dbfile) {
+    pod2usage(-msg => "A --dbfile argument is required\n", -exitval => 2);
+  }
   unless ($project_title) {
     pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
   }
@@ -65,17 +68,16 @@ sub run {
   unless ($namespace =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
+
   if ($verbose) {
     my $db = $dbfile;
     $db ||= 'configured database';
     print STDERR "Updating $db using config from $config\n";
   }
 
-  my @initargs = (name => 'pipeline',
-                  inifile => $config);
-  if ($dbfile) {
-    push @initargs, (dbfile => $dbfile);
-  }
+  my @initargs = (name    => 'pipeline',
+                  inifile => $config,
+                  dbfile  => $dbfile);
 
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (@initargs)->connect
@@ -336,9 +338,9 @@ ready_infinium
 
 =head1 SYNOPSIS
 
-ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--chip-design <name>] [--namespace <sample namespace>] [--maximum <n>] \
-   --project <project name> --run <pipeline run name> \
+ready_infinium [--config <database .ini file>] [--chip-design <name>] \
+   [--namespace <sample namespace>] [--maximum <n>] \
+   --dbfile <SQLite file> --project <project name> --run <pipeline run name> \
    --supplier <supplier name> [--verbose]
 
 Options:
@@ -346,8 +348,7 @@ Options:
   --chip_design Explicitly state the chip design.
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile      The SQLite database file. If not supplied, defaults to the
-                value given in the configuration .ini file.
+  --dbfile      The SQLite database file.
   --help        Display help.
   --maximum     Import samples up to a maximum number. Optional.
   --namespace   The namespace for the imported sample names. Optional,

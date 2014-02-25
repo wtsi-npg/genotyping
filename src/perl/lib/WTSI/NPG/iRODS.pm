@@ -8,11 +8,13 @@ use English;
 use File::Basename qw(basename);
 use File::Spec;
 use JSON;
+use List::AllUtils qw(any);
 use Moose;
 
 use WTSI::NPG::iRODS::Lister;
 use WTSI::NPG::iRODS::MetaLister;
 use WTSI::NPG::iRODS::MetaModifier;
+use WTSI::NPG::iRODS::ACLModifier;
 use WTSI::NPG::Runnable;
 
 with 'WTSI::NPG::Loggable';
@@ -39,7 +41,9 @@ has 'lister' =>
 
      return WTSI::NPG::iRODS::Lister->new
        (environment => $self->environment,
-        max_size    => 1024 * 1204)->start;
+        max_size    => 1024 * 1204,
+        arguments   => ['--acl'],
+        logger      => $self->logger)->start;
    });
 
 has 'meta_lister' =>
@@ -51,7 +55,8 @@ has 'meta_lister' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::MetaLister->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_adder' =>
@@ -64,7 +69,8 @@ has 'meta_adder' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'add'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_remover' =>
@@ -77,7 +83,21 @@ has 'meta_remover' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'rem'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
+   });
+
+has 'acl_modifier' =>
+  (is         => 'ro',
+   isa      => 'WTSI::NPG::iRODS::ACLModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::ACLModifier->new
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 our $IGROUPADMIN = 'igroupadmin';
@@ -90,8 +110,10 @@ our $IMV     = 'imv';
 our $IPUT    = 'iput';
 our $IRM     = 'irm';
 our $IPWD    = 'ipwd';
-our $ICHMOD  = 'ichmod';
+# our $ICHMOD  = 'ichmod';
 our $MD5SUM  = 'md5sum';
+
+our @VALID_PERMISSIONS = qw(null read write own);
 
 around 'working_collection' => sub {
   my ($orig, $self, @args) = @_;
@@ -275,10 +297,9 @@ sub set_group_access {
 
   my $perm_str = defined $permission ? $permission : 'null';
 
-  my @args = ($perm_str, $group, @objects);
-  WTSI::NPG::Runnable->new(executable  => $ICHMOD,
-                           arguments   => \@args,
-                           environment => $self->environment)->run;
+  foreach my $object (@objects) {
+    $self->set_object_permissions($perm_str, $group, $object);
+  }
 
   return @objects;
 }
@@ -317,7 +338,7 @@ sub reset_working_collection {
 =cut
 
 sub list_collection {
-  my ($self, $collection) = @_;
+  my ($self, $collection, $recur) = @_;
 
   defined $collection or
     $self->logconfess('A defined collection argument is required');
@@ -327,9 +348,11 @@ sub list_collection {
 
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
-  $self->debug("Listing collection '$collection'");
 
-  return $self->lister->list_collection($collection);
+  my $recursively = $recur ? 'recursively' : '';
+  $self->debug("Listing collection '$collection' $recursively");
+
+  return $self->lister->list_collection($collection, $recur);
 }
 
 =head2 add_collection
@@ -464,6 +487,53 @@ sub remove_collection {
   WTSI::NPG::Runnable->new(executable  => $IRM,
                            arguments   => ['-r', '-f', $collection],
                            environment => $self->environment)->run;
+  return $collection;
+}
+
+sub get_collection_permissions {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq ''
+    and $self->logconfess('A non-empty collection argument is required');
+
+  return $self->lister->get_collection_acl($collection);
+}
+
+sub set_collection_permissions {
+  my ($self, $level, $owner, $collection) = @_;
+
+  defined $owner or
+    $self->logconfess('A defined owner argument is required');
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $owner eq '' and
+    $self->logconfess('A non-empty owner argument is required');
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  $self->debug("Setting permissions on '$collection' to ",
+               "'$perm_str' for '$owner'");
+
+  my @acl = $self->get_collection_permissions($collection);
+
+  if (any { $_->{owner} eq $owner and
+            $_->{level} eq $perm_str } @acl) {
+    $self->debug("'$collection' already has permission ",
+                 "'$perm_str' for '$owner'");
+  }
+  else {
+    $self->acl_modifier->chmod_collection($perm_str, $owner, $collection);
+  }
+
   return $collection;
 }
 
@@ -812,6 +882,50 @@ sub slurp_object {
   return $copy;
 }
 
+sub get_object_permissions {
+  my ($self, $object) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  return $self->lister->get_object_acl($object);
+}
+
+sub set_object_permissions {
+  my ($self, $level, $owner, $object) = @_;
+
+  defined $owner or
+    $self->logconfess('A defined owner argument is required');
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+
+  $owner eq '' and
+    $self->logconfess('A non-empty owner argument is required');
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  $self->debug("Setting permissions on '$object' to '$perm_str' for '$owner'");
+  my @acl = $self->get_object_permissions($object);
+
+  if (any { $_->{owner} eq $owner and
+            $_->{level} eq $perm_str } @acl) {
+    $self->debug("'$object' already has permission '$perm_str' for '$owner'");
+  }
+  else {
+    $self->acl_modifier->chmod_object($perm_str, $owner, $object);
+  }
+
+  return $object;
+}
+
 =head2 get_object_meta
 
   Arg [1]    : iRODS data object name
@@ -918,7 +1032,7 @@ sub remove_object_avu {
   my @current_meta = $self->get_object_meta($object);
   if (!$self->_meta_exists($attribute, $value, $units, \@current_meta)) {
     $self->logconfess("AVU {'$attribute', '$value', $units_str} ",
-                      "does not exist exists for '$object'");
+                      "does not exist for '$object'");
   }
 
   return $self->meta_remover->modify_object_meta($object, $attribute,
@@ -1026,7 +1140,7 @@ sub calculate_checksum {
 
   Example    : $irods->validate_checksum_metadata('/my/path/lorem.txt')
   Description: Return true if the MD5 checksum in the metadata of an iRODS
-               object is identical to the MD5 caluclated by iRODS.
+               object is identical to the MD5 calculated by iRODS.
   Returntype : boolean
 
 =cut

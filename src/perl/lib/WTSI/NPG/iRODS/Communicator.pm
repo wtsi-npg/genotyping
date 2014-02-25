@@ -29,8 +29,10 @@ sub communicate {
     $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
   }
 
- defined $response or
-   $self->logconfess("Failed to get a response from JSON spec '$json'");
+  defined $response or
+    $self->logconfess("Failed to get a response from JSON spec '$json'");
+
+  $self->debug("Got a response of ", $self->encode($response));
 
   return $response;
 }

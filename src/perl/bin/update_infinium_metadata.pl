@@ -37,6 +37,7 @@ sub run {
   my $verbose;
   my @filter_key;
   my @filter_value;
+  my $stdio;
 
   GetOptions('config=s'       => \$config,
              'debug'          => \$debug,
@@ -46,21 +47,34 @@ sub run {
              'help'           => sub { pod2usage(-verbose => 2,
                                                  -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
-             'verbose'        => \$verbose);
+             'verbose'        => \$verbose,
+             ''               => \$stdio); # Permits a trailing '-' for STDIN
   $config ||= $DEFAULT_INI;
 
-  unless ($publish_dest) {
-    pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
-  }
-  unless (scalar @filter_key == scalar @filter_value) {
-    pod2usage(-msg => "There must be equal numbers of filter keys and values\n",
-              -exitval => 2);
-  }
-
   my @filter;
-  while (@filter_key) {
-    push @filter, [pop @filter_key, pop @filter_value];
+
+  if ($stdio) {
+    if ($publish_dest or @filter_key) {
+      pod2usage(-msg => "The --dest and --filter-key options are " .
+                "incompatible with reading from STDIN\n",
+                -exitval => 2);
+    }
+  }
+  else {
+    unless ($publish_dest) {
+      pod2usage(-msg => "A --dest argument is required\n",
+                -exitval => 2);
+    }
+
+    unless (scalar @filter_key == scalar @filter_value) {
+      pod2usage(-msg => "There must be equal numbers of filter keys " .
+                "and values\n",
+                -exitval => 2);
+    }
+
+    while (@filter_key) {
+      push @filter, [pop @filter_key, pop @filter_value];
+    }
   }
 
   my $log;
@@ -88,15 +102,31 @@ sub run {
                                    mysql_auto_reconnect => 1);
   my $irods = WTSI::NPG::iRODS->new(logger => $log);
 
-  my @infinium_data =
-    $irods->find_objects_by_meta($publish_dest,
-                                 [infinium_plate => '%', 'like'],
-                                 [infinium_well  => '%', 'like'],
-                                 @filter);
+  my @infinium_data;
+  if ($stdio) {
+    while (my $line = <>) {
+      chomp $line;
+      push @infinium_data, $line;
+    }
+  }
+  else {
+    @infinium_data =
+      $irods->find_objects_by_meta($publish_dest,
+                                   [infinium_plate => '%', 'like'],
+                                   [infinium_well  => '%', 'like'],
+                                   @filter);
+  }
+
   my $total = scalar @infinium_data;
   my $updated = 0;
 
-  $log->info("Updating metadata on $total data objects in '$publish_dest'");
+  if ($stdio) {
+    $log->info("Updating metadata on $updated/$total data objects in ",
+               "file list");
+  }
+  else {
+    $log->info("Updating metadata on $total data objects in '$publish_dest'");
+  }
 
   foreach my $data_object (@infinium_data) {
     eval {
@@ -114,10 +144,17 @@ sub run {
     }
   }
 
-  $log->info("Updated metadata on $updated/$total data objects in ",
-             "'$publish_dest'");
-}
+  if ($stdio) {
+    $log->info("Updated metadata on $updated/$total data objects in ",
+               "file list");
+  }
+  else {
+    $log->info("Updated metadata on $updated/$total data objects in ",
+               "'$publish_dest'");
+  }
 
+  $ssdb->disconnect;
+}
 
 __END__
 
@@ -147,6 +184,11 @@ infinium_plate and infinium_well metadata and adds relevant sample
 metadata taken from the Sequencescape warehouse. If the new metadata
 include study information, this is used to set access rights for the
 data in iRODS.
+
+This script will read iRODS paths from STDIN as an alternative to
+finding them via a metadata query. To do this, terminate the command
+line with the '-' option. In this mode, the --dest, --filter-key and
+--filter-value options are invalid.
 
 =head1 METHODS
 

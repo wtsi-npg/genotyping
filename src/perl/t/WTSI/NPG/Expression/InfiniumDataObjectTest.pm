@@ -57,7 +57,7 @@ my $pid = $$;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
-  $irods_tmp_coll = $irods->add_collection("ExpressionDataObjectTest.$pid");
+  $irods_tmp_coll = $irods->add_collection("ExprInfiniumDataObjectTest.$pid");
 
   my $idat_irods_path = "$irods_tmp_coll/$idat_file";
   $irods->add_object("$data_path/$idat_file", $idat_irods_path);

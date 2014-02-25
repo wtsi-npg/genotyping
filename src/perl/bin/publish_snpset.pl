@@ -103,7 +103,8 @@ sub run {
      publication_time => DateTime->now,
      reference_names  => \@references,
      snpset_name      => $snpset,
-     snpset_platform  => $platform);
+     snpset_platform  => $platform,
+     logger           => $log);
 
   my $rods_path = $publisher->publish($publish_dest);
 
