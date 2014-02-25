@@ -6,10 +6,7 @@ package main;
 
 use strict;
 use warnings;
-use Cwd qw(abs_path);
 use DateTime;
-use File::Basename;
-use File::Find;
 use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
