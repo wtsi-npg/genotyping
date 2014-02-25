@@ -5,6 +5,9 @@ package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::SNP;
+use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable';
@@ -22,6 +25,32 @@ sub BUILD {
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
+}
+
+sub get_snpset {
+   my ($self, $snpset_name, $reference_name) = @_;
+
+   $snpset_name or $self->logconfess('The snpset_name argument was empty');
+   $reference_name or
+     $self->logconfess('The reference_name argument was empty');
+
+   my @obj_paths = $self->irods->find_objects_by_meta
+     ('/',
+      [fluidigm_plex  => $snpset_name],
+      [reference_name => $reference_name]);
+
+   my $num_snpsets = scalar @obj_paths;
+   if ($num_snpsets > 1) {
+     $self->logconfess("The SNP set query for SNP set '$snpset_name' and ",
+                       "reference '$reference_name' was not specific enough; ",
+                       "$num_snpsets SNP sets were returned: [",
+                       join(', ',  @obj_paths), "]");
+   }
+
+   my $path = shift @obj_paths;
+   my $obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
+
+   return WTSI::NPG::Genotyping::SNPSet->new($obj);
 }
 
 =head2 get_assay_resultsets
@@ -44,10 +73,16 @@ sub get_assay_resultsets {
   $sample_identifier or
     $self->logconfess('The sample_identifier argument was empty');
 
+  $self->debug("Finding Fluidigm results for sample '$sample_identifier' ",
+               "with plex '$snpset_name'");
+
   my @obj_paths = $self->irods->find_objects_by_meta
     ('/',
      [fluidigm_plex        => $snpset_name],
      ['dcterms:identifier' => $sample_identifier], @query_specs);
+
+  $self->debug("Found ", scalar @obj_paths, " Fluidigm '$snpset_name' plex ",
+               "resultsets for '$sample_identifier'");
 
   my @resultsets;
   foreach my $obj_path (@obj_paths) {
@@ -83,10 +118,42 @@ sub get_assay_resultset {
   my $num_resultsets = scalar @resultsets;
   if ($num_resultsets > 1) {
     $self->logconfess("The assay results query was not specific enough; ",
-                      "$num_resultsets result sets were returned");
+                      "$num_resultsets result sets were returned: [",
+                      join(', ', map { $_->str } @resultsets), "]");
   }
 
   return shift @resultsets;
+}
+
+sub get_calls {
+  my ($self, $reference_name, $snpset_name, $sample_identifier,
+      @query_specs) = @_;
+
+  my $resultset = $self->get_assay_resultset
+    ($snpset_name, $sample_identifier, @query_specs);
+  my $snpset = $self->get_snpset($snpset_name, $reference_name);
+
+  my @calls;
+  foreach my $result (@{$resultset->assay_results}) {
+    if (!$result->is_control) {
+      my @snps = $snpset->named_snp($result->snp_assayed);
+      unless (@snps) {
+        $self->logconfess("Failed to get '", $resultset->str, "' calls ",
+                          "for SNP '", $result->snp_assayed, "' ",
+                          "on reference '$reference_name': this SNP is not ",
+                          "present in SNP set '", $snpset->str, "'");
+      }
+
+      my $snp = shift @snps;
+      my $call = WTSI::NPG::Genotyping::Call->new
+        (genotype => $result->converted_call,
+         snp      => $snp);
+
+      push @calls, $call;
+    }
+  }
+
+  return \@calls;
 }
 
 __PACKAGE__->meta->make_immutable;

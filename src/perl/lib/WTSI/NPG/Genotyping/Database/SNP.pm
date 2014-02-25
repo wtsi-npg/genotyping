@@ -3,6 +3,9 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Database::SNP;
 
+use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::SNP;
+
 use Moose;
 
 extends 'WTSI::NPG::Database';
@@ -66,14 +69,12 @@ sub find_sequenom_plate_id {
   return shift @plate_ids;
 }
 
-=head2 insert_sequenom_calls
+=head2 find_sequenom_calls
 
-  Arg [1]    : WTSI::NPG::Genotyping::Database::Pipeline object
-  Arg [2]    : arrayref of WTSI::NPG::Genotyping::Schema::Result::Sample objects
+  Arg [1]    : Array of sample names (individual.clonename in SNP)
 
-  Example    : $db->insert_sequenom_calls($pipedb, $samples)
-  Description: Inserts Sequenom results from the SNP database into the
-               pipeline database. The 'name' field of the Sample is expected
+  Example    : $db->find_sequenom_calls('ABC123', 'XYZ123')
+  Description: Finds Sequenom results from the SNP. The 'name' is expected
                to match the individual.clonename in SNP.
 
                The linking value between the databases is the identifier
@@ -87,20 +88,25 @@ sub find_sequenom_plate_id {
                more generic term 'sample.name'. However, in the case of WTSI
                samples, this corresponds to the identifier described above.
 
-  Returntype : integer (total number of
-               WTSI::NPG::Genotyping::Schema::Result::SnpResults inserted)
+  Returntype : Hashref 
 
 =cut
 
-sub insert_sequenom_calls {
-  my ($self, $pipedb, $samples) = @_;
+sub find_sequenom_calls {
+  my ($self, $snpset_name, $sample_names) = @_;
+
+  defined $sample_names or
+    $self->logconfess('A defined sample_names argument is required');
+  ref $sample_names eq 'ARRAY' or
+    $self->logconfess('The sample_names argument must be an ArrayRef');
 
   my $query =
     qq(SELECT DISTINCT
-         snp_name.snp_name,
-         snp_sequence.chromosome,
-         mapped_snp.position,
-         genotype.genotype
+         well_assay.id_well AS snpset_name,
+         snp_name.snp_name AS snp_name,
+         snp_sequence.chromosome AS chromosome,
+         mapped_snp.position AS position,
+         genotype.genotype AS genotype
        FROM
          well_assay,
          snpassay_snp,
@@ -110,7 +116,7 @@ sub insert_sequenom_calls {
          genotype,
          individual
        WHERE
-         well_assay.id_assay = snpassay_snp.id_assay
+         AND well_assay.id_assay = snpassay_snp.id_assay
          AND snpassay_snp.id_snp = snp_name.id_snp
          AND mapped_snp.id_snp = snp_name.id_snp
          AND snp_sequence.id_sequence = mapped_snp.id_sequence
@@ -123,37 +129,35 @@ sub insert_sequenom_calls {
 
   my $sth = $self->dbh->prepare($query);
 
-  my $snpset = $pipedb->snpset->find({name => 'Sequenom'});
-  my $method = $pipedb->method->find({name => 'Sequenom'});
+  my %result;
 
-  my $count = 0;
-  foreach my $sample (@$samples) {
-    if ($sample->include && defined $sample->sanger_sample_id) {
-      my $id = $sample->sanger_sample_id;
+  foreach my $sample_name (@$sample_names) {
+    $self->trace("Executing: '$query' with args [$sample_name]");
+    $sth->execute($sample_name);
 
-      $self->trace("Executing: '$query' with args [$id]");
-      $sth->execute($id);
+    my @calls;
+    while (my ($assay_name, $snp_name, $chromosome, $position, $genotype) =
+           $sth->fetchrow_array) {
+      # Selecting on this in the query causes a performance problem;
+      # optimiser tries lots of nested loop joins
+      next unless $assay_name eq $snpset_name;
 
-      my $result = $sample->add_to_results({method => $method});
+      # Genotypes are stored as single characters when both alleles
+      # are the same. Convert to a pair of characters.
+      $genotype .= $genotype if length($genotype) == 1;
 
-      while (my ($name, $chromosome, $position, $genotype) =
-             $sth->fetchrow_array) {
-        $genotype .= $genotype if length($genotype) == 1;
+      my $snp = WTSI::NPG::Genotyping::SNP->new(name       => $snp_name,
+                                                chromosome => $chromosome,
+                                                position   => $position);
 
-        my $snp = $pipedb->snp->find_or_create
-          ({name => $name,
-            chromosome => $chromosome,
-            position   => $position,
-            snpset     => $snpset});
-
-        $result->add_to_snp_results({snp   => $snp,
-                                     value => $genotype});
-        ++$count;
-      }
+      push @calls, WTSI::NPG::Genotyping::Call->new(genotype => $genotype,
+                                                    snp      => $snp);
     }
+
+    $result{$sample_name} = \@calls;
   }
 
-  return $count;
+  return \%result;
 }
 
 =head2 find_sequenom_calls_by_sample
