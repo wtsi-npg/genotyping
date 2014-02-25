@@ -6,9 +6,10 @@ package WTSI::NPG::iRODS::DataObjectTest;
 use strict;
 use warnings;
 use File::Spec;
+use List::AllUtils qw(all any none);
 
 use base qw(Test::Class);
-use Test::More tests => 42;
+use Test::More tests => 48;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -225,6 +226,42 @@ sub str : Test(1) {
 
   my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
   is($obj->str, $obj_path, 'DataObject string');
+}
+
+sub get_permissions : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  my $perms = all { exists $_->{owner} &&
+                    exists $_->{level} }
+   $obj->get_permissions;
+  ok($perms, 'Permissions obtained');
+}
+
+sub set_permissions : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  my $r0 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r0, 'No public read access');
+
+  ok($obj->set_permissions('read', 'public'));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r1, 'Added public read access');
+
+  ok($obj->set_permissions(undef, 'public'));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r2, 'Removed public read access');
 }
 
 1;

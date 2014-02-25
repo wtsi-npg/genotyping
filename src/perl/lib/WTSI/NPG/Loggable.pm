@@ -25,7 +25,7 @@ has 'logger' => (is      => 'rw',
                  handles => [@HANDLED_LOG_METHODS],
                  default => sub {
                     Log::Log4perl->init_once(\$default_conf);
-                    return Log::Log4perl->get_logger('npg.irods.publish');
+                    return Log::Log4perl->get_logger('npg');
                   });
 
 no Moose;

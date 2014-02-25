@@ -50,11 +50,31 @@ around 'metadata' => sub {
   return $self->$orig;
 };
 
+=head2 is_present
+
+  Arg [1]    : None
+
+  Example    : $path->is_present && print $path->str
+  Description: Return true if the data object file exists in iRODS.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
+
 sub is_present {
   my ($self) = @_;
 
   return $self->irods->list_object($self->str);
 }
+
+=head2 absolute
+
+  Arg [1]    : None
+
+  Example    : $path->absolute
+  Description: Return the absolute path of the data object.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
 
 sub absolute {
   my ($self) = @_;
@@ -76,11 +96,32 @@ sub absolute {
   return WTSI::NPG::iRODS::DataObject->new($self->irods, $absolute);
 }
 
+=head2 calculate_checksum
+
+  Arg [1]    : None
+
+  Example    : $path->calculate_checksum
+  Description: Return the MD5 checksum of the data object.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
+
 sub calculate_checksum {
   my ($self) = @_;
 
   return $self->irods->calculate_checksum($self->str);
 }
+
+=head2 validate_checksum_metadata
+
+  Arg [1]    : None
+
+  Example    : $obj->validate_checksum_metadata
+  Description: Return true if the MD5 checksum in the metadata of the
+               object is identical to the MD5 calculated by iRODS.
+  Returntype : boolean
+
+=cut
 
 sub validate_checksum_metadata {
   my ($self) = @_;
@@ -129,7 +170,6 @@ sub add_avu {
   Description: Remove an AVU from an iRODS path (data object or collection)
                Return self.
   Returntype : WTSI::NPG::iRODS::DataObject
-  Caller     : general
 
 =cut
 
@@ -148,6 +188,20 @@ sub remove_avu {
 
   return $self;
 }
+
+=head2 supersede_avus
+
+  Arg [1]    : attribute
+  Arg [2]    : value
+  Arg [2]    : units (optional)
+
+  Example    : $path->supersede_avus('foo', 'bar')
+  Description: Replace an AVU from an iRODS path (data object or collection)
+               while removing any existing AVUs having under the same
+               attribute. Return self.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
 
 sub supersede_avus {
   my ($self, $attribute, $value, $units) = @_;
@@ -240,14 +294,34 @@ sub supersede_avus {
   return $self;
 }
 
-sub grant_group_access {
-  my ($self,  $permission, @groups) = @_;
+sub get_permissions {
+  my ($self) = @_;
 
   my $path = $self->str;
-  foreach my $group (@groups) {
-    $self->info("Giving group '$group' '$permission' access to '$path'");
-    $self->irods->set_group_access($permission, $group, $path);
+  return $self->irods->get_object_permissions($path);
+}
+
+=head2 set_permissions
+
+  Arg [1]    : permission Str, one of 'null', 'read', 'write' or 'own'
+  Arg [2]    : Array of owners (users and /or groups).
+
+  Example    : $obj->set_permissions('read', 'user1', 'group1')
+  Description: Set access permissions on the object. Return self.
+  Returntype : WTSI::NPG::iRODS::DataObject
+
+=cut
+
+sub set_permissions {
+  my ($self, $permission, @owners) = @_;
+
+  my $path = $self->str;
+  foreach my $owner (@owners) {
+    $self->info("Giving owner '$owner' '$permission' access to '$path'");
+    $self->irods->set_object_permissions($permission, $owner, $path);
   }
+
+  return $self;
 }
 
 =head2 str

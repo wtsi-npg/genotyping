@@ -223,7 +223,7 @@ sub publish {
     }
 
     my @groups = $analysis_coll->expected_irods_groups;
-    $analysis_coll->grant_group_access('read', @groups);
+    $analysis_coll->set_content_permissions('read', @groups);
   };
 
   if ($@) {

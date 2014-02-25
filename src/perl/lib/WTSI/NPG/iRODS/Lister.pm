@@ -46,15 +46,23 @@ sub list_object {
   return $path;
 }
 
-sub list_collection{
-  my ($self, $collection) = @_;
+sub list_collection {
+  my ($self, $collection, $recur) = @_;
 
-  my ($object_specs, $collection_specs) = $self->_list_collection($collection);
+  my $obj_specs;
+  my $coll_specs;
+
+  if ($recur) {
+    ($obj_specs, $coll_specs) = $self->_list_collection_recur($collection);
+  }
+  else {
+    ($obj_specs, $coll_specs) = $self->_list_collection($collection);
+  }
 
   my @paths;
-  if ($object_specs and $collection_specs) {
-    my @data_objects = map { $self->_to_path_str($_) } @$object_specs;
-    my @collections  = map { $self->_to_path_str($_) } @$collection_specs;
+  if ($obj_specs and $coll_specs) {
+    my @data_objects = map { $self->_to_path_str($_) } @$obj_specs;
+    my @collections  = map { $self->_to_path_str($_) } @$coll_specs;
     @paths = (\@data_objects, \@collections);
   }
 
@@ -79,6 +87,8 @@ sub get_object_acl {
     $acl = $self->_to_acl($response);
   }
 
+  $self->debug("ACL of '$object' is ", $self->_to_acl_str($acl));
+
   return @$acl;
 }
 
@@ -89,8 +99,12 @@ sub get_collection_acl {
 
   my @acl;
   if ($collection_specs) {
-    my $collection = shift @$collection_specs;
-     @acl = @{$self->_to_acl($collection)};
+    my $collection_spec = shift @$collection_specs;
+    my $acl = $self->_to_acl($collection_spec);
+
+    $self->debug("ACL of '$collection' is ", $self->_to_acl_str($acl));
+
+    @acl = @$acl;
   }
 
   return @acl;
@@ -161,6 +175,31 @@ sub _list_collection {
   return @paths;
 }
 
+# Return two arrays of path specs, given a collection path to recurse
+sub _list_collection_recur {
+  my ($self, $collection) = @_;
+
+  $self->debug("Recursing into '$collection'");
+  my ($obj_specs, $coll_specs) = $self->_list_collection($collection);
+
+  my @coll_specs = @$coll_specs;
+  my $this_coll = shift @coll_specs;
+
+  my @all_obj_specs  = @$obj_specs;
+  my @all_coll_specs = ($this_coll);
+
+  foreach my $sub_coll (@coll_specs) {
+    my $path = $self->_to_path_str($sub_coll);
+    $self->debug("Recursing into sub-collection '$path'");
+
+    my ($sub_obj_specs, $sub_coll_specs) = $self->_list_collection_recur($path);
+    push @all_obj_specs,  @$sub_obj_specs;
+    push @all_coll_specs, @$sub_coll_specs;
+  }
+
+  return (\@all_obj_specs, \@all_coll_specs);
+}
+
 sub _to_path_str {
   my ($self, $path_spec) = @_;
 
@@ -168,7 +207,7 @@ sub _to_path_str {
     $self->logconfess('A defined path_spec argument is required');
 
   ref $path_spec eq 'HASH' or
-    $self->logconfess('A defined path_spec argument is required');
+    $self->logconfess('A HashRef path_spec argument is required');
 
   exists $path_spec->{collection} or
     $self->logconfess('The path_spec argument did not have a "collection" key');
@@ -188,13 +227,33 @@ sub _to_acl {
     $self->logconfess('A defined path_spec argument is required');
 
   ref $path_spec eq 'HASH' or
-    $self->logconfess('A defined path_spec argument is required');
+    $self->logconfess('A HashRef path_spec argument is required');
 
   exists $path_spec->{access} or
     $self->logconfess('The path_spec argument did not have an "access" key');
 
   return $path_spec->{access};
 }
+
+sub _to_acl_str {
+  my ($self, $acl) = @_;
+
+  defined $acl or
+    $self->logconfess('A defined acl argument is required');
+
+  ref $acl eq 'ARRAY' or
+    $self->logconfess('An ArrayRef acl argument is required');
+
+  my $str = '[';
+
+  my @strs;
+  foreach my $elt (@$acl) {
+    push @strs, sprintf("%s:%s", $elt->{owner}, $elt->{level});
+  }
+
+  return '[' . join(', ', @strs) . ']' ;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

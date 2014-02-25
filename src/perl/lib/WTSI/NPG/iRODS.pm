@@ -42,7 +42,8 @@ has 'lister' =>
      return WTSI::NPG::iRODS::Lister->new
        (environment => $self->environment,
         max_size    => 1024 * 1204,
-        arguments   => ['--acl'])->start;
+        arguments   => ['--acl'],
+        logger      => $self->logger)->start;
    });
 
 has 'meta_lister' =>
@@ -54,7 +55,8 @@ has 'meta_lister' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::MetaLister->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_adder' =>
@@ -67,7 +69,8 @@ has 'meta_adder' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'add'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_remover' =>
@@ -80,7 +83,8 @@ has 'meta_remover' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'rem'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'acl_modifier' =>
@@ -92,7 +96,8 @@ has 'acl_modifier' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::ACLModifier->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 our $IGROUPADMIN = 'igroupadmin';
@@ -107,6 +112,8 @@ our $IRM     = 'irm';
 our $IPWD    = 'ipwd';
 # our $ICHMOD  = 'ichmod';
 our $MD5SUM  = 'md5sum';
+
+our @VALID_PERMISSIONS = qw(null read write own);
 
 around 'working_collection' => sub {
   my ($orig, $self, @args) = @_;
@@ -331,7 +338,7 @@ sub reset_working_collection {
 =cut
 
 sub list_collection {
-  my ($self, $collection) = @_;
+  my ($self, $collection, $recur) = @_;
 
   defined $collection or
     $self->logconfess('A defined collection argument is required');
@@ -341,9 +348,11 @@ sub list_collection {
 
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
-  $self->debug("Listing collection '$collection'");
 
-  return $self->lister->list_collection($collection);
+  my $recursively = $recur ? 'recursively' : '';
+  $self->debug("Listing collection '$collection' $recursively");
+
+  return $self->lister->list_collection($collection, $recur);
 }
 
 =head2 add_collection
@@ -507,6 +516,9 @@ sub set_collection_permissions {
     $self->logconfess('A non-empty collection argument is required');
 
   my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
 
   $self->debug("Setting permissions on '$collection' to ",
                "'$perm_str' for '$owner'");
@@ -897,6 +909,9 @@ sub set_object_permissions {
 
   my $perm_str = defined $level ? $level : 'null';
 
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
   $self->debug("Setting permissions on '$object' to '$perm_str' for '$owner'");
   my @acl = $self->get_object_permissions($object);
 
@@ -1125,7 +1140,7 @@ sub calculate_checksum {
 
   Example    : $irods->validate_checksum_metadata('/my/path/lorem.txt')
   Description: Return true if the MD5 checksum in the metadata of an iRODS
-               object is identical to the MD5 caluclated by iRODS.
+               object is identical to the MD5 calculated by iRODS.
   Returntype : boolean
 
 =cut

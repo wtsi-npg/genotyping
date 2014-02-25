@@ -11,7 +11,7 @@ use List::AllUtils qw(all any none);
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 132;
+use Test::More tests => 135;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -90,7 +90,7 @@ sub group_exists : Test(2) {
   ok(!$irods->group_exists('no_such_group'), 'An absent group does not exist');
 }
 
-sub set_group_access : Test(6) {
+sub set_group_access : Test(7) {
   my $irods = WTSI::NPG::iRODS->new;
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
 
@@ -101,6 +101,11 @@ sub set_group_access : Test(6) {
   dies_ok { $irods->set_group_access('read', 'no_such_group_exists',
                                      $lorem_object) }
     'Expected to fail setting access for non-existent group';
+
+  my $r0 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r0, 'No public read access');
 
   ok($irods->set_group_access('read', 'public', $lorem_object));
 
@@ -191,7 +196,7 @@ sub set_collection_permissions : Test(6) {
   ok($r2, 'Removed public read access');
 }
 
-sub list_collection : Test(3) {
+sub list_collection : Test(5) {
   my $irods = WTSI::NPG::iRODS->new;
   my ($objs, $colls) = $irods->list_collection("$irods_tmp_coll/irods");
 
@@ -206,6 +211,39 @@ sub list_collection : Test(3) {
 
    ok(!$irods->list_collection('no_collection_exists'),
       'Failed to list a non-existent collection');
+
+  my ($objs_deep, $colls_deep) =
+    $irods->list_collection("$irods_tmp_coll/irods", 'RECURSE');
+
+  is_deeply($objs_deep, ["$irods_tmp_coll/irods/lorem.txt",
+                         "$irods_tmp_coll/irods/test.txt",
+                         "$irods_tmp_coll/irods/utf-8.txt",
+                         "$irods_tmp_coll/irods/collect_files/a/10.txt",
+                         "$irods_tmp_coll/irods/collect_files/a/x/1.txt",
+                         "$irods_tmp_coll/irods/collect_files/b/20.txt",
+                         "$irods_tmp_coll/irods/collect_files/b/y/2.txt",
+                         "$irods_tmp_coll/irods/collect_files/c/30.txt",
+                         "$irods_tmp_coll/irods/collect_files/c/z/3.txt",
+                         "$irods_tmp_coll/irods/md5sum/lorem.txt",
+                         "$irods_tmp_coll/irods/test/file1.txt",
+                         "$irods_tmp_coll/irods/test/file2.txt",
+                         "$irods_tmp_coll/irods/test/dir1/file3.txt",
+                         "$irods_tmp_coll/irods/test/dir2/file4.txt"])
+    or diag explain $objs_deep;
+
+  is_deeply($colls_deep, ["$irods_tmp_coll/irods",
+                          "$irods_tmp_coll/irods/collect_files",
+                          "$irods_tmp_coll/irods/collect_files/a",
+                          "$irods_tmp_coll/irods/collect_files/a/x",
+                          "$irods_tmp_coll/irods/collect_files/b",
+                          "$irods_tmp_coll/irods/collect_files/b/y",
+                          "$irods_tmp_coll/irods/collect_files/c",
+                          "$irods_tmp_coll/irods/collect_files/c/z",
+                          "$irods_tmp_coll/irods/md5sum",
+                          "$irods_tmp_coll/irods/test",
+                          "$irods_tmp_coll/irods/test/dir1",
+                          "$irods_tmp_coll/irods/test/dir2"])
+    or diag explain $colls_deep;
 }
 
 sub add_collection : Test(2) {

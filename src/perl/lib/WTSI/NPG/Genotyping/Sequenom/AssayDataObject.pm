@@ -42,7 +42,7 @@ sub update_secondary_metadata {
 
     # Revoke access from current groups
     my @current_groups = $self->expected_irods_groups;
-    $self->grant_group_access('null', @current_groups);
+    $self->set_permissions('null', @current_groups);
 
     # Supersede all the secondary metadata with new values
     my @meta = make_sample_metadata($ss_sample);
@@ -53,7 +53,7 @@ sub update_secondary_metadata {
 
     # Grant access to the new groups
     my @groups = $self->expected_irods_groups;
-    $self->grant_group_access('read', @groups);
+    $self->set_permissions('read', @groups);
   }
   else {
     $self->info("Skipping update of metadata for '", $self->str, "': ",
