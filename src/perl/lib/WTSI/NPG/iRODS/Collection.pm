@@ -129,6 +129,13 @@ sub remove_avu {
   return $self;
 }
 
+sub get_permissions {
+  my ($self) = @_;
+
+  my $path = $self->str;
+  return $self->irods->get_collection_permissions($path);
+}
+
 =head2 set_permissions
 
   Arg [1]    : permission Str, one of 'null', 'read', 'write' or 'own'
@@ -147,8 +154,8 @@ sub set_permissions {
 
   my $path = $self->str;
   foreach my $owner (@owners) {
-    $self->info("Giving owner '$owner' '$permission' access to '$path'");
-    $self->irods->set_collection_permissions($permission, $owner, $path);
+    $self->info("Giving owner '$owner' '$perm_str' access to '$path'");
+    $self->irods->set_collection_permissions($perm_str, $owner, $path);
   }
 
   return $self;

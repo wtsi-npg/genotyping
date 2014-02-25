@@ -315,10 +315,13 @@ sub get_permissions {
 sub set_permissions {
   my ($self, $permission, @owners) = @_;
 
+
+  my $perm_str = defined $permission ? $permission : 'null';
+
   my $path = $self->str;
   foreach my $owner (@owners) {
-    $self->info("Giving owner '$owner' '$permission' access to '$path'");
-    $self->irods->set_object_permissions($permission, $owner, $path);
+    $self->info("Giving owner '$owner' '$perm_str' access to '$path'");
+    $self->irods->set_object_permissions($perm_str, $owner, $path);
   }
 
   return $self;
