@@ -20,13 +20,13 @@ use Pod::Usage;
 
 use WTSI::NPG::Utilities::IO qw(maybe_stdin
                                 maybe_stdout);
-use WTSI::NPG::Utilities::DelimitedFiles qw(find_column_indices
-                                            filter_columns);
 
 use WTSI::NPG::Genotyping qw(read_sample_json);
-use WTSI::NPG::Genotyping::Illuminus qw(read_it_column_names
+use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
+                                        read_it_column_names
                                         update_it_columns
-                                        write_gt_calls);
+                                        write_gt_calls
+                                        write_it_header);
 
 Log::Log4perl->easy_init($ERROR);
 
@@ -41,16 +41,16 @@ my $start;
 my $verbose;
 my $whole_genome_amplified;
 
-GetOptions('chr=s' => \$chromosome,
-           'end=i' => \$end,
-           'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-           'input=s' => \$input,
-           'output=s' => \$output,
-           'plink' => \$plink,
+GetOptions('chr=s'     => \$chromosome,
+           'end=i'     => \$end,
+           'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
+           'input=s'   => \$input,
+           'output=s'  => \$output,
+           'plink'     => \$plink,
            'samples=s' => \$samples,
-           'start=i' => \$start,
-           'verbose' => \$verbose,
-           'wga' => \$whole_genome_amplified);
+           'start=i'   => \$start,
+           'verbose'   => \$verbose,
+           'wga'       => \$whole_genome_amplified);
 
 unless ($samples) {
   pod2usage(-msg => "A --samples argument is required\n",
@@ -199,7 +199,6 @@ else {
   exit(0);
 }
 
-
 # Write the header line of the genotype call result
 sub write_gt_header {
   my ($out, $column_names) = @_;
@@ -242,68 +241,6 @@ sub make_fifo {
   mkfifo($filename, '0400') or die "Failed to create FIFO '$filename': $!\n";
 
   return $filename;
-}
-
-sub find_female_columns {
-  my ($col_names, $samples) = @_;
-
-  my @females = grep { $_->{'gender'} eq 'Female'} @samples;
-  my @to_replace = map { $_->{'uri'} } @females;
-
-  my @col_names = @$col_names;
-  unless (@col_names % 2 == 0) {
-    die "Intensity data contained an odd number of data columns\n";
-  }
-
-  # Calculate the real sample names from the intensity data column
-  # names
-  my @sample_names;
-  for (my $i = 0; $i < scalar @col_names; $i += 2) {
-    push(@sample_names, common_stem($col_names[$i], $col_names[$i + 1]));
-  }
-
-  # Validate the input
-  my %sample_lookup = map { $_ => 1 } @sample_names;
-  for (my $i = 0; $i < scalar @to_replace; ++$i) {
-    my $x = $to_replace[$i];
-    unless (exists $sample_lookup{$x}) {
-      die "Intensity data did not contain data columns for '$x'\n";
-    }
-  }
-
-  # Calculate the intensity data column indices on which to operate
-  my %col_lookup = map { $_ => 1 } @to_replace;
-  my @indices;
-  for (my $i = 0, my $j = 0; $i < scalar @sample_names; ++$i, $j += 2) {
-    my $y = $sample_names[$i];
-
-    if (exists $col_lookup{$y}) {
-      push(@indices, $j, $j + 1);
-    }
-  }
-
-  return \@indices;
-}
-
-# Run with all female data set to intensity 1.0 in both channels
-sub nullify_females {
-  my ($input, $command, $samples, $verbose) = @_;
-
-  my $in = maybe_stdin($input);
-  open(my $iln, '|-', "$command") or die "Failed to open pipe to '$command'\n";
-  my $col_names = read_it_column_names($in);
-  my $females = find_female_columns($col_names, $samples);
-
-  if ($verbose) {
-    print STDERR "Nullifying intensities for females in columns: [",
-      join(", "), "]";
-  }
-
-  print $iln join("\t", qw(SNP Coor Alleles), @$col_names), "\n";
-  update_it_columns($in, $iln, $females, 1.0);
-  close($iln) or warn "Failed to close pipe to '$command'\n";
-
-  return;
 }
 
 __END__

@@ -1,17 +1,19 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::SNP;
+package WTSI::NPG::Genotyping::Call;
 
 use Moose;
 
-has 'name'       => (is => 'ro', isa => 'Str', required => 1);
-has 'ref_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'alt_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'chromosome' => (is => 'ro', isa => 'Str', required => 1);
-has 'position'   => (is => 'ro', isa => 'Int', required => 1);
-has 'strand'     => (is => 'ro', isa => 'Str', required => 0);
-has 'str'        => (is => 'ro', isa => 'Str', required => 0);
+has 'snp' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::SNP',
+   required => 1);
+
+has 'genotype' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
 
 __PACKAGE__->meta->make_immutable;
 

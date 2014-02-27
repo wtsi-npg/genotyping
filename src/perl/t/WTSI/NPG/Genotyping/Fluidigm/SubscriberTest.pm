@@ -8,7 +8,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 6;
+use Test::More tests => 7;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -90,5 +90,13 @@ sub get_assay_resultset : Test(2) {
   } 'Fails on matching multiple results';
 }
 
+sub get_calls : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+      (irods => $irods)->get_calls('Homo_sapiens (1000Genomes)', 'qc',
+                                   'ABC0123456789')};
+  cmp_ok(scalar @calls, '==', 26, 'Number of calls');
+}
 
 1;

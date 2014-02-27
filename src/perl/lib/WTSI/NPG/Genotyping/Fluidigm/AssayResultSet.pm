@@ -191,7 +191,7 @@ sub _parse_assay_results {
        type           => $record->[5],
        auto           => $record->[6],
        confidence     => $record->[7],
-       call           => $record->[8],
+       final          => $record->[8],
        converted_call => $record->[9],
        x_intensity    => $record->[10],
        y_intensity    => $record->[11],

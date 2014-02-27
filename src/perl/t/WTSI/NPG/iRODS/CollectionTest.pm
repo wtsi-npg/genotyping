@@ -6,6 +6,7 @@ package WTSI::NPG::iRODS::CollectionTest;
 use strict;
 use warnings;
 use File::Spec;
+use List::AllUtils qw(all any none);
 
 use base qw(Test::Class);
 use Test::More tests => 40;
@@ -208,7 +209,7 @@ sub get_permissions : Test(1) {
 
   my $perms = all { exists $_->{owner} &&
                     exists $_->{level} }
-   $coll->get_permissions;
+    $coll->get_permissions;
   ok($perms, 'Permissions obtained');
 }
 
