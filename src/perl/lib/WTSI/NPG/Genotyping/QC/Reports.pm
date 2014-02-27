@@ -1,7 +1,8 @@
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # July 2012
 
-# Generate human-readable reports containing QC results
+# Generate plots and PDF report containing QC results
+# Accompanies CSV file generated in Collation.pm
 
 package WTSI::NPG::Genotyping::QC::Reports;
 
@@ -9,6 +10,7 @@ use strict;
 use warnings;
 use Carp;
 use Cwd qw/getcwd abs_path/;
+use File::Basename;
 use JSON;
 use POSIX qw/strftime/;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject 
@@ -25,38 +27,19 @@ our $allMetricsName = "ALL_METRICS";
 our $allPlatesName = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
   magnitude/;
-our $NON_EMPTY_FIELDS = @dbInfoHeaders + 2; # add name, inclusion status
-
-sub bySampleName {
-    # comparison function for sorting samples in getSampleInfo
-    # if in plate_well_id format, sort by id; otherwise use standard sort
-    if ($a =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/ &&
-        $b =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/) {
-        my @termsA = split(/_/, $a);
-        my @termsB = split(/_/, $b);
-        return $termsA[-1] cmp $termsB[-1];
-    } else {
-        return $a cmp $b;
-    }   
-}
 
 sub createReports {
-    # 'main' method to write text and CSV files
-    my ($csvPath, $texPath, $resultPath, $config, $dbPath, 
-        $genderThresholdPath, $qcDir, $introPath, $qcName, $title, 
-        $author) = @_;
+    # 'main' method to write text and PDF files
+    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath, 
+	$qcDir, $introPath, $qcName, $title, $author) = @_;
     $qcName ||= qcNameFromPath($qcDir);
-    my $csvOK = writeCsv($resultPath, $dbPath, $config, $csvPath);
-    if (not $csvOK) { carp "Warning: Creation of CSV summary failed."; }
     writeSummaryLatex($texPath, $resultPath, $config, $dbPath, 
                       $genderThresholdPath, $qcDir, $introPath,
                       $qcName, $title, $author);
     my $pdfOK = texToPdf($texPath);
     if (not $pdfOK) { carp "Warning: Creation of PDF summary failed."; }
-    my $ok = $csvOK && $pdfOK;
-    return $ok;
+    return $pdfOK;
 }
-
 
 sub dbDatasetInfo {
     # get general information on analysis run(s) from pipeline database
@@ -76,55 +59,6 @@ sub dbDatasetInfo {
     return @datasetInfo;
 }
 
-sub dbExcludedSamples {
-    # find list of excluded sample URIs from database
-    # use to fill in empty lines for CSV file
-    my $dbfile = shift;
-    my $db = getDatabaseObject($dbfile);
-    my @excluded;
-    my @samples = $db->sample->all;
-    foreach my $sample (@samples) {
-        if (!($sample->include)) {
-            push @excluded, $sample->uri;
-        }
-    }
-    $db->disconnect();
-    return @excluded;
-}
-
-sub dbSampleInfo {
-    # get general information on analysis run from pipeline database
-    # return a hash indexed by sample
-    my $dbfile = shift;
-    my $db = getDatabaseObject($dbfile);
-    my %sampleInfo;
-    my @runs = $db->piperun->all;
-    foreach my $run (@runs) {
-        my @root;
-        my @datasets = $run->datasets->all;
-        foreach my $dataset (@datasets) {
-            my @samples = $dataset->samples->all;
-            @root = ($run->name, $dataset->if_project, 
-                     $dataset->datasupplier->name,                    
-                     $dataset->snpset->name);
-            # query for rowcol, supplier name, chip no.
-            foreach my $sample (@samples) {
-                my @info = (
-                    $sample->supplier_name,
-                    $sample->rowcol,
-                    $sample->beadchip);
-                foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
-                    if ($info[$i] eq "") { $info[$i] = "NA"; } 
-                }
-                unshift(@info, @root);
-                $sampleInfo{$sample->uri} = \@info;
-            }
-        }
-    }
-    $db->disconnect();
-    return %sampleInfo;
-}
-
 sub findPlateFields {
     # find report fields for a single plate, or an entire experiment
     my ($total, $pass, $crRef, $hetRef) = @_;
@@ -135,24 +69,6 @@ sub findPlateFields {
     my $crMedian = median(@cr);
     my ($hetMean, $hetSd) = meanSd(@{$hetRef});
     return ($total, $excl, $exclPercent, $crMean, $crMedian, $hetMean);
-}
-
-sub getCsvHeaders {
-    my $config = shift;
-    my @headers = @dbInfoHeaders;
-    push @headers, qw/sample include plate well pass/;
-    foreach my $metric (@METRIC_NAMES) {
-        my @suffixes;
-        if ($metric eq 'gender') {
-            @suffixes = qw/pass xhet inferred supplied/;
-        } else {
-            @suffixes = qw/pass value/;
-        }
-        foreach my $suffix (@suffixes) {
-            push(@headers, $metric."_".$suffix);
-        }
-    }
-    return @headers;
 }
 
 sub getMetricTableHeader {
@@ -195,43 +111,6 @@ sub getPlateInfo {
         $sampleCounts{$plate}++;
     }
     return (\%passCounts, \%sampleCounts, $sampleTotal, $passTotal);
-}
-
-sub getSampleInfo {
-    # for each sample, get plate, well, metric values and pass/fail status
-    # also get overall sample pass/fail
-    my %records = %{ shift() };
-    my @sampleFields;
-    my @samples = keys(%records);
-    @samples = sort bySampleName @samples;
-    my $include = 1; # all samples with QC results were included in genotyping
-    foreach my $sample (@samples) {
-        if (not $records{$sample}) { 
-            croak "No QC results found for sample $sample!"; 
-        }
-        my %record = %{$records{$sample}};
-        my $samplePass = 1; # $samplePass is placeholder
-        my @fields = ($sample, $include, $record{'plate'}, 
-                      $record{'address'}, $samplePass); 
-        foreach my $metric (@METRIC_NAMES) {
-            if (not $record{$metric}) { 
-                my @null;
-                if ($metric eq 'gender') {
-                    @null = (1, "NA", "NA", "NA");
-                } else {
-                    @null = (1, "NA");
-                }
-                push(@fields, @null); # no results found; use placeholders
-            } else {
-                my @status =  @{$record{$metric}}; # pass/fail and metric
-                if ($status[0]==0) { $samplePass = 0; }
-                push(@fields, @status); 
-            }
-        }
-        $fields[4] = $samplePass;
-        push @sampleFields, \@fields;
-    }
-    return @sampleFields;
 }
 
 sub latexFooter {
@@ -465,56 +344,6 @@ sub readFileToString {
     return $string;
 }
 
-sub sampleFieldsToText {
-    # convert unformatted results to array of formatted text fields
-    my @fields = @{ shift() };
-    my @out;
-    for (my $i=0;$i<@fields;$i++) {
-        if ($fields[$i] =~ /^\d+$/ || $fields[$i] =~ /[a-zA-Z]+/) { 
-            push(@out, $fields[$i]);  # text or integers
-        } else { 
-            push(@out, sprintf('%.4f', $fields[$i])); 
-        }
-    }
-    return @out;
-}
-
-sub textForCsv {
-    my ($resultPath, $dbPath, $config) = @_;
-    my $resultsRef = readJson($resultPath);
-    my @headers = getCsvHeaders($config);
-    my $blankForExcluded = @headers - $NON_EMPTY_FIELDS; 
-    my @text = (\@headers,);
-    my @sampleFields = getSampleInfo($resultsRef, $config); # genotyped samples
-    my %dbInfo = dbSampleInfo($dbPath); # all samples
-    my @excluded = dbExcludedSamples($dbPath);
-    my %excluded;
-    foreach my $sam (@excluded) { $excluded{$sam}=1; }
-    foreach my $ref (@sampleFields) {
-        my @out = sampleFieldsToText($ref);
-        my $sample = $out[0];
-        if ($excluded{$sample}) { next; }
-        unshift(@out, @{$dbInfo{$sample}});
-        if ($#headers != $#out) { 
-            croak "Numbers of output headers and fields differ:".
-                " $#headers != $#out"; 
-        }
-        push(@text, \@out);
-    }
-    # append empty lines for excluded samples
-    foreach my $sample (@excluded) {
-        my @out = ($sample, 0);
-        my $i = 0;
-        while ($i < $blankForExcluded) {
-            push @out, "NA";
-            $i++;
-        }
-        unshift(@out, @{$dbInfo{$sample}});
-        push(@text, \@out);
-    }
-    return @text;
-}
-
 sub textForDatasets {
     # text for dataset identification; includes optional directory name
     # fields: run project data_supplier snpset directory
@@ -664,19 +493,18 @@ sub texToPdf {
     my $cleanup = shift;
     $cleanup ||= 1;
     $texPath = abs_path($texPath);
-    my @terms = split('/', $texPath);
-    my $file = pop @terms;
-    my $texDir = join('/', @terms);
-    my $startDir = getcwd();
+    my $texDir = dirname($texPath);
     # run pdflatex twice; needed to get cross-references correct
-    chdir($texDir);
-    system('pdflatex -draftmode '.$file.' > /dev/null'); # draftmode is faster
-    my $result = system('pdflatex '.$file.' > /dev/null');
+    my $args = '-output-directory '.$texDir.' '.$texPath;
+    system('pdflatex '.$args.' -draftmode > /dev/null'); # draftmode is faster
+    my $result = system('pdflatex '.$args.' > /dev/null');
     if ($cleanup) {
-        my @rm = qw/*.aux *.dvi *.lof/; # keeps .log, .tex, .pdf
-        system('rm -f '.join(' ', @rm));
+	my $texBase = basename($texPath, '.tex');
+	my @suffixes = qw/.aux .dvi .lof/; # keeps .log, .tex, .pdf
+	foreach my $suffix (@suffixes) {
+	    system("rm -f $texDir/$texBase$suffix");
+	}
     }
-    chdir($startDir);
     if ($result==0) { return 1; }
     else { return 0; }
 }

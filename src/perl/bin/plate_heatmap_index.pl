@@ -11,6 +11,7 @@ use warnings;
 use strict;
 use CGI::Pretty qw/:standard *table/; # writes prettier html code
 use Cwd;
+use File::Basename;
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 sub getLinkThumbnail {
@@ -26,10 +27,11 @@ sub getLinkThumbnail {
 }
 
 sub getPlateName {
-    # extract plate name from plot filename
+    # extract plate name from plot path
     # assume plot filenames are in the form plot_PREFIX_PLATE.png 
     # prefix may *not* contain _'s, plate may contain .'s and _'s)
-    my $plotName = shift;
+    my $plotPath = shift;
+    my $plotName = basename($plotPath);
     my @items = split(/_/, $plotName);
     my @tail = splice(@items, 2);
     my $tail = join('_', @tail);
@@ -42,12 +44,10 @@ sub getPlateInfo {
     # return list of plate names, and hashes of CR, het, xy plot paths indexed by plate
     # glob given directory; assume plot filenames are in the form PREFIX_PLATE.png (prefix may contain _'s)
     my $plotDir = shift;
-    my $startDir = getcwd;
-    chdir($plotDir);
     my (%plates, %crPlots, %hetPlots, %magPlots);
     my ($crExpr, $hetExpr, $magExpr) = qw(plot_cr_* plot_het_* 
-  plot_magnitude_*);
-    my @files = glob('{cr,het,magnitude,}*.png');
+                                          plot_magnitude_*);
+    my @files = glob($plotDir.'/{cr,het,magnitude,}*.png');
     foreach my $file (@files) {
         my $plate = getPlateName($file);
         $plates{$plate} = 1;
@@ -56,12 +56,16 @@ sub getPlateInfo {
         elsif ($file =~ $magExpr) { $magPlots{$plate} = $file; }
     }
     my @plates = sort(keys(%plates));
-    chdir($startDir);
     return (\@plates, \%crPlots, \%hetPlots, \%magPlots);
 }
 
 
 my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/output directory, output filename
+if (@ARGV!=3) { 
+    die "Usage: $0 experiment_name input/output_directory output_filename\n";
+} elsif (!(-e $plotDir && -d $plotDir)) {
+    die "Output path '$plotDir' does not exist or is not a directory";
+} 
 my @refs = getPlateInfo($plotDir);
 my @plates = @{shift(@refs)};
 my %crPlots = %{shift(@refs)};
