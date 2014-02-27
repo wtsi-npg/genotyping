@@ -10,8 +10,9 @@
 # - Supply arbitrary lists of samples/SNPs to exclude from QC
 
 use warnings;
-
 use strict;
+use Carp;
+use Cwd;
 use Getopt::Long;
 use File::Temp;
 
@@ -30,7 +31,7 @@ use File::Temp;
 # duplicate.log, basic log info
 
 my (%defaults, %snps, %pos, %chr);
-my ($bfile, $af, $log, $sample_cr, $help, $help_text);
+my ($bfile, $af, $log, $sample_cr, $help, $help_text, $dir);
 my ($maf_min, $maf_max, $max_snps, $min_snp_cr, $min_dist);
 my @use_snps;
 
@@ -50,13 +51,20 @@ GetOptions("af=s"        => \$af,       # SNP file with call rate (CR), allele f
            "maf_min=s"   => \$maf_min,  # only SNPs with MAF in range
            "maf_max=s"   => \$maf_max,
 	   "max=i"       => \$max_snps, # max number of SNPs to use in test
-	   "sample_cr=s" => \$sample_cr, # does nothing, but kept in for backwards compatibility of workflows
+	   #"sample_cr=s" => \$sample_cr, # does nothing, but kept in for backwards compatibility of workflows
+	   "dir=s"       => \$dir,   # directory for input and output
 	   "min_snp_cr=i"=> \$min_snp_cr, # min call rate for snps in test set
 	   "help|h"      => \$help,     # print help string and exit
     );
 # set unspecified parameters to default values
-$af ||= $defaults{'af'};
-$log ||= $defaults{'log'};
+# parameter default values
+if ($dir && !(-e $dir && -d $dir)) {
+    croak "Output path $dir does not exist or is not a directory!";
+}
+$dir ||= getcwd();
+
+$af ||= $dir.'/'.$defaults{'af'};
+$log ||= $dir.'/'.$defaults{'log'};
 $maf_min ||= $defaults{'maf_min'};
 $maf_max ||= $defaults{'maf_max'};
 $max_snps ||= $defaults{'max_snps'};
@@ -94,7 +102,7 @@ close $bim;
 
 # open genotyping SNP results file (defaults to snp_cr_af.txt) and filter on MAF and CR
 # populate a hash %snps: Keys=chromosomes, values = lists of (snp_name, snp_position) pairs
-open my $snpfile, "<", $af or die $!;
+open my $snpfile, "<", $af or die "Cannot read SNP file '$af': $!";
 while (<$snpfile>) {
     my ($snp, $cr, $maf) = (split)[0, 1, 5];
     next unless $chr{$snp};
@@ -131,9 +139,11 @@ $snp_file->autoflush(1);
 print $snp_file map { $_ . "\n" } @use_snps;
 
 # execute binary to write pairwise concordance 
-my $cmd = "pairwise_concordance_bed -n $snp_file $bfile";
+my $full = $dir.'/duplicate_full.txt';
+my $summary = $dir.'/duplicate_summary.txt';
+my $cmd = "pairwise_concordance_bed -n $snp_file -f $full -m $summary $bfile";
 system($cmd) && die qq(Error running command "$cmd": $!);
 
 # gzip pairwise output file; can be quite large, >> 1 GB
-$cmd = "gzip -f duplicate_full.txt";
+$cmd = "gzip -f $full";
 system($cmd) && die qq(Error running command "$cmd": $!);;

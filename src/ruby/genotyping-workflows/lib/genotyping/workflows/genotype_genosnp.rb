@@ -134,8 +134,8 @@ Returns:
 
       if smfile
         qcargs = {:run => run_name }.merge(args)
-        gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', 
-                                    qcargs, async)
+        output = File.join(work_dir, 'genosnp_qc')
+        gsquality = quality_control(dbfile, gsfile, output, qcargs, async)
       end
 
       [gsfile, gsquality] if [gsfile, gsquality].all?

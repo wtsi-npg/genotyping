@@ -128,25 +128,18 @@ Returns:
       manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
-      ## run gencall QC to apply gencall CR filter and find genders
-      gcqcargs = {:run => run_name}.merge(args)
-      gcqcdir = File.join(work_dir, 'gencall_qc')
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                  async, true)
-
-      ## apply filtering to pipeline DB, if required
-      filtered = nil
-      if gcquality
-        if nofilter
-          filtered = true
+      if nofilter
+        gcquality = true
+      else
+        ## run gencall QC to apply gencall CR filter and find genders
+        if fconfig
+          gcqcargs = {:run => run_name, :filter => fconfig}.merge(args)
         else
-          # maf/het and intensity metrics are not calculated (or required)
-          gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
-          if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-          else fargs = {:illuminus => true}.merge(args)
-          end
-          filtered = filter_samples(gcqcjson, dbfile, fargs)
+          gcqcargs = {:run => run_name, :illuminus_filter => true}.merge(args)
         end
+        gcqcdir = File.join(work_dir, 'gencall_qc')
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                    async, true)
       end
 
       ## use post-filter pipeline DB to generate sample JSON and .sim file
@@ -154,7 +147,7 @@ Returns:
         :gender_method => gender_method}.merge(args)
       smfile = nil
       cjson = nil
-      if filtered and manifest
+      if gcquality and manifest
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
@@ -187,7 +180,7 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, args, async)
 
-      output = 'illuminus_qc'
+      output = File.join(work_dir, 'illuminus_qc')
       qcargs = {:run => run_name, :sim => smfile}.merge(args)
       ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
 

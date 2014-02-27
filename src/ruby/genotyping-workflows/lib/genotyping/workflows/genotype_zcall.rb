@@ -46,22 +46,26 @@ Arguments:
 - work_dir (String): The working directory, an absolute path.
 - other arguments (keys and values):
 
-    config: <path> of custom pipeline database .ini file. Optional.
-    manifest: <path> of the chip manifest file. Required.
-    egt:  <path> of the .EGT intensity cluster file. Required.
-    chunk_size: <integer> number of samples to analyse in a single GenoSNP job.
-    Optional, defaults to 20.
-    zstart: <integer> start for range of candidate integer z scores. Optional.
-    ztotal: <integer> total number of candidate integer z scores. Optional.
-    filterconfig: <path> to .json file with thresholds for prefilter on GenCall 
-QC. Optional; if absent, uses default zcall thresholds (requires config 
-argument to be specified).
-    nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
-overrides the filterconfig argument.
-    nosim: <boolean> Omit .sim files and intensity metrics for GenCall QC. Optional, defaults to false. Only relevant if filtering is enabled.
-    memory: <integer> number of Mb to request for jobs.
-    queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
-    'normal'.
+    config:        <path> of custom pipeline database .ini file. Optional.
+    manifest:      <path> of the chip manifest file. Required.
+    egt:           <path> of the .EGT intensity cluster file. Required.
+    chunk_size:    <integer> number of samples to analyse in a single 
+                   GenoSNP job. Optional, defaults to 20.
+    zstart:        <integer> start for range of candidate integer z scores. 
+                   Optional.
+    ztotal:        <integer> total number of candidate integer z scores. 
+                   Optional.
+    filterconfig:  <path> to .json file with thresholds for prefilter on 
+                   GenCall QC. Optional; if absent, uses default zcall 
+                   thresholds (requires config argument to be specified).
+    nofilter:      <boolean> omit the prefilter on GenCall QC. Optional. 
+                   If true, overrides the filterconfig argument.
+    nosim:         <boolean> Omit .sim files and intensity metrics for 
+                   GenCall QC. Optional, defaults to false. Only relevant 
+                   if filtering is enabled.
+    memory:        <integer> number of Mb to request for jobs.
+    queue:         <normal | long etc.> An LSF queue hint. Optional, 
+                   defaults to'normal'.
 
 e.g.
 
@@ -202,7 +206,7 @@ Returns:
                                  sjson, njson, args, async)
 
       ## run zcall QC
-      zqc = 'zcall_qc'
+      zqc = File.join(work_dir, 'zcall_qc')
       qcargs = nil
       if nosim
         # no sim file, therefore no intensity metrics
@@ -243,38 +247,23 @@ Returns:
 
       gcifile, * = gtc_to_bed(gcsjson, manifest, gciname, args, async)
       # Must use raw manifest for gtc_to_bed; manifest needs to be consistent with allele values encoded in GTC files. g2i requires an un-normalized manifest as input, carries out normalization itself, and writes normalized .bim files in output.
-      gcsfile = transpose_bed(gcifile, gcsname, args, async)
-
-      ## run plinktools to find maf/het on transposed .bed output
-      hmjson = het_by_maf(gcsfile, work_dir, run_name, args, async)
-
-      if gcsimfile
-        gcqcargs = {:run => run_name, :sim => gcsimfile}.merge(args)
-      else
-        gcqcargs = {:run => run_name}.merge(args)
-      end
-      ## run gencall QC to get metrics for prefiltering
-      gcqcdir = File.join(work_dir, 'gencall_qc')
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                  async, true)
-
-      mqcjson = nil
-      if gcquality and hmjson
-        ## merge results from plinktools MAF/het and generic QC
-        gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
-        mqcpath = File.join(work_dir, 'run1.gencall.merged_qc.json')
-        mqcjson = merge_qc_results([gcqcjson, hmjson], mqcpath, args)
-      end
-      if mqcjson
-        ## apply prefilter to exclude samples from zcall input
-        if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-        else fargs = {:zcall => true}.merge(args)
+      transposed = transpose_bed(gcifile, gcsname, args, async)
+      if transposed
+        gcsfile = File.join(work_dir, gcsname)
+        gcqcargs = {:run => run_name, :mafhet => true}.merge(args)
+        if gcsimfile
+          gcqcargs = {:sim => gcsimfile}.merge(gcqcargs)
         end
-        fargs[:out] = File.join(work_dir, fname)
-        filtered = filter_samples(mqcjson, dbfile, fargs)
-      end
-      return filtered
-
+        if fconfig
+          gcqcargs = {:filter => fconfig}.merge(gcqcargs)
+        else
+          gcqcargs = {:zcall_filter => true}.merge(gcqcargs)
+        end
+        ## run gencall QC to get metrics for prefiltering
+        gcqcdir = File.join(work_dir, 'gencall_qc')
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                    async, true)
+      end # if transposed
     end # def prefilter
 
   end # end of class

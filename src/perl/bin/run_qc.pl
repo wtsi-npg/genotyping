@@ -10,18 +10,21 @@ use warnings;
 use Getopt::Long;
 use Carp;
 use Cwd qw(getcwd abs_path);
+use File::Basename;
 use FindBin qw($Bin);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
+use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig defaultTexIntroPath
-    readQCFileNames);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
+our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, 
-    $plinkPrefix, $runName);
+    $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter, 
+    $illuminusFilter, $include);
 
 GetOptions("help"              => \$help,
            "output-dir=s"      => \$outDir,
@@ -31,22 +34,55 @@ GetOptions("help"              => \$help,
            "inipath=s"         => \$iniPath,
            "title=s"           => \$title,
            "run=s"             => \$runName,
+           "mafhet"            => \$mafHet,
+	   "filter=s"          => \$filterConfig,
+	   "zcall-filter"      => \$zcallFilter,
+	   "illuminus-filter"  => \$illuminusFilter,
+	   "include"           => \$include,
     );
 
 if ($help) {
     print STDERR "Usage: $0 [ options ] PLINK_GTFILE
-PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension). May include directory names, eg. /home/foo/project where plink files are /home/foo/project.bed, etc.
-Options:
---output-dir=PATH Directory for QC output
---sim=PATH        Path to SIM intensity file for xydiff calculation
-                  See note [1] below
---dbpath=PATH     Path to pipeline database .db file
---inipath=PATH    Path to .ini file containing general pipeline and database configuration; local default is $DEFAULT_INI
---run=NAME        Name of run in pipeline database (needed for database update from gender check)
---config=PATH     Path to .json file with QC thresholds; default is taken from inipath
---title           Title for this analysis; will appear in plots
 
-[1] If --sim is not specified, but the intensity files magnitude.txt and xydiff.txt are present in the pipeline output directory, intensity metrics will be read from the files. This allows intensity metrics to be computed only once when multiple callers are used on the same dataset.
+PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension). May include directory names, eg. /home/foo/project where plink files are /home/foo/project.bed, etc.
+
+Options:
+--output-dir=PATH   Directory for QC output
+--sim=PATH          Path to SIM file for intensity metrics. See note [1] below.
+--dbpath=PATH       Path to pipeline database .db file
+--inipath=PATH      Path to .ini file containing general pipeline and database 
+                    configuration; local default is $DEFAULT_INI
+--run=NAME          Name of run in pipeline database (needed for database 
+                    update from gender check)
+--config=PATH       Path to JSON config file; default is taken from inipath
+--mafhet            Find heterozygosity separately for SNP populations with 
+                    minor allele frequency greater than 1%, and less than 1%.
+--title             Title for this analysis; will appear in plots
+--zcall-filter      Apply default zcall filter; see note [2] below.
+--illuminus-filter  Apply default illuminus filter; see note [2] below.
+--filter=PATH       Read custom filter criteria from PATH. See note [2] below.
+--include           Do not exclude failed samples from the pipeline DB.
+                    See note [2] below.
+
+[1] If --sim is not specified, but the intensity files magnitude.txt and 
+xydiff.txt are present in the pipeline output directory, intensity metrics 
+will be read from the files. This allows intensity metrics to be computed only 
+once when multiple callers are used on the same dataset.
+
+[2] The --zcall, --illuminus, and --filter options enable \"prefilter\" mode:
+    * Samples which fail the filter criteria are excluded in the pipeline 
+      SQLite DB. This ensures that failed samples are not input to subsequent 
+      analyses using the same DB.
+    * Filter criteria are determined by one of three options:
+      --illuminus     Default illuminus criteria
+      --zcall         Default zcall criteria
+      --filter=PATH   Custom criteria, given by the JSON file at PATH.
+    * If more than one of the above options is specified, an error is raised.
+      If none of them is specified, no filtering is carried out.
+    * Additional CSV and JSON summary files are written to describe the 
+      prefilter results.
+    * If the --include option is in effect, filter summary files will be 
+      written but samples will not be excluded from the SQLite DB.
 ";
     exit(0);
 }
@@ -57,9 +93,11 @@ $iniPath ||= $DEFAULT_INI;
 $iniPath = verifyAbsPath($iniPath);
 $configPath ||= defaultJsonConfig($iniPath);
 $configPath = verifyAbsPath($configPath);
+
 if ($simPath) { $simPath = verifyAbsPath($simPath); }
 if ($dbPath) { $dbPath = verifyAbsPath($dbPath); }
 $outDir ||= "./qc";
+$mafHet ||= 0;
 if (not -e $outDir) { mkdir($outDir); }
 elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
 $outDir = abs_path($outDir);
@@ -67,25 +105,30 @@ $title ||= getDefaultTitle($outDir);
 my $texIntroPath = defaultTexIntroPath($iniPath);
 $texIntroPath = verifyAbsPath($texIntroPath);
 
+$filterConfig = getFilterConfig($filterConfig, $zcallFilter, $illuminusFilter);
+$include ||= 0;
+
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $include);
 
 sub cleanup {
-    # create a 'supplementary' directory in current working directory
+    # create a 'supplementary' subdirectory of the output directory
     # move less important files (not directories) into supplementary
+    my $dir = shift;
+    my $cwd = getcwd();
+    system("rm -f $cwd/Rplots.pdf"); # empty default output from R scripts
     my @retain = qw(pipeline_summary.pdf pipeline_summary.csv 
-                    plate_heatmaps.html);
+                    plate_heatmaps.html filter_results.csv);
     my %retain;
-    my $sup = "supplementary";
     foreach my $name (@retain) { $retain{$name} = 1; }
-    system("rm -f Rplots.pdf"); # empty default output from R scripts
-    system("mkdir -p $sup");
-    my $heatmapIndex = "plate_heatmaps/index.html";
+    my $heatmapIndex = $dir."/plate_heatmaps/index.html";
     if (-e $heatmapIndex) {
-        system("ln -s $heatmapIndex plate_heatmaps.html");
+        system("ln -s $heatmapIndex $dir/plate_heatmaps.html");
     }
-    foreach my $name (glob("*")) {
-        if (-d $name || $retain{$name} ) { next; }
+    my $sup = $dir."/supplementary";
+    system("mkdir -p $sup");
+    foreach my $name (glob("$dir/*")) {
+        if (-d $name || $retain{basename($name)} ) { next; }
         else { system("mv $name $sup"); }
     }
     system("touch ".$sup."/finished.txt");
@@ -102,17 +145,43 @@ sub getDefaultTitle {
     return $title;
 }
 
+sub getFilterConfig {
+    # first check for conflicting filter options
+    my @filterOpts = @_;
+    my $filters = 0;
+    foreach my $opt (@filterOpts) {
+	if ($opt) { $filters++; }
+    }
+    if ($filters > 1) { 
+	croak "Incorrect options; must specify at most one of --filter, --illuminus-filter, --zcall-filter";
+    }   
+    my ($fConfig, $zcallFilter, $illuminusFilter) = @filterOpts;
+    # if filter options are OK, check existence of appropriate config file
+    my $configDir = defaultConfigDir();
+    if ($zcallFilter) { 
+	$fConfig = verifyAbsPath($configDir."/zcall_prefilter.json");  
+    } elsif ($illuminusFilter) {
+	$fConfig = verifyAbsPath($configDir."/illuminus_prefilter.json");  
+    } elsif ($fConfig) {
+	$fConfig = verifyAbsPath($filterConfig); # custom filter
+    } else {
+	$fConfig = 0; # no filtering
+    }
+    return $fConfig;    
+}
+
 sub getPlateHeatmapCommands {
-    my ($dbopt, $iniPath, $outDir, $title, $simPathGiven, $fileNamesRef) = @_;
+    my ($dbopt, $iniPath, $dir, $title, $simPathGiven, $fileNamesRef) = @_;
     my %fileNames = %$fileNamesRef;
     my @cmds;
-    my $hmOut = $outDir.'/'.$fileNames{'plate_dir'}; # heatmaps in subdirectory
+    my $hmOut = $dir.'/'.$fileNames{'plate_dir'}; # heatmaps in subdirectory
     unless (-e $hmOut) { push(@cmds, "mkdir $hmOut"); }
     my @modes = qw/cr het/;
-    my @inputs = ($fileNames{'sample_cr_het'}, $fileNames{'sample_cr_het'});
+    my $crHet = $dir.'/'.$fileNames{'sample_cr_het'};
+    my @inputs = ($crHet, $crHet); 
     if ($simPathGiven) {
         push(@modes, 'magnitude');
-        push(@inputs, $fileNames{'magnitude'});
+        push(@inputs, $dir.'/'.$fileNames{'magnitude'});
     }
     foreach my $i (0..@modes-1) {
         push(@cmds, join(" ", ('cat', $inputs[$i], '|', 
@@ -157,16 +226,16 @@ sub verifyAbsPath {
 
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
-        $outDir, $title, $texIntroPath) = @_;
-    my $startDir = getcwd;
+        $outDir, $title, $texIntroPath, $mafHet, $filter, $include) = @_;
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
+    my $exclude = !($include);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix",
-		"$CR_STATS_EXECUTABLE $plinkPrefix",
-		"$Bin/check_duplicates_bed.pl $plinkPrefix",
+    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix --outdir $outDir",
+		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
+		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
 	);
-    my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix";
+    my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
     if ($dbPath) { 
         if (!defined($runName)) { 
             croak "Must supply pipeline run name for database gender update"; 
@@ -174,52 +243,78 @@ sub run {
         $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     }
     push(@cmds, $genderCmd);
-    my $intensityPlots = 0;
-    my $magPath = 'magnitude.txt';
-    my $xydPath = 'xydiff.txt';
+    if ($mafHet) {
+	my $mhout = $outDir.'/'.$fileNames{'het_by_maf'};
+	push(@cmds, "$MAF_HET_EXECUTABLE --in $plinkPrefix --out $mhout");
+    } 
+    my $intensity = 0;
+    my $magPath = $outDir.'/magnitude.txt';
+    my $xydPath = $outDir.'/xydiff.txt';
     if ($simPath) {
         push(@cmds, "simtools qc --infile=$simPath ".
              "--magnitude=$magPath --xydiff=$xydPath");
-        $intensityPlots = 1;
+        $intensity = 1;
     } elsif (-e $magPath && -e $xydPath) {
 	# using previously calculated metric values
-	$intensityPlots = 1;
+	$intensity = 1;
     }
     my $dbopt = "";
     if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
-    my $writeStatus = "$Bin/write_qc_status.pl --config=$configPath $dbopt ".
-        "--inipath=$iniPath";
-    push(@cmds, $writeStatus);
-    ### plot generation ###
-    if ($dbopt) { 
-        my $cmd = "$Bin/plot_metric_scatter.pl $dbopt";
-        if (!$simPath) { $cmd = $cmd." --no-intensity "; }
-        push(@cmds, $cmd); 
-    }
-    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
-                                        $intensityPlots, \%fileNames));
-    my @densityTerms = ('cat', $fileNames{'sample_cr_het'}, '|', 
-                        "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
-                        "--out_dir=".$outDir);
-    push(@cmds, join(' ', @densityTerms));
-    push(@cmds, "$Bin/plot_fail_causes.pl --title=$title");
-    ### execute commands ###
-    chdir($outDir);
+    ### run QC data generation commands ###
     foreach my $cmd (@cmds) { 
         my $result = system($cmd); 
         if ($result!=0) { 
             croak "Command finished with non-zero exit status: \"$cmd\""; 
         } 
     }
-    ### create CSV & PDF reports
-    my $resultPath = "qc_results.json";
-    my $csvPath = "pipeline_summary.csv";
-    my $texPath = "pipeline_summary.tex";
-    my $genderThresholdPath = "sample_xhet_gender_thresholds.txt";
-    my $qcDir = ".";
-    createReports($csvPath, $texPath, $resultPath, $configPath, $dbPath, 
-                  $genderThresholdPath, $qcDir, $texIntroPath);
-    cleanup();
-    chdir($startDir);
+    ### collate inputs, write JSON and CSV ###
+    my $csvPath = $outDir."/pipeline_summary.csv";
+    my $statusJson = $outDir."/qc_results.json";
+    my $metricJson = "";
+    # first pass -- standard thresholds, no DB update
+    my @allMetricNames = keys(%{readMetricThresholds($configPath)});
+    my @metricNames = ();
+    foreach my $metric (@allMetricNames) {
+	if ($intensity || ($metric ne 'magnitude' && $metric ne 'xydiff')) {
+	    push(@metricNames, $metric);
+	}
+    }
+    collate($outDir, $configPath, $configPath, $dbPath, $iniPath, 
+	    $statusJson, $metricJson, $csvPath, 0, \@metricNames);
+    if ($filter) {
+	# second pass -- evaluate filter metrics/thresholds
+	# update DB unless the --include option is in effect
+	$csvPath = $outDir."/filter_results.csv"; 
+	$statusJson = $outDir."/filter_results.json";
+	collate($outDir, $configPath, $filter, $dbPath, $iniPath, 
+		$statusJson, $metricJson, $csvPath, $exclude);
+    }
+    ### plot generation ###
+    @cmds = ();
+    if ($dbopt) { 
+        my $cmd = "$Bin/plot_metric_scatter.pl $dbopt --inipath=$iniPath --config=$configPath --outdir=$outDir --qcdir=$outDir";
+        if (!$simPath) { $cmd = $cmd." --no-intensity "; }
+        push(@cmds, $cmd); 
+    }
+    push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title, 
+                                        $intensity, \%fileNames));
+    my @densityTerms = ('cat', $outDir.'/'.$fileNames{'sample_cr_het'}, '|', 
+                        "$Bin/plot_cr_het_density.pl",  "--title=".$title, 
+                        "--out_dir=".$outDir);
+    push(@cmds, join(' ', @densityTerms));
+    push(@cmds, "$Bin/plot_fail_causes.pl --title=$title --inipath=$iniPath  --config=$configPath --input $outDir/qc_results.json --cr-het $outDir/sample_cr_het.txt --output-dir $outDir");
+    ### execute commands ###
+    foreach my $cmd (@cmds) { 
+        my $result = system($cmd); 
+        if ($result!=0) { 
+            croak "Command finished with non-zero exit status: \"$cmd\""; 
+        } 
+    }
+    ### create PDF report
+    my $texPath = $outDir."/pipeline_summary.tex";
+    my $genderThresholdPath = $outDir."/sample_xhet_gender_thresholds.txt";
+    createReports($texPath, $statusJson, $configPath, $dbPath, 
+                  $genderThresholdPath, $outDir, $texIntroPath);
+    cleanup($outDir);
     return 1;
 }

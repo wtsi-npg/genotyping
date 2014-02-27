@@ -3,6 +3,7 @@
 use warnings;
 use strict;
 use Carp;
+use Cwd;
 use Getopt::Long;
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 use WTSI::NPG::Genotyping::Database::SNP;
@@ -31,30 +32,23 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 # - Either of the above differences *may* occur, but is not guaranteed!
 
 my $help;
-my ($outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
+my ($outDir, $outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
     $outputFailedPairsMatch, $configPath, $iniPath,
     $minCheckedSNPs, $minIdent, $output, $log);
 
-GetOptions("results=s"    => \$outputResults,
+GetOptions("outdir=s"     => \$outDir,
            "config=s"     => \$configPath,
            "ini=s"        => \$iniPath,
-           "fail=s"       => \$outputFail,
-           "fail_pairs=s" => \$outputFailedPairs,
-           "fail_match=s" => \$outputFailedPairsMatch,
-           "gt=s"         => \$outputGT,
            "min_snps=i"   => \$minCheckedSNPs,
            "min_ident=f"  => \$minIdent,
-           "h|help"       => \$help,
-           "log=s"        => \$log);
+           "h|help"       => \$help);
 
 if ($help) {
     print STDERR "Usage: $0 [ output file options ] PLINK_GTFILE
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension)
 Options:
---results=PATH      Output path for full results
---fail=PATH         Output path for failures
---gt=PATH           Output path for genotypes by SNP and sample
---log=PATH          Output path for log file
+--outdir=PATH       Output directory for results files. Optional, defaults 
+                    to current working directory.
 --config=PATH       Config path in .json format with QC thresholds. 
                     At least one of config or min_ident must be given.
 --ini=PATH          Path to .ini file with additional configuration. 
@@ -71,12 +65,17 @@ my $plinkPrefix = $ARGV[0];
 if (!$plinkPrefix) { die "Must supply a Plink genotype file prefix: $!"; }
 
 # parameter default values
-$outputGT ||= 'identity_check_gt.txt'; 
-$outputResults ||= 'identity_check_results.txt';
-$outputFail ||= 'identity_check_fail.txt';
-$outputFailedPairs ||= 'identity_check_failed_pairs.txt';
-$outputFailedPairsMatch ||= 'identity_check_failed_pairs_match.txt';
-$log ||= 'identity_check.log';
+if ($outDir && !(-e $outDir && -d $outDir)) {
+    croak "Output path $outDir does not exist or is not a directory!";
+}
+$outDir ||= getcwd();
+
+$outputGT = $outDir.'/identity_check_gt.txt'; 
+$outputResults = $outDir.'/identity_check_results.txt';
+$outputFail = $outDir.'/identity_check_fail.txt';
+$outputFailedPairs = $outDir.'/identity_check_failed_pairs.txt';
+$outputFailedPairsMatch = $outDir.'/identity_check_failed_pairs_match.txt';
+$log = $outDir.'/identity_check.log';
 $minCheckedSNPs ||= 20;
 if (!$minIdent) {
     if ($configPath) {
@@ -87,7 +86,7 @@ if (!$minIdent) {
     }
 }
 
-run($plinkPrefix, $outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
+run($plinkPrefix, $outputGT, $outputResults, $outputFail, $outputFailedPairs, 
     $outputFailedPairsMatch, $minCheckedSNPs, $minIdent, $log, $iniPath);
 
 sub compareGenotypes {
