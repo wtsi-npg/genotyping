@@ -40,20 +40,14 @@ my $cmd;
 foreach my $plink (@plink) {
     my $input = $dataDir."/".$plink;
     $cmd = "$bin/check_identity_bed.pl --config $config " .
-      "--results $workdir/identity_check_results.txt " .
-      "--fail $workdir/identity_check_fail.txt " .
-      "--fail_pairs $workdir/identity_check_failed_pairs.txt " .
-      "--fail_match $workdir/identity_check_failed_pairs_match.txt " .
-      "--gt $workdir/identity_check_gt.txt " .
-      "--log $workdir/identity_check.log" .
-      " $input ";
+      "--outdir $workdir $input ";
 
-    is(system($cmd), 0, "$bin/check_identity_bed.pl exit status, input $plink");
+    is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     foreach my $output (@outputs) {
         my $ref = $dataDir."/".$output;
         my $check = "$workdir/$output";
         my $status = system("diff $ref $check >& /dev/null");
-        is($status, 0, "Diff result: Input $plink, output $check");
+        is($status, 0, "Diff result: Input $plink, output $output");
         unlink $check;
     }
 }
