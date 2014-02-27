@@ -51,7 +51,6 @@ GetOptions("af=s"        => \$af,       # SNP file with call rate (CR), allele f
            "maf_min=s"   => \$maf_min,  # only SNPs with MAF in range
            "maf_max=s"   => \$maf_max,
 	   "max=i"       => \$max_snps, # max number of SNPs to use in test
-	   #"sample_cr=s" => \$sample_cr, # does nothing, but kept in for backwards compatibility of workflows
 	   "dir=s"       => \$dir,   # directory for input and output
 	   "min_snp_cr=i"=> \$min_snp_cr, # min call rate for snps in test set
 	   "help|h"      => \$help,     # print help string and exit

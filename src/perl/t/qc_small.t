@@ -34,13 +34,8 @@ my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
-# The directories contains the R scripts and Perl scripts
+# The directories containing the R scripts and Perl scripts
 $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
-
-# FIXME - hacked this in because scripts are calling scripts here
-# The code being reused this way should be factored out into modules.
-# (Real problem may have been the changes of working directory in called scripts, removed by ib5 as of 2014-02-21)
-#$ENV{PERL5LIB} = join(':', "$Bin/../blib/lib", $ENV{PERL5LIB});
 
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);

@@ -334,7 +334,7 @@ sub passFailBySample {
 }
 
 sub readMetricThresholds {
-    # exportable convenience method to read metric names from JSON config
+    # exportable convenience method to read metric thresholds from JSON config
     my $configPath = shift;
     my %config = %{decode_json(readFileToString($configPath))};
     my %thresholds = %{$config{'Metrics_thresholds'}};
