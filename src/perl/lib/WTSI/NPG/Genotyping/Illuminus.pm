@@ -14,9 +14,11 @@ use WTSI::NPG::Utilities::DelimitedFiles qw(read_column_names
 use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(find_female_columns
+our @EXPORT_OK = qw(filter_gt_columns
+                    find_female_columns
                     get_it_sample_names
                     nullify_females
+                    read_gt_column_names
                     read_it_column_names
                     update_it_columns
                     write_it_header
