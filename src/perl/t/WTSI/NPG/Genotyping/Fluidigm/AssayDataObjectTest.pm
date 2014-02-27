@@ -6,17 +6,23 @@ use utf8;
 
   use strict;
   use warnings;
+  use Carp;
 
   use base 'WTSI::NPG::Database';
 
   sub find_fluidigm_sample_by_plate {
+    my ($self, $fluidigm_barcode, $well) = @_;
+
+    $well eq 'S01' or
+      confess "WarehouseStub expected well argument 'S01' but got '$well'";
+
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
-            supplier_name      => 'WTSI',
+            supplier_name      => 'aaaaaaaaaa',
             accession_number   => 'A0123456789',
             gender             => 'Female',
             cohort             => 'AAA111222333',
@@ -62,6 +68,12 @@ sub make_fixture : Test(setup) {
 
   $irods->add_object_avu($irods_path, 'fluidigm_plate', '1381735059');
   $irods->add_object_avu($irods_path, 'fluidigm_well', 'S01');
+
+  # Add some existing secondary metadata to be superseded
+  $irods->add_object_avu($irods_path, 'dcterms:identifier',   '9999999999');
+  $irods->add_object_avu($irods_path, 'study_id',             '10');
+  $irods->add_object_avu($irods_path, 'sample_consent',       '1');
+  $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
 }
 
 sub teardown : Test(teardown) {
@@ -112,7 +124,7 @@ sub update_secondary_metadata : Test(2) {
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
      {attribute => 'sample_id',               value => '123456789'},
-     {attribute => 'sample_supplier_name',    value => 'WTSI'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
 
   my $meta = $data_object->metadata;

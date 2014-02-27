@@ -89,8 +89,11 @@ sub get_avu {
       my $fn = sub {
         my $avu = shift;
 
-        return sprintf("{'%s', '%s', '%s'}", $avu->{attribute}, $avu->{value},
-                       $avu->{units});
+        my $a = defined $avu->{attribute} ? $avu->{attribute} : 'undef';
+        my $v = defined $avu->{value}     ? $avu->{value}     : 'undef';
+        my $u = defined $avu->{units}     ? $avu->{units}     : 'undef';
+
+        return sprintf("{'%s', '%s', '%s'}", $a, $v, $u);
       };
 
       my $matched = join ", ", map { $fn->($_) } @exists;
@@ -154,9 +157,6 @@ sub expected_irods_groups {
   my ($self) = @_;
 
   my @ss_study_avus = $self->find_in_metadata($STUDY_ID_META_KEY);
-  unless (@ss_study_avus) {
-    $self->logwarn("Did not find any study information in metadata");
-  }
 
   my @groups;
   foreach my $avu (@ss_study_avus) {

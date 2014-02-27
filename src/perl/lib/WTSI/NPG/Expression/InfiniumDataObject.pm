@@ -48,7 +48,7 @@ sub update_secondary_metadata {
     }
 
     my @groups = $self->expected_irods_groups;
-    $self->grant_group_access('read', @groups);
+    $self->set_permissions('read', @groups);
   }
   else {
     $self->logcroak("Failed to update metadata for '", $self->str,

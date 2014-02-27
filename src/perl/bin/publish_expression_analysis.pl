@@ -99,6 +99,10 @@ sub run {
     pod2usage(-msg => "A --sample-dest argument is required\n",
               -exitval => 3);
   }
+  unless ($manifest_path) {
+    pod2usage(-msg => "A --manifest argument is required\n",
+              -exitval => 3);
+  }
 
   unless (-e $analysis_source) {
     pod2usage(-msg => "No such analysis source as '$analysis_source'\n",
@@ -116,6 +120,10 @@ sub run {
   unless (-d $sample_source) {
     pod2usage(-msg => "The --sample-source argument was not a directory\n",
               -exitval => 4);
+  }
+  unless (-e $manifest_path) {
+    pod2usage(-msg => "No such manifest as '$manifest_path'\n",
+              -exitval => 3);
   }
 
   if ($log4perl_config) {
@@ -165,17 +173,18 @@ sub run {
   my $publication_time = DateTime->now;
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError           => 1,
-                                  mysql_enable_utf8    => 1,
-                                  mysql_auto_reconnect => 1);
-  # $ssdb->log($log);
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
 
   my @data_files = find_data_files($sample_source, $manifest);
   my $sample_publisher = WTSI::NPG::Expression::Publisher->new
     (data_files       => \@data_files,
      manifest         => $manifest,
      publication_time => $publication_time,
-     sequencescape_db => $ssdb);
+     sequencescape_db => $ssdb,
+     logger           => $log);
 
   # Includes secondary metadata (from warehouse)
   $sample_publisher->publish($publish_sample_dest);
@@ -185,7 +194,8 @@ sub run {
      manifest           => $manifest,
      publication_time   => $publication_time,
      sample_archive     => $publish_sample_dest,
-     irods              => $sample_publisher->irods);
+     irods              => $sample_publisher->irods,
+     logger             => $log);
 
   # Uses the secondary metadata added above to find the sample data in
   # iRODS for cross-referencing

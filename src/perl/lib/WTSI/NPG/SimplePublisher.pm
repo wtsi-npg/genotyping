@@ -24,8 +24,8 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 
 =head2 publish_file
 
-  Arg [1]    : file name
-  Arg [2]    : Sample metadata
+  Arg [1]    : File name
+  Arg [2]    : Metadata
   Arg [3]    : Publication path in iRODS
   Arg [4]    : DateTime object of publication
 
@@ -41,30 +41,22 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
 =cut
 
 sub publish_file {
-  my ($self, $file, $sample_meta, $publish_dest, $time) = @_;
+  my ($self, $file, $metadata, $publish_dest, $time) = @_;
 
   my $irods = $self->irods;
   my ($volume, $directories, $filename) = File::Spec->splitpath($file);
   my $md5 = $self->irods->md5sum($file);
   $self->debug("Checksum of file '$file' to be published is '$md5'");
 
-  ### FIXME - use a WTSI::NPG::iRODS::Collection
-  # my $dest = WTSI::NPG::iRODS::Collection->new($irods, $publish_dest);
-
-  my $dest_collection = $publish_dest;
-  $dest_collection = File::Spec->canonpath($dest_collection);
-
-  unless (File::Spec->file_name_is_absolute($dest_collection)) {
-    $dest_collection = $irods->working_collection . '/' . $dest_collection;
+  my $dest_path = File::Spec->canonpath($publish_dest);
+  my $dest = WTSI::NPG::iRODS::Collection->new($irods, $dest_path)->absolute;
+  unless ($dest->is_present) {
+    $irods->add_collection($dest->str);
   }
 
-  unless ($irods->list_collection($dest_collection)) {
-    $irods->add_collection($dest_collection);
-  }
-
-  my $target = $dest_collection . '/' . $filename;
+  my $target = $dest->str . '/' . $filename;
   my $zone = $irods->find_zone_name($target);
-  my @meta = @$sample_meta;
+  my @meta = @$metadata;
 
   my $target_obj = WTSI::NPG::iRODS::DataObject->new($irods, $target);
 
@@ -105,7 +97,7 @@ sub publish_file {
     $target_obj->add_avu($attribute, $value, $units);
   }
 
-  return $target;
+  return $target_obj->str;
 }
 
 __PACKAGE__->meta->make_immutable;

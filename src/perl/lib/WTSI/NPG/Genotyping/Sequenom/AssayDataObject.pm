@@ -40,13 +40,20 @@ sub update_secondary_metadata {
     $self->info("Updating metadata for '", $self->str, "' from plate ",
                 "'$plate_name' (ID $plate_id) well '$well'");
 
+    # Revoke access from current groups
+    my @current_groups = $self->expected_irods_groups;
+    $self->set_permissions('null', @current_groups);
+
+    # Supersede all the secondary metadata with new values
     my @meta = make_sample_metadata($ss_sample);
+
     foreach my $avu (@meta) {
-      $self->add_avu(@$avu);
+      $self->supersede_avus(@$avu);
     }
 
+    # Grant access to the new groups
     my @groups = $self->expected_irods_groups;
-    $self->grant_group_access('read', @groups);
+    $self->set_permissions('read', @groups);
   }
   else {
     $self->info("Skipping update of metadata for '", $self->str, "': ",

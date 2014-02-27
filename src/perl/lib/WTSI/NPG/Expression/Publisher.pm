@@ -3,7 +3,7 @@ use utf8;
 
 package WTSI::NPG::Expression::Publisher;
 
-use Digest::MD5 qw(md5_hex);
+# use Digest::MD5 qw(md5_hex);
 use File::Spec;
 use List::AllUtils qw(firstidx uniq);
 use Moose;

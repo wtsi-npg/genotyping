@@ -134,7 +134,8 @@ sub run {
   my @publisher_args = (analysis_directory => $source,
                         pipe_db            => $pipedb,
                         publication_time   => $now,
-                        run_name           => $run_name);
+                        run_name           => $run_name,
+                        logger             => $log);
   if ($archive_root) {
     push @publisher_args, (sample_archive => $archive_root);
   }

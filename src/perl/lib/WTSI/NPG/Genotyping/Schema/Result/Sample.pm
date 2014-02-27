@@ -137,12 +137,10 @@ sub gtc {
                                     {join => 'method'});
 
   if ($result && $result->value) {
-    # Munge the windows path into the correspoding NFS mount
     $file = $result->value;
-    $file =~ s{\\}{/}gmsx;
-    $file =~ s{//}{/}msx;
-    $file =~ s{netapp6[ab]/illumina}{nfs/new_illumina}msx;
-    $file =~ s{geno(\d)}{geno0$1}msx;
+
+    # Munge the windows path into the correspoding NFS mount
+    $file = _map_netapp_path($file);
   }
 
   return $file;
@@ -183,16 +181,23 @@ sub idat {
   # Horrible, fragile munging because the Infinium LIMS doesn't store
   # the correct path case and the result is then exposed as an NFS mount.
   if ($file) {
-    $file =~ s{\\}{/}gmsx;
-    $file =~ s{//}{/}msx;
-    $file =~ s{netapp6[ab]/illumina}{nfs/new_illumina}msx;
-    $file =~ s{geno(\d)}{geno0$1}msx;
+    $file = _map_netapp_path($file);
     $file =~ s{_r(\d+)c(\d+)_}{_R$1C$2_}msx;
     $file =~ s{grn}{Grn}msx;
     $file =~ s{red}{Red}msx;
   }
 
   return $file;
+}
+
+sub _map_netapp_path {
+  my ($netapp_path) = @_;
+
+  $netapp_path =~ s{\\}{/}gmsx;
+  $netapp_path =~ s{//}{/}msx;
+  $netapp_path =~ s{netapp\d[ab]/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
+
+  return $netapp_path;
 }
 
 1;

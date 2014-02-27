@@ -38,29 +38,34 @@ sub make_fixture : Test(setup) {
   my @data_files = qw(1111111111_R01C01.gtc
                       1111111111_R01C01_Grn.idat
                       1111111111_R01C01_Red.idat
+                      1111111111_R01C02.gtc
+                      1111111111_R01C02_Grn.idat
+                      1111111111_R01C02_Red.idat
                       2222222222_R01C01.gtc
                       2222222222_R01C01_Grn.idat
-                      2222222222_R01C01_Red.idat
-                      3333333333_R01C01.gtc
-                      3333333333_R01C01_Grn.idat
-                      3333333333_R01C01_Red.idat);
+                      2222222222_R01C01_Red.idat);
 
-  my @sample_ids = qw(name1
-                      name1
-                      name1
-                      name2
-                      name2
-                      name2
-                      name3
-                      name3
-                      name3);
+  my @sample_ids = qw(name1 name1 name1
+                      name2 name2 name2
+                      name3 name3 name3);
+
+  my @beadchips = qw(1111111111 1111111111 1111111111
+                     1111111111 1111111111 1111111111
+                     2222222222 2222222222 2222222222);
+
+  my @sections = qw(R01C01 R01C01 R01C01
+                    R01C02 R01C02 R01C02
+                    R01C01 R01C01 R01C01);
+
   my $study_id = 0;
 
   for (my $i = 0; $i < scalar @data_files; $i++) {
     my $irods_path = "$irods_tmp_coll/infinium/" . $data_files[$i];
     my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $irods_path)->absolute;
+    $obj->add_avu('beadchip', $beadchips[$i]);
+    $obj->add_avu('beadchip_section', $sections[$i]);
     $obj->add_avu('dcterms:title', $genotyping_project);
-    $obj->add_avu('dcterms:identifier', $sample_ids[$i]);
+    $obj->add_avu('infinium_sample', $sample_ids[$i]);
     $obj->add_avu('study_id', $study_id);
   }
 }
@@ -107,9 +112,9 @@ sub publish : Test(3) {
     qw(1111111111_R01C01.gtc
        1111111111_R01C01_Grn.idat
        1111111111_R01C01_Red.idat
-       2222222222_R01C01.gtc
-       2222222222_R01C01_Grn.idat
-       2222222222_R01C01_Red.idat);
+       1111111111_R01C02.gtc
+       1111111111_R01C02_Grn.idat
+       1111111111_R01C02_Red.idat);
 
   is_deeply(\@sample_data, \@expected_sample_data,
            "Annotated sample objects match") or diag explain \@sample_data;
@@ -120,16 +125,16 @@ sub make_pipedb {
 
   my $config = $ENV{HOME} . "/.npg/genotyping.ini";
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-    (name => 'pipeline',
-     inifile => $config,
-     dbfile => $dbfile,
+    (name      => 'pipeline',
+     inifile   => $config,
+     dbfile    => $dbfile,
      overwrite => 1)->connect
-       (RaiseError => 1,
+       (RaiseError     => 1,
         sqlite_unicode => 1,
-        on_connect_do => 'PRAGMA foreign_keys = ON')->populate;
+        on_connect_do  => 'PRAGMA foreign_keys = ON')->populate;
 
-  my $snpset = $pipedb->snpset->find({name => 'HumanExome-12v1'});
-  my $autocall = $pipedb->method->find({name => 'Autocall'});
+  my $snpset    = $pipedb->snpset->find({name => 'HumanExome-12v1'});
+  my $autocall  = $pipedb->method->find({name => 'Autocall'});
   my $withdrawn = $pipedb->state->find({name => 'withdrawn'});
 
   $pipedb->in_transaction
@@ -142,17 +147,24 @@ sub make_pipedb {
          ({if_project   => $genotyping_project,
            datasupplier => $supplier,
            snpset       => $snpset});
-       foreach my $i (1..3) {
-         my $beadchip = $i x 10;
-         my @args = ("name$i", "sample$i", $beadchip, $autocall,
-                     "$sample_data_path/" . $beadchip . "_R01C01.gtc",
-                     "$sample_data_path/" . $beadchip . "_R01C01_Red.idat",
-                     "$sample_data_path/" . $beadchip . "_R01C01_Grn.idat");
+
+       my @beadchips = qw(1111111111 1111111111 2222222222);
+       my @sections  = qw(R01C01 R01C02 R01C01);
+
+       foreach my $i (0..2) {
+         my $x = $i + 1;
+         my $beadchip = $beadchips[$i];
+         my $section  = $sections[$i];
+
+         my @args = ("name$x", "sample$x", $beadchip, $section, $autocall,
+                     "$sample_data_path/$beadchip" . "_$section" . ".gtc",
+                     "$sample_data_path/$beadchip" . "_$section" . "_Red.idat",
+                     "$sample_data_path/$beadchip" . "_$section" . "_Grn.idat");
 
          my $sample = add_sample($dataset, @args);
 
          # Exclude the third sample from publication
-         if ($i == 3) {
+         if ($i == 2) {
            $sample->add_to_states($withdrawn);
            $sample->include_from_state;
            $sample->update;
@@ -164,15 +176,16 @@ sub make_pipedb {
 }
 
 sub add_sample {
-  my ($dataset, $name, $id, $beadchip, $method, $gtc, $red, $grn) = @_;
+  my ($dataset, $name, $id, $beadchip, $section, $method,
+      $gtc, $red, $grn) = @_;
 
   my $sample = $dataset->add_to_samples
     ({name             => $name,
       sanger_sample_id => $id,
       beadchip         => $beadchip,
+      rowcol           => $section,
       include          => 1,
-      supplier_name    => 'test_supplier_name',
-      rowcol           => 'R01C01'});
+      supplier_name    => 'test_supplier_name'});
   $sample->add_to_results({method => $method, value => $gtc});
   $sample->add_to_results({method => $method, value => $red});
   $sample->add_to_results({method => $method, value => $grn});

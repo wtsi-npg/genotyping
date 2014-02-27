@@ -7,6 +7,7 @@ package main;
 use warnings;
 use strict;
 use Getopt::Long;
+use List::AllUtils;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
@@ -50,6 +51,9 @@ sub run {
   $config ||= $DEFAULT_INI;
   $namespace ||= $WTSI_NAMESPACE;
 
+  unless ($dbfile) {
+    pod2usage(-msg => "A --dbfile argument is required\n", -exitval => 2);
+  }
   unless ($project_title) {
     pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
   }
@@ -65,17 +69,16 @@ sub run {
   unless ($namespace =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
+
   if ($verbose) {
     my $db = $dbfile;
     $db ||= 'configured database';
     print STDERR "Updating $db using config from $config\n";
   }
 
-  my @initargs = (name => 'pipeline',
-                  inifile => $config);
-  if ($dbfile) {
-    push @initargs, (dbfile => $dbfile);
-  }
+  my @initargs = (name    => 'pipeline',
+                  inifile => $config,
+                  dbfile  => $dbfile);
 
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (@initargs)->connect
@@ -273,7 +276,7 @@ sub run {
          die "Failed to find any samples for project '$project_title'\n";
        }
 
-       $snpdb->insert_sequenom_calls($pipedb, \@samples);
+       insert_sequenom_calls($pipedb, $snpdb, \@samples);
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
@@ -293,6 +296,63 @@ sub validate_snpset {
   }
 
   return $snpset;
+}
+
+sub insert_fluidigm_calls {
+  my ($pipedb, $irods, $samples) = @_;
+
+  my $method = $pipedb->method->find({name => 'Fluidigm'});
+  my $snpset = $pipedb->snpset->find({name => 'qc'});
+
+  my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+    (irods => $irods);
+
+  foreach my $sample (@$samples) {
+    my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', 'qc',
+                                       $sample->sanger_sample_id);
+    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+  }
+}
+
+sub insert_sequenom_calls {
+  my ($pipedb, $snpdb, $samples) = @_;
+
+  my $method = $pipedb->method->find({name => 'Sequenom'});
+  my $snpset = $pipedb->snpset->find({name => 'W30467'});
+
+  my @sample_names;
+  foreach my $sample (@$samples) {
+    if ($sample->include and defined $sample->sanger_sample_id) {
+      push @sample_names, $sample->sanger_sample_id;
+    }
+  }
+
+  my $sequenom_results = $snpdb->find_sequenom_calls($snpset, \@sample_names);
+
+  foreach my $sample (@$samples) {
+    my $calls = $sequenom_results->{$sample->sanger_sample_id};
+
+    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+  }
+}
+
+sub insert_qc_calls {
+  my ($pipedb, $snpset, $method, $sample, $calls) = @_;
+
+  my $result = $sample->add_to_results({method => $method});
+
+  foreach my $call (@$calls) {
+    my $snp = $pipedb->snp->find_or_create
+      ({name       => $call->snp->name,
+        chromosome => $call->snp->chromosome,
+        position   => $call->snp->position,
+        snpset     => $snpset});
+
+    $result->add_to_snp_results({snp   => $snp,
+                                 value => $call->genotype});
+  }
+
+  return $result;
 }
 
 sub print_pre_report {
@@ -336,9 +396,9 @@ ready_infinium
 
 =head1 SYNOPSIS
 
-ready_infinium [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--chip-design <name>] [--namespace <sample namespace>] [--maximum <n>] \
-   --project <project name> --run <pipeline run name> \
+ready_infinium [--config <database .ini file>] [--chip-design <name>] \
+   [--namespace <sample namespace>] [--maximum <n>] \
+   --dbfile <SQLite file> --project <project name> --run <pipeline run name> \
    --supplier <supplier name> [--verbose]
 
 Options:
@@ -346,8 +406,7 @@ Options:
   --chip_design Explicitly state the chip design.
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile      The SQLite database file. If not supplied, defaults to the
-                value given in the configuration .ini file.
+  --dbfile      The SQLite database file.
   --help        Display help.
   --maximum     Import samples up to a maximum number. Optional.
   --namespace   The namespace for the imported sample names. Optional,

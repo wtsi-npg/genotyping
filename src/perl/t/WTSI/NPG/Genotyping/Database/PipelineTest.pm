@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 63;
+use Test::More tests => 66;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -150,7 +150,7 @@ sub add_datasets : Test(6) {
      'A snpset validated in a mismatched piperun');
 }
 
-sub transaction : Test(5) {
+sub transaction : Test(8) {
   my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
                                                     namespace => 'wtsi'});
   my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
@@ -166,7 +166,14 @@ sub transaction : Test(5) {
     push @datasets, $dataset;
   }
 
+  my $autocall = $db->method->find({name => 'Autocall'});
+  my $infinium = $db->method->find({name => 'Infinium'});
   my $pass = $db->state->find({name => 'autocall_pass'});
+
+  my $gtc_path = '\\netapp1a\illumina_geno1\0123456789\0123456789.gtc';
+  my $red_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_red.idat';
+  my $grn_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_grn.idat';
+
   $db->in_transaction(sub {
                         foreach my $i (1..1000) {
                           my $sample = $datasets[0]->add_to_samples
@@ -174,6 +181,13 @@ sub transaction : Test(5) {
                               beadchip => 'ABC123456',
                               include  => 1});
                           $sample->add_to_states($pass);
+
+                          $sample->add_to_results({method => $autocall,
+                                                   value  => $gtc_path});
+                          $sample->add_to_results({method => $infinium,
+                                                   value  => $red_path});
+                          $sample->add_to_results({method => $infinium,
+                                                   value  => $grn_path});
                         }
                       });
 
@@ -183,6 +197,15 @@ sub transaction : Test(5) {
   my @states = $samples[0]->states;
   is(scalar @states, 1);
   is($states[0]->name, 'autocall_pass');
+
+  is($samples[0]->gtc, '/nfs/new_illumina_geno01/0123456789/0123456789.gtc',
+    'GTC file NFS path');
+  is($samples[0]->idat('red'),
+     '/nfs/new_illumina_geno01/0123456789/0123456789_Red.idat',
+     'Red idat file NFS path');
+  is($samples[0]->idat('green'),
+     '/nfs/new_illumina_geno01/0123456789/0123456789_Grn.idat',
+     'Green idat file NFS path');
 
   dies_ok {
     $db->in_transaction(sub {

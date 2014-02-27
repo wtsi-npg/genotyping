@@ -25,7 +25,7 @@ has 'logger' => (is      => 'rw',
                  handles => [@HANDLED_LOG_METHODS],
                  default => sub {
                     Log::Log4perl->init_once(\$default_conf);
-                    return Log::Log4perl->get_logger('npg.irods.publish');
+                    return Log::Log4perl->get_logger('npg');
                   });
 
 no Moose;
@@ -36,13 +36,13 @@ __END__
 
 =head1 NAME
 
-Loggable - a role which provides a logging facility.
+WTSI::NPG::Loggable
 
 =head1 DESCRIPTION
 
 Provides a logging facility via Log::Log4perl. When consumed, this
-role automatically delegates Log::Log4perl logging method calls on the
-consuming objects to a logger.
+role automatically delegates Log::Log4perl logging method calls to a
+logger.
 
 =head1 AUTHOR
 
