@@ -107,9 +107,10 @@ $texIntroPath = verifyAbsPath($texIntroPath);
 
 $filterConfig = getFilterConfig($filterConfig, $zcallFilter, $illuminusFilter);
 $include ||= 0;
+my $exclude = !($include);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $include);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude);
 
 sub cleanup {
     # create a 'supplementary' subdirectory of the output directory
@@ -163,7 +164,7 @@ sub getFilterConfig {
     } elsif ($illuminusFilter) {
 	$fConfig = verifyAbsPath($configDir."/illuminus_prefilter.json");  
     } elsif ($fConfig) {
-	$fConfig = verifyAbsPath($filterConfig); # custom filter
+	$fConfig = verifyAbsPath($fConfig); # custom filter
     } else {
 	$fConfig = 0; # no filtering
     }
@@ -226,10 +227,9 @@ sub verifyAbsPath {
 
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
-        $outDir, $title, $texIntroPath, $mafHet, $filter, $include) = @_;
+        $outDir, $title, $texIntroPath, $mafHet, $filter, $exclude) = @_;
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
-    my $exclude = !($include);
     ### input file generation ###
     my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix --outdir $outDir",
 		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
