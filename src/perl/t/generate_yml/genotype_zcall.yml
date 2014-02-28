@@ -1,0 +1,13 @@
+---
+arguments:
+  - /home/foo/dummy_workdir/genotyping.db
+  - run1
+  - /home/foo/dummy_workdir/
+  - chunk_size: 40
+    egt: /home/foo/dummy_cluster.egt
+    manifest: /home/foo/dummy_manifest.bpm.csv
+    memory: 2048
+    zstart: 7
+    ztotal: 1
+library: genotyping
+workflow: Genotyping::Workflows::GenotypeZCall

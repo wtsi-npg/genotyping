@@ -1,0 +1,10 @@
+---
+arguments:
+  - /home/foo/dummy_workdir/genotyping.db
+  - run1
+  - /home/foo/dummy_workdir/
+  - chunk_size: 40
+    manifest: /home/foo/dummy_manifest.bpm.csv
+    memory: 2048
+library: genotyping
+workflow: Genotyping::Workflows::GenotypeGenoSNP

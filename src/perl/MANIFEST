@@ -7,6 +7,7 @@ bin/export_sequenom_genotypes.pl
 bin/filter_illuminus_output.pl
 bin/find_modified_files.pl
 bin/gendermix_standalone.pl
+bin/generate_yml.pl
 bin/genosnp.pl
 bin/illuminus.pl
 bin/make_irods_study_group.pl
@@ -321,6 +322,7 @@ t/gender/input_xhet.json
 t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
 t/gender_standalone.t
+t/generate_yml.t
 t/identity.t
 t/infinium_analysis_publisher.t
 t/infinium_analysis_publisher/data/analysis/analysis.fcr.txt

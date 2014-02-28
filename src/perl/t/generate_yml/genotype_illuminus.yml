@@ -1,0 +1,11 @@
+---
+arguments:
+  - /home/foo/dummy_workdir/genotyping.db
+  - run1
+  - /home/foo/dummy_workdir/
+  - chunk_size: 4000
+    gender_method: Supplied
+    manifest: /home/foo/dummy_manifest.bpm.csv
+    memory: 2048
+library: genotyping
+workflow: Genotyping::Workflows::GenotypeIlluminus
