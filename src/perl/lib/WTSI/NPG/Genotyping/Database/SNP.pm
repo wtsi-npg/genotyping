@@ -104,25 +104,22 @@ sub find_sequenom_calls {
   my $query =
     qq(SELECT DISTINCT
          well_assay.id_well AS assay_name,
-         snp_name.snp_name AS snp_name,
+         snp_summary.default_name AS snp_name,
          genotype.genotype AS genotype
        FROM
+         individual,
+         genotype,
          well_assay,
          snpassay_snp,
-         snp_name,
-         mapped_snp,
-         genotype,
-         individual
+         snp_summary
        WHERE
-         well_assay.id_assay = snpassay_snp.id_assay
-         AND snpassay_snp.id_snp = snp_name.id_snp
-         AND mapped_snp.id_snp = snp_name.id_snp
-         AND (snp_name.snp_name_type = 1 OR snp_name.snp_name_type = 6)
+         individual.clonename = ?
          AND genotype.id_assay = snpassay_snp.id_assay
          AND genotype.id_ind = individual.id_ind
-         AND disregard = 0
-         AND confidence <> 'A'
-         AND individual.clonename = ?);
+         AND genotype.disregard = 0
+         AND genotype.confidence <> 'A'
+         AND well_assay.id_assay = snpassay_snp.id_assay
+         AND snpassay_snp.id_snp = snp_summary.id_snp);
 
   my $sth = $self->dbh->prepare($query);
 
@@ -146,8 +143,6 @@ sub find_sequenom_calls {
       # Genotypes are stored as single characters when both alleles
       # are the same. Convert to a pair of characters.
       $genotype .= $genotype if length($genotype) == 1;
-      # SNP name sometimes has junk prefix:
-      $snp_name =~ s/^\S+;(\S+)$/$1/;
 
       $self->debug("Got Sequenom call for sample '$sample_name' in SNP set '",
                    $snpset->name, "': '$genotype' for SNP '$snp_name'");
