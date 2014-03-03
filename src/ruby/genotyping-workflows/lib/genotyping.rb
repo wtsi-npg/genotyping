@@ -29,6 +29,7 @@ require 'json'
 require 'genotyping/chromosomes'
 require 'genotyping/exceptions'
 require 'genotyping/utilities'
+require 'genotyping/git_version'
 require 'genotyping/version'
 require 'genotyping/sim'
 

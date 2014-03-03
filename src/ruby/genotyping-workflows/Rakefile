@@ -1,4 +1,6 @@
 # encoding: UTF-8
+
+require 'date'
 require 'rake'
 require 'rake/clean'
 require 'rake/gempackagetask'
@@ -6,11 +8,12 @@ require 'rake/rdoctask'
 require 'rake/testtask'
 require 'rcov/rcovtask'
 
-require 'lib/genotyping/version'
+GIT_VERSION = `git describe --abbrev=0 | sed -e s/v//`
+BUILD_DATE = DateTime.now
 
 spec = Gem::Specification.new do |spec|
   spec.name = 'genotyping-workflows'
-  spec.version = Genotyping::VERSION
+  spec.version = GIT_VERSION
   spec.add_dependency('percolate', '>= 1.0.0')
   spec.extra_rdoc_files = ['README', 'LICENSE']
   spec.summary = 'WTSI genotyping workflows.'
@@ -22,6 +25,20 @@ spec = Gem::Specification.new do |spec|
   spec.files = %w(LICENSE README Rakefile) + Dir.glob('{bin,lib,spec}/**/*')
   spec.require_path = 'lib'
   spec.bindir = 'bin'
+end
+
+task :test => [:write_version_module]
+task :gem  => [:write_version_module]
+
+desc "Write the current version to a module"
+task :write_version_module do
+  f = File.open('lib/genotyping/git_version.rb', 'w')
+  f.puts('module Genotyping')
+  f.puts("  VERSION = '#{GIT_VERSION}'")
+  f.puts("  DATE = '#{BUILD_DATE.year}'")
+  f.puts('end');
+  f.close
+
 end
 
 Rake::GemPackageTask.new(spec) do |pack|
