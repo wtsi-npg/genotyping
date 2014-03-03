@@ -13,6 +13,12 @@ with 'WTSI::NPG::Loggable';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 
+has 'name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => sub { return ''} );
+
 has 'file_name' =>
   (is       => 'ro',
    isa      => 'Str',
@@ -103,6 +109,12 @@ sub named_snp {
     $self->logconfess("A non-empty snp_name argument is required");
 
   return grep { $snp_name eq $_->name } @{$self->snps};
+}
+
+sub contains_snp {
+  my ($self, $snp_name) = @_;
+
+  return defined $self->named_snp($snp_name);
 }
 
 sub write_snpset_data {

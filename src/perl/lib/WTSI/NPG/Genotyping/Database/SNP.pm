@@ -5,6 +5,7 @@ package WTSI::NPG::Genotyping::Database::SNP;
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNP;
+use WTSI::NPG::Genotyping::SNPSet;
 
 use Moose;
 
@@ -88,12 +89,12 @@ sub find_sequenom_plate_id {
                more generic term 'sample.name'. However, in the case of WTSI
                samples, this corresponds to the identifier described above.
 
-  Returntype : Hashref 
+  Returntype : HashRef
 
 =cut
 
 sub find_sequenom_calls {
-  my ($self, $snpset_name, $sample_names) = @_;
+  my ($self, $snpset, $sample_names) = @_;
 
   defined $sample_names or
     $self->logconfess('A defined sample_names argument is required');
@@ -102,24 +103,20 @@ sub find_sequenom_calls {
 
   my $query =
     qq(SELECT DISTINCT
-         well_assay.id_well AS snpset_name,
+         well_assay.id_well AS assay_name,
          snp_name.snp_name AS snp_name,
-         snp_sequence.chromosome AS chromosome,
-         mapped_snp.position AS position,
          genotype.genotype AS genotype
        FROM
          well_assay,
          snpassay_snp,
          snp_name,
          mapped_snp,
-         snp_sequence,
          genotype,
          individual
        WHERE
-         AND well_assay.id_assay = snpassay_snp.id_assay
+         well_assay.id_assay = snpassay_snp.id_assay
          AND snpassay_snp.id_snp = snp_name.id_snp
          AND mapped_snp.id_snp = snp_name.id_snp
-         AND snp_sequence.id_sequence = mapped_snp.id_sequence
          AND (snp_name.snp_name_type = 1 OR snp_name.snp_name_type = 6)
          AND genotype.id_assay = snpassay_snp.id_assay
          AND genotype.id_ind = individual.id_ind
@@ -136,22 +133,38 @@ sub find_sequenom_calls {
     $sth->execute($sample_name);
 
     my @calls;
-    while (my ($assay_name, $snp_name, $chromosome, $position, $genotype) =
-           $sth->fetchrow_array) {
-      # Selecting on this in the query causes a performance problem;
-      # optimiser tries lots of nested loop joins
-      next unless $assay_name eq $snpset_name;
+    while (my ($assay_name, $snp_name, $genotype) = $sth->fetchrow_array) {
+      # Selecting WHERE well_assay.id_well = $assay_name in the query
+      # causes a performance problem; optimiser tries lots of nested
+      # loop joins
+      unless ($assay_name eq $snpset->name) {
+        $self->debug("Ignoring Sequenom result for sample '$sample_name' ",
+                     "SNP '$snp_name' because assay '$assay_name' is not ",
+                     "SNP set '", $snpset->name, "'");
+      }
 
       # Genotypes are stored as single characters when both alleles
       # are the same. Convert to a pair of characters.
       $genotype .= $genotype if length($genotype) == 1;
+      # SNP name sometimes has junk prefix:
+      $snp_name =~ s/^\S+;(\S+)$/$1/;
 
-      my $snp = WTSI::NPG::Genotyping::SNP->new(name       => $snp_name,
-                                                chromosome => $chromosome,
-                                                position   => $position);
+      $self->debug("Got Sequenom call for sample '$sample_name' in SNP set '",
+                   $snpset->name, "': '$genotype' for SNP '$snp_name'");
 
-      push @calls, WTSI::NPG::Genotyping::Call->new(genotype => $genotype,
-                                                    snp      => $snp);
+      # May get >1 item for a name for gender markers. Just use the first.
+      my @named = $snpset->named_snp($snp_name);
+      my $snp = shift @named;
+
+      if ($snp) {
+        push @calls, WTSI::NPG::Genotyping::Call->new(genotype => $genotype,
+                                                      snp      => $snp);
+      }
+      else {
+        $self->warn("Ignoring Sequenom call on SNP '$snp_name' for sample ",
+                    "'$sample_name' because SNP is not a member of SNP set '",
+                    $snpset->name, "'");
+      }
     }
 
     $result{$sample_name} = \@calls;
