@@ -17,8 +17,6 @@
 #
 
 module Genotyping
-  VERSION = '1.3.0'
-  YEAR = '2014'
   VERSION_LOG_NAME = 'version.log'
 
   def maybe_version_log(log_dir)
@@ -28,9 +26,9 @@ module Genotyping
   end
 
   def version_text()
-    text = "WTSI Genotyping Pipeline version "+VERSION+"\n"+
-      "Pipeline software copyright (c) "+YEAR+" Genome Research Ltd.\n"+
-      "All rights reserved.\n"
+    "WTSI Genotyping Pipeline version "+VERSION+"\n"+
+    "Pipeline software copyright (c) "+YEAR+" Genome Research Ltd.\n"+
+    "All rights reserved.\n"
   end
 
   def write_version_log(log_dir)
