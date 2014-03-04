@@ -35,10 +35,9 @@ task :write_version_module do
   f = File.open('lib/genotyping/git_version.rb', 'w')
   f.puts('module Genotyping')
   f.puts("  VERSION = '#{GIT_VERSION}'")
-  f.puts("  DATE = '#{BUILD_DATE.year}'")
+  f.puts("  YEAR = '#{BUILD_DATE.year}'")
   f.puts('end');
   f.close
-
 end
 
 Rake::GemPackageTask.new(spec) do |pack|
