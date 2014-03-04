@@ -408,7 +408,14 @@ sub insert_sequenom_calls {
 
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
-    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+
+    if ($calls) {
+      insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+    }
+    else {
+      warn("Failed to find any Sequenom results for '",
+           $sample->sanger_sample_id, "'");
+    }
   }
 }
 
