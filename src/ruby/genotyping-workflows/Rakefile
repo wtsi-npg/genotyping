@@ -8,12 +8,22 @@ require 'rake/rdoctask'
 require 'rake/testtask'
 require 'rcov/rcovtask'
 
-GIT_VERSION = `git describe --abbrev=0 | sed -e s/v//`
+GIT_VERSION = `git describe`
 BUILD_DATE = DateTime.now
+
+# The Gem packaging will not accept default git version numbers so we present
+# a default of 0.0.0 where the version tag cannot be represented.
+def maybe_git_version(raw_git_version)
+  if (/^v?(\d+\.\d+\.\d+)(\S*)$/.match(raw_git_version.strip))
+    $1
+  else
+    '0.0.0'
+  end
+end
 
 spec = Gem::Specification.new do |spec|
   spec.name = 'genotyping-workflows'
-  spec.version = GIT_VERSION
+  spec.version = maybe_git_version(GIT_VERSION)
   spec.add_dependency('percolate', '>= 1.0.0')
   spec.extra_rdoc_files = ['README', 'LICENSE']
   spec.summary = 'WTSI genotyping workflows.'
