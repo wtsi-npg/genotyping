@@ -10,7 +10,7 @@ use File::Temp qw(tempdir);
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 10;
+use Test::More tests => 13;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -19,7 +19,7 @@ Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 our $READY_PIPE     = './bin/ready_pipe.pl';
 our $READY_INFINIUM = './bin/ready_infinium.pl';
-our $READY_SAMPLE   = './bin/ready_samples.pl';
+our $READY_SAMPLES  = './bin/ready_samples.pl';
 
 sub test_ready_pipe : Test(2) {
   my $tmpdir = tempdir(CLEANUP => 1);
@@ -75,7 +75,7 @@ sub test_ready_infinium : Test(8) {
   ok(-e "$dbfile");
 }
 
-sub test_ready_samples : Test(1) {
+sub test_ready_samples : Test(3) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $dbfile = "$tmpdir/test_ready_samples.db";
 
