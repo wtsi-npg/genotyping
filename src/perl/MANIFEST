@@ -322,7 +322,12 @@ t/gender/input_xhet.json
 t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
 t/gender_standalone.t
-t/generate_yml.t
+t/genotyping_yml.t
+t/genotyping_yml/config.yml
+t/genotyping_yml/genotype_genosnp.yml
+t/genotyping_yml/genotype_illuminus.yml
+t/genotyping_yml/genotype_zcall.yml
+t/genotyping_yml/genotyping_DUMMY.db
 t/identity.t
 t/infinium_analysis_publisher.t
 t/infinium_analysis_publisher/data/analysis/analysis.fcr.txt
@@ -471,6 +476,7 @@ t/WTSI/NPG/Genotyping/Sequenom/AssayDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/PublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
+t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/iRODS/CollectionTest.pm
 t/WTSI/NPG/iRODS/DataObjectTest.pm
 t/WTSI/NPG/iRODSTest.pm
