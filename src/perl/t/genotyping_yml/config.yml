@@ -1,0 +1,8 @@
+---
+async: lsf
+log: t/genotyping_yml/percolate.log
+log_level: DEBUG
+max_processes: 250
+msg_host: farm3-head2
+msg_port: 11300
+root_dir: t/genotyping_yml/
