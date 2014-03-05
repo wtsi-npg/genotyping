@@ -4,7 +4,7 @@ arguments:
   - run1
   - t/genotyping_yml/
   - chunk_size: 40
-    egt: /home/foo/dummy_cluster.egt
+    egt: /nfs/gapi/data/genotype/pipeline_test/Human670-QuadCustom_v1_A.egt
     manifest: /nfs/gapi/data/genotype/pipeline_test/Human670-QuadCustom_v1_A.bpm.csv
     memory: 2048
     zstart: 7

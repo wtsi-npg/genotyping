@@ -54,7 +54,7 @@ sub run {
     }
     if ($workdir !~ '/$') { $workdir .= '/'; } # ensure $workdir ends with /
     if ($outdir !~ '/$') { $outdir .= '/'; } # similarly for $outdir
-    if ($verbose) { print "WORKDIR: $workdir\nOUTDIR: $outdir\n"; }
+    if ($verbose) { print "WORKDIR: $workdir\n"; }
 
     $dbfile ||= 'genotyping.db';
     my $dbpath = $workdir.$dbfile;
@@ -83,7 +83,9 @@ sub run {
     if ($workflow) {
 	my @params = ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory);
 	if (! $manifest) { 
-	    $log->logcroak("Must specify --manifest for workflow!"); 
+	    $log->logcroak("Must specify --manifest for workflow!");
+	} elsif (! -e $manifest) {
+	    $log->logwarn("Warning: Manifest '$manifest' does not exist, must be created before running workflow.");
 	} elsif ($workflow eq 'illuminus') { 
 	    write_illuminus(@params); 
 	} elsif ($workflow eq 'genosnp') {
@@ -91,6 +93,8 @@ sub run {
 	} elsif ($workflow eq 'zcall') {
 	    if (!$egt) {
 		$log->logcroak("Must specify --egt for zcall workflow");
+	    } elsif (! -e $egt) {
+		 $log->logwarn("Warning: EGT file '$egt' does not exist, must be created before running workflow.");
 	    } else {
 		write_zcall(\@params, $egt, $zstart, $ztotal);  
 	    }
