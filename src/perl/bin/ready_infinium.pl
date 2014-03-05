@@ -248,7 +248,9 @@ sub run {
          my $address = $pipedb->address->find({label1 => $if_well});
          my $ss_sample = $ss_plate->{$address->label2};
          my $ss_supply = $ss_plate->{'supplier_name'};
-         unless (defined($ss_supply)) { $ss_supply = ""; } # field may be null
+         unless (defined($ss_supply)) {
+           $ss_supply = ""; # field may be null
+         }
 
          # Untracked
          my $ss_id = $ss_sample->{sanger_sample_id} ||
@@ -376,6 +378,9 @@ sub insert_fluidigm_calls {
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   my $snpset = $pipedb->snpset->find({name => 'qc'});
 
+  $method or die "The genotyping method 'Fluidigm' is not configured for use\n";
+  $snpset or die "The Fluidigm SNP set 'qc' is unknown\n";
+
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods => $irods);
 
@@ -391,6 +396,9 @@ sub insert_sequenom_calls {
 
   my $method = $pipedb->method->find({name => 'Sequenom'});
   my $snpset = $pipedb->snpset->find({name => 'W30467'});
+
+  $method or die "The genotyping method 'Sequenom' is not configured for use\n";
+  $snpset or die "The Sequenom SNP set 'W30467' is unknown\n";
 
   my $sequenom_set = WTSI::NPG::Genotyping::SNPSet->new
     (name      => 'W30467',
