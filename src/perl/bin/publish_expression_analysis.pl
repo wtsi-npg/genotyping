@@ -51,6 +51,10 @@ my $log;
 
 our $DEFAULT_INI = $ENV{HOME} . '/.npg/genotyping.ini';
 
+our $EXIT_CLI_ARG = 3;
+our $EXIT_CLI_VAL = 4;
+our $EXIT_UPLOAD  = 5;
+
 # our $DEFAULT_ANALYSIS_DEST = '/archive/GAPI/exp/analysis';
 # our $DEFAULT_SAMPLE_DEST = '/archive/GAPI/exp/infinium';
 
@@ -83,47 +87,48 @@ sub run {
              'verbose'            => \$verbose);
 
   unless ($analysis_source) {
-    pod2usage(-msg => "An --analysis-source argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "An --analysis-source argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
   unless ($sample_source) {
-    pod2usage(-msg => "A --sample-source argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "A --sample-source argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
 
   unless ($publish_analysis_dest) {
-    pod2usage(-msg => "An --analysis-dest argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "An --analysis-dest argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
   unless ($publish_sample_dest) {
-    pod2usage(-msg => "A --sample-dest argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "A --sample-dest argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
   unless ($manifest_path) {
-    pod2usage(-msg => "A --manifest argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "A --manifest argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
 
   unless (-e $analysis_source) {
-    pod2usage(-msg => "No such analysis source as '$analysis_source'\n",
-              -exitval => 4);
+    pod2usage(-msg     => "No such analysis source as '$analysis_source'\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   unless (-d $analysis_source) {
-    pod2usage(-msg => "The --analysis-source argument was not a directory\n",
-              -exitval => 4);
+    pod2usage
+      (-msg     => "The --analysis-source argument was not a directory\n",
+       -exitval => $EXIT_CLI_VAL);
   }
 
   unless (-e $sample_source) {
-    pod2usage(-msg => "No such sample source as '$sample_source'\n",
-              -exitval => 4);
+    pod2usage(-msg     => "No such sample source as '$sample_source'\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   unless (-d $sample_source) {
-    pod2usage(-msg => "The --sample-source argument was not a directory\n",
-              -exitval => 4);
+    pod2usage(-msg     => "The --sample-source argument was not a directory\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   unless (-e $manifest_path) {
-    pod2usage(-msg => "No such manifest as '$manifest_path'\n",
-              -exitval => 3);
+    pod2usage(-msg     => "No such manifest as '$manifest_path'\n",
+              -exitval => $EXIT_CLI_VAL);
   }
 
   if ($log4perl_config) {
@@ -166,8 +171,9 @@ sub run {
       (file_name => $manifest_path);
   }
   else {
-    pod2usage(-msg => "Invalid --manifest-version, expected one of [1, 2]\n",
-              -exitval => 4);
+    pod2usage
+      (-msg     => "Invalid --manifest-version, expected one of [1, 2]\n",
+       -exitval => $EXIT_CLI_VAL);
   }
 
   my $publication_time = DateTime->now;
@@ -209,6 +215,7 @@ sub run {
     print "New analysis UUID: ", $analysis_uuid, "\n";
   }
   else {
+    exit $EXIT_UPLOAD;
     $log->error('No analysis UUID; upload aborted because of errors.',
                 ' Please raise an RT ticket or email ',
                 'new-seq-pipe@sanger.ac.uk');

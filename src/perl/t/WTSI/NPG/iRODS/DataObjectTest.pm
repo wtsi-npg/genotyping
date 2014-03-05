@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use File::Spec;
 use List::AllUtils qw(all any none);
+use Log::Log4perl;
 
 use base qw(Test::Class);
 use Test::More tests => 48;
