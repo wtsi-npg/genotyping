@@ -16,66 +16,83 @@ use YAML qw /DumpFile/;
 
 Log::Log4perl->easy_init($ERROR);
 
+our $PERCOLATE_LOG_NAME = 'percolate.log';
+
 run() unless caller();
 
 sub run {
 
-    my $workdir;
-    my $manifest;
-    my $dbfile;
-    my $run;
-    my $egt;
-    my $help;
-    my $verbose;
-    my $host;
-    my $workflow = "";
+    my ($outdir, $workdir, $manifest, $dbfile, $run, $egt, $help, $verbose, 
+	$host, $workflow, $chunk_size, $memory, $zstart, $ztotal);
 
     my $log = Log::Log4perl->get_logger();
 
-    GetOptions('workdir=s' => \$workdir,
-	       'manifest=s' => \$manifest,
-	       'host=s' => \$host,
+    GetOptions('outdir=s'      => \$outdir,
+               'workdir=s'     => \$workdir,
+	       'manifest=s'    => \$manifest,
+	       'host=s'        => \$host,
+	       'dbfile=s'      => \$dbfile,
+	       'run=s'         => \$run,
+	       'egt=s'         => \$egt,
+	       'verbose'       => \$verbose,
+	       'workflow=s'    => \$workflow,
+	       'chunk_size=i'  => \$chunk_size,
+	       'memory=i'      => \$memory,
+	       'zstart=i'      => \$zstart,
+	       'ztotal=i'      => \$ztotal,
 	       'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-	       'dbfile=s' => \$dbfile,
-	       'run=s' => \$run,
-	       'egt=s' => \$egt,
-	       'verbose' => \$verbose,
-	       'workflow=s' => \$workflow,
 	);
-
+    $outdir ||= '.';
     if (!($workdir && $run)) {
 	$log->logcroak("Must specify pipeline run name and working directory");
+    } elsif (!(-e $outdir && -d $outdir)) {
+	$log->logcroak("Output path '$outdir' does not exist or is not a directory");
+    } elsif (-e $workdir && !(-d $workdir)) {
+	$log->logcroak("Working directory path '$workdir' already exists, and is not a directory");
+    } elsif (!(-e $workdir)) {
+	$log->logwarn("Warning: Pipeline working directory '$workdir' does not exist; must be created before running workflow.");
     }
     if ($workdir !~ '/$') { $workdir .= '/'; } # ensure $workdir ends with /
-    if ($verbose) { print "WORKDIR: $workdir\n"; }
+    if ($outdir !~ '/$') { $outdir .= '/'; } # similarly for $outdir
+    if ($verbose) { print "WORKDIR: $workdir\nOUTDIR: $outdir\n"; }
 
     $dbfile ||= 'genotyping.db';
     my $dbpath = $workdir.$dbfile;
+    if (! -e $dbpath) {
+	$log->logwarn("Warning: Pipeline database '$dbpath' does not exist; must be created before running workflow.");
+    }
     $host ||= 'farm3-head2'; 
+    # illuminus paralellizes by SNP, other callers by sample
+    if ($workflow && $workflow eq 'illuminus') { $chunk_size ||= 4000; }
+    else { $chunk_size ||= 40; } 
+    $memory ||= 2048,
+    $zstart ||= 7;
+    $ztotal ||= 1;
 
     my %config = (
 	'root_dir' => $workdir,
-	'log' => $workdir."percolate.log",
+	'log' => $workdir.$PERCOLATE_LOG_NAME,
 	'log_level' => 'DEBUG',
 	'msg_host' => $host,
 	'msg_port' => '11300',
 	'async' => 'lsf',
 	'max_processes' => '250'
 	);
-    DumpFile('config.yml', (\%config));
+    DumpFile($outdir.'config.yml', (\%config));
 
     if ($workflow) {
-	if (! $manifest) {
-	    $log->logcroak("Must specify --manifest for workflow!");
+	my @params = ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory);
+	if (! $manifest) { 
+	    $log->logcroak("Must specify --manifest for workflow!"); 
 	} elsif ($workflow eq 'illuminus') { 
-	    write_illuminus($dbpath, $run, $workdir, $manifest); 
+	    write_illuminus(@params); 
 	} elsif ($workflow eq 'genosnp') {
-	    write_genosnp($dbpath, $run, $workdir, $manifest);  
+	    write_genosnp(@params);  
 	} elsif ($workflow eq 'zcall') {
 	    if (!$egt) {
 		$log->logcroak("Must specify --egt for zcall workflow");
 	    } else {
-		write_zcall($dbpath, $run, $workdir, $manifest, $egt);  
+		write_zcall(\@params, $egt, $zstart, $ztotal);  
 	    }
 	} else {
 	    $log->logcroak("Invalid workflow argument $workflow; must be one of illuminus, genosnp, zcall");
@@ -84,44 +101,46 @@ sub run {
 }
 
 sub write_genosnp {
-    my ($dbpath, $run, $workdir, $manifest) = @_;
+    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @_;
     my %genosnp_args = (
-	'chunk_size' => '40',
-	'memory' => '2048',
+	'chunk_size' => $chunk_size,
+	'memory' => $memory,
 	'manifest' => $manifest,
 	);
     my $workflow_name = 'Genotyping::Workflows::GenotypeGenoSNP';
     write_workflow($dbpath, $run, $workdir, $workflow_name, \%genosnp_args,
-		   'genotype_genosnp.yml');
+		   $outdir.'genotype_genosnp.yml');
 }
 
 sub write_illuminus {
-    my ($dbpath, $run, $workdir, $manifest) = @_;
+    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @_;
    
     my %illuminus_args = (
-	'chunk_size' => '4000',
-	'memory' => '2048',
+	'chunk_size' => $chunk_size,
+	'memory' => $memory,
 	'manifest' => $manifest,
 	'gender_method' => 'Supplied'
 	);
     my $workflow_name = 'Genotyping::Workflows::GenotypeIlluminus';
     write_workflow($dbpath, $run, $workdir, $workflow_name, \%illuminus_args,
-		   'genotype_illuminus.yml');
+		   $outdir.'genotype_illuminus.yml');
 }
 
 sub write_zcall {
-    my ($dbpath, $run, $workdir, $manifest, $egt) = @_;
+    my ($paramsRef, $egt, $zstart, $ztotal) = @_;
+    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @{$paramsRef};
     my %zcall_args = (
-	'chunk_size' => '40',
-	'memory' => '2048',
+	'chunk_size' => $chunk_size,
+	'memory' => $memory,
 	'manifest' => $manifest,
-	'zstart' => '7',
-	'ztotal' => '1',
-	'egt' => $egt
+	'egt' => $egt,
+	'zstart' => $zstart,
+	'ztotal' => $ztotal
 	);
     my $workflow_name = 'Genotyping::Workflows::GenotypeZCall';
     write_workflow($dbpath, $run, $workdir, $workflow_name, \%zcall_args,
-		   'genotype_zcall.yml');
+		   $outdir.'genotype_zcall.yml');
+}
 
 sub write_workflow {
     my ($dbpath, $run, $workdir, $workflow_name, $extra_args_ref, $out) = @_;
@@ -135,36 +154,41 @@ sub write_workflow {
 }
 
 
-}
-
 __END__
+
 
 =head1 NAME
 
-generate_yml
+genotyping_yml
 
 =head1 SYNOPSIS
 
-generate_yml [--dbfile <SQLite filename>] [--help] 
+genotyping_yml [--dbfile <SQLite filename>] [--help] 
   --manifest <manifest_path> --run <run_name> [--egt <egt_path>]
   [--verbose] --workdir <directory path> --workflow <workflow_name>
 
 Options:
 
+  --chunk_size  Chunk size for parallelization. Optional, defaults to 
+                4000 for Illuminus or 40 for zCall/GenoSNP.
   --dbfile      The SQLite database filename (not the full path). Optional,
                 defaults to genotyping.db.
-  --help        Display help.
-  --manifest    Path to the .bpm.csv manifest file.
-  --run         The pipeline run name in the database. Required.
   --egt         Path to an Illumina .egt cluster file. Required for zcall. 
+  --help        Display help.
+  --host        Name of host machine for the beanstalk message queue.
+                Optional, defaults to farm3-head2.
+  --manifest    Path to the .bpm.csv manifest file.
+  --memory      Memory limit hint for LSF, in MB. Default = 2048.
+  --outdir      Directory in which to write YML files. Optional, defaults 
+                to current working directory.
+  --run         The pipeline run name in the database. Required.
   --verbose     Print messages while processing. Optional.
   --workdir     Working directory for pipeline run. Required.
   --workflow    Pipeline workflow for which to create a .yml file. If 
                 supplied, must be one of: illuminus, genosnp, zcall.
                 If absent, only config.yml will be generated.
-  --host        Name of host machine for the beanstalk message queue.
-                Optional, defaults to farm3-head2.
-    
+  --zstart      Start of zscore range, used for zCall only. Default = 7.
+  --ztotal      Number of zscores in range, for zCall only. Default = 1.
 
 =head1 DESCRIPTION
 
@@ -174,7 +198,7 @@ genotype callers. The workflow file can then be placed in the Percolate 'in'
 directory while the config file is supplied as an argument to the Percolate 
 executable.
 
-The script assumes that a copy of the named genotyping database file is 
+The script assumes that the named genotyping database file will be present 
 in the given working directory.
 
 =head1 METHODS

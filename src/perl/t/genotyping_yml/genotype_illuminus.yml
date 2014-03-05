@@ -1,11 +1,11 @@
 ---
 arguments:
-  - /home/foo/dummy_workdir/genotyping.db
+  - t/genotyping_yml/genotyping_DUMMY.db
   - run1
-  - /home/foo/dummy_workdir/
+  - t/genotyping_yml/
   - chunk_size: 4000
     gender_method: Supplied
-    manifest: /home/foo/dummy_manifest.bpm.csv
+    manifest: /nfs/gapi/data/genotype/pipeline_test/Human670-QuadCustom_v1_A.bpm.csv
     memory: 2048
 library: genotyping
 workflow: Genotyping::Workflows::GenotypeIlluminus
