@@ -107,6 +107,10 @@ sub run {
     pod2usage(-msg     => "A --manifest argument is required\n",
               -exitval => $EXIT_CLI_ARG);
   }
+  unless ($manifest_path) {
+    pod2usage(-msg => "A --manifest argument is required\n",
+              -exitval => 3);
+  }
 
   unless (-e $analysis_source) {
     pod2usage(-msg     => "No such analysis source as '$analysis_source'\n",
@@ -129,6 +133,10 @@ sub run {
   unless (-e $manifest_path) {
     pod2usage(-msg     => "No such manifest as '$manifest_path'\n",
               -exitval => $EXIT_CLI_VAL);
+  }
+  unless (-e $manifest_path) {
+    pod2usage(-msg => "No such manifest as '$manifest_path'\n",
+              -exitval => 3);
   }
 
   if ($log4perl_config) {
