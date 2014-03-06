@@ -297,9 +297,7 @@ t/fluidigm_publisher/0123456789/0123456789.csv
 t/fluidigm_publisher/0123456789/Data/aramis.tif
 t/fluidigm_publisher/0123456789/Data/athos.tif
 t/fluidigm_publisher/0123456789/Data/porthos.tif
-t/fluidigm_publisher/0123456789/header.csv
 t/fluidigm_publisher/qc.csv
-t/fluidigm_publisher/qc_big.csv
 t/fluidigm_resultset.t
 t/fluidigm_resultset/complete/0123456789/0123456789.csv
 t/fluidigm_resultset/complete/0123456789/Data/aramis.tif
@@ -406,7 +404,7 @@ t/publisher.t
 t/publisher/lorem.txt
 t/publisher/update/lorem.txt
 t/qc/.gitattributes
-t/qc/small_test/.pversion
+t/qc/alpha/pipeline_summary.lof
 t/qc_small.t
 t/qc_test_data/config_test.json
 t/qc_test_data/config_test_nomaf.json
@@ -563,7 +561,6 @@ t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/SubscriberTest.pm
-t/WTSI/NPG/Genotyping/IlluminusTest.pm
 t/WTSI/NPG/Genotyping/Infinium/AnalysisPublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Infinium/PublisherTest.pm
@@ -573,7 +570,6 @@ t/WTSI/NPG/Genotyping/Sequenom/AssayDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/PublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
-t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/iRODS/CollectionTest.pm
 t/WTSI/NPG/iRODS/DataObjectTest.pm
 t/WTSI/NPG/iRODSTest.pm
@@ -581,4 +577,4 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
-test/test_publish_infinium_analysis.db
+
