@@ -29,42 +29,43 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my $help;
-my ($outDir, $outputGT, $outputResults,  $outputFail, $outputFailedPairs, 
-    $outputFailedPairsMatch, $configPath, $iniPath,
-    $minCheckedSNPs, $minIdent, $output, $log);
+my ($outDir, $configPath, $iniPath, $manifest, $minCheckedSNPs, $minIdent, $plink, $help);
 
 GetOptions("outdir=s"     => \$outDir,
            "config=s"     => \$configPath,
            "ini=s"        => \$iniPath,
+	   "manifest=s"   => \$manifest,
            "min_snps=i"   => \$minCheckedSNPs,
            "min_ident=f"  => \$minIdent,
+	   "plink=s"      => \$plink,
            "h|help"       => \$help);
 
 if ($help) {
     print STDERR "Usage: $0 [ output file options ] PLINK_GTFILE
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension)
 Options:
---outdir=PATH       Output directory for results files. Optional, defaults 
-                    to current working directory.
 --config=PATH       Config path in .json format with QC thresholds. 
                     At least one of config or min_ident must be given.
 --ini=PATH          Path to .ini file with additional configuration. 
                     Defaults to: $DEFAULT_INI
+--manifest=PATH     Path to the .bpm.csv genotyping manifest. Required.
 --min_snps=NUMBER   Minimum number of SNPs for comparison
 --min_ident=NUMBER  Minimum threshold of SNP matches for identity; if given, overrides value in config file; 0 <= NUMBER <= 1
+--outdir=PATH       Output directory for results files. Optional, defaults 
+                    to current working directory.
+--plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
+                    .bim, .fam extension. Required.
 --help              Print this help text and exit
-Unspecified options will receive default values, with output written to current directory.
 ";
     exit(0);
 }
 
-my $plinkPrefix = $ARGV[0];
-if (!$plinkPrefix) { die "Must supply a Plink genotype file prefix: $!"; }
-
-# parameter default values
-if ($outDir && !(-e $outDir && -d $outDir)) {
-    croak "Output path $outDir does not exist or is not a directory!";
+if (!($plink && -e $plink.'.bed' && -e $plink.'.bim' && -e $plink.'.fam')) {
+    die "Prefix '$plink' is not a valid Plink binary dataset; one or more files missing";
+} elsif (!($manifest && -e $manifest)) {
+    die "Manifest path '$manifest' does not exist";
+} elsif ($outDir && !(-e $outDir && -d $outDir)) {
+    die "Output '$outDir' does not exist or is not a directory";
 }
 $outDir ||= getcwd();
 $minCheckedSNPs ||= 20;
@@ -78,5 +79,6 @@ if (!$minIdent) {
 }
 $iniPath ||= $DEFAULT_INI;
 
-run_identity_check($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $iniPath);
+run_identity_check($plink, $outDir, $minCheckedSNPs, $minIdent, 
+		   $manifest, $iniPath);
 

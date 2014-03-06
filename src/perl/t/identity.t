@@ -29,18 +29,20 @@ my $config = $Bin."/../etc/qc_config.json";
 # see gapi/genotype_identity_test.git on http://git.internal.sanger.ac.uk
 # data contains some "real" samples and calls, so not made public on github
 
-my $dataDir = "/nfs/gapi/data/genotype/qc_test/identity_check";
+my $dataDir = "/nfs/gapi/data/genotype/pipeline_test/identity_check";
 my @plink = qw/identity_test identity_test_not_exome/;
 my @outputs = qw/identity_check_results.txt
                  identity_check_failed_pairs.txt
                  identity_check_failed_pairs_match.txt/;
 my $workdir = "$Bin/identity";
+my $manifest = "/nfs/gapi/data/genotype/pipeline_test/Human670-QuadCustom_v1_A.bpm.csv";
 my $cmd;
+
 
 foreach my $plink (@plink) {
     my $input = $dataDir."/".$plink;
     $cmd = "$bin/check_identity_bed.pl --config $config " .
-      "--outdir $workdir $input ";
+      "--outdir $workdir --manifest $manifest --plink $input";
 
     is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     foreach my $output (@outputs) {

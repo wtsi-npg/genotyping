@@ -355,9 +355,16 @@ sub writeFailedPairResults {
     return @matchedPairs;
 }
 
+# TODO cross-reference Sequenom plex with manifest to find number of available SNPs for identity check.
+# Find Sequenom plex from IRODS (?)
+# Compare with manifest -- requires a manifest argument
+# Compute match rate for each SNP (vs. maximum)
+# Count no-calls as mismatches? Or require minimum number of calls for check?
+
+
 sub run_identity_check {
     # 'main' method to run identity check
-    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $iniPath) = @_;
+    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $manifest, $iniPath) = @_;
     open my $logfile, ">", $outDir.'/'.$OUTPUT_NAMES{'log'} || die $!; 
     my $pb = new plink_binary::plink_binary($plinkPrefix);
     $pb->{"missing_genotype"} = "N"; 
