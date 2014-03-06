@@ -297,7 +297,6 @@ t/fluidigm_publisher/0123456789/0123456789.csv
 t/fluidigm_publisher/0123456789/Data/aramis.tif
 t/fluidigm_publisher/0123456789/Data/athos.tif
 t/fluidigm_publisher/0123456789/Data/porthos.tif
-t/fluidigm_publisher/0123456789/header.csv
 t/fluidigm_publisher/qc.csv
 t/fluidigm_resultset.t
 t/fluidigm_resultset/complete/0123456789/0123456789.csv
@@ -578,4 +577,4 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
-test/test_publish_infinium_analysis.db
+
