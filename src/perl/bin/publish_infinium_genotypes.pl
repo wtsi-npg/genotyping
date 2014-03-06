@@ -130,7 +130,8 @@ sub run {
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
-     infinium_db      => $ifdb);
+     infinium_db      => $ifdb,
+     logger           => $log);
   $publisher->publish($publish_dest);
 
   return 0;

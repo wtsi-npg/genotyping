@@ -39,6 +39,10 @@ my $embedded_conf = "
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
+our $EXIT_CLI_ARG = 3;
+our $EXIT_CLI_VAL = 4;
+our $EXIT_UPLOAD  = 5;
+
 run() unless caller();
 
 sub run {
@@ -64,32 +68,33 @@ sub run {
              'verbose'   => \$verbose);
 
   unless ($publish_dest) {
-    pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "A --dest argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
   unless ($run_name) {
-    pod2usage(-msg => "A --run argument is required\n", -exitval => 3);
+    pod2usage(-msg     => "A --run argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
   unless ($source) {
-    pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 3);
+    pod2usage(-msg     => "A --source argument is required\n",
+              -exitval => $EXIT_CLI_ARG);
   }
 
   if ($config && ! -e $config) {
-    pod2usage(-msg => "The config file '$config' does not exist\n",
-              -exitval => 4);
+    pod2usage(-msg     => "The config file '$config' does not exist\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   if ($dbfile && ! -e $dbfile) {
-    pod2usage(-msg => "The database file '$dbfile' does not exist\n",
-              -exitval => 4);
+    pod2usage(-msg     => "The database file '$dbfile' does not exist\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   unless (-e $source) {
-    pod2usage(-msg => "No such source as '$source'\n",
-              -exitval => 4);
+    pod2usage(-msg     => "No such source as '$source'\n",
+              -exitval => $EXIT_CLI_VAL);
   }
   unless (-d $source) {
-    pod2usage(-msg => "The --source argument was not a directory\n",
-              -exitval => 4);
+    pod2usage(-msg     => "The --source argument was not a directory\n",
+              -exitval => $EXIT_CLI_VAL);
   }
 
   $config ||= $DEFAULT_INI;
@@ -151,9 +156,9 @@ sub run {
     $log->error('No analysis UUID generated; upload aborted because of errors.',
                 ' Please raise an RT ticket or email ',
                 'new-seq-pipe@sanger.ac.uk');
+    exit $EXIT_UPLOAD;
   }
 }
-
 
 __END__
 
