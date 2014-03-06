@@ -12,16 +12,63 @@ use File::Spec;
 
 use base 'Module::Build';
 
+# Git version code courtesy of Marina Gourtovaia <mg8@sanger.ac.uk>
+sub git_tag {
+  my $version;
+
+  unless (`which git`) {
+    warn 'git command not found; no version number will be generated';
+    $version = 'unknown';
+  }
+
+  if (!$version) {
+    $version = `git describe`;
+    chomp $version;
+  }
+
+  return $version;
+}
+
+sub ACTION_code {
+  my ($self) = @_;
+
+  $self->SUPER::ACTION_code;
+
+  my $version_file = 'blib/lib/WTSI/NPG/Genotyping/Version.pm';
+  my $gitver = $self->git_tag;
+
+  if (-e $version_file) {
+    warn "Changing version of WTSI::NPG::Genotyping::Version to $gitver\n";
+
+    my $backup  = '.original';
+    local $^I   = $backup;
+    local @ARGV = ($version_file);
+
+    while (<>) {
+      s/(\$VERSION\s*=\s*)('?\S+'?)\s*;/${1}'$gitver';/;
+      print;
+    }
+
+    unlink "$version_file$backup";
+  } else {
+    warn "File $version_file not found\n";
+  }
+}
+
 #
 # Prepare configuration for tests
 #
 sub ACTION_test {
-  my $self = shift;
+  my ($self) = @_;
 
   $self->copy_files_by_category('conf_files', './blib');
   $self->copy_files_by_category('ini_files', './blib');
 
-  $self->SUPER::ACTION_test;
+  {
+    local $ENV{PATH} = "./bin:../r/bin:$ENV{PATH}";
+
+    $self->SUPER::ACTION_test;
+  }
 }
 
 #
@@ -37,10 +84,10 @@ sub ACTION_install_config {
 }
 
 sub ACTION_install_gendermix {
-    my $self = shift;
-    my $gendermix_manifest = './etc/gendermix_manifest.txt';
-    $self->process_alternate_manifest($gendermix_manifest);
-    return $self;
+  my ($self) = @_;
+  my $gendermix_manifest = './etc/gendermix_manifest.txt';
+  $self->process_alternate_manifest($gendermix_manifest);
+  return $self;
 }
 
 sub ACTION_install_R {

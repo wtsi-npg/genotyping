@@ -8,21 +8,46 @@ use warnings;
 use strict;
 use Getopt::Long;
 use List::AllUtils;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
+use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Database::SNP;
-
+use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Utilities qw(user_session_log);
 
 our $AUTOCALL_PASS = 'Pass';
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
 
-Log::Log4perl->easy_init($ERROR);
+our $SEQUENOM = 'sequenom';
+our $FLUIDIGM = 'fluidigm';
+
+our $SEQUENOM_QC_PLEX = '/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv';
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'ready_infinium');
+
+my $embedded_conf = "
+   log4perl.logger.npg.irods.publish = ERROR, A1, A2
+
+   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
+   log4perl.appender.A1.utf8      = 1
+   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
+
+   log4perl.appender.A2           = Log::Log4perl::Appender::File
+   log4perl.appender.A2.filename  = $session_log
+   log4perl.appender.A2.utf8      = 1
+   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
+   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
+   log4perl.appender.A2.syswrite  = 1
+";
 
 run() unless caller();
 
@@ -30,20 +55,26 @@ sub run {
   my $chip_design;
   my $config;
   my $dbfile;
+  my $debug;
+  my $log4perl_config;
   my $maximum;
   my $namespace;
   my $project_title;
+  my $qc_platform;
   my $run_name;
   my $supplier_name;
   my $verbose;
 
-  GetOptions('chip_design=s' => \$chip_design,
+  GetOptions('chip-design=s' => \$chip_design,
              'config=s'      => \$config,
              'dbfile=s'      => \$dbfile,
+             'debug'         => \$debug,
              'help'          => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'     => \$log4perl_config,
              'maximum=i'     => \$maximum,
              'namespace=s'   => \$namespace,
              'project=s'     => \$project_title,
+             'qc-platform=s' => \$qc_platform,
              'run=s'         => \$run_name,
              'supplier=s'    => \$supplier_name,
              'verbose'       => \$verbose);
@@ -57,17 +88,45 @@ sub run {
   unless ($project_title) {
     pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
   }
+  unless ($qc_platform) {
+    pod2usage(-msg => "A --qc-platform argument is required\n", -exitval => 2);
+  }
   unless ($run_name) {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
   }
   unless ($supplier_name) {
     pod2usage(-msg => "A --supplier argument is required\n", -exitval => 2);
   }
+
   unless ($run_name =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid run name '$run_name'\n", -exitval => 2);
   }
   unless ($namespace =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
+  }
+
+  $qc_platform = lc $qc_platform;
+  unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
+    pod2usage(-msg => "Invalid qc-platform '$qc_platform' " .
+              "expected one of [$FLUIDIGM, $SEQUENOM]\n", -exitval => 2);
+  }
+
+  my $log;
+
+  if ($log4perl_config) {
+    Log::Log4perl::init($log4perl_config);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+  }
+  else {
+    Log::Log4perl::init(\$embedded_conf);
+    $log = Log::Log4perl->get_logger('npg.irods.publish');
+
+    if ($verbose) {
+      $log->level($INFO);
+    }
+    elsif ($debug) {
+      $log->level($DEBUG);
+    }
   }
 
   if ($verbose) {
@@ -87,18 +146,16 @@ sub run {
        on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
-    (name   => 'infinium',
-     inifile =>  $config)->connect(RaiseError => 1);
+    (name    => 'infinium',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError           => 1,
-                                   mysql_enable_utf8    => 1,
-                                   mysql_auto_reconnect => 1);
-
-  my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-    (name   => 'snp',
-     inifile => $config)->connect(RaiseError => 1);
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
 
   my @chip_designs = $ifdb->find_project_chip_design($project_title);
   unless (@chip_designs) {
@@ -107,15 +164,15 @@ sub run {
   }
 
   if ($chip_design) {
-    unless (grep { /^$chip_design$/ }  @chip_designs) {
+    unless (grep { /^$chip_design$/ } @chip_designs) {
       die "Invalid chip design '$chip_design' design. Valid designs are: [ "
         . join(", ", @chip_designs) . "]\n";
     }
   }
   else {
     if (scalar @chip_designs > 1) {
-      die "Found >1 chip design. Use the --chip_design argument to specify which one " .
-        "to use: [" . join(", ", @chip_designs) . "]\n";
+      die "Found >1 chip design. Use the --chip_design argument to specify " .
+        "which one to use: [" . join(", ", @chip_designs) . "]\n";
     }
     else {
       $chip_design = $chip_designs[0];
@@ -124,8 +181,9 @@ sub run {
 
   my $snpset = $pipedb->snpset->find({name => $chip_design});
   unless ($snpset) {
-    die "Chip design '$chip_design' is not configured for use. Configured are: [" .
-      join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
+    die "Chip design '$chip_design' is not configured for use. " .
+      "Configured are: [" .
+        join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
   }
 
   my $infinium = $pipedb->method->find({name => 'Infinium'});
@@ -145,15 +203,15 @@ sub run {
   # This is here because SequenceScape is missing (!) some tracking
   # information. It enables the data to be imported without removing
   # NOT NULL UNIQUE constraints.
-  my $num_untracked_samples = 0;
+  my $num_untracked_samples         = 0;
   my $num_consent_withdrawn_samples = 0;
-  my $num_untracked_plates = 0;
+  my $num_untracked_plates          = 0;
   my %untracked_plates;
 
   $pipedb->in_transaction
     (sub {
        my $supplier = $pipedb->datasupplier->find_or_create
-         ({name => $supplier_name,
+         ({name      => $supplier_name,
            namespace => $namespace});
        my $run = $pipedb->piperun->find_or_create({name => $run_name});
        validate_snpset($run, $snpset);
@@ -190,7 +248,9 @@ sub run {
          my $address = $pipedb->address->find({label1 => $if_well});
          my $ss_sample = $ss_plate->{$address->label2};
          my $ss_supply = $ss_plate->{'supplier_name'};
-         unless (defined($ss_supply)) { $ss_supply = ""; } # field may be null
+         unless (defined($ss_supply)) {
+           $ss_supply = ""; # field may be null
+         }
 
          # Untracked
          my $ss_id = $ss_sample->{sanger_sample_id} ||
@@ -276,7 +336,21 @@ sub run {
          die "Failed to find any samples for project '$project_title'\n";
        }
 
-       insert_sequenom_calls($pipedb, $snpdb, \@samples);
+       if ($qc_platform eq $SEQUENOM) {
+         my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+           (name    => 'snp',
+            inifile => $config,
+            logger  => $log)->connect(RaiseError => 1);
+
+         insert_sequenom_calls($pipedb, $snpdb, \@samples);
+       }
+       elsif ($qc_platform eq $FLUIDIGM) {
+         my $irods = WTSI::NPG::iRODS->new(logger => $log);
+         insert_fluidigm_calls($pipedb, $irods, \@samples);
+       }
+       else {
+         die "Unexpected QC platform '$qc_platform'\n";
+       }
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
@@ -304,6 +378,9 @@ sub insert_fluidigm_calls {
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   my $snpset = $pipedb->snpset->find({name => 'qc'});
 
+  $method or die "The genotyping method 'Fluidigm' is not configured for use\n";
+  $snpset or die "The Fluidigm SNP set 'qc' is unknown\n";
+
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods => $irods);
 
@@ -320,6 +397,13 @@ sub insert_sequenom_calls {
   my $method = $pipedb->method->find({name => 'Sequenom'});
   my $snpset = $pipedb->snpset->find({name => 'W30467'});
 
+  $method or die "The genotyping method 'Sequenom' is not configured for use\n";
+  $snpset or die "The Sequenom SNP set 'W30467' is unknown\n";
+
+  my $sequenom_set = WTSI::NPG::Genotyping::SNPSet->new
+    (name      => 'W30467',
+     file_name => $SEQUENOM_QC_PLEX);
+
   my @sample_names;
   foreach my $sample (@$samples) {
     if ($sample->include and defined $sample->sanger_sample_id) {
@@ -327,12 +411,19 @@ sub insert_sequenom_calls {
     }
   }
 
-  my $sequenom_results = $snpdb->find_sequenom_calls($snpset, \@sample_names);
+  my $sequenom_results = $snpdb->find_sequenom_calls($sequenom_set,
+                                                     \@sample_names);
 
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
 
-    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+    if ($calls) {
+      insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+    }
+    else {
+      warn("Failed to find any Sequenom results for '",
+           $sample->sanger_sample_id, "'");
+    }
   }
 }
 
@@ -398,12 +489,12 @@ ready_infinium
 
 ready_infinium [--config <database .ini file>] [--chip-design <name>] \
    [--namespace <sample namespace>] [--maximum <n>] \
-   --dbfile <SQLite file> --project <project name> --run <pipeline run name> \
-   --supplier <supplier name> [--verbose]
+   --dbfile <SQLite file> --project <project name> --qc-platform <name> \
+   --run <pipeline run name> --supplier <supplier name> [--verbose]
 
 Options:
 
-  --chip_design Explicitly state the chip design.
+  --chip-design Explicitly state the chip design.
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dbfile      The SQLite database file.
@@ -412,6 +503,7 @@ Options:
   --namespace   The namespace for the imported sample names. Optional,
                 defaults to 'wtsi'.
   --project     The name of the Infinium LIMS project to import.
+  --qc-platform The QC genotyping platform. Fluidigm or Sequenom.
   --run         The pipeline run name in the database which will be created
                 or added to.
   --supplier    The name of the sample supplier.

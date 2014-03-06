@@ -145,6 +145,8 @@ sub find_sample_by_plate {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
+  $self->debug("Found 1 sample in plate ID '$plate_id' ''$unpadded_map");
+
   return shift @samples;
 }
 
@@ -224,6 +226,8 @@ sub find_infinium_plate {
     $plate{$row->{map}} = $row;
   }
 
+  $self->debug("Found Infinium plate '$infinium_barcode'");
+
   return \%plate;
 }
 
@@ -285,6 +289,8 @@ sub find_infinium_sample_by_plate {
   if ($n > 1) {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
+
+  $self->debug("Found 1 Infinium sample in '$infinium_barcode' '$unpadded_map'");
 
   return shift @samples;
 }
@@ -358,6 +364,8 @@ sub find_infinium_gex_sample {
                       "were returned where 1 was expected");
   }
 
+  $self->debug("Found 1 GEX sample in '$plate_barcode' '$map'");
+
   return shift @samples;
 }
 
@@ -416,6 +424,8 @@ sub find_infinium_gex_sample_by_sanger_id {
     $self->logconfess("$n records for sample '$sanger_sample_id' ",
                       "were returned where 1 was expected");
   }
+
+  $self->debug("Found 1 GEX sample for '$sanger_sample_id'");
 
   return shift @samples;
 }
@@ -495,6 +505,8 @@ sub find_fluidigm_plate {
   while (my $row = $sth->fetchrow_hashref) {
     $plate{$row->{map}} = $row;
   }
+
+  $self->debug("Found Fluidigm plate '$fluidigm_barcode'");
 
   return \%plate;
 }
@@ -584,6 +596,8 @@ sub find_fluidigm_sample_by_plate {
   if ($n > 1) {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
+
+  $self->debug("Found 1 Fluidigm sample in '$fluidigm_barcode' '$map'");
 
   return shift @samples;
 }

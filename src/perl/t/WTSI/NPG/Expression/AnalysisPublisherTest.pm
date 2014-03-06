@@ -48,8 +48,6 @@ sub make_fixture : Test(setup) {
 
   $irods->put_collection($sample_data_path, $irods_tmp_coll);
 
-
-
   for (my $i = 0; $i < scalar @data_files; $i++) {
     my $irods_path = "$irods_tmp_coll/infinium/" . $data_files[$i];
     my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $irods_path)->absolute;

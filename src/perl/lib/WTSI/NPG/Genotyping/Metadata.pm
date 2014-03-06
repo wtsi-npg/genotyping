@@ -123,8 +123,8 @@ sub infinium_fingerprint {
   return make_fingerprint([$INFINIUM_BEADCHIP_META_KEY,
                            $INFINIUM_BEADCHIP_SECTION_META_KEY,
                            # $INFINIUM_BEADCHIP_DESIGN_META_KEY,
-                           # $INFINIUM_PROJECT_TITLE_META_KEY,
-                           # $INFINIUM_SAMPLE_NAME (Was 'dcterms:identifier')
+                           $INFINIUM_PROJECT_TITLE_META_KEY,
+                           $INFINIUM_SAMPLE_NAME,
                            $INFINIUM_PLATE_BARCODE_META_KEY,
                            $INFINIUM_PLATE_WELL_META_KEY],
                           \@meta);
