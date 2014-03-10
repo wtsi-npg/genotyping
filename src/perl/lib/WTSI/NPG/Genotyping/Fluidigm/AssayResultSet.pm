@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
@@ -10,17 +9,10 @@ use Text::CSV;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
 
-has 'file_name' =>
-  (is       => 'ro',
-   isa      => 'Str',
-   required => 0);
-
-has 'data_object' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::Fluidigm::AssayDataObject',
-   required => 0);
+has '+data_object' =>
+  (isa      => 'WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');
 
 has 'assay_results' =>
   (is       => 'ro',
@@ -45,34 +37,6 @@ around BUILDARGS => sub {
     return $class->$orig(@_);
   }
 };
-
-sub BUILD {
-  my ($self) = @_;
-
-  unless ($self->data_object or $self->file_name) {
-     $self->logconfess("Neither data_object nor file_name ",
-                       "arguments were supplied to the constructor");
-  }
-
-  if ($self->data_object and $self->file_name) {
-    $self->logconfess("Both data_object '", $self->data_object,
-                      "' and file_name '", $self->file_name,
-                      "' arguments were supplied to the constructor");
-  }
-
-  if ($self->data_object) {
-    $self->data_object->is_present or
-      $self->logconfess("Assay data file ", $self->data_object->absolute,
-                        " is not present");
-  }
-
-  if ($self->file_name) {
-    unless (-e $self->file_name) {
-      $self->logconfess("Assay data file ", $self->file_name,
-                        " is not present");
-    }
-  }
-}
 
 sub snpset_name {
   my ($self) = @_;
@@ -124,17 +88,6 @@ sub filter_on_confidence {
   }
 
   return \@filtered_results;
-}
-
-sub str {
-  my ($self) = @_;
-
-  if ($self->data_object) {
-    return $self->data_object->str;
-  }
-  else {
-    return $self->file_name
-  }
 }
 
 sub _build_assay_results {
