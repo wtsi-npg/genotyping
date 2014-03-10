@@ -5,18 +5,16 @@ package WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 
 use Moose;
 
-use WTSI::NPG::Genotyping::Metadata qw($SEQUENOM_PLATE_NAME_META_KEY
-                                       $SEQUENOM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Metadata qw(make_sample_metadata);
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';
 
 sub update_secondary_metadata {
   my ($self, $snpdb, $ssdb) = @_;
 
-  my $sequenom_plate_avu = $self->get_avu($SEQUENOM_PLATE_NAME_META_KEY);
+  my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
   my $plate_name = $sequenom_plate_avu->{value};
-  my $well_avu = $self->get_avu($SEQUENOM_PLATE_WELL_META_KEY);
+  my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
   my $well = $well_avu->{value};
 
   $self->debug("Found plate well '$plate_name': '$well' in ",
@@ -45,7 +43,7 @@ sub update_secondary_metadata {
     $self->set_permissions('null', @current_groups);
 
     # Supersede all the secondary metadata with new values
-    my @meta = make_sample_metadata($ss_sample);
+    my @meta = $self->make_sample_metadata($ss_sample);
 
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);

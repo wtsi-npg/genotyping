@@ -9,12 +9,11 @@ use Moose;
 use Text::CSV;
 use URI;
 
-use WTSI::NPG::Genotyping::Metadata qw(make_sequenom_metadata
-                                       sequenom_fingerprint);
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -124,8 +123,8 @@ sub publish_samples {
         $self->_write_sequenom_csv_file($file, \@keys, \@records);
       $self->debug("Wrote $record_count records into $file");
 
-      my @meta = make_sequenom_metadata($first);
-      my @fingerprint = sequenom_fingerprint(@meta);
+      my @meta = $self->make_sequenom_metadata($first);
+      my @fingerprint = $self->sequenom_fingerprint(@meta);
       my $data_object = $publisher->publish_file($file, \@fingerprint,
                                                  $publish_dest,
                                                  $self->publication_time);

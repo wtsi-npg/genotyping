@@ -10,7 +10,8 @@ use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotation',
+  'WTSI::NPG::Genotyping::Annotation';
 
 has 'irods' =>
   (is       => 'ro',
@@ -27,6 +28,17 @@ sub BUILD {
   $self->irods->logger($self->logger);
 }
 
+=head2 get_snpset
+
+  Arg [1]    : Str snpset name e.g. 'qc'
+  Arg [2]    : Str reference name e.g. 'Homo sapiens (1000 Genomes)'
+
+  Example    : $set = $subscriber->get_snpset('qc', $reference_name)
+  Description: Make a new SNPSet from data in iRODS.
+  Returntype : WTSI::NPG::Genotyping::SNPSet
+
+=cut
+
 sub get_snpset {
    my ($self, $snpset_name, $reference_name) = @_;
 
@@ -36,8 +48,8 @@ sub get_snpset {
 
    my @obj_paths = $self->irods->find_objects_by_meta
      ('/',
-      [fluidigm_plex  => $snpset_name],
-      [reference_name => $reference_name]);
+      [$self->fluidigm_plex_name_attr    => $snpset_name],
+      [$self->reference_genome_name_attr => $reference_name]);
 
    my $num_snpsets = scalar @obj_paths;
    if ($num_snpsets > 1) {
@@ -78,8 +90,8 @@ sub get_assay_resultsets {
 
   my @obj_paths = $self->irods->find_objects_by_meta
     ('/',
-     [fluidigm_plex        => $snpset_name],
-     ['dcterms:identifier' => $sample_identifier], @query_specs);
+     [$self->fluidigm_plex_name_attr => $snpset_name],
+     [$self->dcterms_identifier_attr => $sample_identifier], @query_specs);
 
   $self->debug("Found ", scalar @obj_paths, " Fluidigm '$snpset_name' plex ",
                "resultsets for '$sample_identifier'");
@@ -124,6 +136,21 @@ sub get_assay_resultset {
 
   return shift @resultsets;
 }
+
+=head2 get_calls
+
+  Arg [1]    : Str reference name e.g. 'Homo sapiens (1000 Genomes)'
+  Arg [2]    : Str snpset name e.g. 'qc'
+  Arg [3]    : Str sample identifier (dcterms:identifier)
+  Arg [n]    : Optional additional query specs as ArrayRefs.
+
+  Example    : $sub->get_calls('Homo sapiens (1000 Genomes)', 'qc',
+                               '0123456789', [study => 12345]);
+  Description: Get genotype calls mapped to the specified reference for
+               a specified SNP multiplex and sample.
+  Returntype : ArrayRef[WTSI::NPG::Genotyping::Call]
+
+=cut
 
 sub get_calls {
   my ($self, $reference_name, $snpset_name, $sample_identifier,
