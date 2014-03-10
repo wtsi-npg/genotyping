@@ -28,14 +28,19 @@ use strict;
 
 use Carp;
 use Cwd;
+use POSIX qw(ceil);
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
 
+use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
+
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/run_identity_check/;
+our @EXPORT_OK = qw/run_identity_check getPlinkSnpNames getSequenomSNPNames/;
 
 our %OUTPUT_NAMES = ('genotypes'  => 'identity_check_gt.txt',
 		     'results'    => 'identity_check_results.txt',
@@ -44,6 +49,8 @@ our %OUTPUT_NAMES = ('genotypes'  => 'identity_check_gt.txt',
 		     'fail_match' => 'identity_check_failed_pairs_match.txt',
 		     'log'        => 'identity_check.log',
     );
+our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
+our $log = Log::Log4perl->get_logger('genotyping.qc.identity');
 
 sub compareGenotypes {
     # read plink and (if available) sequenom genotypes by SNP and sample
@@ -154,6 +161,35 @@ sub genotypesAreEquivalent {
     }
 }
 
+sub getMatchesForPass {
+    # get minimum number of matching SNPs for pass
+    # depends on overlap between Plink snpset and Sequenom plex
+    my ($pb, $threshold) = @_;
+    my @sequenomSNPs = getSequenomSNPNames();
+    my %sequenomSNPs;
+    foreach my $name (@sequenomSNPs) { $sequenomSNPs{$name} = 1; } 
+    my @plinkSNPs = getPlinkSNPNames($pb);
+    my $shared = 0;
+    foreach my $name (@plinkSNPs) {
+	my $sqName = illuminaToSequenomSNP($name);
+	if ($sequenomSNPs{$sqName}) { $shared++; }
+    }
+    print "SHARED: $shared\n";
+    my $min = ceil($threshold * $shared); # minimum number of SNPs
+    return $min;
+}
+
+sub getPlinkSNPNames {
+    # extract (raw) SNP names from a plink_binary object
+    my $pb = shift;  # $pb = plink_binary 
+    my @names;
+    for my $i (0..$pb->{"snps"}->size() - 1) {
+	my $name = $pb->{"snps"}->get($i)->{"name"};
+	push @names, $name;
+    }
+    return @names;
+}
+
 sub getSampleNamesIDs {  
     # extract sample IDs from a plink_binary object
     # first, try parsing sampleName in standard PLATE_WELL_ID format
@@ -174,6 +210,20 @@ sub getSampleNamesIDs {
     }
     my $total = @sampleNames;
     return (\%samples, \@sampleNames, $total);
+}
+
+sub getSequenomSNPNames {
+    # read definitive Sequenom plex from iRODS, using SNPSet module
+    # note that W30467 has same snp set for 1000Genomes and GRCh37
+    my $plex = 'W30467_snp_set_info_1000Genomes.tsv';
+    #my $irods = WTSI::NPG::iRODS->new;
+    #my $data_object = WTSI::NPG::iRODS::DataObject->new
+    #($irods, "/seq/sequenom/multiplexes/$plex");
+    #my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+    # 2014-03-07 iRODS is having issues, use filename instead
+    my $plexPath = "$PLEX_DIR/$plex";
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plexPath);
+    return $snpset->snp_names;
 }
 
 sub readPlinkCalls {
@@ -365,23 +415,31 @@ sub writeFailedPairResults {
 sub run_identity_check {
     # 'main' method to run identity check
     my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $manifest, $iniPath) = @_;
-    open my $logfile, ">", $outDir.'/'.$OUTPUT_NAMES{'log'} || die $!; 
     my $pb = new plink_binary::plink_binary($plinkPrefix);
     $pb->{"missing_genotype"} = "N"; 
     # get sample names and IDs from Plink file
     my ($samplesRef, $sampleNamesRef, $total) = getSampleNamesIDs($pb);
-    print $logfile $total." samples read from PLINK binary.\n"; 
-    # get Sequenom genotypes for all samples 
+    $log->debug($total." samples read from PLINK binary.\n"); 
+    # minimum depends on overlap between Plink snpset and Sequenom plex
+    my $threshold = 0.9;
+    my $minMatch = getMatchesForPass($pb, $threshold);
+    print "MIN_MATCH: $minMatch\n";
+
+    
+    
+    # cross-reference with Plink to find threshold
+
+    # get Sequenom results from SNP DB
     my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
         (name   => 'snp',
          inifile => $iniPath)->connect(RaiseError => 1);
     my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
         = $snpdb->find_sequenom_calls_by_sample($samplesRef);
-    print $logfile $sqnmTotal." calls read from Sequenom.\n"; 
+    $log->debug($sqnmTotal." calls read from Sequenom.\n"); 
     # get PLINK genotypes for all samples; can take a while!
     my ($plinkCallsRef, $duration) 
         = readPlinkCalls($pb, $sampleNamesRef, $sqnmSnpsRef);
-    print $logfile "Calls read from PLINK binary: $duration seconds.\n"; 
+    $log->debug("Calls read from PLINK binary: $duration seconds.\n"); 
     # compare PLINK and Sequenom genotypes, and write to combined file 
     my ($countRef, $matchRef) 
         = compareGenotypes($plinkCallsRef, $sqnmCallsRef, $outDir);
@@ -394,8 +452,7 @@ sub run_identity_check {
         = compareFailedPairs($plinkCallsRef, $sqnmCallsRef, \@failedSamples);
     writeFailedPairCheck(\@failedSamples, $countRef, $matchRef, $minIdent, 
                          $outDir);
-    print $logfile "Finished.\n";
-    close $logfile;
+    $log->debug("Finished identity check.\n");
     return 1;
 }
 
