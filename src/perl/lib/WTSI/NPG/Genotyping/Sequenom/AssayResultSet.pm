@@ -2,12 +2,14 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 
+use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
 
 use WTSI::NPG::Genotyping::Sequenom::AssayResult;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable',
+  'WTSI::NPG::Genotyping::Annotation';
 
 our $HEADER = "ALLELE\tASSAY_ID\tCHIP\tCUSTOMER\tEXPERIMENT\tGENOTYPE_ID\tHEIGHT\tMASS\tPLATE\tPROJECT\tSAMPLE_ID\tSTATUS\tWELL_POSITION";
 
@@ -45,7 +47,8 @@ sub snpset_name {
     $self->logconfess("Failed to determine SNP set name: '", $self->str,
                       "' is not in iRODS");
 
-  my @snpset_names = $self->data_object->find_in_metadata('sequenom_plex');
+  my @snpset_names = $self->data_object->find_in_metadata
+    ($self->sequenom_plex_name_attr);
   my $num_names = scalar @snpset_names;
 
   $num_names > 0 or
@@ -57,6 +60,28 @@ sub snpset_name {
   my $avu = shift @snpset_names;
 
   return $avu->{value};
+}
+
+=head2 snp_names
+
+  Arg [1]    : None
+
+  Example    : $result->snp_names
+  Description: Return a sorted array of the names of the SNPs assayed in
+               this result set.
+  Returntype : Array
+
+=cut
+
+sub snp_names {
+  my ($self) = @_;
+
+  my @snp_names;
+  foreach my $result (@{$self->assay_results}) {
+    push @snp_names, $result->snp_assayed;
+  }
+
+  return sort { $a cmp $b } uniq @snp_names;
 }
 
 sub _build_assay_results {
@@ -109,8 +134,6 @@ sub _parse_assay_results {
       $self->logconfess("Invalid Sequenom record '$str': ",
                         "expected 13 fields but found $num_fields");
     }
-
-
 
     push @records, WTSI::NPG::Genotyping::Sequenom::AssayResult->new
       (allele        => $record->[0],

@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::AssayResult;
@@ -19,6 +18,28 @@ has 'sample_id'     => (is => 'ro', isa => 'Str', required => 1);
 has 'status'        => (is => 'ro', isa => 'Str', required => 1);
 has 'well_position' => (is => 'ro', isa => 'Str', required => 1);
 has 'str'           => (is => 'ro', isa => 'Str', required => 1);
+
+sub snpset_name {
+  my ($self) = @_;
+
+  return $self->_split_assay_id->[0];
+}
+
+sub snp_assayed {
+  my ($self) = @_;
+
+  return $self->_split_assay_id->[1];
+}
+
+sub _split_assay_id {
+  my ($self) = @_;
+
+  my ($snpset_name, $snp_name) = split /-/, $self->assay_id;
+  $snpset_name ||= '';
+  $snp_name    ||= '';
+
+  return [$snpset_name, $snp_name];
+}
 
 __PACKAGE__->meta->make_immutable;
 
