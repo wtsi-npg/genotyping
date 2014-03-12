@@ -6,8 +6,8 @@ package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use Moose;
 use Text::CSV;
 
-use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
-                                       $FLUIDIGM_PLATE_WELL_META_KEY);
+with 'WTSI::NPG::Genotyping::Annotation';
+
 use WTSI::NPG::Utilities qw(trim);
 
 our $HEADER_BARCODE_ROW = 0;
@@ -164,8 +164,8 @@ sub fluidigm_metadata {
     $self->logconfess("FluidigmExportFile '", $self->fluidigm_barcode,
                       "' has no sample address '$address'");
 
-  return ([$FLUIDIGM_PLATE_NAME_META_KEY => $self->fluidigm_barcode],
-          [$FLUIDIGM_PLATE_WELL_META_KEY => $address]);
+  return ([$self->fluidigm_plate_name_attr => $self->fluidigm_barcode],
+          [$self->fluidigm_plate_well_attr => $address]);
 }
 
 =head2 fluidigm_fingerprint

@@ -3,24 +3,16 @@ use utf8;
 
 package WTSI::NPG::Expression::Publisher;
 
-# use Digest::MD5 qw(md5_hex);
 use File::Spec;
-use List::AllUtils qw(firstidx uniq);
 use Moose;
 
-use WTSI::NPG::Expression::Metadata qw(infinium_fingerprint
-                                       make_infinium_metadata
-                                       make_analysis_metadata);
 use WTSI::NPG::Expression::InfiniumDataObject;
 use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
-                           make_creation_metadata
-                           make_modification_metadata
-                           make_sample_metadata);
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Expression::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -100,8 +92,8 @@ sub _publish_files {
 
   my $num_published = 0;
   my @meta;
-  push @meta, make_infinium_metadata($resultset);
-  my @fingerprint = infinium_fingerprint(@meta);
+  push @meta, $self->make_infinium_metadata($resultset);
+  my @fingerprint = $self->infinium_fingerprint(@meta);
 
   foreach my $file ($resultset->idat_file, $resultset->xml_file) {
     eval {

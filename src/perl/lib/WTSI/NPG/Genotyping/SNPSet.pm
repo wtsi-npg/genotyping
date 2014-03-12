@@ -56,6 +56,16 @@ sub BUILD {
   $self->_build_snps;
 }
 
+=head2 snp_names
+
+  Arg [1]    : None
+
+  Example    : $set->snp_names
+  Description: Return a sorted array of the names of the SNPs in the set.
+  Returntype : Array
+
+=cut
+
 sub snp_names {
   my ($self) = @_;
 
@@ -66,6 +76,16 @@ sub snp_names {
 
   return sort { $a cmp $b } uniq @snp_names;
 }
+
+=head2 snp_names
+
+  Arg [1]    : Str SNP name e.g. rs######
+
+  Example    : $snp = $set->named_snp('rs0123456')
+  Description: Return specific, named SNP from the set.
+  Returntype : WTSI::NPG::Genotyping::SNP
+
+=cut
 
 sub named_snp {
   my ($self, $snp_name) = @_;
@@ -83,6 +103,19 @@ sub contains_snp {
 
   return defined $self->named_snp($snp_name);
 }
+
+=head2 write_snpset_data
+
+  Arg [1]    : Str file name
+
+  Example    : $set->write_snpset_data('snpset.txt')
+  Description: Write the content of the set to a file in the TSV format
+               used by NPG.
+  Returntype : Int number of records written (may be > number of unique
+               SNP names for cases such as gender markers that have
+               multiple locations on the reference genome).
+
+=cut
 
 sub write_snpset_data {
   my ($self, $file_name) = @_;

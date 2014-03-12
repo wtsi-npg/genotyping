@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::iRODS;
@@ -1283,6 +1282,15 @@ sub _make_imeta_query {
     }
     else {
       $operator = '=';
+    }
+
+    unless (defined $value) {
+      $self->logconfess("Invalid query value 'undef' in query spec ",
+                        "[$attribute, undef, $operator]");
+    }
+    if ($value eq '') {
+      $self->logconfess("Invalid query value '$value' in query spec ",
+                        "[$attribute, $value, $operator]");
     }
 
     if ($i > 0) {

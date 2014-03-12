@@ -1,26 +1,16 @@
-
 use utf8;
 
 package WTSI::NPG::Expression::AnalysisPublisher;
 
-use Digest::MD5 qw(md5_hex);
 use File::Spec;
-use List::AllUtils qw(firstidx uniq);
 use Moose;
 
-use WTSI::NPG::Expression::Metadata qw($EXPRESSION_ANALYSIS_UUID_META_KEY
-                                       $EXPRESSION_BEADCHIP_META_KEY
-                                       $EXPRESSION_BEADCHIP_SECTION_META_KEY
-                                       make_analysis_metadata);
 use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
-                           make_creation_metadata
-                           make_modification_metadata
-                           make_sample_metadata);
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Expression::Annotator';
 
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/exp/infinium';
 
@@ -100,7 +90,7 @@ sub publish {
   eval {
     # Analysis directory
     my @analysis_meta;
-    push(@analysis_meta, make_analysis_metadata($uuid));
+    push(@analysis_meta, $self->make_analysis_metadata($uuid));
 
     if ($irods->list_collection($leaf_collection)) {
       $self->info("Collection '$leaf_collection' exists; ",
@@ -110,24 +100,26 @@ sub publish {
     }
     else {
       $irods->add_collection($target);
-      push(@analysis_meta, make_creation_metadata($self->affiliation_uri,
-                                                  $self->publication_time,
-                                                  $self->accountee_uri));
+      push(@analysis_meta,
+           $self->make_creation_metadata($self->affiliation_uri,
+                                         $self->publication_time,
+                                         $self->accountee_uri));
       my $coll_path = $irods->put_collection($self->analysis_directory,
                                              $target);
       $analysis_coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
       $self->info("Created new collection '", $analysis_coll->str, "'");
     }
 
-    my @uuid_meta = grep { $_->[0] =~ /uuid/ } @analysis_meta;
+    my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
+      @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
 
     foreach my $sample (@{$self->manifest->samples}) {
       my @sample_objects = $irods->find_objects_by_meta
         ($self->sample_archive,
-         ['dcterms:identifier'                  => $sample->{sample_id}],
-         [$EXPRESSION_BEADCHIP_META_KEY         => $sample->{beadchip}],
-         [$EXPRESSION_BEADCHIP_SECTION_META_KEY => $sample->{beadchip_section}]);
+         [$self->dcterms_identifier_attr          => $sample->{sample_id}],
+         [$self->expression_beadchip_attr         => $sample->{beadchip}],
+         [$self->expression_beadchip_section_attr => $sample->{beadchip_section}]);
       unless (@sample_objects) {
         $self->logconfess("Failed to find data in iRODS in sample archive '",
                           $self->sample_archive, "' for sample '",
@@ -142,7 +134,7 @@ sub publish {
 
         # Xref analysis to sample studies
         my @studies = map { $_->{value} }
-          $obj->find_in_metadata($STUDY_ID_META_KEY);
+          $obj->find_in_metadata($self->study_id_attr);
 
         if (@studies) {
           $self->debug("Sample '", $sample->{sample_id}, "' has metadata for ",
@@ -150,7 +142,7 @@ sub publish {
 
           foreach my $study (@studies) {
             unless (exists $studies_seen{$study}) {
-              push(@analysis_meta, [$STUDY_ID_META_KEY => $study]);
+              push(@analysis_meta, [$self->study_id_attr => $study]);
               $studies_seen{$study}++;
             }
           }
@@ -162,7 +154,7 @@ sub publish {
         }
 
         # Xref samples to analysis UUID
-        $obj->add_avu($EXPRESSION_ANALYSIS_UUID_META_KEY, $analysis_uuid);
+        $obj->add_avu($self->analysis_uuid_attr, $analysis_uuid);
         ++$num_objects;
       }
 

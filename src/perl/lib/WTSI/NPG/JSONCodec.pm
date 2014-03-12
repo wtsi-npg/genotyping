@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::JSONCodec;

@@ -38,6 +38,18 @@ around BUILDARGS => sub {
   }
 };
 
+=head2 snpset_name
+
+  Arg [1]    : None
+
+  Example    : $result->snpset_name
+  Description: Return the name of the SNP set annotated in the iRODS
+               metadata. Fails if the data backing the result set is not
+               an iRODS data object.
+  Returntype : Str
+
+=cut
+
 sub snpset_name {
   my ($self) = @_;
 
@@ -59,6 +71,17 @@ sub snpset_name {
   return $avu->{value};
 }
 
+=head2 snp_names
+
+  Arg [1]    : None
+
+  Example    : $result->snp_names
+  Description: Return a sorted array of the names of the SNPs assayed in
+               this result set.
+  Returntype : Array
+
+=cut
+
 sub snp_names {
   my ($self) = @_;
 
@@ -72,6 +95,16 @@ sub snp_names {
 
   return sort { $a cmp $b } uniq @snp_names;
 }
+
+=head2 filter_on_confidence
+
+  Arg [1]    : Num confidence threshold to compare using >=
+
+  Example    : @confident = $result->filter_on_confidence(0.9)
+  Description: Return assay results with confidence >= the specified value.
+  Returntype : ArrayRef[WTSI::NPG::Genotyping::Fluidigm::AssayResult]
+
+=cut
 
 sub filter_on_confidence {
   my ($self, $confidence_threshold) = @_;

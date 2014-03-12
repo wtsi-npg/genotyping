@@ -6,12 +6,10 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use Moose;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
-use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY
-                                       $FLUIDIGM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Metadata qw(make_sample_metadata);
+
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';
-
 
 =head2 assay_resultset
 
@@ -33,9 +31,9 @@ sub assay_resultset {
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
 
-  my $fluidigm_barcode_avu = $self->get_avu($FLUIDIGM_PLATE_NAME_META_KEY);
+  my $fluidigm_barcode_avu = $self->get_avu($self->fluidigm_plate_name_attr);
   my $fluidigm_barcode = $fluidigm_barcode_avu->{value};
-  my $well_avu = $self->get_avu($FLUIDIGM_PLATE_WELL_META_KEY);
+  my $well_avu = $self->get_avu($self->fluidigm_plate_well_attr);
   my $well = $well_avu->{value};
 
   $self->debug("Found plate well '$fluidigm_barcode': '$well' in ",
@@ -53,7 +51,7 @@ sub update_secondary_metadata {
     $self->set_permissions('null', @current_groups);
 
     # Supersede all the secondary metadata with new values
-    my @meta = make_sample_metadata($ss_sample);
+    my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);
     }

@@ -6,16 +6,11 @@ package WTSI::NPG::Genotyping::Infinium::AnalysisPublisher;
 use File::Spec;
 use Moose;
 
-use WTSI::NPG::Genotyping::Metadata qw($GENOTYPING_ANALYSIS_UUID_META_KEY
-                                       $INFINIUM_BEADCHIP_META_KEY
-                                       $INFINIUM_BEADCHIP_SECTION_META_KEY
-                                       make_analysis_metadata);
 use WTSI::NPG::iRODS;
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
-                           make_creation_metadata);
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Genotyping::Annotator';
 
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/gen/infinium';
 
@@ -125,10 +120,10 @@ sub publish {
 
   eval {
     my @analysis_meta;
-    push(@analysis_meta, make_analysis_metadata(\@project_titles));
-    push(@analysis_meta, make_creation_metadata($self->affiliation_uri,
-                                                $self->publication_time,
-                                                $self->accountee_uri));
+    push(@analysis_meta, $self->make_analysis_metadata(\@project_titles));
+    push(@analysis_meta, $self->make_creation_metadata($self->affiliation_uri,
+                                                       $self->publication_time,
+                                                       $self->accountee_uri));
     unless ($irods->list_collection($target)) {
       $irods->add_collection($target);
     }
@@ -138,7 +133,7 @@ sub publish {
 
     $self->info("Created new collection '", $analysis_coll->str, "'");
 
-    my @uuid_meta = grep { $_->[0] eq $GENOTYPING_ANALYSIS_UUID_META_KEY }
+    my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
       @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
 
@@ -167,9 +162,9 @@ sub publish {
 
         my @sample_objects = $irods->find_objects_by_meta
           ($self->sample_archive,
-           ['dcterms:title'                     => $project_title],
-           [$INFINIUM_BEADCHIP_META_KEY         => $sample->beadchip],
-           [$INFINIUM_BEADCHIP_SECTION_META_KEY => $sample->rowcol]);
+           [$self->dcterms_title_attr             => $project_title],
+           [$self->infinium_beadchip_attr         => $sample->beadchip],
+           [$self->infinium_beadchip_section_attr => $sample->rowcol]);
 
         unless (@sample_objects) {
           $self->logconfess("Failed to find data in iRODS in sample archive '",
@@ -184,7 +179,7 @@ sub publish {
 
           # Xref analysis to sample studies
           my @studies = map { $_->{value} }
-            $obj->find_in_metadata($STUDY_ID_META_KEY);
+            $obj->find_in_metadata($self->study_id_attr);
 
           if (@studies) {
             $self->debug("Sample '$included_sample_name' has metadata for ",
@@ -192,7 +187,7 @@ sub publish {
 
             foreach my $study (@studies) {
               unless (exists $studies_seen{$study}) {
-                push(@analysis_meta, [$STUDY_ID_META_KEY => $study]);
+                push(@analysis_meta, [$self->study_id_attr => $study]);
                 $studies_seen{$study}++;
               }
             }
@@ -204,7 +199,7 @@ sub publish {
           }
 
           # Xref samples to analysis UUID
-          $obj->add_avu($GENOTYPING_ANALYSIS_UUID_META_KEY, $analysis_uuid);
+          $obj->add_avu($self->analysis_uuid_attr, $analysis_uuid);
           ++$num_objects;
         }
 
