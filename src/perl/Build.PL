@@ -3,7 +3,10 @@ use utf8;
 
 use strict;
 use warnings;
-use lib qw(.);
+
+# These paths are propagated to @INC in the build script. The 't'
+# directory is added because the Test::Class tests are there.
+use lib qw(. t);
 
 use Module::Build;
 use Build;
