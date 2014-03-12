@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::Publisher;
@@ -9,6 +8,8 @@ use Moose;
 use Text::CSV;
 use URI;
 
+use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
+use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
 
@@ -125,9 +126,19 @@ sub publish_samples {
 
       my @meta = $self->make_sequenom_metadata($first);
       my @fingerprint = $self->sequenom_fingerprint(@meta);
-      my $data_object = $publisher->publish_file($file, \@fingerprint,
-                                                 $publish_dest,
-                                                 $self->publication_time);
+      my $rods_path = $publisher->publish_file($file, \@fingerprint,
+                                               $publish_dest,
+                                               $self->publication_time);
+
+      # Build from local file to avoid and iRODS round trip with iget
+      my $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
+        ($file);
+      my $snpset_name = $self->_find_resultset_snpset($resultset);
+
+      WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+          ($self->irods, $rods_path)->add_avu($self->sequenom_plex_name_attr,
+                                              $snpset_name);
+
       unlink $file;
       ++$num_published;
     };
@@ -193,6 +204,27 @@ sub _write_sequenom_csv_file {
 
   return $records_written;
 }
+
+sub _find_resultset_snpset {
+  my ($self, $resultset) = @_;
+
+  my @snpset_names;
+  foreach my $result (@{$resultset->assay_results}) {
+    push @snpset_names, $result->snpset_name;
+  }
+
+  my $num_names = scalar @snpset_names;
+
+  $num_names > 0 or
+    $self->logconfess("No SNP set name could be found in '", $resultset->str,
+                      "'");
+  $num_names == 1 or
+    $self->logconfess("$num_names SNP sets found in '", $resultset->str,
+                      "': [", join(', ', @snpset_names), "]");
+
+  return shift @snpset_names;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

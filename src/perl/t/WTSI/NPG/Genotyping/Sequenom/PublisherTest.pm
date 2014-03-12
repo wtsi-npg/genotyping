@@ -99,7 +99,8 @@ sub publish : Test(2) {
   my @published_data =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [sequenom_plate => 'plate1'],
-                                 [sequenom_well  => 'A01']);
+                                 [sequenom_well  => 'A01'],
+                                 [sequenom_plex  => 'assay1']);
   cmp_ok(scalar @published_data, '==', scalar @addresses_to_publish,
          "Number of wells published with sequenom_plate metadata");
 }
@@ -129,7 +130,8 @@ sub publish_overwrite : Test(2) {
   my @data_objects =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [sequenom_plate => 'plate1'],
-                                 [sequenom_well  => 'A01']);
+                                 [sequenom_well  => 'A01'],
+                                 [sequenom_plex  => 'assay1'] );
   cmp_ok(scalar @data_objects, '==', scalar @addresses_to_publish,
          "Number of wells published with sequenom_plate metadata");
 }
