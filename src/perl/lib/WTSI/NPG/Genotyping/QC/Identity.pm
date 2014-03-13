@@ -319,7 +319,7 @@ sub writeJson {
 
 sub run_identity_check {
     # 'main' method to run identity check
-    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $iniPath) = @_;
+    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath) = @_;
     my $pb = new plink_binary::plink_binary($plinkPrefix);
     $pb->{"missing_genotype"} = "N"; 
 
@@ -360,7 +360,7 @@ sub run_identity_check {
 
     # 5) Pairwise check on failed samples for possible swaps
     my @failed = sort(keys(%{$failRef}));
-    my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $minIdent);
+    my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $swap);
     writeFailedPairComparison($compareRef, $minIdent, $outDir);
 
     $log->debug("Finished identity check.\n");

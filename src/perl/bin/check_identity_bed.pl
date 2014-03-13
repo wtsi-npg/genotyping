@@ -29,16 +29,18 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my ($outDir, $configPath, $iniPath, $manifest, $minCheckedSNPs, $minIdent, $plink, $help);
+my ($outDir, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $help);
 
 GetOptions("outdir=s"     => \$outDir,
            "config=s"     => \$configPath,
            "ini=s"        => \$iniPath,
-	   "manifest=s"   => \$manifest,
-           "min_snps=i"   => \$minCheckedSNPs,
+           "min_snps=i"   => \$minSNPs,
            "min_ident=f"  => \$minIdent,
+	   "swap=f"       => \$swap,
 	   "plink=s"      => \$plink,
            "h|help"       => \$help);
+
+my $swapDefault = 0.95;
 
 if ($help) {
     print STDERR "Usage: $0 [ output file options ] PLINK_GTFILE
@@ -48,11 +50,13 @@ Options:
                     At least one of config or min_ident must be given.
 --ini=PATH          Path to .ini file with additional configuration. 
                     Defaults to: $DEFAULT_INI
---manifest=PATH     Path to the .bpm.csv genotyping manifest. Required.
 --min_snps=NUMBER   Minimum number of SNPs for comparison
 --min_ident=NUMBER  Minimum threshold of SNP matches for identity; if given, overrides value in config file; 0 <= NUMBER <= 1
---outdir=PATH       Output directory for results files. Optional, defaults 
-                    to current working directory.
+--swap=NUMBER       Minimum threshold of SNP matches to flag a failed sample
+                    pair as a potential swap; 0 <= NUMBER <= 1. Optional, 
+                    defaults to $swapDefault.
+--outdir=PATH       Directory for output files. Optional, defaults to current 
+                    working directory.
 --plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
                     .bim, .fam extension. Required.
 --help              Print this help text and exit
@@ -60,15 +64,15 @@ Options:
     exit(0);
 }
 
-if (!($plink && -e $plink.'.bed' && -e $plink.'.bim' && -e $plink.'.fam')) {
-    die "Prefix '$plink' is not a valid Plink binary dataset; one or more files missing";
-} elsif (!($manifest && -e $manifest)) {
-    die "Manifest path '$manifest' does not exist";
+if (!($plink)) {
+    croak "Must supply a Plink binary input prefix";
+} elsif (!(-e $plink.'.bed' && -e $plink.'.bim' && -e $plink.'.fam')) {
+    croak "Prefix '$plink' is not a valid Plink binary dataset; one or more files missing";
 } elsif ($outDir && !(-e $outDir && -d $outDir)) {
-    die "Output '$outDir' does not exist or is not a directory";
+    croak "Output '$outDir' does not exist or is not a directory";
 }
 $outDir ||= getcwd();
-$minCheckedSNPs ||= 20;
+$minSNPs ||= 8;
 if (!$minIdent) {
     if ($configPath) {
         my %thresholds = readThresholds($configPath);
@@ -77,8 +81,15 @@ if (!$minIdent) {
         croak("Must supply a value for either --min_ident or --config");
     }
 }
+if ($minIdent < 0 || $minIdent > 1) {
+    croak("Minimum identity value must be a number between 0 and 1");
+}
+if ($swap && ($swap < 0 || $swap > 1)) {
+    croak("Swap threshold must be a number between 0 and 1");
+}
+$swap ||= $swapDefault;
+
 $iniPath ||= $DEFAULT_INI;
 
-run_identity_check($plink, $outDir, $minCheckedSNPs, $minIdent, 
-		   $manifest, $iniPath);
+run_identity_check($plink, $outDir, $minSNPs, $minIdent, $swap, $iniPath);
 
