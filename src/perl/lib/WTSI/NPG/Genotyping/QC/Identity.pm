@@ -317,6 +317,19 @@ sub writeJson {
     close $out || $log->logcroak("Cannot close '$outPath'");
 }
 
+
+sub writeJsonDummy {
+    # if insufficient plex SNPs, write dummy .json for use downstream
+    my @samples = @{ shift() }; 
+    my $outDir = shift;
+    my %samples;
+    foreach my $sample (@samples) { $samples{$sample} = 'NA'; }
+    my $outPath = $outDir.'/'.$OUTPUT_NAMES{'json'};
+    open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
+    print $out encode_json(\%samples);
+    close $out || $log->logcroak("Cannot close '$outPath'");
+}
+
 sub run_identity_check {
     # 'main' method to run identity check
     my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath) = @_;
@@ -330,6 +343,7 @@ sub run_identity_check {
     my $snpTotal = @snps;
     if ($snpTotal < $minCheckedSNPs) {
 	# TODO write dummy output if not enough SNPs are present?
+	writeJsonDummy($sampleNamesRef, $outDir);
 	my $msg = "Cannot do identity check; $minCheckedSNPs SNPs from QC ".
 	    "plex required, $snpTotal found";
 	$log->logwarn($msg);
