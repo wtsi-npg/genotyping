@@ -435,6 +435,14 @@ sub resultsHighMafHet {
     return resultsMafHet($inputDir, 1);
 }
 
+sub resultsIdentity {
+    my $inputDir = shift;
+    my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
+    my %results = %{decode_json(readFileToString($inPath))};
+    return %results;
+}
+
+
 sub resultsLowMafHet {
     my $inputDir = shift;
     return resultsMafHet($inputDir, 0);
@@ -466,26 +474,6 @@ sub resultsMagnitude {
     }
     my $index = 1;
     return resultsSpaceDelimited($inPath, $index);
-}
-
-sub resultsIdentity {
-    my $inputDir = shift;
-    my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
-    if (!(-e $inPath)) { 
-	croak "Input path for identity \"$inPath\" does not exist: $!";
-    }
-    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath);
-    my %results;
-    foreach my $ref (@data) {
-	my @fields = @$ref;
-	my ($sample, $concord, $status) = ($fields[0], $fields[3], $fields[4]);
-	if ($concord eq '.' || $status eq 'Skipped') {  
-	    $results{$sample} = 'NA'; # concordance not available
-	} else {
-	    $results{$sample} = $concord;
-	}
-    }
-    return %results;
 }
 
 sub resultsSpaceDelimited {
