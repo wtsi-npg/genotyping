@@ -15,7 +15,7 @@
                   "het_by_maf":"het_by_maf.json",
                   "call_rate":"sample_cr_het.txt",
                   "xydiff":"xydiff.txt",
-                  "identity":"identity_check_results.txt",
+                  "identity":"identity_check.json",
                   "duplicate":"duplicate_full.txt.gz",
                   "gender":"sample_xhet_gender.txt",
                   "magnitude":"magnitude.txt"},
