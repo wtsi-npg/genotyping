@@ -31,19 +31,17 @@ my $config = $Bin."/../etc/qc_config.json";
 
 my $dataDir = "/nfs/gapi/data/genotype/pipeline_test/identity_check";
 my @plink = qw/identity_test identity_test_not_exome/;
-my @outputs = qw/identity_check_results.txt
-                 identity_check_failed_pairs.txt
-                 identity_check_failed_pairs_match.txt/;
+my @outputs = qw/identity_check.json
+                 identity_check_results.txt
+                 identity_check_failed_pairs.txt/;
 my $workdir = "$Bin/identity";
-my $manifest = "/nfs/gapi/data/genotype/pipeline_test/Human670-QuadCustom_v1_A.bpm.csv";
 my $cmd;
 
 
 foreach my $plink (@plink) {
     my $input = $dataDir."/".$plink;
     $cmd = "$bin/check_identity_bed.pl --config $config " .
-      "--outdir $workdir --manifest $manifest --plink $input";
-
+      "--outdir $workdir --plink $input";
     is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     foreach my $output (@outputs) {
         my $ref = $dataDir."/".$output;
