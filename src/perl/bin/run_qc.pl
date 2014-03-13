@@ -231,7 +231,7 @@ sub run {
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath $plinkPrefix --outdir $outDir",
+    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir",
 		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
 		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
 	);

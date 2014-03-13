@@ -57,7 +57,7 @@ if (-e $outDir) {
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config $plink");
+$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --plink $plink");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
