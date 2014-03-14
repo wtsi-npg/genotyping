@@ -13,9 +13,7 @@ use Cwd qw/getcwd abs_path/;
 use File::Basename;
 use JSON;
 use POSIX qw/strftime/;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject 
-  getSummaryStats meanSd median readQCNameArray readQCShortNameHash 
-  plateLabel/; 
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash plateLabel/; 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use Exporter;
 
@@ -30,10 +28,9 @@ our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity
 
 sub createReports {
     # 'main' method to write text and PDF files
-    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath, 
-	$qcDir, $introPath, $qcName, $title, $author) = @_;
+    my ($texPath, $resultPath, $idPath, $config, $dbPath, $genderThresholdPath, $qcDir, $introPath, $qcName, $title, $author) = @_;
     $qcName ||= qcNameFromPath($qcDir);
-    writeSummaryLatex($texPath, $resultPath, $config, $dbPath, 
+    writeSummaryLatex($texPath, $resultPath, $idPath, $config, $dbPath, 
                       $genderThresholdPath, $qcDir, $introPath,
                       $qcName, $title, $author);
     my $pdfOK = texToPdf($texPath);
@@ -176,9 +173,10 @@ sub latexResultNotes {
 }
 
 sub latexSectionResults {
-    my ($config, $qcDir, $resultPath) = @_;
+    my ($config, $qcDir, $resultPath, $identityPath) = @_;
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
+    push @lines, textForIdentity($identityPath);
     push @lines, "\\subsection{Tables}\n\n";
     my @titles = ("Pass/fail summary",
                   "Key to metric abbreviations", 
@@ -373,6 +371,22 @@ sub textForDatasets {
     return @text;
 }
 
+sub textForIdentity {
+    # text for subsection to describe status of identity metric
+    my $idResultsPath = shift;
+    my %results = %{readJson($idResultsPath)};
+    my $idCheck = $results{'identity_check_run'}; # was identity check run?
+    my $minSnps = $results{'min_snps'};
+    my $commonSnps = $results{'common_snps'}; # Illumina/Sequenom shared SNPs
+    my $text = "\\subsection{Identity Metric}\n\n\\begin{itemize}\n \\item Minimum number of SNPs for identity check = $minSnps\n\\item Common SNPs between input and QC plex = $commonSnps\n";
+    if ($idCheck) {
+	$text.= "\\item Identity check run successfully.\n\\end{itemize}\n\n";
+    } else {
+	$text.= "\\item \\textbf{Identity check omitted.} All samples pass with respect to identity; scatterplot not created.\n\\end{itemize}\n\n";
+    }
+    return $text;
+}
+
 sub textForMetrics {
     # text for metric threshold/description table
     my ($jsonPath, $mMax, $fMin) = @_;
@@ -509,22 +523,9 @@ sub texToPdf {
     else { return 0; }
 }
 
-sub writeCsv {
-    my ($resultPath, $dbPath, $config, $outPath) = @_;
-    $config ||= defaultJsonConfig();
-    my @text = textForCsv($resultPath, $dbPath, $config);
-    open my $out, ">", $outPath || croak "Cannot open output path $outPath";
-    foreach my $lineRef (@text) {
-        print $out join(',', @$lineRef)."\n";
-    }
-    close $out || croak  "Cannot close output path $outPath";
-    if (@text > 0) { return 1; } # at least one line written without croak
-    else { return 0; }
-}
-
 sub writeSummaryLatex {
     # write .tex file for report
-    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath,
+    my ($texPath, $resultPath, $idPath, $config, $dbPath, $genderThresholdPath,
         $qcDir, $introPath, $qcName, $title, $author) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
@@ -538,7 +539,7 @@ sub writeSummaryLatex {
     print $out latexSectionInput($qcName, $dbPath);
     print $out readFileToString($introPath); # new section = Preface
     print $out latexSectionMetrics($config, $genderThresholdPath);
-    print $out latexSectionResults($config, $qcDir, $resultPath);
+    print $out latexSectionResults($config, $qcDir, $resultPath, $idPath);
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
 }

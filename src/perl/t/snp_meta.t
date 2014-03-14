@@ -12,7 +12,7 @@ use JSON;
 use Test::More tests => 5;
 
 my $bin = "$Bin/../bin/";
-my $manifest = "/nfs/gapi/data/genotype/qc_test/manifests/".
+my $manifest = "/nfs/gapi/data/genotype/pipeline_test/manifests/".
     "Human670-QuadCustom_v1_A_TRUNCATED.bpm.csv";
 my $temp = tempdir("snp_meta_test_XXXXXX", CLEANUP => 1);
 my $chr = $temp."/chr.json";

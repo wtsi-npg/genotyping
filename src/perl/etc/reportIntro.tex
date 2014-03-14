@@ -7,7 +7,7 @@
 
 This QC (quality control) report accompanies two further QC resources:
 \begin{enumerate}
-\item Summary of sample metadata and QC results: illumina\_genotyping.csv.  A comma-separated text file (.csv) comprising one line per sample, with associated annotation and QC status.  The .csv file can be viewed in any spreadsheet application.
+\item Summary of sample metadata and QC results: pipeline\_summary.csv. A comma-separated text file (.csv) comprising one line per sample, with associated annotation and QC status. The .csv file can be viewed in any spreadsheet application.
 \item Detailed QC datafiles and companion plots within the release.  These appear in the `plate heatmaps' and `supplementary' subdirectories.
 % TODO Reference to detailed QC documentation
 \end{enumerate}
@@ -21,7 +21,7 @@ Each metric requires appropriate threshold criteria to include or exclude sample
 \subsubsection*{Metric descriptions}
 
 \begin{enumerate}
-\item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  The check requires a minimum number of Sequenom sites to be called in Illumina output (default is 10). If there are sufficient shared calls and concordance is greater than a chosen threshold, the sample will pass. If there are fewer than the minimum calls, the identity check is not applied and the sample is marked as a pass \emph{regardless} of concordance.
+\item \textbf{Identity:}  All samples are typed on Sequenom prior to Illumina genotyping.  The check requires a minimum number of Sequenom sites to be present in the Illumina manifest (default is 8). If fewer than the minimum are available, the identity check is not applied and \emph{all} samples receive a pass. Otherwise, only samples for which concordance on the Sequenom sites is greater than a chosen threshold will pass.
 
 See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
 

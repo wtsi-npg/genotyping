@@ -409,7 +409,7 @@ t/qc_small.t
 t/qc_test_data/config_test.json
 t/qc_test_data/config_test_nomaf.json
 t/qc_test_data/output_examples/duplicate_full.txt.gz
-t/qc_test_data/output_examples/identity_check_results.txt
+t/qc_test_data/output_examples/identity_check.json
 t/qc_test_data/output_examples/magnitude.txt
 t/qc_test_data/output_examples/qc_exclusions.json
 t/qc_test_data/output_examples/qc_metrics.json
@@ -436,6 +436,7 @@ t/reports/failScatterDetail.pdf
 t/reports/failScatterPlot.pdf
 t/reports/failsCombined.pdf
 t/reports/failsIndividual.pdf
+t/reports/identity_check.json
 t/reports/qc_results.json
 t/reports/sample_xhet_gender_thresholds.txt
 t/reports/scatter_call_rate_000.pdf
