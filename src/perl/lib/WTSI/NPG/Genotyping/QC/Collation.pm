@@ -439,7 +439,7 @@ sub resultsIdentity {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
     my %data = %{decode_json(readFileToString($inPath))};
-    return $data{'results'};
+    return %{$data{'results'}};
 }
 
 
