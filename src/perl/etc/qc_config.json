@@ -3,7 +3,7 @@
                  "duplicate_input":"duplicate_summary.txt",
                  "main_index":"index.html",
                  "het_by_maf":"het_by_maf.json",
-                 "identity_input":"identity_check_results.txt",
+		 "id_json":"identity_check.json",
                  "magnitude":"magnitude.txt",
                  "sample_cr_het":"sample_cr_het.txt",
                  "plate_index":"index.html",
