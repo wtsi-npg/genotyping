@@ -48,7 +48,7 @@ foreach my $plink (@plink) {
         my $check = "$workdir/$output";
         my $status = system("diff $ref $check >& /dev/null");
         is($status, 0, "Diff result: Input $plink, output $output");
-        unlink $check;
+        #unlink $check;
     }
 }
 
