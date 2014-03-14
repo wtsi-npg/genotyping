@@ -29,7 +29,7 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my ($outDir, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $help);
+my ($outDir, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $noWarning, $help);
 
 GetOptions("outdir=s"     => \$outDir,
            "config=s"     => \$configPath,
@@ -38,6 +38,7 @@ GetOptions("outdir=s"     => \$outDir,
            "min_ident=f"  => \$minIdent,
 	   "swap=f"       => \$swap,
 	   "plink=s"      => \$plink,
+	   "no_warning"   => \$noWarning,
            "h|help"       => \$help);
 
 my $swapDefault = 0.95;
@@ -59,6 +60,7 @@ Options:
                     working directory.
 --plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
                     .bim, .fam extension. Required.
+--no_warning        Do not write a warning if insufficent SNPs are present
 --help              Print this help text and exit
 ";
     exit(0);
@@ -91,5 +93,9 @@ $swap ||= $swapDefault;
 
 $iniPath ||= $DEFAULT_INI;
 
-run_identity_check($plink, $outDir, $minSNPs, $minIdent, $swap, $iniPath);
+my $warn;
+if ($noWarning) { $warn = 0; } # option to suppress warning in pipeline tests
+else { $warn = 1; }
+
+run_identity_check($plink, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
 
