@@ -438,8 +438,8 @@ sub resultsHighMafHet {
 sub resultsIdentity {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
-    my %results = %{decode_json(readFileToString($inPath))};
-    return %results;
+    my %data = %{decode_json(readFileToString($inPath))};
+    return $data{'results'};
 }
 
 
