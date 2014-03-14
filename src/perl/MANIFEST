@@ -438,6 +438,7 @@ t/reports/failScatterDetail.pdf
 t/reports/failScatterPlot.pdf
 t/reports/failsCombined.pdf
 t/reports/failsIndividual.pdf
+t/reports/identity_check.json
 t/reports/qc_results.json
 t/reports/sample_xhet_gender_thresholds.txt
 t/reports/scatter_call_rate_000.pdf
