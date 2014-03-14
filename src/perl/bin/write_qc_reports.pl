@@ -57,7 +57,8 @@ if (!(-d $qcDir)) { croak "Path $qcDir is not a directory!"; }
 $configPath = defaultJsonConfig($iniPath);
 $texIntroPath = defaultTexIntroPath($iniPath);
 $resultPath = $qcDir."/qc_results.json";
+$idPath = $qcDir."/identity_check.json";
 $genderThresholdPath = $qcDir."/sample_xhet_gender_thresholds.txt";
 
-createReports($texPath, $resultPath, $configPath, $dbPath, 
+createReports($texPath, $resultPath, $idPath, $configPath, $dbPath, 
               $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
