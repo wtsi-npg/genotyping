@@ -167,7 +167,6 @@ sub getIntersectingSNPs {
     return @shared;
 }
 
-
 sub getSampleNamesIDs {  
     # extract sample IDs from a plink_binary object
     # first, try parsing sampleName in standard PLATE_WELL_ID format
@@ -309,30 +308,24 @@ sub writeIdentity {
 }
 
 sub writeJson {
-    # write identity metric by sample to JSON file
-    my ($idRef, $outDir) = @_;
+    # get data structure for output to and write to JSON file
+    # first argument is hash of values (if check was run) or list of samples (if check was not run)
+    my ($resultsRef, $idCheck, $minSnps, $commonSnps, $outDir) = @_;
+    my $idRef;
+    my %data = (results => $resultsRef,
+		identity_check_run => $idCheck,
+		min_snps => $minSnps,
+		common_snps => $commonSnps
+	);
     my $outPath = $outDir.'/'.$OUTPUT_NAMES{'json'};
     open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
-    print $out encode_json($idRef);
-    close $out || $log->logcroak("Cannot close '$outPath'");
-}
-
-
-sub writeJsonDummy {
-    # if insufficient plex SNPs, write dummy .json for use downstream
-    my @samples = @{ shift() }; 
-    my $outDir = shift;
-    my %samples;
-    foreach my $sample (@samples) { $samples{$sample} = 'NA'; }
-    my $outPath = $outDir.'/'.$OUTPUT_NAMES{'json'};
-    open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
-    print $out encode_json(\%samples);
+    print $out encode_json(\%data);
     close $out || $log->logcroak("Cannot close '$outPath'");
 }
 
 sub run_identity_check {
     # 'main' method to run identity check
-    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath) = @_;
+    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath, $warn) = @_;
     my $pb = new plink_binary::plink_binary($plinkPrefix);
     $pb->{"missing_genotype"} = "N"; 
 
@@ -342,11 +335,12 @@ sub run_identity_check {
     my @snps = getIntersectingSNPs($pb); # definitive list of SNPs for metric
     my $snpTotal = @snps;
     if ($snpTotal < $minCheckedSNPs) {
-	# TODO write dummy output if not enough SNPs are present?
-	writeJsonDummy($sampleNamesRef, $outDir);
+	my %id;
+	foreach my $sample (@{$sampleNamesRef}) { $id{$sample} = 'NA'; }
+	writeJson(\%id, 0, $minCheckedSNPs, $snpTotal, $outDir);
 	my $msg = "Cannot do identity check; $minCheckedSNPs SNPs from QC ".
 	    "plex required, $snpTotal found";
-	$log->logwarn($msg);
+	if ($warn) { $log->logwarn($msg); }
 	exit(0);
     }
 
@@ -367,7 +361,7 @@ sub run_identity_check {
 
     # 4) Find identity, genotypes, and pass/fail status; write output files
     my ($idRef, $gtRef, $failRef) = findIdentity($plinkCallsRef, $sqnmCallsRef, \@snps, $minIdent);
-    writeJson($idRef, $outDir);
+    writeJson($idRef, 1, $minCheckedSNPs, $snpTotal, $outDir);
     writeGenotypes($gtRef, \@snps, $outDir);
     writeIdentity($idRef, $failRef, $missingSamplesRef, $sampleNamesRef,
 		  $snpTotal, $minIdent, $outDir);
