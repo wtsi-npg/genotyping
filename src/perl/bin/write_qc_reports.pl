@@ -17,7 +17,7 @@ my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";
 my $defaultPrefix = "pipeline_summary";
 
-my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath, 
+my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath, $idPath,
     $dbPath, $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
 
 GetOptions("help"        => \$help,
