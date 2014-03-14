@@ -231,7 +231,7 @@ sub run {
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir",
+    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir --no_warning",
 		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
 		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
 	);
@@ -267,6 +267,8 @@ sub run {
             croak "Command finished with non-zero exit status: \"$cmd\""; 
         } 
     }
+    my $idJson = $outDir.'/'.$fileNames{'id_json'};
+    if (!(-e $idJson)) { croak "Identity JSON file '$idJson' does not exist!"; }
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
     my $statusJson = $outDir."/qc_results.json";
@@ -313,7 +315,7 @@ sub run {
     ### create PDF report
     my $texPath = $outDir."/pipeline_summary.tex";
     my $genderThresholdPath = $outDir."/sample_xhet_gender_thresholds.txt";
-    createReports($texPath, $statusJson, $configPath, $dbPath, 
+    createReports($texPath, $statusJson, $idJson, $configPath, $dbPath, 
                   $genderThresholdPath, $outDir, $texIntroPath);
     cleanup($outDir);
     return 1;
