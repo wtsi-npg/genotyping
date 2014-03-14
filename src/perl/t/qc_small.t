@@ -57,7 +57,7 @@ if (-e $outDir) {
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --plink $plink");
+$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --plink $plink --no_warning");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
@@ -164,11 +164,11 @@ ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
 
 ## test standalone report script
 print "\tTesting standalone report generation script.\n";
-system("rm -f $outDir/pipeline_summary.*");
+system("rm -f $outDir/pipeline_summary.pdf");
 $cmd = "$bin/write_qc_reports.pl --database $dbfile --prefix $outDir/pipeline_summary --input $outDir/supplementary";
 system($cmd);
 ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found from standalone script");
-system("rm -f pipeline_summary.log pipeline_summary.tex");
+system("rm -f $outDir/pipeline_summary.log $outDir/pipeline_summary.tex");
 print "\tTest dataset $testName finished.\n";
 
 my $duration = time() - $start;
