@@ -78,5 +78,3 @@ foreach my $plink (@plink) {
     is_deeply($workRef, $failDataRef, "Compare output JSON data structure after insufficient SNPs failure, input $plink");
 }
 
-# TODO create a fake .json results path, in order to test identity scatterplot
-# put this in main 'alpha' test data set?
