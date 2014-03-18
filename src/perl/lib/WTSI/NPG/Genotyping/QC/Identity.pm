@@ -342,37 +342,36 @@ sub run_identity_check {
 	my $msg = "Cannot do identity check; $minCheckedSNPs SNPs from QC ".
 	    "plex required, $snpTotal found";
 	if ($warn) { $log->logwarn($msg); }
-	exit(0);
+    } else {
+	# 2) Read Sequenom results from SNP DB
+	my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+	    (name   => 'snp',
+	     inifile => $iniPath)->connect(RaiseError => 1);
+	my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
+	    = $snpdb->find_sequenom_calls_by_sample($samplesRef);
+	$log->debug($sqnmTotal." calls read from Sequenom.\n"); 
+	
+	# 3) Read PLINK genotypes for all samples; can take a while!
+	my $start = time();
+	my $plinkCallsRef = readPlinkCalls($pb, $sampleNamesRef, \@snps);
+	#print to_json($plinkCallsRef, { pretty => 1 })."\n";
+	my $duration = time() - $start;
+	$log->debug("Calls read from PLINK binary: $duration seconds.\n"); 
+	
+	# 4) Find identity, genotypes, and pass/fail status; write output
+	my ($idRef, $gtRef, $failRef) = findIdentity($plinkCallsRef, $sqnmCallsRef, \@snps, $minIdent);
+	writeJson($idRef, 1, $minCheckedSNPs, $snpTotal, $outDir);
+	writeGenotypes($gtRef, \@snps, $outDir);
+	writeIdentity($idRef, $failRef, $missingSamplesRef, $sampleNamesRef,
+		      $snpTotal, $minIdent, $outDir);
+	
+	# 5) Pairwise check on failed samples for possible swaps
+	my @failed = sort(keys(%{$failRef}));
+	my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $swap);
+	writeFailedPairComparison($compareRef, $minIdent, $outDir);
+	
+	$log->debug("Finished identity check.\n");
     }
-
-    # 2) Read Sequenom results from SNP DB
-    my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-        (name   => 'snp',
-         inifile => $iniPath)->connect(RaiseError => 1);
-    my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
-        = $snpdb->find_sequenom_calls_by_sample($samplesRef);
-    $log->debug($sqnmTotal." calls read from Sequenom.\n"); 
-
-    # 3) Read PLINK genotypes for all samples; can take a while!
-    my $start = time();
-    my $plinkCallsRef = readPlinkCalls($pb, $sampleNamesRef, \@snps);
-    #print to_json($plinkCallsRef, { pretty => 1 })."\n";
-    my $duration = time() - $start;
-    $log->debug("Calls read from PLINK binary: $duration seconds.\n"); 
-
-    # 4) Find identity, genotypes, and pass/fail status; write output files
-    my ($idRef, $gtRef, $failRef) = findIdentity($plinkCallsRef, $sqnmCallsRef, \@snps, $minIdent);
-    writeJson($idRef, 1, $minCheckedSNPs, $snpTotal, $outDir);
-    writeGenotypes($gtRef, \@snps, $outDir);
-    writeIdentity($idRef, $failRef, $missingSamplesRef, $sampleNamesRef,
-		  $snpTotal, $minIdent, $outDir);
-
-    # 5) Pairwise check on failed samples for possible swaps
-    my @failed = sort(keys(%{$failRef}));
-    my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $swap);
-    writeFailedPairComparison($compareRef, $minIdent, $outDir);
-
-    $log->debug("Finished identity check.\n");
     return 1;
 }
 
