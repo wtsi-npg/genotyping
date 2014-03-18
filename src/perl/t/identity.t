@@ -1,5 +1,5 @@
 
-# Tests generate_yml.pl
+# Tests identity QC metric
 
 use utf8;
 use strict;
