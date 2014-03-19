@@ -9,7 +9,7 @@ use JSON;
 use Log::Log4perl;
 
 use base qw(Test::Class);
-use Test::More tests => 29;
+use Test::More tests => 30;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC::Identity qw(run_identity_check getIntersectingSNPsManifest);
@@ -71,18 +71,19 @@ sub test_command_line : Test(6) {
     validate_outputs();
 }
 
-sub test_manifest_intersection : Test(3) {
+sub test_manifest_intersection : Test(4) {
     my $expected = 25;
     my @snps = getIntersectingSNPsManifest($manifest);
     is(@snps, $expected, "$expected SNPs shared between manifest and Sequenom plex");
     my $snps = $workdir.'/shared_snps.txt';
     my $cmd = "manifest_plex_intersection.pl --manifest $manifest --out $snps --quiet";
     is(system($cmd), 0, 'manifest_plex_intersection.pl exit status');
+    ok(-e $snps, 'SNP output text file exists');
     my $total = 0;
     open my $in, "<", $snps || $log->logcroak("Cannot open input '$snps'");
     while (<$in>) { $total++; }
     close $in || $log->logcroak("Cannot close input '$snps'");
-    is($total, $expected, "$expected SNPs written to text file");
+    is($total, $expected, "$expected SNPs read from text file");
 }
 
 sub test_insufficient_snps : Test(3) {
