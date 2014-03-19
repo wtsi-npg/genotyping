@@ -255,7 +255,8 @@ sub writeFailedPairComparison {
 	my $status;
 	if ($metric > $maxSimilarity) { $status = 'SWAP_WARNING'; }
 	else { $status = 'NO_MATCH'; }
-	print $out join("\t", $sample1, $sample2, $metric, $status)."\n";
+	my $line = sprintf("%s\t%s\t%.4f\t%s\n", $sample1, $sample2, $metric, $status);
+	print $out $line;
     }
     close $out || $log->logcroak("Cannot close '$outPath'");
 }
