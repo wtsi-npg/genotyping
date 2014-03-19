@@ -8,6 +8,7 @@ use File::Spec;
 use Moose;
 
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::NPG::iRODS::Path';
 
@@ -127,6 +128,38 @@ sub remove_avu {
   $self->clear_metadata;
 
   return $self;
+}
+
+=head2 get_contents
+
+  Arg [1]    : 
+
+  Example    : my ($objs, $cols) = $irods->get_contents($coll)
+  Description: Return the contents of the collection as two arrayrefs,
+               the first listing data objects, the second listing nested
+               collections.
+  Returntype : Array
+
+=cut
+
+sub get_contents {
+   my ($self, $recurse) = @_;
+
+   my $irods = $self->irods;
+   my $path = $self->str;
+   my ($objs, $colls) = $self->irods->list_collection($path, $recurse);
+
+   my @objects;
+   my @collections;
+
+   foreach my $obj (@$objs) {
+     push @objects, WTSI::NPG::iRODS::DataObject->new($irods, $obj);
+   }
+   foreach my $coll (@$colls) {
+     push @collections, WTSI::NPG::iRODS::Collection->new($irods, $coll);
+   }
+
+   return (\@objects, \@collections);
 }
 
 sub get_permissions {
