@@ -11,6 +11,7 @@ bin/genosnp.pl
 bin/genotyping_yml.pl
 bin/illuminus.pl
 bin/make_irods_study_group.pl
+bin/manifest_plex_intersection.pl
 bin/plate_heatmap_index.pl
 bin/plate_heatmap_plots.pl
 bin/plot_box_bean.pl
