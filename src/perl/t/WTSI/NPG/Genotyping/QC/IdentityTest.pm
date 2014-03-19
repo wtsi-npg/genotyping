@@ -9,15 +9,15 @@ use JSON;
 use Log::Log4perl;
 
 use base qw(Test::Class);
-use Test::More tests => 26;
+use Test::More tests => 30;
 use Test::Exception;
 
-use WTSI::NPG::Genotyping::QC::Identity qw(run_identity_check);
+use WTSI::NPG::Genotyping::QC::Identity qw(run_identity_check getIntersectingSNPsManifest);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readFileToString defaultJsonConfig/;
 use WTSI::NPG::Genotyping::QC::SnpID qw/illuminaToSequenomSNP sequenomToIlluminaSNP/;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
-
+my $log = Log::Log4perl->get_logger();
 my $workdir;
 my $jsonRef;
 my $jsonOutPath;
@@ -25,7 +25,9 @@ my $jsonName = 'identity_check.json';
 my $textName = 'identity_check_results.txt';
 my $gtName = 'identity_check_gt.txt';
 my $failPairsName = 'identity_check_failed_pairs.txt';
-my $dataDir = "/nfs/gapi/data/genotype/pipeline_test/identity_check";
+my $pipelineTestDir = '/nfs/gapi/data/genotype/pipeline_test';
+my $dataDir = $pipelineTestDir.'/identity_check';
+my $manifest = $pipelineTestDir.'/manifests/Human670-QuadCustom_v1_A.bpm.csv';
 my $minSNPs = 8;
 my $manySNPs = 1000; # use to make methods fail
 my $minIdent = 0.90;
@@ -67,6 +69,21 @@ sub test_command_line : Test(6) {
 	"--plink $plink";
     is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     validate_outputs();
+}
+
+sub test_manifest_intersection : Test(4) {
+    my $expected = 25;
+    my @snps = getIntersectingSNPsManifest($manifest);
+    is(@snps, $expected, "$expected SNPs shared between manifest and Sequenom plex");
+    my $snps = $workdir.'/shared_snps.txt';
+    my $cmd = "manifest_plex_intersection.pl --manifest $manifest --out $snps --quiet";
+    is(system($cmd), 0, 'manifest_plex_intersection.pl exit status');
+    ok(-e $snps, 'SNP output text file exists');
+    my $total = 0;
+    open my $in, "<", $snps || $log->logcroak("Cannot open input '$snps'");
+    while (<$in>) { $total++; }
+    close $in || $log->logcroak("Cannot close input '$snps'");
+    is($total, $expected, "$expected SNPs read from text file");
 }
 
 sub test_insufficient_snps : Test(3) {
