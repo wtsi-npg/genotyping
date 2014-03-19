@@ -30,9 +30,12 @@ use Carp;
 use Cwd;
 use JSON; # for testing only
 use List::Util qw(max);
+use Log::Log4perl;
+use Log::Log4perl::Level;
 use POSIX qw(ceil);
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 use WTSI::NPG::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir);
 use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
 
 use WTSI::NPG::Genotyping::SNPSet;
@@ -42,7 +45,7 @@ use WTSI::NPG::iRODS::DataObject;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/run_identity_check/;
+our @EXPORT_OK = qw/run_identity_check getIntersectingSNPsManifest $PLEX_DIR $PLEX_FILE/;
 
 our %OUTPUT_NAMES = ('genotypes'  => 'identity_check_gt.txt',
 		     'results'    => 'identity_check_results.txt',
@@ -51,7 +54,10 @@ our %OUTPUT_NAMES = ('genotypes'  => 'identity_check_gt.txt',
     );
 our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
 our $PLEX_FILE = 'W30467_snp_set_info_1000Genomes.tsv'; # W30467 has same snp set for 1000Genomes and GRCh37
-our $log = Log::Log4perl->get_logger('genotyping.qc.identity');
+
+Log::Log4perl::init(defaultConfigDir().'/log4perl.conf');
+our $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
+$log->level($WARN);
 
 # Check identity of Plink calls with a QC plex.
 # QC plex method is currently Sequenom, may later extend to Fluidigm.
@@ -145,24 +151,45 @@ sub findIdentity {
 }
 
 
-sub getIntersectingSNPs {
+sub getIntersectingSNPsPlink {
     # find SNPs in Plink data which are also in QC plex
     # TODO modify to get plex file from IRODS
     my $pb = shift;
-    my $plexPath = "$PLEX_DIR/$PLEX_FILE";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plexPath);
-    my %sequenomSNPs;
-    foreach my $name ($snpset->snp_names) { $sequenomSNPs{$name} = 1; } 
     # find Plink SNP names and cross-reference with Sequenom
     my @plinkSNPs;
     for my $i (0..$pb->{"snps"}->size() - 1) {
 	my $name = $pb->{"snps"}->get($i)->{"name"};
 	push @plinkSNPs, $name;
     }
+    return getPlexIntersection(@plinkSNPs);
+}
+
+sub getIntersectingSNPsManifest {
+    # find SNPs in given .bpm.csv manifest which are also in QC plex
+    my $manifestPath = shift;
+    my @manifest;
+    open my $in, "<", $manifestPath || $log->logcroak("Cannot open '$manifestPath'");
+    while (<$in>) {
+	if (/^Index/) { next; } # skip header line
+	chomp;
+	my @words = split(/,/);
+	push(@manifest, $words[1]);
+    }
+    close $in || $log->logcroak("Cannot close '$manifestPath'");
+    return getPlexIntersection(@manifest);
+}
+
+sub getPlexIntersection {
+    # find intersection of given SNP list with QC plex
+    my @compare = @_;
+    my $plexPath = "$PLEX_DIR/$PLEX_FILE";
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new(file_name=>$plexPath, logger=>$log);
+    my %plexSNPs = ();
+    foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; } 
     my @shared;
-    foreach my $name (@plinkSNPs) {
+    foreach my $name (@compare) {
 	my $sqName = illuminaToSequenomSNP($name);
-	if ($sequenomSNPs{$sqName}) { push(@shared, $sqName); }
+	if ($plexSNPs{$sqName}) { push(@shared, $sqName); }
     }
     return @shared;
 }
@@ -197,6 +224,8 @@ sub getSequenomSNPNames {
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
     return $snpset->snp_names;
 }
+
+
 
 sub readPlinkCalls {
     # read genotype calls by sample & snp from given plink_binary object
@@ -333,7 +362,7 @@ sub run_identity_check {
     # 1) Read sample names and IDs from Plink
     my ($samplesRef, $sampleNamesRef) = getSampleNamesIDs($pb);
     $log->debug("Sample names read from PLINK binary.\n"); 
-    my @snps = getIntersectingSNPs($pb); # definitive list of SNPs for metric
+    my @snps = getIntersectingSNPsPlink($pb); # definitive list of qc SNPs
     my $snpTotal = @snps;
     if ($snpTotal < $minCheckedSNPs) {
 	my %id;
@@ -372,7 +401,6 @@ sub run_identity_check {
 	
 	$log->debug("Finished identity check.\n");
     }
-
     return 1;
 }
 
