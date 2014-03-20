@@ -1,4 +1,3 @@
-
 use utf8;
 
 package WTSI::NPG::Expression::ResultSet;
@@ -38,6 +37,15 @@ no Moose;
 1;
 
 __END__
+
+=head1 NAME
+
+WTSI::NPG::Expression::ResultSet
+
+=head1 DESCRIPTION
+
+A class which represents the result files of an Infinium gene
+expression array assay of one sample.
 
 =head1 AUTHOR
 
