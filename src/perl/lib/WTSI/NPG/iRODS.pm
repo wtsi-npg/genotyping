@@ -326,9 +326,10 @@ sub reset_working_collection {
 
 =head2 list_collection
 
-  Arg [1]    : iRODS collection name
+  Arg [1]    : Str iRODS collection name
+  Arg [1]    : Bool recurse flag.
 
-  Example    : $dir = $irods->list_collection($coll)
+  Example    : my ($objs, $colls) = $irods->list_collection($coll)
   Description: Return the contents of the collection as two arrayrefs,
                the first listing data objects, the second listing nested
                collections.
@@ -337,7 +338,7 @@ sub reset_working_collection {
 =cut
 
 sub list_collection {
-  my ($self, $collection, $recur) = @_;
+  my ($self, $collection, $recurse) = @_;
 
   defined $collection or
     $self->logconfess('A defined collection argument is required');
@@ -348,10 +349,10 @@ sub list_collection {
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
 
-  my $recursively = $recur ? 'recursively' : '';
+  my $recursively = $recurse ? 'recursively' : '';
   $self->debug("Listing collection '$collection' $recursively");
 
-  return $self->lister->list_collection($collection, $recur);
+  return $self->lister->list_collection($collection, $recurse);
 }
 
 =head2 add_collection

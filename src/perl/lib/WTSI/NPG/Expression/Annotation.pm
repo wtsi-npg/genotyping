@@ -11,7 +11,10 @@ our %EXPRESSION_METADATA_ATTR =
    expression_beadchip_design  => 'beadchip_design',
    expression_beadchip_section => 'beadchip_section',
    expression_plate_name       => 'gex_plate',
-   expression_plate_well       => 'gex_well');
+   expression_plate_well       => 'gex_well',
+   expression_norm_method      => 'normalisation_method',
+   expression_summary_group    => 'summary_group',
+   expression_summary_type     => 'summary_type');
 
 my $meta = __PACKAGE__->meta;
 

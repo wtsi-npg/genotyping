@@ -317,6 +317,9 @@ sub find_scanned_sample {
          LEFT OUTER JOIN appvalue redchannelav
            ON redintensityfile.channel_id = redchannelav.appvalueid
 
+         LEFT OUTER JOIN imagingevent
+           ON imagingevent.imaging_event_id = redintensityfile.imaging_event_id
+
          LEFT OUTER JOIN applicationfile redappfile
            ON redintensityfile.application_file_id = redappfile.application_file_id
          LEFT OUTER JOIN parentdirectory redparentdir
@@ -341,6 +344,7 @@ sub find_scanned_sample {
           AND redappfile.file_name = ?
           AND redchannelav.appvaluetype = 'Red'
           AND greenchannelav.appvaluetype = 'Green'
+          AND imagingevent.is_latest = 1
 
        ORDER BY
           platei.item,
@@ -470,6 +474,9 @@ sub find_called_sample {
          LEFT OUTER JOIN appvalue redchannelav
            ON redintensityfile.channel_id = redchannelav.appvalueid
 
+         LEFT OUTER JOIN imagingevent
+           ON imagingevent.imaging_event_id = redintensityfile.imaging_event_id
+
          LEFT OUTER JOIN applicationfile redappfile
            ON redintensityfile.application_file_id = redappfile.application_file_id
          LEFT OUTER JOIN parentdirectory redparentdir
@@ -494,6 +501,7 @@ sub find_called_sample {
           AND callappfile.file_name = ?
           AND redchannelav.appvaluetype = 'Red'
           AND greenchannelav.appvaluetype = 'Green'
+          AND imagingevent.is_latest = 1
 
        ORDER BY
           platei.item,

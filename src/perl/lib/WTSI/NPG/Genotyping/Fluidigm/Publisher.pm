@@ -199,7 +199,6 @@ sub publish_samples {
 =cut
 
 sub publish_directory {
-
   my ($self, $publish_dest) = @_;
 
   my $export_file = $self->resultset->export_file;

@@ -2,10 +2,14 @@ use utf8;
 
 package WTSI::NPG::Expression::Annotator;
 
+use List::AllUtils qw(any);
 use Moose::Role;
 use UUID;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Expression::Annotation';
+
+our @VALID_PROFILE_GROUPINGS = qw(group sample);
+our @VALID_SUMMARY_TYPES     = qw(gene probe annotation);
 
 =head2 make_infinium_metadata
 
@@ -34,6 +38,31 @@ sub make_infinium_metadata {
   }
 
   return @meta;
+}
+
+sub make_profile_metadata {
+   my ($self, $normalisation_method, $grouping, $type) = @_;
+
+   any { $grouping eq $_ } @VALID_PROFILE_GROUPINGS
+     or $self->logconfess("Invalid profile grouping '$grouping'");
+   any { $type eq $_ } @VALID_SUMMARY_TYPES
+     or $self->logconfess("Invalid summary type '$type'");
+
+   my @meta =
+     ([$self->expression_summary_group_attr => $grouping],
+      [$self->expression_summary_type_attr  => $type],
+      [$self->expression_norm_method_attr   => $normalisation_method]);
+
+   return @meta;
+}
+
+sub make_profile_annotation_metadata {
+  my ($self, $type) = @_;
+
+  any { $type eq $_ } @VALID_SUMMARY_TYPES
+    or $self->logconfess("Invalid summary type '$type'");
+
+  return ([$self->expression_summary_type_attr => $type]);
 }
 
 =head2 make_analysis_metadata

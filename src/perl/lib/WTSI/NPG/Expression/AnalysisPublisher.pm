@@ -5,9 +5,14 @@ package WTSI::NPG::Expression::AnalysisPublisher;
 use File::Spec;
 use Moose;
 
+use WTSI::NPG::Expression::ControlProfileHint;
+use WTSI::NPG::Expression::ProfileAnnotation;
 use WTSI::NPG::Expression::ResultSet;
-use WTSI::NPG::iRODS;
+use WTSI::NPG::Expression::SampleProbeProfile;
 use WTSI::NPG::Publisher;
+use WTSI::NPG::SimplePublisher;
+use WTSI::NPG::Utilities qw(collect_files);
+use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
   'WTSI::NPG::Expression::Annotator';
@@ -65,22 +70,8 @@ sub publish {
   $self->info("Publishing to '$publish_dest' using the sample archive in '",
               $self->sample_archive, "'");
 
-  # Make a based on the md5sum of the manifest
+  # Make a path based on the md5sum of the manifest
   my $irods = $self->irods;
-  my $hash_path = $irods->hash_path($self->manifest->file_name);
-  my $target = File::Spec->catdir($publish_dest, $hash_path);
-
-  my @dirs = grep { $_ ne '' } File::Spec->splitdir($self->analysis_directory);
-  my $leaf_dir = pop @dirs;
-  my $leaf_collection = File::Spec->catdir($target, $leaf_dir);
-
-  unless ($uuid) {
-    if ($irods->list_collection($leaf_collection)) {
-      $self->logcroak("An iRODS collection already exists at ",
-                      "'$leaf_collection'. ",
-                      "Please move or delete it before proceeding.");
-    }
-  }
 
   my $analysis_coll;
   my $analysis_uuid;
@@ -90,29 +81,25 @@ sub publish {
   eval {
     # Analysis directory
     my @analysis_meta;
-    push(@analysis_meta, $self->make_analysis_metadata($uuid));
 
-    if ($irods->list_collection($leaf_collection)) {
-      $self->info("Collection '$leaf_collection' exists; ",
-                  "updating metadata only");
-      $analysis_coll = WTSI::NPG::iRODS::Collection->new($irods,
-                                                         $leaf_collection);
-    }
-    else {
-      $irods->add_collection($target);
+    push(@analysis_meta, $self->make_analysis_metadata($uuid));
+    unless ($uuid) {
       push(@analysis_meta,
            $self->make_creation_metadata($self->affiliation_uri,
                                          $self->publication_time,
                                          $self->accountee_uri));
-      my $coll_path = $irods->put_collection($self->analysis_directory,
-                                             $target);
-      $analysis_coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
-      $self->info("Created new collection '", $analysis_coll->str, "'");
     }
 
     my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
       @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
+
+    $analysis_coll = $self->ensure_analysis_collection($publish_dest, $uuid);
+    my @analysis_files = $self->find_analysis_files;
+
+    foreach my $file (@analysis_files) {
+      $self->publish_analysis_file($analysis_coll, $file, $analysis_uuid);
+    }
 
     foreach my $sample (@{$self->manifest->samples}) {
       my @sample_objects = $irods->find_objects_by_meta
@@ -181,6 +168,91 @@ sub publish {
   }
 
   return $analysis_uuid;
+}
+
+sub ensure_analysis_collection {
+  my ($self, $publish_dest, $uuid) = @_;
+
+  my $irods = $self->irods;
+
+  # Make a path based on the md5sum of the manifest
+  my $hash_path = $irods->hash_path($self->manifest->file_name);
+  my $target = File::Spec->catdir($publish_dest, $hash_path);
+
+  my @dirs = grep { $_ ne '' } File::Spec->splitdir($self->analysis_directory);
+  my $leaf_dir = pop @dirs;
+  my $leaf_coll = File::Spec->catdir($target, $leaf_dir);
+
+  unless ($uuid) {
+    if ($irods->list_collection($leaf_coll)) {
+      $self->logcroak("An iRODS collection already exists at '$leaf_coll'. ",
+                      "Please move or delete it before proceeding.");
+    }
+  }
+
+  my $analysis_coll;
+
+  if ($irods->list_collection($leaf_coll)) {
+    $self->info("Collection '$leaf_coll' exists; updating metadata only");
+    $analysis_coll = WTSI::NPG::iRODS::Collection->new($irods, $leaf_coll);
+  }
+  else {
+    my $coll_path = $irods->add_collection($leaf_coll);
+    $analysis_coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
+    $self->info("Created new collection '", $analysis_coll->str, "'");
+  }
+
+  return $analysis_coll;
+}
+
+sub find_analysis_files {
+  my ($self) = @_;
+
+  return collect_files($self->analysis_directory, sub { return 1;});
+}
+
+sub publish_analysis_file {
+  my ($self, $analysis_coll, $filename, $uuid) = @_;
+
+  $self->debug("Publishing expression analysis content file '$filename' to '",
+               $analysis_coll->str, "'");
+
+  my @fingerprint = $self->make_analysis_metadata($uuid);
+
+  # Test file to see whether it a type we recognise
+  my $profile    = WTSI::NPG::Expression::SampleProbeProfile->new($filename);
+  my $annotation = WTSI::NPG::Expression::ProfileAnnotation->new($filename);
+  $annotation->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
+
+  if ($profile->guess) {
+    push @fingerprint,
+      $self->make_profile_metadata($profile->normalisation_method,
+                                   'sample', 'probe');
+  }
+  elsif ($annotation->guess) {
+    push @fingerprint, $self->make_profile_annotation_metadata('annotation');
+  }
+
+  my $publisher;
+
+  if (@fingerprint) {
+    $publisher = WTSI::NPG::Publisher->new
+      (disperse      => 0,
+       irods         => $self->irods,
+       accountee_uid => $self->accountee_uid,
+       logger        => $self->logger);
+  }
+  else {
+    $publisher = WTSI::NPG::SimplePublisher->new
+      (irods         => $self->irods,
+       accountee_uid => $self->accountee_uid,
+       logger        => $self->logger);
+  }
+
+  my $data_object = $publisher->publish_file($filename, \@fingerprint,
+                                             $analysis_coll->str,
+                                             $self->publication_time);
+  return $data_object;
 }
 
 __PACKAGE__->meta->make_immutable;

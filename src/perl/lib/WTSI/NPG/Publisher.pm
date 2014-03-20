@@ -13,6 +13,12 @@ has 'irods' =>
    isa      => 'WTSI::NPG::iRODS',
    required => 1);
 
+has 'disperse' =>
+  (is       => 'ro',
+   isa      => 'Bool',
+   required => 1,
+   default  => 1);
+
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator';
 
 =head2 publish_file
@@ -50,8 +56,11 @@ sub publish_file {
     $dest_collection = $irods->working_collection . '/' . $dest_collection;
   }
 
-  my $hash_path = $irods->hash_path($file, $md5);
-  $dest_collection = $dest_collection . '/' . $hash_path;
+  if ($self->disperse) {
+    my $hash_path = $irods->hash_path($file, $md5);
+    $dest_collection = $dest_collection . '/' . $hash_path;
+  }
+
   unless ($irods->list_collection($dest_collection)) {
     $irods->add_collection($dest_collection);
   }
