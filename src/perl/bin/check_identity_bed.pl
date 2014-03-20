@@ -29,9 +29,10 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my ($outDir, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $noWarning, $help);
+my ($outDir, $dbPath, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $noWarning, $help);
 
 GetOptions("outdir=s"     => \$outDir,
+	   "db=s"         => \$dbPath,
            "config=s"     => \$configPath,
            "ini=s"        => \$iniPath,
            "min_snps=i"   => \$minSNPs,
@@ -60,6 +61,7 @@ Options:
                     working directory.
 --plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
                     .bim, .fam extension. Required.
+--db=PATH           Path to an SQLite pipeline database containing the QC plex calls. Required.
 --no_warning        Do not write a warning if insufficent SNPs are present
 --help              Print this help text and exit
 ";
@@ -72,7 +74,12 @@ if (!($plink)) {
     croak "Prefix '$plink' is not a valid Plink binary dataset; one or more files missing";
 } elsif ($outDir && !(-e $outDir && -d $outDir)) {
     croak "Output '$outDir' does not exist or is not a directory";
+} elsif (!($dbPath)) {
+    croak "Must supply an SQLite pipeline database path";
+} elsif (!(-e $dbPath)) {
+    croak "Database path $dbPath does not exist"; 
 }
+
 $outDir ||= getcwd();
 $minSNPs ||= 8;
 if (!$minIdent) {
@@ -97,5 +104,5 @@ my $warn;
 if ($noWarning) { $warn = 0; } # option to suppress warning in pipeline tests
 else { $warn = 1; }
 
-run_identity_check($plink, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
+run_identity_check($plink, $dbPath, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
 

@@ -27,6 +27,7 @@ my $gtName = 'identity_check_gt.txt';
 my $failPairsName = 'identity_check_failed_pairs.txt';
 my $pipelineTestDir = '/nfs/gapi/data/genotype/pipeline_test';
 my $dataDir = $pipelineTestDir.'/identity_check';
+my $dbPath =  $dataDir.'/id_test_genotyping.db';
 my $manifest = $pipelineTestDir.'/manifests/Human670-QuadCustom_v1_A.bpm.csv';
 my $minSNPs = 8;
 my $manySNPs = 1000; # use to make methods fail
@@ -57,7 +58,7 @@ sub require : Test(1) {
 
 sub test_alternate_snp_names : Test(6) {
     my $plink = $dataDir."/identity_test_not_exome";
-    my @inputs = ($plink, $workdir, $minSNPs, $minIdent, $swap, $iniPath);
+    my @inputs = ($plink, $dbPath, $workdir, $minSNPs, $minIdent, $swap, $iniPath);
     run_identity(\@inputs);
     validate_outputs();
 }
@@ -66,7 +67,7 @@ sub test_command_line : Test(6) {
     my $plink = $dataDir."/identity_test";
     my $config = defaultJsonConfig();
     my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
-	"--plink $plink";
+	"--plink $plink --db $dbPath";
     is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     validate_outputs();
 }
@@ -88,7 +89,7 @@ sub test_manifest_intersection : Test(4) {
 
 sub test_insufficient_snps : Test(3) {
     my $plink = $dataDir."/identity_test";
-    my @inputs = ($plink, $workdir, $manySNPs, $minIdent, $swap, $iniPath);
+    my @inputs = ($plink, $dbPath, $workdir, $manySNPs, $minIdent, $swap, $iniPath);
     run_identity(\@inputs);
     ok(-e $jsonOutPath, "JSON output exists for insufficient SNPs");
     my $failJson = $dataDir.'/identity_check_fail.json';
@@ -108,7 +109,7 @@ sub test_name_conversion : Test(4) {
 
 sub test_standard : Test(6) {
     my $plink = $dataDir."/identity_test";
-    my @inputs = ($plink, $workdir, $minSNPs, $minIdent, $swap, $iniPath);
+    my @inputs = ($plink, $dbPath, $workdir, $minSNPs, $minIdent, $swap, $iniPath);
     run_identity(\@inputs);
     validate_outputs();
 }

@@ -35,7 +35,7 @@ use Log::Log4perl::Level;
 use POSIX qw(ceil);
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 use WTSI::NPG::Genotyping::Database::SNP;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir getDatabaseObject);
 use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
 
 use WTSI::NPG::Genotyping::SNPSet;
@@ -125,9 +125,12 @@ sub findIdentity {
     my %sequenom = %{ shift() };
     my @snps = @{ shift() };
     my $minIdent = shift;
-    my (%identity, %genotypes, %failed);
+    my (%identity, %genotypes, %failed, %missing);
     foreach my $sample (keys(%plink)) {
 	my $match = 0;
+	# check if sample is missing from QC plex calls
+	if (!defined($sequenom{$sample})) { $missing{$sample} = 1; }
+	# compare genotypes
 	foreach my $snp (@snps) {
 	    my $pCall = $plink{$sample}{$snp};
 	    my $sCall = $sequenom{$sample}{$snp};
@@ -147,7 +150,7 @@ sub findIdentity {
 	$identity{$sample} = $id;
 	if ($id < $minIdent) { $failed{$sample} = 1; }
     }
-    return (\%identity, \%genotypes, \%failed);
+    return (\%identity, \%genotypes, \%failed, \%missing);
 }
 
 sub getIntersectingSNPsPlink {
@@ -224,6 +227,44 @@ sub getSequenomSNPNames {
     return $snpset->snp_names;
 }
 
+sub readPlexCalls {
+    # read QC plex calls (Sequenom or Fluidigm) from pipeline SQLite database
+    # return a hash of calls indexed by sample and SNP
+    my ($dbPath, $iniPath) = @_;
+    my $db = getDatabaseObject($dbPath, $iniPath);
+    # read samples and SNP names
+    my @samples = $db->sample->all;
+    my @snps = $db->snp->all;
+    my $snpTotal = @snps;
+    $log->debug("Read $snpTotal SNPs from pipeline DB");
+    my %snpNames;
+    foreach my $snp (@snps) {
+	$snpNames{$snp->id_snp} = $snp->name; 
+    }
+    # read QC calls for each sample and SNP
+    my $snpResultTotal = 0;
+    my %results;
+    $db->in_transaction(sub {
+	foreach my $sample (@samples) {
+	    if ($sample->include == 0) { next; }
+	    my $sampleName = $sample->name;
+	    my @results = $sample->results->all;
+	    foreach my $result (@results) {
+		my @snpResults = $result->snp_results->all;
+		$snpResultTotal += @snpResults;
+		foreach my $snpResult (@snpResults) {
+		    my $snpName = $snpNames{$snpResult->id_snp};
+		    if (!$results{$sampleName}{$snpName}) {
+			$results{$sampleName}{$snpName} = $snpResult->value;
+		    }
+		}
+	    }
+	}
+			});
+    $log->debug("Read $snpResultTotal QC SNP results from pipeline DB");
+    return \%results;
+}
+
 sub readPlinkCalls {
     # read genotype calls by sample & snp from given plink_binary object
     # requires list of sample names in same order as in plink file
@@ -245,7 +286,7 @@ sub readPlinkCalls {
             if (!$snps{$snp_id}) { next; }
             for my $i (0..$genotypes->size() - 1) {
                 my $call = $genotypes->get($i);
-                if ($call =~ /[N]{2}/) { next; } # skip 'NN' calls
+		if ($call =~ /[N]{2}/) { $call = 0; } 
                 $plinkCalls{$sampleNames[$i]}{$snp_id} = $call;
             }
         }
@@ -293,6 +334,8 @@ sub writeGenotypes {
     my $outDir = shift;
     my @samples = sort(keys(%genotypes));
     open my $gt, ">", $outDir.'/'.$OUTPUT_NAMES{'genotypes'} or die $!;
+    my @heads = qw/SNP sample illumina_call qc_plex_call/;
+    print $gt join("\t", @heads)."\n";
     foreach my $snp (@snps) {
 	foreach my $sample (sort(keys(%genotypes))) {
 	    my ($pCall, $sCall) = @{ $genotypes{$sample}{$snp} };
@@ -352,7 +395,7 @@ sub writeJson {
 
 sub run_identity_check {
     # 'main' method to run identity check
-    my ($plinkPrefix, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath, $warn) = @_;
+    my ($plinkPrefix, $dbPath, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath, $warn) = @_;
     my $pb = new plink_binary::plink_binary($plinkPrefix);
     $pb->{"missing_genotype"} = "N"; 
 
@@ -369,28 +412,19 @@ sub run_identity_check {
 	    "plex required, $snpTotal found";
 	if ($warn) { $log->logwarn($msg); }
     } else {
-	# 2) Read Sequenom results from SNP DB
-	my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-	    (name   => 'snp',
-	     inifile => $iniPath)->connect(RaiseError => 1);
-	my ($sqnmCallsRef, $sqnmSnpsRef, $missingSamplesRef, $sqnmTotal) 
-	    = $snpdb->find_sequenom_calls_by_sample($samplesRef);
-	$log->debug($sqnmTotal." calls read from Sequenom.\n"); 
-	
+	# 2) Read Sequenom results from pipeline SQLite DB
+	my $plexCallsRef = readPlexCalls($dbPath, $iniPath);
 	# 3) Read PLINK genotypes for all samples; can take a while!
 	my $start = time();
 	my $plinkCallsRef = readPlinkCalls($pb, $sampleNamesRef, \@snps);
-	#print to_json($plinkCallsRef, { pretty => 1 })."\n";
 	my $duration = time() - $start;
-	$log->debug("Calls read from PLINK binary: $duration seconds.\n"); 
-	
+	$log->debug("Calls read from PLINK binary: $duration seconds.\n");
 	# 4) Find identity, genotypes, and pass/fail status; write output
-	my ($idRef, $gtRef, $failRef) = findIdentity($plinkCallsRef, $sqnmCallsRef, \@snps, $minIdent);
+	my ($idRef, $gtRef, $failRef, $missingRef) = findIdentity($plinkCallsRef, $plexCallsRef, \@snps, $minIdent);
 	writeJson($idRef, 1, $minCheckedSNPs, $snpTotal, $outDir);
 	writeGenotypes($gtRef, \@snps, $outDir);
-	writeIdentity($idRef, $failRef, $missingSamplesRef, $sampleNamesRef,
-		      $snpTotal, $minIdent, $outDir);
-	
+	writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
+		      $snpTotal, $minIdent, $outDir);	
 	# 5) Pairwise check on failed samples for possible swaps
 	my @failed = sort(keys(%{$failRef}));
 	my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $swap);
