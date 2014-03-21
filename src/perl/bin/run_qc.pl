@@ -49,7 +49,7 @@ PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam exte
 Options:
 --output-dir=PATH   Directory for QC output
 --sim=PATH          Path to SIM file for intensity metrics. See note [1] below.
---dbpath=PATH       Path to pipeline database .db file
+--dbpath=PATH       Path to pipeline database .db file. Required.
 --inipath=PATH      Path to .ini file containing general pipeline and database 
                     configuration; local default is $DEFAULT_INI
 --run=NAME          Name of run in pipeline database (needed for database 
@@ -95,7 +95,7 @@ $configPath ||= defaultJsonConfig($iniPath);
 $configPath = verifyAbsPath($configPath);
 
 if ($simPath) { $simPath = verifyAbsPath($simPath); }
-if ($dbPath) { $dbPath = verifyAbsPath($dbPath); }
+$dbPath = verifyAbsPath($dbPath); 
 $outDir ||= "./qc";
 $mafHet ||= 0;
 if (not -e $outDir) { mkdir($outDir); }
@@ -231,17 +231,15 @@ sub run {
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir --no_warning",
+    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir --no_warning --db $dbPath",
 		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
 		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
-    if ($dbPath) { 
-        if (!defined($runName)) { 
-            croak "Must supply pipeline run name for database gender update"; 
-        }
-        $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
+    if (!defined($runName)) { 
+	croak "Must supply pipeline run name for database gender update"; 
     }
+    $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     push(@cmds, $genderCmd);
     if ($mafHet) {
 	my $mhout = $outDir.'/'.$fileNames{'het_by_maf'};
@@ -258,8 +256,7 @@ sub run {
 	# using previously calculated metric values
 	$intensity = 1;
     }
-    my $dbopt = "";
-    if ($dbPath) { $dbopt = "--dbpath=$dbPath "; }
+    my $dbopt = "--dbpath=$dbPath "; 
     ### run QC data generation commands ###
     foreach my $cmd (@cmds) { 
         my $result = system($cmd); 
