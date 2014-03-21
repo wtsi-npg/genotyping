@@ -103,12 +103,14 @@ sub equivalent {
     # - swap (major/minor allele reversal) and/or a flip (reverse complement)
     my ($gt0, $gt1) = @_;
     # basic sanity checking on input
+    # allow no-call genotypes (represented by NN or 0)
     my $inputOK = 1;
     foreach my $gt ($gt0, $gt1) {
-        if (length($gt)!=2) { $inputOK = 0; }
-        elsif ($gt =~ /[^ACGT]/) { $inputOK = 0; }
+	if ($gt && $gt ne 'NN' && (length($gt)!=2 || $gt =~ /[^ACGT]/)) { 
+	    $inputOK = 0; 
+	}
     }
-    unless ($inputOK) { croak "Incorrect arguments to equivalentGenotype: $gt0 $gt1\n"; }
+    unless ($inputOK) { $log->logcroak("Incorrect arguments to equivalentGenotype: $gt0 $gt1"); }
     my $gt1Swap = join('', reverse(split('', $gt1))); # swap alleles
     if ($gt0 eq $gt1 || $gt0 eq $gt1Swap || $gt0 eq revComp($gt1) || 
         $gt0 eq revComp($gt1Swap) ) {
@@ -122,33 +124,37 @@ sub findIdentity {
     # find the identity metric for each sample
     # return: metric values, genotypes by SNP & sample, pass/fail status
     my %plink = %{ shift() };
-    my %sequenom = %{ shift() };
+    my %qcplex = %{ shift() };
     my @snps = @{ shift() };
     my $minIdent = shift;
     my (%identity, %genotypes, %failed, %missing);
     foreach my $sample (keys(%plink)) {
 	my $match = 0;
-	# check if sample is missing from QC plex calls
-	if (!defined($sequenom{$sample})) { $missing{$sample} = 1; }
 	# compare genotypes
-	foreach my $snp (@snps) {
-	    my $pCall = $plink{$sample}{$snp};
-	    my $sCall = $sequenom{$sample}{$snp};
-	    if ($pCall && $sCall) {
-		my $equiv = eval { equivalent($pCall, $sCall) };
-		unless (defined($equiv)) {  
-		    $log->logwarn("WARNING: ".$@); # error caught
-		    $equiv = 0;
+	# mark samples as missing OR pass/fail (but not both)
+	if ($qcplex{$sample}) {
+	    foreach my $snp (@snps) {
+		my $pCall = $plink{$sample}{$snp};
+		my $sCall = $qcplex{$sample}{$snp};
+		if ($pCall && $sCall) {
+		    my $equiv = eval { equivalent($pCall, $sCall) };
+		    unless (defined($equiv)) {  
+			$log->logwarn("WARNING: ".$@); # error caught
+			$equiv = 0;
+		    }
+		    if ($equiv) { $match++; }
 		}
-		if ($equiv) { $match++; }
+		$pCall ||= 0;
+		$sCall ||= 0;
+		$genotypes{$sample}{$snp} = [$pCall, $sCall];
 	    }
-	    $pCall ||= 0;
-	    $sCall ||= 0;
-	    $genotypes{$sample}{$snp} = [$pCall, $sCall];
+	    my $id = $match / @snps;
+	    $identity{$sample} = $id;
+	    if ($id < $minIdent) { $failed{$sample} = 1; }
+	} else {
+	    $missing{$sample} = 1;
+	    $identity{$sample} = 0;
 	}
-	my $id = $match / @snps;
-	$identity{$sample} = $id;
-	if ($id < $minIdent) { $failed{$sample} = 1; }
     }
     return (\%identity, \%genotypes, \%failed, \%missing);
 }
@@ -247,15 +253,15 @@ sub readPlexCalls {
     $db->in_transaction(sub {
 	foreach my $sample (@samples) {
 	    if ($sample->include == 0) { next; }
-	    my $sampleName = $sample->name;
+	    my $sampleURI = $sample->uri;
 	    my @results = $sample->results->all;
 	    foreach my $result (@results) {
 		my @snpResults = $result->snp_results->all;
 		$snpResultTotal += @snpResults;
 		foreach my $snpResult (@snpResults) {
 		    my $snpName = $snpNames{$snpResult->id_snp};
-		    if (!$results{$sampleName}{$snpName}) {
-			$results{$sampleName}{$snpName} = $snpResult->value;
+		    if (!$results{$sampleURI}{$snpName}) {
+			$results{$sampleURI}{$snpName} = $snpResult->value;
 		    }
 		}
 	    }
@@ -268,6 +274,7 @@ sub readPlexCalls {
 sub readPlinkCalls {
     # read genotype calls by sample & snp from given plink_binary object
     # requires list of sample names in same order as in plink file
+    # assumes that "sample names" in the Plink dataset are URI's
     # return hash of calls by sample and SNP name
     my ($pb, $sampleNamesRef, $snpsRef) = @_;
     my @sampleNames = @$sampleNamesRef;
@@ -315,13 +322,13 @@ sub writeFailedPairComparison {
     my $outDir = shift;
     my $outPath = $outDir.'/'.$OUTPUT_NAMES{'fail_pairs'};
     open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
-    my $header = join("\t", "#Sample_1", "Sample_2", "Similarity", "Status");
+    my $header = join("\t", "#Sample_1", "Sample_2", "Similarity", "Swap_warning");
     print $out $header."\n";
     foreach my $resultRef (@compareResults) {
 	my ($sample1, $sample2, $metric) = @$resultRef;
 	my $status;
-	if ($metric > $maxSimilarity) { $status = 'SWAP_WARNING'; }
-	else { $status = 'NO_MATCH'; }
+	if ($metric > $maxSimilarity) { $status = 'TRUE'; }
+	else { $status = 'FALSE'; }
 	my $line = sprintf("%s\t%s\t%.4f\t%s\n", $sample1, $sample2, $metric, $status);
 	print $out $line;
     }
@@ -335,7 +342,7 @@ sub writeGenotypes {
     my @samples = sort(keys(%genotypes));
     open my $gt, ">", $outDir.'/'.$OUTPUT_NAMES{'genotypes'} or die $!;
     my @heads = qw/SNP sample illumina_call qc_plex_call/;
-    print $gt join("\t", @heads)."\n";
+    print $gt '#'.join("\t", @heads)."\n";
     foreach my $snp (@snps) {
 	foreach my $sample (sort(keys(%genotypes))) {
 	    my ($pCall, $sCall) = @{ $genotypes{$sample}{$snp} };
@@ -358,10 +365,10 @@ sub writeIdentity {
     my $minIdent = shift;
     my $outDir = shift;
     open my $results, ">",  $outDir.'/'.$OUTPUT_NAMES{'results'} or die $!;
-    my $header = join("\t", "# Identity comparison",
+    my $header = join("\t", "#Identity comparison",
 		      "MIN_IDENTITY:$minIdent", 
                       "AVAILABLE_PLEX_SNPS:$snpTotal")."\n";
-    $header .= join("\t", "# sample", "concordance", "result")."\n";
+    $header .= join("\t", "#sample", "concordance", "result")."\n";
     print $results $header;
     foreach my $sample (@samples) {
 	my $line;
