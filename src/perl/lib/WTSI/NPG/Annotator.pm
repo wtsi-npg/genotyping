@@ -9,7 +9,7 @@ use WTSI::NPG::Utilities qw(md5sum);
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotation';
 
-our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xml);
+our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
 
 =head2 make_creation_metadata
 
@@ -143,7 +143,12 @@ sub make_type_metadata {
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
   $suffix =~ s{^\.?}{}msxi;
 
-  return ([$self->file_type_attr => $suffix]);
+  my @meta;
+  if ($suffix) {
+    push @meta, [$self->file_type_attr => $suffix];
+  }
+
+  return @meta;
 }
 
 =head2 make_md5_metadata
