@@ -19,6 +19,7 @@
 module Genotyping::Tasks
 
   RUN_QC = 'run_qc.pl'
+  CHECK_IDENTITY_BED = 'check_identity_bed.pl'
 
   module QualityControl
     include Genotyping::Tasks
@@ -73,6 +74,56 @@ module Genotyping::Tasks
         end
       end
     end # quality_control
+
+
+    # Runs the identity check stand-alone on genotype call results.
+    #
+    # Arguments:
+    # - dbfile (String): The SQLite database file name.
+    # - input (String): Path to the Plink BED file; corresponding BIM, FAM files are assumed to be present in the same directory
+    # - output (String): Path to directory to write results
+    # - args (Hash): Arguments for the operation.
+    # - async (Hash): Arguments for asynchronous management.
+    #
+    # Returns:
+    # - boolean
+    def check_identity(dbfile, input, output, args = {}, async = {})
+      
+      args, work_dir, log_dir = process_task_args(args)
+
+      if args_available?(dbfile, input, output, work_dir)
+
+        base = File.basename(input, File.extname(input))
+        plink = File.join(File.dirname(input), base)
+        Dir.mkdir(output) unless File.exist?(output)
+
+        cli_args = args.merge({:db => dbfile,
+                               :plink => plink,
+                               :outdir => output})
+        margs = [dbfile, input, output]
+        
+
+        command = [CHECK_IDENTITY_BED,
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+        task_id = task_identity(:check_identity, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        
+        result_names = ['identity_check_failed_pairs.txt',
+                        'identity_check_gt.txt',
+                        'identity_check.json',
+                        'identity_check_results.txt'
+                       ]
+        results = Array.new
+        result_names.each{ |name| results.push(File.join(output, name)) }
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda {ensure_files(results, :error => false)},
+                   :result => lambda { true },
+                   :async => async)
+
+      end
+
+    end # check_identity
 
   end
 end

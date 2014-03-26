@@ -40,12 +40,15 @@ $ENV{PATH} = abs_path('../r/bin') . ':' . $ENV{PATH};
 
 my %refGenders = readBenchmark($refFile);
 my @names = keys(%refGenders);
+my $dbMaster = $outDir."/genotyping_master.db";
+system("rm -f $dbMaster");
+createTestDatabase(\@names, $dbMaster);
 
 foreach my $format (qw/plink json text/) {
     foreach my $jsonOut ((0,1)) {
         my ($input, $outPath, $outType);
-        my $dbfile = createTestDatabase(\@names);
-        print "\tCreated temporary database in $dbfile\n";
+	my $dbfile = "$outDir/genotyping.db";
+	system("cp $dbMaster $dbfile");
         if ($format eq 'json') { $input = "$inputDir/input_xhet.json"; } 
         elsif ($format eq 'text') { $input = "$inputDir/input_xhet.txt"; } 
         elsif ($format eq 'plink') { $input = $plink; } 
