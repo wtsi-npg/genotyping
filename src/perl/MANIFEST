@@ -165,7 +165,6 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
-MANIFEST.orig
 README
 t/collation.t
 t/critic.ignore
@@ -177,6 +176,7 @@ t/database_warehouse.t
 t/expression_analysis_publisher.t
 t/expression_analysis_publisher/data/analysis/Control_Probe_Profile.txt
 t/expression_analysis_publisher/data/analysis/cubic_norm_Sample_Probe_Profile.txt
+t/expression_analysis_publisher/data/analysis/dummy_spreadsheet.xlsx
 t/expression_analysis_publisher/data/analysis/no_norm_Sample_Probe_Profile.txt
 t/expression_analysis_publisher/data/analysis/profile_annotation.txt
 t/expression_analysis_publisher/data/analysis/quantile_norm_Sample_Probe_Profile.txt
@@ -437,7 +437,6 @@ t/publisher.t
 t/publisher/lorem.txt
 t/publisher/update/lorem.txt
 t/qc/.gitattributes
-t/qc/alpha/pipeline_summary.lof
 t/qc/small_test/.pversion
 t/qc_small.t
 t/qc_test_data/config_test.json
@@ -506,7 +505,7 @@ t/scripts/publish_expression_analysis/infinium/9425128065_K_Grn.xml
 t/scripts/publish_expression_analysis/infinium/9425128065_L_Grn.idat
 t/scripts/publish_expression_analysis/infinium/9425128065_L_Grn.xml
 t/scripts/publish_expression_analysis/manifest/hipsci_12samples_2014-02-12.txt
-t/scripts/publish_expression_analysis/results/hipsci_12samples_2014-02-12_Sample_Probe_Profile.txt
+t/scripts/publish_expression_analysis/results/cubic_norm_Sample_Probe_Profile.txt
 t/scripts/publish_infinium_analysis/analysis/analysis.txt
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R02C01.gtc
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R02C02.gtc
@@ -621,3 +620,4 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
+

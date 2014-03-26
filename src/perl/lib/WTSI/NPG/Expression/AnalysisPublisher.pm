@@ -17,6 +17,7 @@ use WTSI::NPG::iRODS;
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
   'WTSI::NPG::Expression::Annotator';
 
+our $FILE_TESTER = 'file';
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/exp/infinium';
 
 has 'irods' =>
@@ -219,18 +220,25 @@ sub publish_analysis_file {
 
   my @fingerprint = $self->make_analysis_metadata($uuid);
 
-  # Test file to see whether it a type we recognise
-  my $profile    = WTSI::NPG::Expression::SampleProbeProfile->new($filename);
-  my $annotation = WTSI::NPG::Expression::ProfileAnnotation->new($filename);
-  $annotation->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
+  if ($self->is_text_file($filename)) {
+    $self->debug("Testing contents of text file '$filename'");
 
-  if ($profile->guess) {
-    push @fingerprint,
-      $self->make_profile_metadata($profile->normalisation_method,
-                                   'sample', 'probe');
+    # Test file to see whether it a type we recognise
+    my $profile    = WTSI::NPG::Expression::SampleProbeProfile->new($filename);
+    my $annotation = WTSI::NPG::Expression::ProfileAnnotation->new($filename);
+    $annotation->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
+
+    if ($profile->guess) {
+      push @fingerprint,
+        $self->make_profile_metadata($profile->normalisation_method,
+                                     'sample', 'probe');
+    }
+    elsif ($annotation->guess) {
+      push @fingerprint, $self->make_profile_annotation_metadata('annotation');
+    }
   }
-  elsif ($annotation->guess) {
-    push @fingerprint, $self->make_profile_annotation_metadata('annotation');
+  else {
+    $self->debug("Skipping testing contents of non-text file '$filename'");
   }
 
   my $publisher;
@@ -253,6 +261,20 @@ sub publish_analysis_file {
                                              $analysis_coll->str,
                                              $self->publication_time);
   return $data_object;
+}
+
+sub is_text_file {
+  my ($self, $filename) = @_;
+
+  my $test_run = WTSI::NPG::Runnable->new
+    (executable  => $FILE_TESTER,
+     arguments   => ['-b', '-i', $filename])->run;
+
+  my @result = $test_run->split_stdout;
+
+  $self->debug("Detected file '$filename' to be ", join(' ', @result));
+
+  return (@result && $result[0] =~ m{^text\/plain});
 }
 
 __PACKAGE__->meta->make_immutable;
