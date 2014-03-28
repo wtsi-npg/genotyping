@@ -127,6 +127,11 @@ sub _parse_assay_results {
       next;
     }
 
+    # Ignore empty lines
+    if ($str =~ m{^\s*$}) {
+      next;
+    }
+
     $self->debug("Building a new result from '$str'");
 
     my $num_fields = scalar @$record;

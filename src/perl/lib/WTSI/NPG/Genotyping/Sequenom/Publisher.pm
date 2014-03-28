@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping::Sequenom::Publisher;
 
 use File::Spec;
 use File::Temp qw(tempdir);
+use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
 use URI;
@@ -135,6 +136,8 @@ sub publish_samples {
         ($file);
       my $snpset_name = $self->_find_resultset_snpset($resultset);
 
+      $self->debug("Found results to be of SNP set '$snpset_name'");
+
       WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
           ($self->irods, $rods_path)->add_avu($self->sequenom_plex_name_attr,
                                               $snpset_name);
@@ -212,6 +215,8 @@ sub _find_resultset_snpset {
   foreach my $result (@{$resultset->assay_results}) {
     push @snpset_names, $result->snpset_name;
   }
+
+  @snpset_names = uniq @snpset_names;
 
   my $num_names = scalar @snpset_names;
 
