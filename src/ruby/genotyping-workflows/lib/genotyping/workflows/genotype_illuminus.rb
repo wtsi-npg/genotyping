@@ -60,6 +60,7 @@ Arguments:
     (requires config argument to be specified).
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
+    - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
 
 e.g.
 
@@ -84,14 +85,15 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size, :gender_method,
-                               :filterconfig, :nofilter)
+                               :select, :chunk_size, :fam_dummy, 
+                               :gender_method, :filterconfig, :nofilter)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest)
       chunk_size = args.delete(:chunk_size) || 2000
+      fam_dummy = args.delete(:fam_dummy) || -9
       gender_method = args.delete(:gender_method)
       gtconfig = args.delete(:config)
       fconfig = args.delete(:filterconfig) || nil
@@ -178,7 +180,7 @@ Returns:
       end
 
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
-                                 sjson, njson, args, async)
+                                 sjson, njson, fam_dummy, args, async)
 
       output = File.join(work_dir, 'illuminus_qc')
       qcargs = {:run => run_name, :sim => smfile}.merge(args)
