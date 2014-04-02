@@ -12,8 +12,27 @@ use WTSI::NPG::Genotyping qw(read_snp_json
                              read_sample_json);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(update_snp_locations
+our @EXPORT_OK = qw(update_placeholder 
+                    update_snp_locations
                     update_sample_genders);
+
+sub update_placeholder {
+    my ($input, $output, $placeholder, $tmp_dir) = @_;
+    my ($in_base, $in_path, $in_suffix) = fileparse($input, '.bed');
+    my $in_fam = $in_path . '/' . $in_base . '.fam';
+    my $tmp_fam = $tmp_dir . $in_base . '.fam';
+    open(my $in, '<', $in_fam) or confess "Failed to open '$in_fam': $!\n";
+    open(my $out, '>', $tmp_fam)  or confess "Failed to open '$tmp_fam': $!\n";
+    my $num_updated = _update_placeholder($in, $out, $placeholder);
+    close($in) or warn "Failed to close $in\n" ;
+    close($out) or warn "Failed to close $out\n";
+    my ($out_base, $out_path, $out_suffix) = fileparse($output, '.bed');
+    my $out_fam = $out_path . '/' . $out_base . '.fam';
+    move($tmp_fam, $out_fam) or
+	confess "Failed to move $tmp_fam to $out_fam: $!\n";
+
+    return $num_updated;
+}
 
 sub update_snp_locations {
   my ($input, $output, $snps, $tmp_dir) = @_;
@@ -75,6 +94,38 @@ sub update_sample_genders {
   return $num_updated;
 }
 
+=head2 _update_placeholder
+
+  Arg [1]    : filehandle
+  Arg [2]    : filehandle
+  Arg [3]    : string containing a placeholder value for missing data in
+               .fam files (typically 0 or -9)
+  Example    : $n = update_placeholder(\*STDIN, \*STDOUT, 0)
+  Description: Update a stream of Plink FAM format records with new placeholder
+               value for missing data
+  Returntype : integer, number of records processed
+  Caller     : general
+
+=cut
+
+sub _update_placeholder {
+    my ($in, $out, $placeholder) = @_;
+    my $n = 0;
+    while (my $line = <$in>) {
+	chomp($line);
+	my @fields = split /\s+/, $line;
+	my $updated = 0;
+	for (my $i=2;$i<@fields;$i++) {
+	    if ($fields[$i] eq '0' || $fields[$i] eq '-9') { 
+		$fields[$i] = $placeholder;
+		$updated = 1;
+	    }
+	}
+	print $out join("\t", @fields)."\n";
+	if ($updated) { $n++; }
+    }
+    return $n;
+}
 
 =head2 _update_snp_locations
 

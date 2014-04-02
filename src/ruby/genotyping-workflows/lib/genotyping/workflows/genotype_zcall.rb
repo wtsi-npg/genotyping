@@ -63,6 +63,9 @@ Arguments:
     nosim:         <boolean> Omit .sim files and intensity metrics for 
                    GenCall QC. Optional, defaults to false. Only relevant 
                    if filtering is enabled.
+    fam_dummy:     Dummy value for missing paternal/maternal ID or phenotype
+                   in Plink .fam output. Must be equal to 0 or -9. Optional,
+                   defaults to -9.
     memory:        <integer> number of Mb to request for jobs.
     queue:         <normal | long etc.> An LSF queue hint. Optional, 
                    defaults to'normal'.
@@ -89,8 +92,9 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :egt, :queue, 
-                               :memory, :select, :chunk_size, :zstart, 
-                               :ztotal, :filterconfig, :nofilter, :nosim)
+                               :memory, :select, :chunk_size, :fam_dummy,
+                               :zstart, :ztotal, :filterconfig, :nofilter, 
+                               :nosim)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -98,6 +102,7 @@ Returns:
       manifest_raw = args.delete(:manifest) 
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
+      fam_dummy = args.delete(:fam_dummy) || -9
       gtconfig = args.delete(:config)
       zstart = args.delete(:zstart) || 1  # wider z range for production
       ztotal = args.delete(:ztotal) || 10
@@ -203,8 +208,7 @@ Returns:
       end
       
       zfile = update_annotation(merge_bed(zchunks_t, zname, args, async),
-                                 sjson, njson, args, async)
-
+                                sjson, njson, fam_dummy, args, async)
       ## run zcall QC
       zqc = File.join(work_dir, 'zcall_qc')
       qcargs = nil
@@ -222,6 +226,7 @@ Returns:
       if qcargs
         zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       end
+      # update placeholder value in Plink .fam files
       # .sim files are large; delete gencall .sim on successful completion
       if zquality and gcsimfile then File.delete(gcsimfile) end
       [zfile, zquality] if [zfile, zquality].all?
