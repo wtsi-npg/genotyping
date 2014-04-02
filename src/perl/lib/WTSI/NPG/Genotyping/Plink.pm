@@ -113,15 +113,18 @@ sub _update_placeholder {
     my $n = 0;
     while (my $line = <$in>) {
 	chomp($line);
-	my @fields = split /\s+/, $line;
+	my ($family, $individual, $paternal, $maternal, $sex, $phenotype) = split /\s+/, $line;
 	my $updated = 0;
-	for (my $i=2;$i<@fields;$i++) {
-	    if ($fields[$i] eq '0' || $fields[$i] eq '-9') { 
-		$fields[$i] = $placeholder;
+	my @output = ($family, $individual);
+	my @fields = ($paternal, $maternal, $sex, $phenotype);
+	foreach my $field (@fields) {
+	    if ($field eq '0' || $field eq '-9') { 
+		$field = $placeholder;
 		$updated = 1;
 	    }
+	    push (@output, $field);
 	}
-	print $out join("\t", @fields)."\n";
+	print $out join("\t", @output)."\n";
 	if ($updated) { $n++; }
     }
     return $n;
