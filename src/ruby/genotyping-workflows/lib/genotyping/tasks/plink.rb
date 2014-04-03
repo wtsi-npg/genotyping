@@ -152,7 +152,8 @@ module Genotyping::Tasks
       end
     end
 
-    def update_annotation(bed_file, sample_json, snp_json, args = {}, async = {})
+    def update_annotation(bed_file, sample_json, snp_json, fam_dummy=-9, 
+                          args = {}, async = {})
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(bed_file, sample_json, snp_json, work_dir)
@@ -161,7 +162,8 @@ module Genotyping::Tasks
 
         cli_args = {:bed => bed_file,
                     :samples => sample_json,
-                    :snps => snp_json}
+                    :snps => snp_json,
+                    :placeholder => fam_dummy }
         command = [UPDATE_ANNOTATION,
                    cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
 

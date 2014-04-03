@@ -45,10 +45,9 @@ sub dbDatasetInfo {
     my @datasetInfo;
     my @runs = $db->piperun->all;
     foreach my $run (@runs) {
-        my @info;
         my @datasets = $run->datasets->all;
         foreach my $dataset (@datasets) {
-            @info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
+            my @info = ($run->name, $dataset->if_project, $dataset->datasupplier->name, $dataset->snpset->name);
             push(@datasetInfo, \@info);
         }
     }
