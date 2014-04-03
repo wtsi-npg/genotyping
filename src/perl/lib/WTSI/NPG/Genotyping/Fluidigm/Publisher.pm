@@ -52,6 +52,12 @@ has 'reference_name' =>
      return 'Homo_sapiens (1000Genomes)'
    });
 
+has 'reference_zone' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => '/');
+
 has 'resultset' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::Fluidigm::ResultSet',
@@ -231,7 +237,7 @@ sub _build_snpsets {
   my ($self) = @_;
 
   my @snpset_paths = $self->irods->find_objects_by_meta
-    ('/',
+    ($self->reference_zone,
      [$self->fluidigm_plex_name_attr    => '%', 'like'],
      [$self->reference_genome_name_attr => $self->reference_name]);
 

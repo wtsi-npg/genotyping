@@ -128,13 +128,15 @@ around 'working_collection' => sub {
 
     WTSI::NPG::Runnable->new(executable  => $ICD,
                              arguments   => [$collection],
-                             environment => $self->environment)->run;
+                             environment => $self->environment,
+                             logger      => $self->logger)->run;
     $self->$orig($collection);
   }
   elsif (!$self->has_working_collection) {
     my ($wc) = WTSI::NPG::Runnable->new
       (executable  => $IPWD,
-       environment => $self->environment)->run->split_stdout;
+       environment => $self->environment,
+       logger      => $self->logger)->run->split_stdout;
 
     $self->$orig($wc);
   }
@@ -210,7 +212,8 @@ sub list_groups {
   my @groups = WTSI::NPG::Runnable->new
     (executable  => $IGROUPADMIN,
      arguments   => ['lg'],
-     environment => $self->environment)->run->split_stdout;
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   return @groups;
 }
 
@@ -249,7 +252,8 @@ sub add_group {
 
   WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
                            arguments   => ['mkgroup', $name],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $name;
 }
 
@@ -274,7 +278,8 @@ sub remove_group {
 
   WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
                            arguments   => ['rmgroup', $name],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $name;
 }
 
@@ -318,7 +323,8 @@ sub reset_working_collection {
   my ($self) = @_;
 
   WTSI::NPG::Runnable->new(executable  => $ICD,
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   $self->clear_working_collection;
 
   return $self;
@@ -380,7 +386,8 @@ sub add_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IMKDIR,
                            arguments   => ['-p', $collection],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $collection;
 }
 
@@ -417,7 +424,8 @@ sub put_collection {
   my @args = ('-r', $dir, $target);
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => \@args,
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
 
   # FIXME - this is handling a case where the target collection exists
   return $target . '/' . basename($dir);
@@ -456,7 +464,8 @@ sub move_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IMV,
                            arguments   => [$source, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -486,7 +495,8 @@ sub remove_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IRM,
                            arguments   => ['-r', '-f', $collection],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $collection;
 }
 
@@ -690,7 +700,8 @@ sub find_collections_by_meta {
   my @raw_results = WTSI::NPG::Runnable->new
     (executable  => $IMETA,
      arguments   => \@args,
-     environment => $self->environment)->run->split_stdout;
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
 
   my @results;
   foreach my $row (@raw_results) {
@@ -699,6 +710,9 @@ sub find_collections_by_meta {
     }
     elsif ($row =~ m{^collection:\s(\S*)}) {
       my $coll = $1;
+
+      $self->debug("Found collection (to filter by '$root') '$coll'");
+
       push @results, $coll;
     }
   }
@@ -761,7 +775,8 @@ sub add_object {
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => [$file, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -794,7 +809,8 @@ sub replace_object {
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => ['-f', $file, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -828,7 +844,8 @@ sub move_object {
 
   WTSI::NPG::Runnable->new(executable  => $IMV,
                            arguments   => [$source, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target
 }
 
@@ -855,7 +872,8 @@ sub remove_object {
 
   WTSI::NPG::Runnable->new(executable  => $IRM,
                            arguments   => [$target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -870,12 +888,10 @@ sub slurp_object {
 
   $self->debug("Slurping object '$target'");
 
-  my $iget = WTSI::NPG::Runnable->new(executable  => $IGET,
-                                      arguments   => [$target, '-']);
-
   my $runnable = WTSI::NPG::Runnable->new
     (executable  => $IGET,
-     arguments   => [$target, '-'])->run;
+     arguments   => [$target, '-'],
+     logger      => $self->logger)->run;
 
   my $copy = decode('UTF-8', ${$runnable->stdout}, Encode::FB_CROAK);
 
@@ -1069,7 +1085,8 @@ sub find_objects_by_meta {
   my @raw_results = WTSI::NPG::Runnable->new
     (executable  => $IMETA,
      arguments   => \@args,
-     environment => $self->environment)->run->split_stdout;
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
 
   my @results;
   my $coll;
@@ -1088,6 +1105,8 @@ sub find_objects_by_meta {
         $self->logconfess("Failed to parse imeta output; missing collection ",
                           "in [", join(', ', @raw_results), "]");
       }
+
+      $self->debug("Found object (to filter by '$root') '$coll/$obj'");
 
       push @results, "$coll/$obj";
       undef $coll;
@@ -1123,7 +1142,8 @@ sub calculate_checksum {
   my @raw_checksum = WTSI::NPG::Runnable->new
     (executable  => $ICHKSUM,
      arguments   => [$object],
-     environment => $self->environment)->run->split_stdout;
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   unless (@raw_checksum) {
     $self->logconfess("Failed to get iRODS checksum for '$object'");
   }
@@ -1195,7 +1215,8 @@ sub md5sum {
   my @result = WTSI::NPG::Runnable->new
     (executable  => $MD5SUM,
      arguments   => [$file],
-     environment => $self->environment)->run->split_stdout;
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;
