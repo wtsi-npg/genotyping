@@ -568,9 +568,11 @@ t/update_illuminus_input/columns.json
 t/update_illuminus_input/illuminus_intensities.txt
 t/update_plink_annotation.t
 t/update_plink_annotation/expected.bim
-t/update_plink_annotation/expected.fam
+t/update_plink_annotation/expected_gender.fam
+t/update_plink_annotation/expected_placeholder.fam
 t/update_plink_annotation/input.bim
-t/update_plink_annotation/input.fam
+t/update_plink_annotation/input_gender.fam
+t/update_plink_annotation/input_placeholder.fam
 t/utilities.t
 t/utilities/collect_files/a/10.txt
 t/utilities/collect_files/a/x/1.txt
@@ -612,6 +614,7 @@ t/WTSI/NPG/Genotyping/Sequenom/AssayResultTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/PublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
+t/WTSI/NPG/Genotyping/UpdatePlinkAnnotationTest.pm
 t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/iRODS/CollectionTest.pm
 t/WTSI/NPG/iRODS/DataObjectTest.pm
