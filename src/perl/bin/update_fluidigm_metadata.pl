@@ -112,11 +112,12 @@ sub run {
     }
   }
   else {
-    $irods->find_objects_by_meta($publish_dest,
-                                 [fluidigm_plate => '%', 'like'],
-                                 [fluidigm_well  => '%', 'like'],
-                                 [type           => 'csv'],
-                                 @filter);
+    @fluidigm_data =
+      $irods->find_objects_by_meta($publish_dest,
+                                   [fluidigm_plate => '%', 'like'],
+                                   [fluidigm_well  => '%', 'like'],
+                                   [type           => 'csv'],
+                                   @filter);
   }
 
   my $total = scalar @fluidigm_data;
