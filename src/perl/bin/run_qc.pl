@@ -280,14 +280,6 @@ sub run {
     }
     collate($outDir, $configPath, $configPath, $dbPath, $iniPath, 
 	    $statusJson, $metricJson, $csvPath, 0, \@metricNames);
-    if ($filter) {
-	# second pass -- evaluate filter metrics/thresholds
-	# update DB unless the --include option is in effect
-	$csvPath = $outDir."/filter_results.csv"; 
-	$statusJson = $outDir."/filter_results.json";
-	collate($outDir, $configPath, $filter, $dbPath, $iniPath, 
-		$statusJson, $metricJson, $csvPath, $exclude);
-    }
     ### plot generation ###
     @cmds = ();
     if ($dbopt) { 
@@ -314,6 +306,16 @@ sub run {
     my $genderThresholdPath = $outDir."/sample_xhet_gender_thresholds.txt";
     createReports($texPath, $statusJson, $idJson, $configPath, $dbPath, 
                   $genderThresholdPath, $outDir, $texIntroPath);
+    ### exclude failed samples from pipeline DB
+    if ($filter) {
+	# second pass -- evaluate filter metrics/thresholds
+	# update DB unless the --include option is in effect
+	$csvPath = $outDir."/filter_results.csv"; 
+	$statusJson = $outDir."/filter_results.json";
+	collate($outDir, $configPath, $filter, $dbPath, $iniPath, 
+		$statusJson, $metricJson, $csvPath, $exclude);
+    }
+    ## create 'supplementary' directory and move files
     cleanup($outDir);
     return 1;
 }
