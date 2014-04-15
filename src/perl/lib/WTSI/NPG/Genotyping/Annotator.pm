@@ -44,6 +44,12 @@ sub make_fluidigm_metadata {
           [$self->fluidigm_plate_well_attr => $well->{well}]);
 }
 
+sub make_manual_qc_metadata {
+  my ($self, $manual_qc) = @_;
+
+  return ([$self->manual_qc_attr => $manual_qc]);
+}
+
 =head2 make_analysis_metadata
 
   Arg [1]    : Arrayref of genotyping project titles

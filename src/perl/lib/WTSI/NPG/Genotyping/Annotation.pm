@@ -18,7 +18,8 @@ our %GENOTYPING_METADATA_ATTR =
    sequenom_plex_name        => 'sequenom_plex',
    fluidigm_plate_name       => 'fluidigm_plate',
    fluidigm_plate_well       => 'fluidigm_well',
-   fluidigm_plex_name        => 'fluidigm_plex');
+   fluidigm_plex_name        => 'fluidigm_plex',
+   manual_qc                 => 'manual_qc');
 
 my $meta = __PACKAGE__->meta;
 
