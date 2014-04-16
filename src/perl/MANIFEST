@@ -64,6 +64,7 @@ lib/WTSI/NPG/Addressable.pm
 lib/WTSI/NPG/Annotatable.pm
 lib/WTSI/NPG/Annotation.pm
 lib/WTSI/NPG/Annotator.pm
+lib/WTSI/NPG/Cacheable.pm
 lib/WTSI/NPG/Database.pm
 lib/WTSI/NPG/Database/Warehouse.pm
 lib/WTSI/NPG/Executable.pm
@@ -165,7 +166,9 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
+MANIFEST.orig
 README
+t/cacheable.t
 t/collation.t
 t/critic.ignore
 t/database_infinium.t
@@ -581,6 +584,7 @@ t/utilities/collect_files/b/y/2.txt
 t/utilities/collect_files/c/30.txt
 t/utilities/collect_files/c/z/3.txt
 t/utilities/lorem.txt
+t/WTSI/NPG/CacheableTest.pm
 t/WTSI/NPG/Database/WarehouseTest.pm
 t/WTSI/NPG/DatabaseTest.pm
 t/WTSI/NPG/Expression/AnalysisPublisherTest.pm
@@ -623,4 +627,3 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
-
