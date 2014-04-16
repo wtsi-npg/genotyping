@@ -21,6 +21,11 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+
+# descriptions of iRODS upload status
+our @DESCRIPTIONS = qw/UPLOAD_OK SOURCE_MISSING DEST_MISSING 
+                       METADATA_MD5_ERROR SOURCE_MD5_ERROR/;
+
 unless (caller()) {
     my $status = run();
     exit($status);
@@ -29,18 +34,16 @@ unless (caller()) {
 sub run {
   my $debug;
   my $log4perl_config;
+  my $output;
   my $publish_dest;
-  my $silent;
-  my $type;
   my $verbose;
 
   # parse command line options
-
   GetOptions('debug'      => \$debug,
              'dest=s'     => \$publish_dest,
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
-             'silent'     => \$silent,
+	     'output=s'   => \$output,
 	     'verbose'    => \$verbose);
 
   unless ($publish_dest) {
@@ -49,7 +52,6 @@ sub run {
   }
 
   # set up log
-
   my $log;
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
@@ -58,86 +60,86 @@ sub run {
   else {
     Log::Log4perl::init(\$embedded_conf);
     $log = Log::Log4perl->get_logger('npg.irods.validate');
-
     if ($verbose) {
       $log->level($INFO);
-    }
-    elsif ($debug) {
+    } elsif ($debug) {
       $log->level($DEBUG);
     }
   }
 
-  # create iRODS object and read paths
-
-  my $irods =  WTSI::NPG::iRODS->new;
-  $log->debug("Created irods object");
-
   my @files = <>;
-  @files = uniq(@files);
-  $log->debug("Read ".@files." distinct file paths.");
-  my %filenames;
-  foreach my $file (@files) {
-    chomp($file);
-    my ($filename, $directories, $suffix) = fileparse($file);
-    $filenames{$file} = $filename;
-  }
-
-  # process input file paths
-
-  my ($invalid_file, $invalid_object, $invalid_meta, $invalid_md5) = (0,0,0,0);
-  my $i = 0;
-  my $total = @files;
-  foreach my $file (@files) {
-      chomp $file;
-      $i++;
-      my $prefix =  "File $i of $total: $file";
-      if (! -e $file) { 
-	  $log->logwarn("FAIL: $prefix: Input path '$file' does not exist!");
-	  $invalid_file++;
-	  next;
-      }
-      my $md5 = $irods->md5sum($file);
-      my ($filename, $directories, $suffix) = fileparse($file);
-      unless ($publish_dest =~ /\/$/) { $publish_dest .= '/'; }
-      my $iPath = $publish_dest.$irods->hash_path($file).'/'.$filename;
-      my $listing = $irods->list_object($iPath);
-      if (!$listing) {
-	  $log->logwarn("FAIL: $prefix: Cannot read iRODS path $iPath");
-	  $invalid_object++;
-	  next;
-      }
-      my $valid_meta = $irods->validate_checksum_metadata($iPath);
-      if (! $valid_meta) {
-	  $log->logwarn("FAIL: $prefix: Invalid checksum in metadata for $iPath");
-	  $invalid_meta++;
-	  next;
-      }
-      my $irods_md5 = $irods->calculate_checksum($iPath);
-      if ($md5 ne $irods_md5) {
-	  $log->logwarn("FAIL: $prefix: Original and iRODS md5 checksums do not match for $file");
-	  $invalid_md5++;
-	  next;
-      }
-      $log->info("OK: $prefix validated");
-  }
-  $log->info("Total files processed: $total");
-  $log->info("Invalid input file path: $invalid_file");
-  $log->info("Invalid iRODS object path: $invalid_object");
-  $log->info("Invalid iRODS metadata checksum: $invalid_meta");
-  $log->info("Mismatched original and iRODS md5: $invalid_md5");
-  my $errors = $invalid_file + $invalid_object + $invalid_meta + $invalid_md5;
-  if ($errors == 0) {
-      my $msg = "$total input files processed, no errors found.";
-      $log->info($msg);
-      if (!$silent) { print "Finished: $msg\n"; }
-      return 0;
-  } else {
-      my $msg = "Errors found in $errors of $total input files.";
-      $log->info($msg);
-      if (!$silent) { print "Finished: $msg\n"; }
-      return 1;
-  }
+  foreach my $file (@files) { chomp($file); }
+  $log->debug("Validating iRODS upload, output $output");
+  my $valtotal = validate(\@files, $publish_dest, $output);
+  $log->info("Validated ", $valtotal, " of ", scalar @files, " files");
+  if ($valtotal == scalar @files) { return 0; }
+  else { return 1; }
 }
+
+sub validate {
+    my ($filesRef, $publish_dest, $out_path) = @_; 
+    my $log = Log::Log4perl->get_logger('npg.irods.validate');
+    $log->debug("Starting validation for destination $publish_dest");
+    my $irods =  WTSI::NPG::iRODS->new;
+    $log->debug("Created irods object");
+    my $out;
+    my $num_valid = 0;
+    if (!$out_path) {
+	$out = 0; # no output
+    } elsif ($out_path eq '-') { 
+	$out = *STDOUT;
+    } else {   
+	$out = open ">", $out_path || 
+	    $log->logconfess("Cannot open output '$out_path'");
+    }
+    my @header = qw/Source Destination Status Description/;
+    if ($out) { print $out join("\t", @header)."\n";  }
+    foreach my $file (@{$filesRef}) {
+	my $result = _validate_file($irods, $file, $publish_dest); 
+	my ($file, $irods_file, $status) = @{$result};
+	if ($status == 0) { $num_valid++; }
+	my @fields = ($file, $irods_file, $status, $DESCRIPTIONS[$status]);
+	if ($out) { print $out join("\t", @fields)."\n"; }
+    }
+    if ($out && $out_path ne '-') {
+	close $out || $log->logconfess("Cannot close output '$out_path'");
+    }
+    return $num_valid;
+}
+
+sub _validate_file {
+  my ($irods, $file, $publish_dest) = @_;
+  my $status = 0;
+  my $log = Log::Log4perl->get_logger('npg.irods.validate');
+  # gather information on source and destination files, if available
+  my ($file_exists, $listing, $valid_meta, $file_md5, $irods_md5);
+  unless ($publish_dest =~ /\/$/) { $publish_dest .= '/'; }
+  if (-e $file) { 
+      $file_exists = 1;
+      $file_md5 = $irods->md5sum($file); 
+      $publish_dest .= $irods->hash_path($file).'/'.fileparse($file);
+      $listing = eval { $irods->list_object($publish_dest) };
+      if ($listing) {
+	  $valid_meta = $irods->validate_checksum_metadata($publish_dest);
+	  $irods_md5 = $irods->calculate_checksum($publish_dest);
+      }
+  } else {
+      $publish_dest = 'UNKNOWN';
+  }
+  # assign status to file
+  if (! $file_exists) { 
+    $status = 1;
+  } elsif (! $listing) {
+    $status = 2;
+  } elsif (! $valid_meta) {
+    $status = 3;
+  } elsif ($file_md5 ne $irods_md5) {
+    $status = 4;
+  }
+  $log->debug("Attempted to validate file ", $file, " status ", $status);
+  return [$file, $publish_dest, $status];
+}
+
 
 
 __END__
@@ -153,15 +155,15 @@ validate_published_file_list [--config <database .ini file>] \
 
 Options:
 
-  --dest        The data destination root collection in iRODS.
-  --help        Display help.
-  --logconf     A log4perl configuration file. Optional.
-  --silent      Do not print status message on completion.
-  --verbose     Print messages while processing. Optional.
+  --dest         The data destination root collection in iRODS. Required.
+  --help         Display help.
+  --logconf      A log4perl configuration file. Optional.
+  --output=PATH  PATH for output, or '-' for STDOUT. Optional.
+  --verbose      Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Attempts to find files named on STDIN in iRODS and validates their MD5 checksums. Finds if checksum stored in iRODS metadata, checksum of iRODS data object, and checksum of original file are identical. Exit status is 1 if any discrepancies are found, 0 otherwise.
+Given a list of 'source' file paths on STDIN, check if there are valid 'destination' copies of the files in iRODS. Validation fails if the source or destination does not exist; if the MD5 checksums of the source and destination files are not identical; or if the MD5 checksum of the destination file does not match the value in iRODS metadata.
 
 =head1 METHODS
 
