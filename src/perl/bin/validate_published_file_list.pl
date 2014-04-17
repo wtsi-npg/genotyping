@@ -163,7 +163,15 @@ Options:
 
 =head1 DESCRIPTION
 
-Given a list of 'source' file paths on STDIN, check if there are valid 'destination' copies of the files in iRODS. Validation fails if the source or destination does not exist; if the MD5 checksums of the source and destination files are not identical; or if the MD5 checksum of the destination file does not match the value in iRODS metadata.
+Given a list of 'source' file paths on STDIN, check if there are valid 
+'destination' copies of the files in iRODS. Validation fails if the source or 
+destination does not exist; if the MD5 checksums of the source and destination 
+files are not identical; or if the MD5 checksum of the destination file does 
+not match the value in iRODS metadata.
+
+This script is intended for use immediately after an upload to iRODS to verify
+success, particularly when many files have been uploaded at once using 
+publish_infinium_file_list.pl.
 
 =head1 METHODS
 
