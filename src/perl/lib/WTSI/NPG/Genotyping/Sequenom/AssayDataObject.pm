@@ -54,18 +54,11 @@ sub update_secondary_metadata {
 
     # Supersede all the secondary metadata with new values
     push @meta, $self->make_sample_metadata($ss_sample);
-
-    # Revoke access from current groups
-    my @current_groups = $self->expected_irods_groups;
-    $self->set_permissions('null', @current_groups);
-
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);
     }
 
-    # Grant access to the new groups
-    my @groups = $self->expected_irods_groups;
-    $self->set_permissions('read', @groups);
+    $self->update_group_permissions;
   }
   else {
     $self->info("Skipping update of metadata for '", $self->str, "': ",

@@ -141,18 +141,18 @@ sub find_in_metadata {
   return @exists;
 }
 
-=head2 expected_irods_groups
+=head2 expected_groups
 
   Arg [1]    : None
 
-  Example    : @groups = $path->expected_irods_groups
+  Example    : @groups = $path->expected_groups
   Description: Return an array of iRODS group names given metadata containing
                >=1 study_id under the key Annotation::study_id_attr
   Returntype : Array
 
 =cut
 
-sub expected_irods_groups {
+sub expected_groups {
   my ($self) = @_;
 
   my @ss_study_avus = $self->find_in_metadata($self->study_id_attr);
