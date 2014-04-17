@@ -16,7 +16,20 @@ use utf8;
                        experiment => 'experiment1',
                        chip       => 1234,
                        well       => 'A01',
-                       assay      => 'assay1',
+                       assay      => 'assay1-rs012345678',
+                       genotype   => 'CT',
+                       status     => 'status1',
+                       sample     => 'sample1',
+                       allele     => 'C',
+                       mass       => 1,
+                       height     => 10},
+                      {customer   => 'customer1',
+                       project    => 'project1',
+                       plate      => 'plate1',
+                       experiment => 'experiment1',
+                       chip       => 1234,
+                       well       => 'A01',
+                       assay      => 'assay1-rs987654321',
                        genotype   => 'CT',
                        status     => 'status1',
                        sample     => 'sample1',
@@ -99,7 +112,8 @@ sub publish : Test(2) {
   my @published_data =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [sequenom_plate => 'plate1'],
-                                 [sequenom_well  => 'A01']);
+                                 [sequenom_well  => 'A01'],
+                                 [sequenom_plex  => 'assay1']);
   cmp_ok(scalar @published_data, '==', scalar @addresses_to_publish,
          "Number of wells published with sequenom_plate metadata");
 }
@@ -129,7 +143,8 @@ sub publish_overwrite : Test(2) {
   my @data_objects =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [sequenom_plate => 'plate1'],
-                                 [sequenom_well  => 'A01']);
+                                 [sequenom_well  => 'A01'],
+                                 [sequenom_plex  => 'assay1'] );
   cmp_ok(scalar @data_objects, '==', scalar @addresses_to_publish,
          "Number of wells published with sequenom_plate metadata");
 }

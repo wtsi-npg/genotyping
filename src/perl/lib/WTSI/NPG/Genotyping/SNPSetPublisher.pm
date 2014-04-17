@@ -8,11 +8,10 @@ use Moose;
 use Moose::Util::TypeConstraints;
 
 use WTSI::NPG::Genotyping::SNPSet;
-use WTSI::NPG::Genotyping::Metadata qw();
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator';
 
 enum 'GenotypingPlatform', [qw(fluidigm sequenom)];
 
@@ -73,7 +72,7 @@ sub publish {
 
   my @meta = ([$snpset_name   => $self->snpset_name]);
   foreach my $reference_name (@{$self->reference_names}) {
-    push @meta, [reference_name => $reference_name]
+    push @meta, [$self->reference_genome_name_attr => $reference_name]
   }
 
   my $rods_path = $publisher->publish_file($self->file_name, \@meta,

@@ -10,6 +10,7 @@ use Moose;
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Executable';
 
 =head2 run
+
   Example    : WTSI::NPG::Runnable->new(executable => 'ls',
                                         arguments  => ['/'])->run;
   Description: Run the executable with the supplied arguments and STDIN.

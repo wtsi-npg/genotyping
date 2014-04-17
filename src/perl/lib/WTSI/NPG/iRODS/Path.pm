@@ -7,7 +7,6 @@ use JSON;
 use File::Spec;
 use Moose::Role;
 
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
 use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotatable';
@@ -148,7 +147,7 @@ sub find_in_metadata {
 
   Example    : @groups = $path->expected_irods_groups
   Description: Return an array of iRODS group names given metadata containing
-               >=1 study_id under the key $STUDY_ID_META_KEY
+               >=1 study_id under the key Annotation::study_id_attr
   Returntype : Array
 
 =cut
@@ -156,7 +155,7 @@ sub find_in_metadata {
 sub expected_irods_groups {
   my ($self) = @_;
 
-  my @ss_study_avus = $self->find_in_metadata($STUDY_ID_META_KEY);
+  my @ss_study_avus = $self->find_in_metadata($self->study_id_attr);
 
   my @groups;
   foreach my $avu (@ss_study_avus) {

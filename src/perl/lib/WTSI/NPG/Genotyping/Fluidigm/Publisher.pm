@@ -12,12 +12,12 @@ use URI;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
-use WTSI::NPG::Genotyping::Metadata qw($FLUIDIGM_PLATE_NAME_META_KEY);
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -51,6 +51,12 @@ has 'reference_name' =>
    default  => sub {
      return 'Homo_sapiens (1000Genomes)'
    });
+
+has 'reference_zone' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => '/');
 
 has 'resultset' =>
   (is       => 'ro',
@@ -133,8 +139,8 @@ sub publish_samples {
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
   my @meta =
-    ([$FLUIDIGM_PLATE_NAME_META_KEY => $export_file->fluidigm_barcode],
-     ['dcterms:audience'            => $self->audience_uri->as_string]);
+    ([$self->fluidigm_plate_name_attr => $export_file->fluidigm_barcode],
+     [$self->dcterms_audience_attr    => $self->audience_uri->as_string]);
 
   $publisher->publish_file($self->resultset->export_file, \@meta,
                            $publish_dest,
@@ -168,7 +174,8 @@ sub publish_samples {
       my $snpset_name = $self->_find_snpset_name($snpset);
 
       WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-          ($self->irods, $rods_path)->add_avu('fluidigm_plex', $snpset_name);
+          ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
+                                              $snpset_name);
 
       ++$num_published;
     };
@@ -198,7 +205,6 @@ sub publish_samples {
 =cut
 
 sub publish_directory {
-
   my ($self, $publish_dest) = @_;
 
   my $export_file = $self->resultset->export_file;
@@ -231,9 +237,9 @@ sub _build_snpsets {
   my ($self) = @_;
 
   my @snpset_paths = $self->irods->find_objects_by_meta
-    ('/',
-     ['fluidigm_plex'  => '%', 'like'],
-     ['reference_name' => $self->reference_name]);
+    ($self->reference_zone,
+     [$self->fluidigm_plex_name_attr    => '%', 'like'],
+     [$self->reference_genome_name_attr => $self->reference_name]);
 
   my @snpsets;
   foreach my $rods_path (@snpset_paths) {
@@ -262,7 +268,8 @@ sub _find_resultset_snpset {
 
   my @matched;
   foreach my $snpset (@{$self->snpsets}) {
-    my @names = $snpset->data_object->find_in_metadata('fluidigm_plex');
+    my @names = $snpset->data_object->find_in_metadata
+      ($self->fluidigm_plex_name_attr);
 
     my @snp_names = $snpset->snp_names;
     my $num_snps = scalar @snp_names;
@@ -306,7 +313,7 @@ sub _find_snpset_name {
   my ($self, $snpset) = @_;
 
   my @snpset_names = map { $_->{value} }
-    $snpset->data_object->find_in_metadata('fluidigm_plex');
+    $snpset->data_object->find_in_metadata($self->fluidigm_plex_name_attr);
   my $num_names = scalar @snpset_names;
 
   $num_names > 0 or
@@ -318,7 +325,6 @@ sub _find_snpset_name {
 
   return shift @snpset_names;
 }
-
 
 __PACKAGE__->meta->make_immutable;
 

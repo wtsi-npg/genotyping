@@ -9,7 +9,7 @@ use Text::CSV;
 
 use WTSI::NPG::Genotyping::SNP;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 
@@ -18,16 +18,6 @@ has 'name' =>
    isa      => 'Str',
    required => 1,
    default  => sub { return ''} );
-
-has 'file_name' =>
-  (is       => 'ro',
-   isa      => 'Str',
-   required => 0);
-
-has 'data_object' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::iRODS::DataObject',
-   required => 0);
 
 has 'column_names' =>
   (is      => 'ro',
@@ -59,35 +49,22 @@ around BUILDARGS => sub {
   }
 };
 
+# BUILD is defined in the Storable Role
 sub BUILD {
   my ($self) = @_;
 
-  unless ($self->data_object or $self->file_name) {
-    $self->logconfess("Neither data_object nor file_name ",
-                      "arguments were supplied to the constructor");
-  }
-
-  if ($self->data_object and $self->file_name) {
-    $self->logconfess("Both data_object '", $self->data_object,
-                      "' and file_name '", $self->file_name,
-                      "' arguments were supplied to the constructor");
-  }
-
-  if ($self->data_object) {
-    $self->data_object->is_present or
-      $self->logconfess("SNP set data file ", $self->data_object->absolute,
-                        " is not present");
-  }
-
-  if ($self->file_name) {
-    unless (-e $self->file_name) {
-      $self->logconfess("SNP set data file ", $self->file_name,
-                        " is not present");
-    }
-  }
-
   $self->_build_snps;
 }
+
+=head2 snp_names
+
+  Arg [1]    : None
+
+  Example    : $set->snp_names
+  Description: Return a sorted array of the names of the SNPs in the set.
+  Returntype : Array
+
+=cut
 
 sub snp_names {
   my ($self) = @_;
@@ -99,6 +76,16 @@ sub snp_names {
 
   return sort { $a cmp $b } uniq @snp_names;
 }
+
+=head2 snp_names
+
+  Arg [1]    : Str SNP name e.g. rs######
+
+  Example    : $snp = $set->named_snp('rs0123456')
+  Description: Return specific, named SNP from the set.
+  Returntype : WTSI::NPG::Genotyping::SNP
+
+=cut
 
 sub named_snp {
   my ($self, $snp_name) = @_;
@@ -116,6 +103,19 @@ sub contains_snp {
 
   return defined $self->named_snp($snp_name);
 }
+
+=head2 write_snpset_data
+
+  Arg [1]    : Str file name
+
+  Example    : $set->write_snpset_data('snpset.txt')
+  Description: Write the content of the set to a file in the TSV format
+               used by NPG.
+  Returntype : Int number of records written (may be > number of unique
+               SNP names for cases such as gender markers that have
+               multiple locations on the reference genome).
+
+=cut
 
 sub write_snpset_data {
   my ($self, $file_name) = @_;
@@ -147,17 +147,6 @@ sub write_snpset_data {
   close $out;
 
   return $records_written;
-}
-
-sub str {
-  my ($self) = @_;
-
-  if ($self->data_object) {
-    return $self->data_object->str;
-  }
-  else {
-    return $self->file_name
-  }
 }
 
 sub _build_snps {

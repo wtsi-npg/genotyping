@@ -7,20 +7,19 @@ use Moose;
 
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::DataObject;
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY
-                           has_consent
-                           make_creation_metadata
-                           make_md5_metadata
-                           make_type_metadata
-                           make_modification_metadata
-                           make_sample_metadata);
 
 has 'irods' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::iRODS',
    required => 1);
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+has 'disperse' =>
+  (is       => 'ro',
+   isa      => 'Bool',
+   required => 1,
+   default  => 1);
+
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator';
 
 =head2 publish_file
 
@@ -57,8 +56,11 @@ sub publish_file {
     $dest_collection = $irods->working_collection . '/' . $dest_collection;
   }
 
-  my $hash_path = $irods->hash_path($file, $md5);
-  $dest_collection = $dest_collection . '/' . $hash_path;
+  if ($self->disperse) {
+    my $hash_path = $irods->hash_path($file, $md5);
+    $dest_collection = $dest_collection . '/' . $hash_path;
+  }
+
   unless ($irods->list_collection($dest_collection)) {
     $irods->add_collection($dest_collection);
   }
@@ -130,8 +132,8 @@ sub publish_file {
         $target_obj->remove_avu($avu->{attribute}, $avu->{value});
       }
 
-      push(@meta, make_md5_metadata($file));
-      push(@meta, make_modification_metadata($time));
+      push(@meta, $self->make_md5_metadata($file));
+      push(@meta, $self->make_modification_metadata($time));
     }
   }
   elsif (@existing) {
@@ -155,8 +157,8 @@ sub publish_file {
         $target_obj->remove_avu($avu->{attribute}, $avu->{value});
       }
 
-      push(@meta, make_md5_metadata($file));
-      push(@meta, make_modification_metadata($time));
+      push(@meta, $self->make_md5_metadata($file));
+      push(@meta, $self->make_modification_metadata($time));
     }
   }
   else {
@@ -165,11 +167,12 @@ sub publish_file {
 
     my $creator_uri = $self->affiliation_uri;
     my $publisher_uri = $self->accountee_uri;
-    push(@meta, make_creation_metadata($creator_uri, $time, $publisher_uri));
-    push(@meta, make_md5_metadata($file));
+    push(@meta, $self->make_creation_metadata($creator_uri, $time,
+                                              $publisher_uri));
+    push(@meta, $self->make_md5_metadata($file));
   }
 
-  push(@meta, make_type_metadata($file));
+  push(@meta, $self->make_type_metadata($file));
 
   foreach my $m (@meta) {
     my ($attribute, $value, $units) = @$m;

@@ -1,0 +1,6 @@
+Illumina Inc. GenomeStudio version 1.9.0
+Normalization = cubic spline
+Array Content = HumanHT-12_V4_0_R1_15002873_B.bgx.xml
+Error Model = none
+DateTime = 06/09/2013 09:22
+Local Settings = en-GB

@@ -71,6 +71,7 @@ sub ACTION_test {
   $self->copy_files_by_category('ini_files', './blib');
 
   {
+    # Ensure that the tests can see the Perl and R scripts
     local $ENV{PATH} = "./bin:../r/bin:$ENV{PATH}";
 
     $self->SUPER::ACTION_test;
@@ -157,6 +158,5 @@ sub copy_files_by_category {
     return @installed;
   }
 }
-
 
 1;

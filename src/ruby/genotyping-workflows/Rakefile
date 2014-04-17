@@ -44,7 +44,7 @@ desc "Write the current version to a module"
 task :write_version_module do
   f = File.open('lib/genotyping/git_version.rb', 'w')
   f.puts('module Genotyping')
-  f.puts("  VERSION = '#{GIT_VERSION}'")
+  f.puts("  VERSION = '#{spec.version}'")
   f.puts("  YEAR = '#{BUILD_DATE.year}'")
   f.puts('end');
   f.close

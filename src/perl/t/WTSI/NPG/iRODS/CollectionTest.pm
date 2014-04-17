@@ -9,7 +9,7 @@ use File::Spec;
 use List::AllUtils qw(all any none);
 
 use base qw(Test::Class);
-use Test::More tests => 40;
+use Test::More tests => 44;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -200,6 +200,54 @@ sub str : Test(1) {
   my $coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
 
   is($coll->str, $coll_path, 'Collection string');
+}
+
+sub get_contents : Test(4) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll_path = "$irods_tmp_coll/irods_path_test/test_dir/contents";
+
+  my $coll = WTSI::NPG::iRODS::Collection->new($irods, $coll_path);
+
+  my ($objs, $colls) = $coll->get_contents;
+
+  my @obj_paths  = map { $_->str } @$objs;
+  my @coll_paths = map { $_->str } @$colls;
+
+  my $expected_objs  = [];
+  my $expected_colls = [$coll_path,
+                        "$coll_path/a",
+                        "$coll_path/b",
+                        "$coll_path/c"];
+
+  is_deeply(\@obj_paths, $expected_objs, 'Object contents')
+    or diag explain \@obj_paths;
+
+  is_deeply(\@coll_paths, $expected_colls, 'Collection contents')
+    or diag explain \@coll_paths;
+
+  my ($objs_r, $colls_r) = $coll->get_contents('RECURSE');
+  my @obj_paths_r  = map { $_->str } @$objs_r;
+  my @coll_paths_r = map { $_->str } @$colls_r;
+
+  my $expected_objs_r  = ["$coll_path/a/10.txt",
+                          "$coll_path/a/x/1.txt",
+                          "$coll_path/b/20.txt",
+                          "$coll_path/b/y/2.txt",
+                          "$coll_path/c/30.txt",
+                          "$coll_path/c/z/3.txt"];
+  my $expected_colls_r = [$coll_path,
+                          "$coll_path/a",
+                          "$coll_path/a/x",
+                          "$coll_path/b",
+                          "$coll_path/b/y",
+                          "$coll_path/c",
+                          "$coll_path/c/z"];
+
+  is_deeply(\@obj_paths_r, $expected_objs_r, 'Object recursive contents')
+    or diag explain \@obj_paths_r;
+
+  is_deeply(\@coll_paths_r, $expected_colls_r, 'Collection recursive contents')
+    or diag explain \@coll_paths_r;
 }
 
 sub get_permissions : Test(1) {

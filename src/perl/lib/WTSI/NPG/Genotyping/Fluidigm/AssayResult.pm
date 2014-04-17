@@ -23,6 +23,16 @@ our $EMPTY_NAME          = '[ Empty ]';
 our $NO_TEMPLATE_CONTROL = 'NTC';
 our $NO_CALL             = 'No Call';
 
+=head2 is_control
+
+  Arg [1]    : None
+
+  Example    : $result->is_control
+  Description: Return whether the result is for a control assay.
+  Returntype : Bool
+
+=cut
+
 sub is_control {
   my ($self) = @_;
 
@@ -40,11 +50,32 @@ sub is_control {
           $self->type        eq $NO_TEMPLATE_CONTROL);
 }
 
+=head2 is_call
+
+  Arg [1]    : None
+
+  Example    : $result->is_call
+  Description: Return whether the result has called a genotype.
+  Returntype : Bool
+
+=cut
+
 sub is_call {
   my ($self) = @_;
 
   $self->final ne $NO_CALL;
 }
+
+=head2 compact_call
+
+  Arg [1]    : None
+
+  Example    : $result->compact_call
+  Description: Return the Fluidigm converted call attribute, having removed
+               the colon separator.
+  Returntype : Str
+
+=cut
 
 sub compact_call {
   my ($self) = @_;

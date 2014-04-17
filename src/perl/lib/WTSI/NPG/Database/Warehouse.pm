@@ -10,6 +10,13 @@ use WTSI::NPG::Utilities qw(depad_well);
 
 extends 'WTSI::NPG::Database';
 
+with 'WTSI::NPG::Cacheable';
+
+# Method names for MOP operations
+our $FIND_SAMPLE_BY_PLATE = 'find_sample_by_plate';
+
+my $meta = __PACKAGE__->meta;
+
 =head2 find_plate
 
   Arg [1]    : string
@@ -86,6 +93,23 @@ sub find_plate {
 
   return \%plate;
 }
+
+around $FIND_SAMPLE_BY_PLATE => sub {
+  my ($orig, $self, $plate_id, $map) = @_;
+
+  defined $plate_id or
+    $self->logconfess('A defined plate_id argument is required');
+  $plate_id or $self->logconfess('A non-empty plate_id argument is required');
+
+  defined $map or $self->logconfess('A defined map argument is required');
+  $map or $self->logconfess('A non-empty map argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_SAMPLE_BY_PLATE), {default_expires_in => 600});
+  my $key = $plate_id . $map;
+
+  return $self->get_with_cache($cache, $key, $orig, $plate_id, $map);
+};
 
 sub find_sample_by_plate {
   my ($self, $plate_id, $map) = @_;

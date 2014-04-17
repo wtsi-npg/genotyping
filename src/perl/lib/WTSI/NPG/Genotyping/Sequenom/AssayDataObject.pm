@@ -1,30 +1,42 @@
-
 use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 
 use Moose;
 
-use WTSI::NPG::Genotyping::Metadata qw($SEQUENOM_PLATE_NAME_META_KEY
-                                       $SEQUENOM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Metadata qw(make_sample_metadata);
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';
 
 sub update_secondary_metadata {
   my ($self, $snpdb, $ssdb) = @_;
 
-  my $sequenom_plate_avu = $self->get_avu($SEQUENOM_PLATE_NAME_META_KEY);
+  my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
   my $plate_name = $sequenom_plate_avu->{value};
-  my $well_avu = $self->get_avu($SEQUENOM_PLATE_WELL_META_KEY);
+  my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
   my $well = $well_avu->{value};
 
   $self->debug("Found plate well '$plate_name': '$well' in ",
                "current metadata of '", $self->str, "'");
 
+  my @meta; # The new metadata
+
+  # Get well manual QC status from the SNP database.
+  my $manual_qc = $self->find_manual_qc_status($snpdb, $plate_name, $well);
+  if (defined $manual_qc) {
+    $self->debug("Found manual QC '$manual_qc' on '$plate_name : $well' for '",
+                 $self->str, "'");
+
+    push @meta, $self->make_manual_qc_metadata($manual_qc);
+  }
+  else {
+    $self->debug("No manual QC information on '$plate_name : $well' for '",
+                 $self->str, "'");
+  }
+
   # Identify the plate via the SNP database.  It would be preferable
   # to look up directly in the warehouse.  However, the warehouse does
-  # not contain tracking information on Sequenom plates
+  # not contain tracking information on Sequenom plates.
   my $plate_id = $snpdb->find_sequenom_plate_id($plate_name);
   if (defined $plate_id) {
     $self->debug("Found Sequencescape plate identifier '$plate_id' for '",
@@ -40,12 +52,12 @@ sub update_secondary_metadata {
     $self->info("Updating metadata for '", $self->str, "' from plate ",
                 "'$plate_name' (ID $plate_id) well '$well'");
 
+    # Supersede all the secondary metadata with new values
+    push @meta, $self->make_sample_metadata($ss_sample);
+
     # Revoke access from current groups
     my @current_groups = $self->expected_irods_groups;
     $self->set_permissions('null', @current_groups);
-
-    # Supersede all the secondary metadata with new values
-    my @meta = make_sample_metadata($ss_sample);
 
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);
@@ -61,6 +73,25 @@ sub update_secondary_metadata {
   }
 
   return $self;
+}
+
+sub find_manual_qc_status {
+  my ($self, $snpdb, $plate_name, $well) = @_;
+
+  my $status;
+  if ($snpdb->find_plate_passed($plate_name)) {
+    if ($snpdb->find_well_passed($plate_name, $well)) {
+      $status = 1;
+    }
+    elsif ($snpdb->find_well_failed($plate_name, $well)) {
+      $status = 0;
+    }
+  }
+  elsif ($snpdb->find_plate_failed($plate_name)) {
+    $status = 0;
+  }
+
+  return $status;
 }
 
 __PACKAGE__->meta->make_immutable;

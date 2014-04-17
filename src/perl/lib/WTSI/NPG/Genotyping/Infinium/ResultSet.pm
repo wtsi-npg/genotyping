@@ -50,6 +50,16 @@ no Moose;
 
 __END__
 
+
+=head1 NAME
+
+WTSI::NPG::Genotyping::Infinium::ResultSet
+
+=head1 DESCRIPTION
+
+A class which represents the result files of an Infinium genotyping
+array assay of one sample.
+
 =head1 AUTHOR
 
 Keith James <kdj@sanger.ac.uk>

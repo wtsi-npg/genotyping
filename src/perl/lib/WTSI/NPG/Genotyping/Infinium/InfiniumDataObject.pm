@@ -5,18 +5,16 @@ package WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 
 use Moose;
 
-use WTSI::NPG::Genotyping::Metadata qw($INFINIUM_PLATE_BARCODE_META_KEY
-                                       $INFINIUM_PLATE_WELL_META_KEY);
-use WTSI::NPG::Metadata qw(make_sample_metadata);
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';
 
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
 
-  my $infinium_barcode_avu = $self->get_avu($INFINIUM_PLATE_BARCODE_META_KEY);
+  my $infinium_barcode_avu = $self->get_avu($self->infinium_plate_name_attr);
   my $infinium_barcode = $infinium_barcode_avu->{value};
-  my $well_avu = $self->get_avu($INFINIUM_PLATE_WELL_META_KEY);
+  my $well_avu = $self->get_avu($self->infinium_plate_well_attr);
   my $well = $well_avu->{value};
 
   $self->debug("Found plate well '$infinium_barcode': '$well' in ",
@@ -34,7 +32,7 @@ sub update_secondary_metadata {
     $self->set_permissions('null', @current_groups);
 
     # Supersede all the secondary metadata with new values
-    my @meta = make_sample_metadata($ss_sample);
+    my @meta = $self->make_sample_metadata($ss_sample);
 
     foreach my $avu (@meta) {
       $self->debug("Superseding [", join(', ', @$avu, "]"));

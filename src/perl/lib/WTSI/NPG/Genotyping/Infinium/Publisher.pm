@@ -9,10 +9,8 @@ use WTSI::NPG::Genotyping::Infinium::ResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-use WTSI::NPG::Genotyping::Metadata qw(infinium_fingerprint
-                                       make_infinium_metadata);
-
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable';
+with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
+  'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -157,8 +155,8 @@ sub _publish_file {
                               accountee_uid => $self->accountee_uid,
                               logger        => $self->logger);
 
-  my @meta = make_infinium_metadata($if_sample);
-  my @fingerprint = infinium_fingerprint(@meta);
+  my @meta = $self->make_infinium_metadata($if_sample);
+  my @fingerprint = $self->infinium_fingerprint(@meta);
   my $data_object = $publisher->publish_file($filename, \@fingerprint,
                                              $publish_dest,
                                              $self->publication_time);

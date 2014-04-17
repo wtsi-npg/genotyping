@@ -5,7 +5,7 @@ package WTSI::NPG::Expression::InfiniumDataObject;
 
 use Moose;
 
-use WTSI::NPG::Metadata qw(make_sample_metadata);
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';
 
@@ -42,7 +42,7 @@ sub update_secondary_metadata {
     $self->info("Updating metadata for '", $self->str, "' from plate '",
                 $ss_sample->{barcode}, "' well '", $ss_sample->{map}, "'");
 
-    my @meta = make_sample_metadata($ss_sample);
+    my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
       $self->add_avu(@$avu);
     }

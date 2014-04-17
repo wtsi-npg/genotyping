@@ -8,7 +8,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 6;
+use Test::More tests => 10;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -79,7 +79,7 @@ sub constructor : Test(1) {
           sample_archive     => $sample_data_path]);
 }
 
-sub publish : Test(3) {
+sub publish : Test(7) {
   my $irods = WTSI::NPG::iRODS->new;
   my $publish_dest = $irods_tmp_coll;
   my $sample_archive = "$irods_tmp_coll/infinium";
@@ -101,6 +101,34 @@ sub publish : Test(3) {
     $irods->find_collections_by_meta($irods_tmp_coll,
                                      [analysis_uuid => $analysis_uuid]);
   cmp_ok(scalar @analysis_data, '==', 1, "A single analysis annotated");
+
+  my @no_norm_profiles =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [normalisation_method => 'none'],
+                                 [summary_type         => 'probe'],
+                                 [summary_group        => 'sample']);
+  cmp_ok(scalar @no_norm_profiles, '==', 1, "A single no-norm profile");
+
+  my @cubic_norm_profiles =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [normalisation_method => 'cubic spline'],
+                                 [summary_type         => 'probe'],
+                                 [summary_group        => 'sample']);
+  cmp_ok(scalar @cubic_norm_profiles, '==', 1, "A single cubic norm profile");
+
+  my @quantile_norm_profiles =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [normalisation_method => 'quantile'],
+                                 [summary_type         => 'probe'],
+                                 [summary_group        => 'sample']);
+  cmp_ok(scalar @quantile_norm_profiles, '==', 1,
+         "A single quantile norm profile");
+
+  my @profile_annotation =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [summary_type => 'annotation']);
+  cmp_ok(scalar @profile_annotation, '==', 1,
+         "A single annotation file");
 
   my @sample_data =
     $irods->find_objects_by_meta("$irods_tmp_coll/infinium",

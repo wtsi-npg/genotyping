@@ -3,7 +3,10 @@ use utf8;
 
 use strict;
 use warnings;
-use lib qw(.);
+
+# These paths are propagated to @INC in the build script. The 't'
+# directory is added because the Test::Class tests are there.
+use lib qw(. t);
 
 use Module::Build;
 use Build;
@@ -15,8 +18,6 @@ my $build = Build->new
    dist_abstract   => 'WTSI genotyping data management tools',
    dist_version    => Build->git_tag,
    license         => 'gpl',
-   use_tap_harness => 1,
-   tap_harness_args => {lib => ['./blib/lib', './blib/arch', './t']},
    requires => {'Carp'             => 0,
                 'TAP::Harness'     => 0,
                 'Test::Class'      => 0,
