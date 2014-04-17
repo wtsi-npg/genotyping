@@ -109,8 +109,9 @@ our $IMV     = 'imv';
 our $IPUT    = 'iput';
 our $IRM     = 'irm';
 our $IPWD    = 'ipwd';
-# our $ICHMOD  = 'ichmod';
 our $MD5SUM  = 'md5sum';
+
+our $GROUP_PREFIX = 'ss_';
 
 our @VALID_PERMISSIONS = qw(null read write own);
 
@@ -193,7 +194,7 @@ sub find_zone_name {
 sub make_group_name {
   my ($self, $study_id) = @_;
 
-  return "ss_" . $study_id;
+  return $GROUP_PREFIX . $study_id;
 }
 
 =head2 list_groups
@@ -545,6 +546,36 @@ sub set_collection_permissions {
   }
 
   return $collection;
+}
+
+=head2 get_collection_groups
+
+  Arg [1]    : iRODS data collection path
+  Arg [2]    : permission Str, one of 'null', 'read', 'write' or 'own',
+               optional
+
+  Example    : $irods->get_collection_groups($path)
+  Description: Return a list of the data access groups in the collection's ACL.
+               If a permission leve argument is supplied, only groups with
+               that level of access will be returned.
+  Returntype : Array
+
+=cut
+
+sub get_collection_groups {
+  my ($self, $collection, $level) = @_;
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  my @perms = $self->get_collection_permissions($collection);
+  if ($level) {
+    @perms = grep { $_->{level} eq $perm_str } @perms;
+  }
+
+  return sort grep { m{^$GROUP_PREFIX} } map { $_->{owner} } @perms;
 }
 
 =head2 get_collection_meta
@@ -940,6 +971,36 @@ sub set_object_permissions {
   }
 
   return $object;
+}
+
+=head2 get_object_groups
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : permission Str, one of 'null', 'read', 'write' or 'own',
+               optional
+
+  Example    : $irods->get_object_groups($path)
+  Description: Return a list of the data access groups in the object's ACL.
+               If a permission leve argument is supplied, only groups with
+               that level of access will be returned.
+  Returntype : Array
+
+=cut
+
+sub get_object_groups {
+  my ($self, $object, $level) = @_;
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  my @perms = $self->get_object_permissions($object);
+  if ($level) {
+    @perms = grep { $_->{level} eq $perm_str } @perms;
+  }
+
+  return sort grep { m{^$GROUP_PREFIX} } map { $_->{owner} } @perms;
 }
 
 =head2 get_object_meta

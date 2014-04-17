@@ -11,7 +11,7 @@ use List::AllUtils qw(all any none);
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 135;
+use Test::More tests => 147;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -159,7 +159,31 @@ sub set_object_permissions : Test(6) {
   ok($r2, 'Removed public read access');
 }
 
-sub get_colleciotn_permissions : Test(1) {
+sub get_object_groups : Test(6) {
+   my $irods = WTSI::NPG::iRODS->new;
+   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
+
+   ok($irods->set_object_permissions('read', 'public', $lorem_object));
+   ok($irods->set_object_permissions('read', 'ss_0',   $lorem_object));
+   ok($irods->set_object_permissions('read', 'ss_10',  $lorem_object));
+
+   my $expected_all = ['ss_0', 'ss_10'];
+   my @found_all  = $irods->get_object_groups($lorem_object);
+   is_deeply(\@found_all, $expected_all, 'Expected all groups')
+     or diag explain \@found_all;
+
+   my $expected_read = ['ss_0', 'ss_10'];
+   my @found_read = $irods->get_object_groups($lorem_object, 'read');
+   is_deeply(\@found_read, $expected_read, 'Expected read groups')
+     or diag explain \@found_read;
+
+   my $expected_own = [];
+   my @found_own  = $irods->get_object_groups($lorem_object, 'own');
+   is_deeply(\@found_own, $expected_own, 'Expected own groups')
+     or diag explain \@found_own;
+}
+
+sub get_collection_permissions : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
   my $coll = "$irods_tmp_coll/irods";
 
@@ -194,6 +218,30 @@ sub set_collection_permissions : Test(6) {
                   exists $_->{level} && $_->{level} eq 'read' }
     $irods->get_collection_permissions($coll);
   ok($r2, 'Removed public read access');
+}
+
+sub get_collection_groups : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll = "$irods_tmp_coll/irods";
+
+  ok($irods->set_collection_permissions('read', 'public', $coll));
+  ok($irods->set_collection_permissions('read', 'ss_0',   $coll));
+  ok($irods->set_collection_permissions('read', 'ss_10',  $coll));
+
+  my $expected_all = ['ss_0', 'ss_10'];
+  my @found_all  = $irods->get_collection_groups($coll);
+  is_deeply(\@found_all, $expected_all, 'Expected all groups')
+    or diag explain \@found_all;
+
+  my $expected_read = ['ss_0', 'ss_10'];
+  my @found_read = $irods->get_collection_groups($coll, 'read');
+  is_deeply(\@found_read, $expected_read, 'Expected read groups')
+    or diag explain \@found_read;
+
+  my $expected_own = [];
+  my @found_own  = $irods->get_collection_groups($coll, 'own');
+  is_deeply(\@found_own, $expected_own, 'Expected own groups')
+    or diag explain \@found_own;
 }
 
 sub list_collection : Test(5) {

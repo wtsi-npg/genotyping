@@ -217,7 +217,7 @@ sub publish {
       $analysis_coll->add_avu($attribute, $value, $units);
     }
 
-    my @groups = $analysis_coll->expected_irods_groups;
+    my @groups = $analysis_coll->expected_groups;
     $analysis_coll->set_content_permissions('read', @groups);
   };
 

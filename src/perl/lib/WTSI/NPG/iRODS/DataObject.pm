@@ -6,6 +6,7 @@ package WTSI::NPG::iRODS::DataObject;
 use JSON;
 use File::Spec;
 use Moose;
+use Set::Scalar;
 
 use WTSI::NPG::iRODS;
 
@@ -325,6 +326,33 @@ sub set_permissions {
   }
 
   return $self;
+}
+
+sub get_groups {
+  my ($self, $level) = @_;
+
+  $self->irods->get_object_groups($self->str, $level);
+}
+
+sub update_group_permissions {
+  my ($self) = @_;
+
+  # Record the current group permissions
+  my @groups_permissions = $self->get_groups('read');
+  my @groups_annotated = $self->expected_groups;
+
+  $self->debug("Permissions before: [", join(", ", @groups_permissions), "]");
+  $self->debug("Updated annotations: [", join(", ", @groups_annotated), "]");
+
+  my $perms = Set::Scalar->new(@groups_permissions);
+  my $annot = Set::Scalar->new(@groups_annotated);
+  my @to_remove = $perms->difference($annot)->members;
+  my @to_add    = $annot->difference($perms)->members;
+
+  $self->debug("Groups to remove: [", join(', ', @to_remove), "]");
+  $self->set_permissions('null', @to_remove);
+  $self->debug("Groups to add: [", join(', ', @to_add), "]");
+  $self->set_permissions('read', @to_add);
 }
 
 =head2 str

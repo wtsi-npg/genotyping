@@ -10,7 +10,7 @@ use List::AllUtils qw(all any none);
 use Log::Log4perl;
 
 use base qw(Test::Class);
-use Test::More tests => 48;
+use Test::More tests => 54;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -263,6 +263,31 @@ sub set_permissions : Test(5) {
                   exists $_->{level} && $_->{level} eq 'read' }
     $obj->get_permissions;
   ok($r2, 'Removed public read access');
+}
+
+sub get_groups : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  ok($irods->set_object_permissions('read', 'public', $obj_path));
+  ok($irods->set_object_permissions('read', 'ss_0',   $obj_path));
+  ok($irods->set_object_permissions('read', 'ss_10',  $obj_path));
+
+  my $expected_all = ['ss_0', 'ss_10'];
+  my @found_all  = $obj->get_groups;
+  is_deeply(\@found_all, $expected_all, 'Expected all groups')
+    or diag explain \@found_all;
+
+  my $expected_read = ['ss_0', 'ss_10'];
+  my @found_read = $obj->get_groups('read');
+  is_deeply(\@found_read, $expected_read, 'Expected read groups')
+    or diag explain \@found_read;
+
+  my $expected_own = [];
+  my @found_own  = $obj->get_groups('own');
+  is_deeply(\@found_own, $expected_own, 'Expected own groups')
+    or diag explain \@found_own;
 }
 
 1;

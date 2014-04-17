@@ -14,9 +14,9 @@ extends 'WTSI::NPG::Database';
 with 'WTSI::NPG::Cacheable';
 
 # Method names for MOP operations
-our $FIND_SEQUENOM_PLATE_ID = 'find_sequenom_plate_id';
-our $FIND_PLATE_STATUS      = 'find_plate_status';
-our $FIND_WELL_STATUS       = 'find_well_status';
+our $FIND_SEQUENOM_PLATE_ID  = 'find_sequenom_plate_id';
+our $FIND_PLATE_STATUS       = 'find_plate_status';
+our $FIND_PLATE_WELLS_STATUS = '_find_plate_wells_status';
 
 our $PLATE_STATUS_GENOTYPING_DONE   = 'Genotyping Done';
 our $PLATE_STATUS_GENOTYPING_FAILED = 'Genotyping Failed';
@@ -360,24 +360,6 @@ sub find_well_failed {
   return $status eq $WELL_STATUS_GENOTYPING_FAILED;
 }
 
-around $FIND_WELL_STATUS => sub {
-  my ($orig, $self, $plate_name, $map) = @_;
-
-  defined $plate_name or
-    $self->logconfess('A defined plate_name argument is required');
-  $plate_name or
-    $self->logconfess('A non-empty plate_name argument is required');
-
-  defined $map or $self->logconfess('A defined map argument is required');
-  $map or $self->logconfess('A non-empty map argument is required');
-
-  my $cache = $self->get_method_cache($meta->get_method($FIND_WELL_STATUS),
-                                      {default_expires_in => 60});
-  my $key = $plate_name . $map;
-
-  return $self->get_with_cache($cache, $key, $orig, $plate_name, $map);
-};
-
 =head2 find_well_status
 
   Arg [1]    : A plate name from the Sequenom LIMS
@@ -409,6 +391,22 @@ sub find_well_status {
     return $self->_find_plate_wells_status($plate_name)->{$map};
   }
 }
+
+# Reduce database access to one hit per plate
+around $FIND_PLATE_WELLS_STATUS => sub {
+  my ($orig, $self, $plate_name) = @_;
+
+  defined $plate_name or
+    $self->logconfess('A defined plate_name argument is required');
+  $plate_name or
+    $self->logconfess('A non-empty plate_name argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_PLATE_WELLS_STATUS), {default_expires_in => 180});
+  my $key = $plate_name;
+
+  return $self->get_with_cache($cache, $key, $orig, $plate_name);
+};
 
 sub _find_plate_wells_status {
   my ($self, $plate_name) = @_;
