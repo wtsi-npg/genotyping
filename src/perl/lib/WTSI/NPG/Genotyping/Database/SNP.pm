@@ -3,6 +3,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Database::SNP;
 
+use Cache::Cache qw($EXPIRES_NEVER);
 use Moose;
 
 use WTSI::NPG::Genotyping::Call;
@@ -196,6 +197,68 @@ sub find_sequenom_calls {
   }
 
   return \%result;
+}
+
+=head2 find_updated_plate_names
+
+  Arg [1]    : start DateTime
+  Arg [2]    : end DateTime. Optional, defaults to start
+
+  Example    : $db->find_updated_plate_names($then, $now)
+  Description: Returns a list of names of plates whose status has been set
+               to its current value between start and end dates, inclusive.
+               Only the date part of the DateTime arguments is significant;
+               these arguments are cloned and truncated prior to
+               comparison.
+  Returntype : ArrayRef[Str]
+
+=cut
+
+sub find_updated_plate_names {
+  my ($self, $start_date, $end_date) = @_;
+
+  defined $start_date or
+    $self->logconfess('The start_date argument was undefined');
+
+  $end_date ||= $start_date;
+
+  my $start = $start_date->clone->truncate(to => 'day');
+  my $end   = $end_date->clone->truncate(to => 'day');
+
+  # Note the DISTINCT; it appears that the plate can be entered
+  # multiple times with the same and can have multiple "current"
+  # statuses (which should all be the same).
+  my $query =
+    qq(SELECT DISTINCT
+         dp.plate_name
+       FROM
+         dna_plate          dp,
+         dnaplate_status    dps,
+         dnaplatestatusdict dpsd,
+         dptypedict         dptd
+       WHERE
+           trunc(dps.status_date) >= to_date(?, 'YYYY-MM-DD')
+       AND trunc(dps.status_date) <= to_date(?, 'YYYY-MM-DD')
+       AND dp.id_dnaplate   = dps.id_dnaplate
+       AND dp.plate_type    = dptd.id_dict
+       AND dptd.description = 'mspec'
+       AND dps.is_current   = 1
+       AND dps.status       = dpsd.id_dict);
+
+  if ($start->compare($end) > 0) {
+    $self->logconfess("Start date '$start' was after end date '$end'");
+  }
+
+  $self->trace("Executing: '$query' with args [$start, $end]");
+  my $sth = $self->dbh->prepare($query);
+  $sth->execute($start->ymd('-'), $end->ymd('-'));
+
+  my @plates;
+  while (my $row = $sth->fetchrow_arrayref) {
+    push(@plates, $row->[0]);
+  }
+
+  return \@plates;
 }
 
 =head2 find_plate_passed

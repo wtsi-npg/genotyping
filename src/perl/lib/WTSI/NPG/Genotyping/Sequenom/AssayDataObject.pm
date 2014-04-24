@@ -19,21 +19,6 @@ sub update_secondary_metadata {
   $self->debug("Found plate well '$plate_name': '$well' in ",
                "current metadata of '", $self->str, "'");
 
-  my @meta; # The new metadata
-
-  # Get well manual QC status from the SNP database.
-  my $manual_qc = $self->find_manual_qc_status($snpdb, $plate_name, $well);
-  if (defined $manual_qc) {
-    $self->debug("Found manual QC '$manual_qc' on '$plate_name : $well' for '",
-                 $self->str, "'");
-
-    push @meta, $self->make_manual_qc_metadata($manual_qc);
-  }
-  else {
-    $self->debug("No manual QC information on '$plate_name : $well' for '",
-                 $self->str, "'");
-  }
-
   # Identify the plate via the SNP database.  It would be preferable
   # to look up directly in the warehouse.  However, the warehouse does
   # not contain tracking information on Sequenom plates.
@@ -53,7 +38,7 @@ sub update_secondary_metadata {
                 "'$plate_name' (ID $plate_id) well '$well'");
 
     # Supersede all the secondary metadata with new values
-    push @meta, $self->make_sample_metadata($ss_sample);
+    my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);
     }
@@ -68,7 +53,37 @@ sub update_secondary_metadata {
   return $self;
 }
 
-sub find_manual_qc_status {
+sub update_qc_metadata {
+  my ($self, $snpdb) = @_;
+
+  my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
+  my $plate_name = $sequenom_plate_avu->{value};
+  my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
+  my $well = $well_avu->{value};
+
+  # Get well manual QC status from the SNP database.
+  my $manual_qc = $self->_find_manual_qc_status($snpdb, $plate_name, $well);
+  if (defined $manual_qc) {
+    $self->debug("Found manual QC '$manual_qc' on '$plate_name : $well' for '",
+                 $self->str, "'");
+
+    $self->info("Updating manual QC metadata for '", $self->str,
+                "' from plate '$plate_name' well '$well'");
+
+    my @meta = $self->make_manual_qc_metadata($manual_qc);
+    foreach my $avu (@meta) {
+      $self->supersede_avus(@$avu);
+    }
+  }
+  else {
+    $self->debug("No manual QC information on '$plate_name : $well' for '",
+                 $self->str, "'");
+  }
+
+  return $self;
+}
+
+sub _find_manual_qc_status {
   my ($self, $snpdb, $plate_name, $well) = @_;
 
   my $status;

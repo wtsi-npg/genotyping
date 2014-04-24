@@ -1125,7 +1125,8 @@ sub remove_object_avu {
                                             ['id' => 'ABCD1234'])
   Description: Find objects by their metadata, restricted to a parent
                collection.
-               Return a list of collections.
+               Return a list of objects, sorted by their data object name
+               component.
   Returntype : Array
 
 =cut
@@ -1152,6 +1153,7 @@ sub find_objects_by_meta {
   my @results;
   my $coll;
   my $obj;
+
   foreach my $row (@raw_results) {
     if ($row =~ m{^----$}) {
       next;
@@ -1164,19 +1166,24 @@ sub find_objects_by_meta {
 
       unless ($coll) {
         $self->logconfess("Failed to parse imeta output; missing collection ",
-                          "in [", join(', ', @raw_results), "]");
+                          "got object '$obj'");
       }
 
-      $self->debug("Found object (to filter by '$root') '$coll/$obj'");
-
-      push @results, "$coll/$obj";
+      push @results, ["$coll", "$obj"];
       undef $coll;
       undef $row;
     }
   }
 
+  $self->debug("Found ", scalar @results, " objects (to filter by '$root')");
+
+  my @sorted = map  { $_->[0] . '/' . $_->[1] }
+               sort { $a->[1] cmp $b->[1] } @results;
+
+  $self->debug("Sorted ", scalar @sorted, " objects (to filter by '$root')");
+
   # imeta doesn't permit filtering by path, natively.
-  return grep { /^$root/ } @results;
+  return grep { /^$root/ } @sorted;
 }
 
 =head2 calculate_checksum
