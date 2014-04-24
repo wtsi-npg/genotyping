@@ -342,20 +342,23 @@ sub find_plate_status {
     $self->logconfess('A non-empty plate_name argument is required');
 
   my $query =
-    qq(SELECT
-         dpsd.description
-       FROM
-         dna_plate          dp,
-         dnaplate_status    dps,
-         dnaplatestatusdict dpsd,
-         dptypedict         dptd
-       WHERE
-       dp.plate_name = ?
-       AND dp.id_dnaplate   = dps.id_dnaplate
-       AND dp.plate_type    = dptd.id_dict
-       AND dptd.description = 'mspec'
-       AND dps.is_current   = 1
-       AND dps.status       = dpsd.id_dict);
+    qq(SELECT description FROM
+         (SELECT
+            dpsd.description, dps.status_date
+          FROM
+            dna_plate          dp,
+            dnaplate_status    dps,
+            dnaplatestatusdict dpsd,
+            dptypedict         dptd
+          WHERE
+            dp.plate_name = ?
+          AND dp.id_dnaplate   = dps.id_dnaplate
+          AND dp.plate_type    = dptd.id_dict
+          AND dptd.description = 'mspec'
+          AND dps.is_current   = 1
+          AND dps.status       = dpsd.id_dict
+          ORDER BY dps.status_date DESC)
+        WHERE ROWNUM <= 1);
 
   $self->trace("Executing: '$query' with args [$plate_name]");
   my $sth = $self->dbh->prepare($query);
