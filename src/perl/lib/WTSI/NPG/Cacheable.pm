@@ -97,7 +97,9 @@ sub get_with_cache {
   }
   else {
     $value = $self->$method(@args);
-    $self->debug("Cache miss for $namespace : $key -> $value");
+
+    my $value_str = defined $value ? 'undef' : $value;
+    $self->debug("Cache miss for $namespace : $key -> $value_str");
     $cache->set($key, $value);
   }
 

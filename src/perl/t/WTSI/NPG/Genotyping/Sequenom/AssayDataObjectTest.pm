@@ -152,7 +152,6 @@ sub update_secondary_metadata : Test(4) {
 
   my $expected_meta =
     [{attribute => 'dcterms:identifier',      value => '0123456789'},
-     {attribute => 'manual_qc',               value => 1},
      {attribute => 'sample',                  value => 'sample1' },
      {attribute => 'sample_accession_number', value => 'A0123456789'},
      {attribute => 'sample_cohort',           value => 'AAA111222333'},
