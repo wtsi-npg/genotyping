@@ -100,7 +100,7 @@ sub run {
   my $relative_depth = 2;
 
   my @path = grep { $_ ne '' } File::Spec->splitdir($publish_dest);
-  my $reference_zone = shift @path;
+  my $reference_zone = '/' . shift @path;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              " results finished between ",
