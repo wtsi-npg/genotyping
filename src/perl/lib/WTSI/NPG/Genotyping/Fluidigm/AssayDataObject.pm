@@ -46,19 +46,13 @@ sub update_secondary_metadata {
     $self->info("Updating metadata for '", $self->str, "' from plate ",
                 "'$fluidigm_barcode' well '$well'");
 
-    # Revoke access from current groups
-    my @current_groups = $self->expected_irods_groups;
-    $self->set_permissions('null', @current_groups);
-
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
       $self->supersede_avus(@$avu);
     }
 
-    # Grant access to the new groups
-    my @groups = $self->expected_irods_groups;
-    $self->set_permissions('read', @groups);
+    $self->update_group_permissions;
   }
   else {
     $self->logcarp("Failed to update metadata for '", $self->str,

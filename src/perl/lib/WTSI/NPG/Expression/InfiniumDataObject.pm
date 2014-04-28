@@ -47,7 +47,7 @@ sub update_secondary_metadata {
       $self->add_avu(@$avu);
     }
 
-    my @groups = $self->expected_irods_groups;
+    my @groups = $self->expected_groups;
     $self->set_permissions('read', @groups);
   }
   else {
