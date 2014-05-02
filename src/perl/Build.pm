@@ -23,11 +23,11 @@ sub git_tag {
   }
 
   if (!$version) {
-    $version = `git describe`;
+    $version = `git describe --dirty --always`;
     chomp $version;
   }
 
-  unless ($version =~ /\d+\.\d+\.\d+$/) {
+  unless ($version =~ /^\d+\.\d+\.\d+$/) {
     warn "git version string $version not in canonical format, defaulting to $default";
     $version = $default;
   }
