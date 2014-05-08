@@ -6,17 +6,23 @@ use utf8;
 
   use strict;
   use warnings;
+  use Carp;
 
   use base 'WTSI::NPG::Database';
 
   sub find_fluidigm_sample_by_plate {
+    my ($self, $fluidigm_barcode, $well) = @_;
+
+    $well eq 'S01' or
+      confess "WarehouseStub expected well argument 'S01' but got '$well'";
+
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
-            supplier_name      => 'WTSI',
+            supplier_name      => 'aaaaaaaaaa',
             accession_number   => 'A0123456789',
             gender             => 'Female',
             cohort             => 'AAA111222333',
@@ -36,7 +42,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 7;
+use Test::More tests => 9;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -62,6 +68,16 @@ sub make_fixture : Test(setup) {
 
   $irods->add_object_avu($irods_path, 'fluidigm_plate', '1381735059');
   $irods->add_object_avu($irods_path, 'fluidigm_well', 'S01');
+
+  # Add some existing secondary metadata to be superseded
+  $irods->add_object_avu($irods_path, 'dcterms:identifier',   '9999999999');
+  $irods->add_object_avu($irods_path, 'study_id',             '10');
+  $irods->add_object_avu($irods_path, 'sample_consent',       '1');
+  $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
+
+  # Add some ss_ group permissions to be removed
+  $irods->set_object_permissions('read', 'ss_10',  $irods_path);
+  $irods->set_object_permissions('read', 'ss_100', $irods_path);
 }
 
 sub teardown : Test(teardown) {
@@ -89,7 +105,7 @@ sub metadata : Test(3) {
   ok(! defined $audience);
 }
 
-sub update_secondary_metadata : Test(2) {
+sub update_secondary_metadata : Test(4) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
@@ -98,6 +114,11 @@ sub update_secondary_metadata : Test(2) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
     (name => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
+
+  my $expected_groups_before = ['ss_10', 'ss_100'];
+  my @groups_before = $data_object->get_groups;
+  is_deeply(\@groups_before, $expected_groups_before, 'Groups before update')
+    or diag explain \@groups_before;
 
   ok($data_object->update_secondary_metadata($ssdb));
 
@@ -112,10 +133,16 @@ sub update_secondary_metadata : Test(2) {
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
      {attribute => 'sample_id',               value => '123456789'},
-     {attribute => 'sample_supplier_name',    value => 'WTSI'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
 
   my $meta = $data_object->metadata;
   is_deeply($meta, $expected_meta, 'Secondary metadata added')
     or diag explain $meta;
+
+  my $expected_groups_after = ['ss_0'];
+  my @groups_after = $data_object->get_groups;
+
+  is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
+    or diag explain \@groups_after;
 }

@@ -8,6 +8,7 @@ use File::Spec;
 use Moose;
 
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::NPG::iRODS::Path';
 
@@ -23,11 +24,31 @@ around 'metadata' => sub {
   return $self->$orig;
 };
 
+=head2 is_present
+
+  Arg [1]    : None
+
+  Example    : $path->is_present && print $path->str
+  Description: Return true if the collection exists in iRODS.
+  Returntype : WTSI::NPG::iRODS::Collection
+
+=cut
+
 sub is_present {
   my ($self) = @_;
 
   return $self->irods->list_collection($self->str);
 }
+
+=head2 absolute
+
+  Arg [1]    : None
+
+  Example    : $path->absolute
+  Description: Return the absolute path of the collection.
+  Returntype : WTSI::NPG::iRODS::Collection
+
+=cut
 
 sub absolute {
   my ($self) = @_;
@@ -109,14 +130,109 @@ sub remove_avu {
   return $self;
 }
 
-sub grant_group_access {
-  my ($self, $permission, @groups) = @_;
+=head2 get_contents
+
+  Arg [1]    : 
+
+  Example    : my ($objs, $cols) = $irods->get_contents($coll)
+  Description: Return the contents of the collection as two arrayrefs,
+               the first listing data objects, the second listing nested
+               collections.
+  Returntype : Array
+
+=cut
+
+sub get_contents {
+   my ($self, $recurse) = @_;
+
+   my $irods = $self->irods;
+   my $path = $self->str;
+   my ($objs, $colls) = $self->irods->list_collection($path, $recurse);
+
+   my @objects;
+   my @collections;
+
+   foreach my $obj (@$objs) {
+     push @objects, WTSI::NPG::iRODS::DataObject->new($irods, $obj);
+   }
+   foreach my $coll (@$colls) {
+     push @collections, WTSI::NPG::iRODS::Collection->new($irods, $coll);
+   }
+
+   return (\@objects, \@collections);
+}
+
+sub get_permissions {
+  my ($self) = @_;
 
   my $path = $self->str;
-  foreach my $group (@groups) {
-    $self->info("Giving group '$group' -r '$permission' access to '$path'");
-    $self->irods->set_group_access('-r', $permission, $group, $path);
+  return $self->irods->get_collection_permissions($path);
+}
+
+=head2 set_permissions
+
+  Arg [1]    : permission Str, one of 'null', 'read', 'write' or 'own'
+  Arg [2]    : Array of owners (users and /or groups).
+
+  Example    : $coll->set_permissions('read', 'user1', 'group1')
+  Description: Set access permissions on the collection. Return self.
+  Returntype : WTSI::NPG::iRODS::Collection
+
+=cut
+
+sub set_permissions {
+  my ($self, $permission, @owners) = @_;
+
+  my $perm_str = defined $permission ? $permission : 'null';
+
+  my $path = $self->str;
+  foreach my $owner (@owners) {
+    $self->info("Giving owner '$owner' '$perm_str' access to '$path'");
+    $self->irods->set_collection_permissions($perm_str, $owner, $path);
   }
+
+  return $self;
+}
+
+sub get_groups {
+  my ($self, $level) = @_;
+
+  $self->irods->get_collection_groups($self->str, $level);
+}
+
+=head2 set_content_permissions
+
+  Arg [1]    : permission Str, one of 'null', 'read', 'write' or 'own'
+  Arg [2]    : Array of owners (users and /or groups).
+
+  Example    : $coll->set_content_permissions('read', 'user1', 'group1')
+  Description: Recursively set access permissions on the collection and
+               its contents. Return self.
+  Returntype : WTSI::NPG::iRODS::Collection
+
+=cut
+
+sub set_content_permissions {
+  my ($self, $permission, @owners) = @_;
+
+  my $perm_str = defined $permission ? $permission : 'null';
+
+  my $path = $self->str;
+  my ($objects, $collections) = $self->irods->list_collection($path, 'RECURSE');
+
+ foreach my $owner (@owners) {
+   foreach my $object (@$objects) {
+     $self->info("Giving owner '$owner' '$permission' access to '$object'");
+     $self->irods->set_object_permissions($perm_str, $owner, $object);
+   }
+
+   foreach my $collection (@$collections) {
+     $self->info("Giving owner '$owner' '$permission' access to '$collection'");
+     $self->irods->set_collection_permissions($perm_str, $owner, $collection);
+   }
+ }
+
+  return $self;
 }
 
 =head2 str

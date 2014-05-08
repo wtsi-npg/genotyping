@@ -1,0 +1,6 @@
+Illumina Inc. GenomeStudio version 1.9.0
+Normalization = quantile
+Array Content = HumanHT-12_V4_0_R1_15002873_B.bgx.xml
+Error Model = none
+DateTime = 14/11/2013 10:35
+Local Settings = en-GB

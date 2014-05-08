@@ -60,6 +60,7 @@ Arguments:
     (requires config argument to be specified).
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
+    - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
 
 e.g.
 
@@ -84,14 +85,15 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size, :gender_method,
-                               :filterconfig, :nofilter)
+                               :select, :chunk_size, :fam_dummy, 
+                               :gender_method, :filterconfig, :nofilter)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest)
       chunk_size = args.delete(:chunk_size) || 2000
+      fam_dummy = args.delete(:fam_dummy) || -9
       gender_method = args.delete(:gender_method)
       gtconfig = args.delete(:config)
       fconfig = args.delete(:filterconfig) || nil
@@ -128,25 +130,18 @@ Returns:
       manifest_name = manifest_name+'.normalized.bpm.csv'
       manifest = normalize_manifest(manifest_raw, manifest_name, args)
 
-      ## run gencall QC to apply gencall CR filter and find genders
-      gcqcargs = {:run => run_name}.merge(args)
-      gcqcdir = File.join(work_dir, 'gencall_qc')
-      gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                  async, true)
-
-      ## apply filtering to pipeline DB, if required
-      filtered = nil
-      if gcquality
-        if nofilter
-          filtered = true
+      if nofilter
+        gcquality = true
+      else
+        ## run gencall QC to apply gencall CR filter and find genders
+        if fconfig
+          gcqcargs = {:run => run_name, :filter => fconfig}.merge(args)
         else
-          # maf/het and intensity metrics are not calculated (or required)
-          gcqcjson = File.join(gcqcdir, 'supplementary', 'qc_results.json')
-          if fconfig then fargs = {:thresholds => fconfig}.merge(args)
-          else fargs = {:illuminus => true}.merge(args)
-          end
-          filtered = filter_samples(gcqcjson, dbfile, fargs)
+          gcqcargs = {:run => run_name, :illuminus_filter => true}.merge(args)
         end
+        gcqcdir = File.join(work_dir, 'gencall_qc')
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
+                                    async, true)
       end
 
       ## use post-filter pipeline DB to generate sample JSON and .sim file
@@ -154,7 +149,7 @@ Returns:
         :gender_method => gender_method}.merge(args)
       smfile = nil
       cjson = nil
-      if filtered and manifest
+      if gcquality and manifest
         sjson = sample_intensities(dbfile, run_name, sjname, siargs)
         smargs = {:normalize => true }.merge(args)
         smfile = gtc_to_sim(sjson, manifest, smname, smargs, async)
@@ -185,9 +180,9 @@ Returns:
       end
 
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
-                                 sjson, njson, args, async)
+                                 sjson, njson, fam_dummy, args, async)
 
-      output = 'illuminus_qc'
+      output = File.join(work_dir, 'illuminus_qc')
       qcargs = {:run => run_name, :sim => smfile}.merge(args)
       ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
 

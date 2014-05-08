@@ -1,0 +1,8 @@
+[Header]
+GSGX Version	1.9.0
+Report Date	13/11/2013 17:26:25
+Project	hipsci_11samples_2013-11-13
+Group Set	groupset
+Analysis	groupset_nonorm_nobkgd
+Normalization	none
+[Control Probe Profile]

@@ -12,56 +12,93 @@ use File::Spec;
 
 use base 'Module::Build';
 
+# Git version code courtesy of Marina Gourtovaia <mg8@sanger.ac.uk>
+sub git_tag {
+  my $version;
+  my $default = '0.0.0';
+
+  unless (`which git`) {
+    warn "git command not found; cannot generate version string, defaulting to $default";
+    $version = $default;
+  }
+
+  if (!$version) {
+    $version = `git describe`;
+    chomp $version;
+  }
+
+  unless ($version =~ /\d+\.\d+\.\d+$/) {
+    warn "git version string $version not in canonical format, defaulting to $default";
+    $version = $default;
+  }
+
+  return $version;
+}
+
+sub ACTION_code {
+  my ($self) = @_;
+
+  $self->SUPER::ACTION_code;
+
+  my $version_file = 'blib/lib/WTSI/NPG/Genotyping/Version.pm';
+  my $gitver = $self->git_tag;
+
+  if (-e $version_file) {
+    warn "Changing version of WTSI::NPG::Genotyping::Version to $gitver\n";
+
+    my $backup  = '.original';
+    local $^I   = $backup;
+    local @ARGV = ($version_file);
+
+    while (<>) {
+      s/(\$VERSION\s*=\s*)('?\S+'?)\s*;/${1}'$gitver';/;
+      print;
+    }
+
+    unlink "$version_file$backup";
+  } else {
+    warn "File $version_file not found\n";
+  }
+}
+
 #
 # Prepare configuration for tests
 #
 sub ACTION_test {
-  my $self = shift;
+  my ($self) = @_;
 
   $self->copy_files_by_category('conf_files', './blib');
   $self->copy_files_by_category('ini_files', './blib');
 
-  $self->SUPER::ACTION_test;
+  {
+    # Ensure that the tests can see the Perl and R scripts
+    local $ENV{PATH} = "./bin:../r/bin:$ENV{PATH}";
+
+    $self->SUPER::ACTION_test;
+  }
 }
 
 #
-# Add targets to the build file.
+# Subclass the install action to include config and R files
 #
-sub ACTION_install_config {
-  my ($self) = @_;
+sub ACTION_install {
+    my ($self) = @_;
 
-  $self->process_conf_files;
-  $self->process_ini_files;
-
-  return $self;
-}
-
-sub ACTION_install_gendermix {
-    my $self = shift;
-    my $gendermix_manifest = './etc/gendermix_manifest.txt';
-    $self->process_alternate_manifest($gendermix_manifest);
+    $self->copy_files_by_category('conf_files', $self->install_base, 1);
+    $self->copy_files_by_category('ini_files', $self->install_base, 1);
+    $self->copy_files_by_category('R_files', $self->install_base, 1);
+    $self->SUPER::ACTION_install;
     return $self;
 }
 
-sub ACTION_install_R {
+#
+# Additional target to install gendermix standalone
+#
+sub ACTION_install_gendermix {
   my ($self) = @_;
-  $self->process_R_files;
+  my $gendermix_manifest = './etc/gendermix_manifest.txt';
+  $self->process_alternate_manifest($gendermix_manifest);
   return $self;
-}
-
-sub process_conf_files {
-  my ($self) = @_;
-  return $self->copy_files_by_category('conf_files', $self->install_base, 1);
-}
-
-sub process_ini_files {
-  my ($self) = @_;
-  return $self->copy_files_by_category('ini_files', $self->install_base, 1);
-}
-
-sub process_R_files {
-  my ($self) = @_;
-  return $self->copy_files_by_category('R_files', $self->install_base, 1);
 }
 
 sub process_alternate_manifest {
@@ -99,9 +136,10 @@ sub process_alternate_manifest {
 sub copy_files_by_category {
   my ($self, $category, $destination, $verbose) = @_;
 
+  print STDERR "Installing category $category\n" if $verbose;
+
   # This is horrible - there must be a better way
-  if ($self->current_action eq 'install_config' ||
-      $self->current_action eq 'install_R' ||
+  if ($self->current_action eq 'install' ||
       $self->current_action eq 'test') {
     my $translations = $self->{properties}->{$category};
 
@@ -120,6 +158,5 @@ sub copy_files_by_category {
     return @installed;
   }
 }
-
 
 1;

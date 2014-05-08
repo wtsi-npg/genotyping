@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/decode_json defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median mergeJsonResults parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleInclusion readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 use vars qw/$UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
@@ -172,41 +172,6 @@ sub median {
     return $inputs[$mid];
 }
 
-sub mergeJsonResults {
-    # merge qc_results.json format files
-    # result is a hash (indexed by sample) of hashes (indexed by metric)
-    # use to include results of MAF/het calculation from plinktools
-    my @inPaths = @{ shift() };
-    my $outPath = shift;
-    my @results;
-    foreach my $inPath (@inPaths) {
-        my %result = %{decode_json(readFileToString($inPath))};
-        push @results, \%result;
-    }
-    my %merged = %{$results[0]};
-    for (my $i=1;$i<@results;$i++) {
-        if (!hashKeysEqual($results[0], $results[$i])) {
-            croak('Samples not identical for '.$inPaths[0].' and '
-                  .$inPaths[$i]);
-        }
-        my %result = %{$results[$i]};
-        foreach my $name (keys %result) {
-            my %sampleOld = %{$merged{$name}};
-            my %sampleNew = %{$result{$name}};
-            foreach my $metric (keys %sampleNew) {
-                if ($sampleOld{$metric}) {
-                    croak("Refusing to overwrite metric key $metric");
-                }
-                $sampleOld{$metric} = $sampleNew{$metric};
-            }
-            $merged{$name} = \%sampleOld;
-        }
-    }
-    open my $out, ">", $outPath || croak "Cannot open output $outPath";
-    print $out encode_json(\%merged);
-    close $out || croak "Cannot close output $outPath";
-}
-
 sub numeric {
     return $a <=> $b;
 }
@@ -216,17 +181,12 @@ sub openDatabase {
     my $dbfile = shift;
     my $inifile = shift;
     $inifile ||= defaultPipelineDBConfig();
-    my $start = getcwd;
-    # very hacky, but ensures paths in .ini file interpreted correctly
-    my $etc_dir = defaultConfigDir($inifile);
-    chdir($etc_dir."/.."); # parent of "etc" directory
     my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
 	 inifile => $inifile,
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;
-    chdir $start;
     return $db;
 }
 

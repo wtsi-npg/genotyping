@@ -99,9 +99,13 @@ sub run {
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
+  my @path = grep { $_ ne '' } File::Spec->splitdir($publish_dest);
+  my $reference_zone = '/' . shift @path;
+
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              " results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
+  $log->info("Using reference zone '$reference_zone'");
 
   foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
                                 $dir_regex)) {
@@ -112,6 +116,7 @@ sub run {
     my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
       (publication_time => $now,
        resultset        => $resultset,
+       reference_zone   => $reference_zone,
        logger           => $log);
     $publisher->irods->logger($log);
 

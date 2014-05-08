@@ -6,9 +6,11 @@ package WTSI::NPG::iRODS::DataObjectTest;
 use strict;
 use warnings;
 use File::Spec;
+use List::AllUtils qw(all any none);
+use Log::Log4perl;
 
 use base qw(Test::Class);
-use Test::More tests => 37;
+use Test::More tests => 54;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -194,6 +196,30 @@ sub remove_avu : Test(5) {
   is_deeply($meta, $expected_meta,
             'DataObject metadata AVUs removed 2') or diag explain $meta;
 }
+sub supersede_avus : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $expected_meta = [{attribute => 'a', value => 'new_a'},
+                       {attribute => 'b', value => 'new_b', units => 'km'},
+                       {attribute => 'c', value => 'x', units => 'cm'},
+                       {attribute => 'c', value => 'y'}];
+
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  ok($obj->supersede_avus('a' => 'new_a'));
+  ok($obj->supersede_avus('b' => 'new_b', 'km'));
+
+  my $meta = $obj->metadata;
+  is_deeply($meta, $expected_meta,
+            'DataObject metadata AVUs superseded 1') or diag explain $meta;
+
+  # Flush the cache to re-read from iRODS
+  $obj->clear_metadata;
+
+  $meta = $obj->metadata;
+  is_deeply($meta, $expected_meta,
+            'DataObject metadata AVUs superseded 2') or diag explain $meta;
+}
 
 sub str : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
@@ -201,6 +227,67 @@ sub str : Test(1) {
 
   my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
   is($obj->str, $obj_path, 'DataObject string');
+}
+
+sub get_permissions : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  my $perms = all { exists $_->{owner} &&
+                    exists $_->{level} }
+   $obj->get_permissions;
+  ok($perms, 'Permissions obtained');
+}
+
+sub set_permissions : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  my $r0 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r0, 'No public read access');
+
+  ok($obj->set_permissions('read', 'public'));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r1, 'Added public read access');
+
+  ok($obj->set_permissions(undef, 'public'));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $obj->get_permissions;
+  ok($r2, 'Removed public read access');
+}
+
+sub get_groups : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $obj_path = "$irods_tmp_coll/irods_path_test/test_dir/test_file.txt";
+  my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $obj_path);
+
+  ok($irods->set_object_permissions('read', 'public', $obj_path));
+  ok($irods->set_object_permissions('read', 'ss_0',   $obj_path));
+  ok($irods->set_object_permissions('read', 'ss_10',  $obj_path));
+
+  my $expected_all = ['ss_0', 'ss_10'];
+  my @found_all  = $obj->get_groups;
+  is_deeply(\@found_all, $expected_all, 'Expected all groups')
+    or diag explain \@found_all;
+
+  my $expected_read = ['ss_0', 'ss_10'];
+  my @found_read = $obj->get_groups('read');
+  is_deeply(\@found_read, $expected_read, 'Expected read groups')
+    or diag explain \@found_read;
+
+  my $expected_own = [];
+  my @found_own  = $obj->get_groups('own');
+  is_deeply(\@found_own, $expected_own, 'Expected own groups')
+    or diag explain \@found_own;
 }
 
 1;

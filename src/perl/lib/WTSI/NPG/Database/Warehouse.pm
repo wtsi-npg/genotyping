@@ -6,7 +6,16 @@ package WTSI::NPG::Database::Warehouse;
 use Carp;
 use Moose;
 
+use WTSI::NPG::Utilities qw(depad_well);
+
 extends 'WTSI::NPG::Database';
+
+with 'WTSI::NPG::Cacheable';
+
+# Method names for MOP operations
+our $FIND_SAMPLE_BY_PLATE = 'find_sample_by_plate';
+
+my $meta = __PACKAGE__->meta;
 
 =head2 find_plate
 
@@ -40,6 +49,7 @@ sub find_plate {
   my ($self, $plate_id) = @_;
 
   defined $plate_id or $self->logconfess('The plate_id argument was undefined');
+  $plate_id or $self->logconfess('The plate_id argument was empty');
 
   my $query =
     qq(SELECT
@@ -84,14 +94,33 @@ sub find_plate {
   return \%plate;
 }
 
+around $FIND_SAMPLE_BY_PLATE => sub {
+  my ($orig, $self, $plate_id, $map) = @_;
+
+  defined $plate_id or
+    $self->logconfess('A defined plate_id argument is required');
+  $plate_id or $self->logconfess('A non-empty plate_id argument is required');
+
+  defined $map or $self->logconfess('A defined map argument is required');
+  $map or $self->logconfess('A non-empty map argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_SAMPLE_BY_PLATE), {default_expires_in => 600});
+  my $key = $plate_id . $map;
+
+  return $self->get_with_cache($cache, $key, $orig, $plate_id, $map);
+};
+
 sub find_sample_by_plate {
   my ($self, $plate_id, $map) = @_;
 
   defined $plate_id or $self->logconfess('The plate_id argument was undefined');
-  defined $map or $self->logconfess('The map argument was undefined');
+  $plate_id or $self->logconfess('The plate_id argument was empty');
 
-  my $unpadded_map = $map;
-  $unpadded_map =~ s/0//;
+  defined $map or $self->logconfess('The map argument was undefined');
+  $map or $self->logconfess('The map argument was empty');
+
+  my $unpadded_map = depad_well($map);
 
   my $query =
     qq(SELECT
@@ -140,6 +169,8 @@ sub find_sample_by_plate {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
+  $self->debug("Found 1 sample in plate ID '$plate_id' ''$unpadded_map");
+
   return shift @samples;
 }
 
@@ -176,6 +207,8 @@ sub find_infinium_plate {
 
   defined $infinium_barcode or
     $self->logconfess('The infinium_barcode argument was undefined');
+  $infinium_barcode or
+    $self->logconfess('The infinium_barcode argument was empty');
 
   my $query =
     qq(SELECT
@@ -217,6 +250,8 @@ sub find_infinium_plate {
     $plate{$row->{map}} = $row;
   }
 
+  $self->debug("Found Infinium plate '$infinium_barcode'");
+
   return \%plate;
 }
 
@@ -225,10 +260,13 @@ sub find_infinium_sample_by_plate {
 
   defined $infinium_barcode or
     $self->logconfess('The infinium_barcode argument was undefined');
-  defined $map or $self->logconfess('The map argument was undefined');
+  $infinium_barcode or
+    $self->logconfess('The infinium_barcode argument was empty');
 
-  my $unpadded_map = $map;
-  $unpadded_map =~ s/0//;
+  defined $map or $self->logconfess('The map argument was undefined');
+  $map or $self->logconfess('The map argument was empty');
+
+  my $unpadded_map = depad_well($map);
 
   my $query =
     qq(SELECT
@@ -276,6 +314,8 @@ sub find_infinium_sample_by_plate {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
+  $self->debug("Found 1 Infinium sample in '$infinium_barcode' '$unpadded_map'");
+
   return shift @samples;
 }
 
@@ -285,6 +325,7 @@ sub find_infinium_gex_sample {
   defined $plate_barcode or
     $self->logconfess("The plate_barcode argument was undefined");
   defined $map or $self->logconfess("The map argument was undefined");
+  $map or $self->logconfess('The map argument was empty');
 
   my ($barcode_prefix, $barcode) =
     $plate_barcode =~ /^([A-Z]{2})([0-9]+)[A-Z]$/;
@@ -347,6 +388,8 @@ sub find_infinium_gex_sample {
                       "were returned where 1 was expected");
   }
 
+  $self->debug("Found 1 GEX sample in '$plate_barcode' '$map'");
+
   return shift @samples;
 }
 
@@ -355,6 +398,8 @@ sub find_infinium_gex_sample_by_sanger_id {
 
   defined $sanger_sample_id or
     $self->logconfess("The sanger_sample_id argument was undefined");
+  $sanger_sample_id or
+    $self->logconfess("The sanger_sample_id argument was empty");
 
   my $query =
     qq(SELECT DISTINCT
@@ -404,6 +449,8 @@ sub find_infinium_gex_sample_by_sanger_id {
                       "were returned where 1 was expected");
   }
 
+  $self->debug("Found 1 GEX sample for '$sanger_sample_id'");
+
   return shift @samples;
 }
 
@@ -440,6 +487,8 @@ sub find_fluidigm_plate {
 
   defined $fluidigm_barcode or
     $self->logconfess("The fluidigm_barcode argument was undefined");
+  $fluidigm_barcode or
+    $self->logconfess("The fluidigm_barcode argument was empty");
 
   my $query =
     qq(SELECT
@@ -481,6 +530,8 @@ sub find_fluidigm_plate {
     $plate{$row->{map}} = $row;
   }
 
+  $self->debug("Found Fluidigm plate '$fluidigm_barcode'");
+
   return \%plate;
 }
 
@@ -518,7 +569,11 @@ sub find_fluidigm_sample_by_plate {
 
   defined $fluidigm_barcode or
     $self->logconfess("The fluidigm_barcode argument was undefined");
+  $fluidigm_barcode or
+    $self->logconfess("The fluidigm_barcode argument was empty");
+
   defined $map or $self->logconfess("The map argument was undefined");
+  $map or $self->logconfess("The map argument was empty");
 
   my $query =
     qq(SELECT
@@ -566,40 +621,9 @@ sub find_fluidigm_sample_by_plate {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
+  $self->debug("Found 1 Fluidigm sample in '$fluidigm_barcode' '$map'");
+
   return shift @samples;
-}
-
-sub find_sample_studies {
-  my ($self, $sample_id) = @_;
-
-  $self->logwarn('Warehouse::find_sample_studies is deprecated');
-
-  my $query =
-    qq(SELECT DISTINCT
-         st.internal_id,
-         st.name,
-         st.accession_number,
-         st.study_title,
-         st.study_type
-      FROM
-         current_samples sm,
-         current_study_samples ss,
-         current_studies st
-       WHERE
-         sm.internal_id = ?
-         AND ss.sample_internal_id = sm.internal_id
-         AND st.internal_id = ss.study_internal_id);
-
-  $self->trace("Executing: '$query' with arg [$sample_id]");
-  my $sth = $self->dbh->prepare($query);
-  $sth->execute($sample_id);
-
-  my @studies;
-  while (my $row = $sth->fetchrow_hashref) {
-    push(@studies, $row);
-  }
-
-  return \@studies;
 }
 
 sub find_study_title {

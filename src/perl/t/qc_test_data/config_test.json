@@ -1,0 +1,20 @@
+{ "input_names": {"heterozygosity":"sample_cr_het.txt",
+                  "call_rate":"sample_cr_het.txt",
+                  "xydiff":"xydiff.txt",
+                  "identity":"identity_check.json",
+                  "duplicate":"duplicate_full.txt.gz",
+                  "gender":"sample_xhet_gender.txt",
+                  "magnitude":"magnitude.txt",
+		  "het_by_maf":"small_test_maf_het.json"},
+   "Metrics_thresholds" : {
+      "heterozygosity" : 3,
+      "low_maf_het" : 3,
+      "high_maf_het" : 3,
+      "gender" : "NA",
+      "identity" : 0.9,
+      "magnitude" : 0.9,
+      "xydiff" : 3,
+      "duplicate" : 0.98,
+      "call_rate" : 0.95
+   }
+}

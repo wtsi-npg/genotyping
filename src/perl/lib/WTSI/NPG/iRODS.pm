@@ -1,17 +1,19 @@
-
 use utf8;
 
 package WTSI::NPG::iRODS;
 
+use Encode qw(decode);
 use English;
 use File::Basename qw(basename);
 use File::Spec;
 use JSON;
+use List::AllUtils qw(any);
 use Moose;
 
 use WTSI::NPG::iRODS::Lister;
 use WTSI::NPG::iRODS::MetaLister;
 use WTSI::NPG::iRODS::MetaModifier;
+use WTSI::NPG::iRODS::ACLModifier;
 use WTSI::NPG::Runnable;
 
 with 'WTSI::NPG::Loggable';
@@ -37,7 +39,10 @@ has 'lister' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::Lister->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        max_size    => 1024 * 1204,
+        arguments   => ['--acl'],
+        logger      => $self->logger)->start;
    });
 
 has 'meta_lister' =>
@@ -49,7 +54,8 @@ has 'meta_lister' =>
      my ($self) = @_;
 
      return WTSI::NPG::iRODS::MetaLister->new
-       (environment => $self->environment)->start;
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_adder' =>
@@ -62,7 +68,8 @@ has 'meta_adder' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'add'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 has 'meta_remover' =>
@@ -75,20 +82,38 @@ has 'meta_remover' =>
 
      return WTSI::NPG::iRODS::MetaModifier->new
        (arguments   => ['--operation', 'rem'],
-        environment => $self->environment)->start;
+        environment => $self->environment,
+        logger      => $self->logger)->start;
+   });
+
+has 'acl_modifier' =>
+  (is         => 'ro',
+   isa      => 'WTSI::NPG::iRODS::ACLModifier',
+   required => 1,
+   lazy     => 1,
+   default  => sub {
+     my ($self) = @_;
+
+     return WTSI::NPG::iRODS::ACLModifier->new
+       (environment => $self->environment,
+        logger      => $self->logger)->start;
    });
 
 our $IGROUPADMIN = 'igroupadmin';
-our $ICD = 'icd';
+our $ICD     = 'icd';
 our $ICHKSUM = 'ichksum';
-our $IMETA = 'imeta';
-our $IMKDIR = 'imkdir';
-our $IMV = 'imv';
-our $IPUT = 'iput';
-our $IRM = 'irm';
-our $IPWD = 'ipwd';
-our $ICHMOD = 'ichmod';
-our $MD5SUM = 'md5sum';
+our $IGET    = 'iget';
+our $IMETA   = 'imeta';
+our $IMKDIR  = 'imkdir';
+our $IMV     = 'imv';
+our $IPUT    = 'iput';
+our $IRM     = 'irm';
+our $IPWD    = 'ipwd';
+our $MD5SUM  = 'md5sum';
+
+our $GROUP_PREFIX = 'ss_';
+
+our @VALID_PERMISSIONS = qw(null read write own);
 
 around 'working_collection' => sub {
   my ($orig, $self, @args) = @_;
@@ -104,12 +129,16 @@ around 'working_collection' => sub {
 
     WTSI::NPG::Runnable->new(executable  => $ICD,
                              arguments   => [$collection],
-                             environment => $self->environment)->run;
+                             environment => $self->environment,
+                             logger      => $self->logger)->run;
     $self->$orig($collection);
   }
   elsif (!$self->has_working_collection) {
-    my ($wc) = WTSI::NPG::Runnable->new(executable  => $IPWD,
-                                        environment => $self->environment)->run;
+    my ($wc) = WTSI::NPG::Runnable->new
+      (executable  => $IPWD,
+       environment => $self->environment,
+       logger      => $self->logger)->run->split_stdout;
+
     $self->$orig($wc);
   }
 
@@ -135,7 +164,15 @@ sub find_zone_name {
   my $abs_path = $self->_ensure_absolute_path($path);
   $abs_path =~ s/^\///;
 
-  my @path = File::Spec->splitdir($abs_path);
+  $self->debug("Determining zone from path '", $abs_path, "'");
+
+  # If no zone if given, assume the current zone
+  unless ($abs_path) {
+    $self->debug("Using '", $self->working_collection, "' to determine zone");
+    $abs_path = $self->working_collection;
+  }
+
+  my @path = grep { $_ ne '' } File::Spec->splitdir($abs_path);
   unless (@path) {
     $self->logconfess("Failed to parse iRODS zone from path '$path'");
   }
@@ -157,7 +194,7 @@ sub find_zone_name {
 sub make_group_name {
   my ($self, $study_id) = @_;
 
-  return "ss_" . $study_id;
+  return $GROUP_PREFIX . $study_id;
 }
 
 =head2 list_groups
@@ -173,9 +210,11 @@ sub make_group_name {
 sub list_groups {
   my ($self, @args) = @_;
 
-  my @groups = WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
-                                        arguments   => ['lg'],
-                                        environment => $self->environment)->run;
+  my @groups = WTSI::NPG::Runnable->new
+    (executable  => $IGROUPADMIN,
+     arguments   => ['lg'],
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   return @groups;
 }
 
@@ -214,7 +253,8 @@ sub add_group {
 
   WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
                            arguments   => ['mkgroup', $name],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $name;
 }
 
@@ -239,7 +279,8 @@ sub remove_group {
 
   WTSI::NPG::Runnable->new(executable  => $IGROUPADMIN,
                            arguments   => ['rmgroup', $name],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $name;
 }
 
@@ -261,10 +302,9 @@ sub set_group_access {
 
   my $perm_str = defined $permission ? $permission : 'null';
 
-  my @args = ($perm_str, $group, @objects);
-  WTSI::NPG::Runnable->new(executable  => $ICHMOD,
-                           arguments   => \@args,
-                           environment => $self->environment)->run;
+  foreach my $object (@objects) {
+    $self->set_object_permissions($perm_str, $group, $object);
+  }
 
   return @objects;
 }
@@ -284,7 +324,8 @@ sub reset_working_collection {
   my ($self) = @_;
 
   WTSI::NPG::Runnable->new(executable  => $ICD,
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   $self->clear_working_collection;
 
   return $self;
@@ -292,9 +333,10 @@ sub reset_working_collection {
 
 =head2 list_collection
 
-  Arg [1]    : iRODS collection name
+  Arg [1]    : Str iRODS collection name
+  Arg [1]    : Bool recurse flag.
 
-  Example    : $dir = $irods->list_collection($coll)
+  Example    : my ($objs, $colls) = $irods->list_collection($coll)
   Description: Return the contents of the collection as two arrayrefs,
                the first listing data objects, the second listing nested
                collections.
@@ -303,7 +345,7 @@ sub reset_working_collection {
 =cut
 
 sub list_collection {
-  my ($self, $collection) = @_;
+  my ($self, $collection, $recurse) = @_;
 
   defined $collection or
     $self->logconfess('A defined collection argument is required');
@@ -313,9 +355,11 @@ sub list_collection {
 
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
-  $self->debug("Listing collection '$collection'");
 
-  return $self->lister->list_collection($collection);
+  my $recursively = $recurse ? 'recursively' : '';
+  $self->debug("Listing collection '$collection' $recursively");
+
+  return $self->lister->list_collection($collection, $recurse);
 }
 
 =head2 add_collection
@@ -343,7 +387,8 @@ sub add_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IMKDIR,
                            arguments   => ['-p', $collection],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $collection;
 }
 
@@ -380,7 +425,8 @@ sub put_collection {
   my @args = ('-r', $dir, $target);
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => \@args,
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
 
   # FIXME - this is handling a case where the target collection exists
   return $target . '/' . basename($dir);
@@ -419,7 +465,8 @@ sub move_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IMV,
                            arguments   => [$source, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -449,8 +496,86 @@ sub remove_collection {
 
   WTSI::NPG::Runnable->new(executable  => $IRM,
                            arguments   => ['-r', '-f', $collection],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $collection;
+}
+
+sub get_collection_permissions {
+  my ($self, $collection) = @_;
+
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $collection eq ''
+    and $self->logconfess('A non-empty collection argument is required');
+
+  return $self->lister->get_collection_acl($collection);
+}
+
+sub set_collection_permissions {
+  my ($self, $level, $owner, $collection) = @_;
+
+  defined $owner or
+    $self->logconfess('A defined owner argument is required');
+  defined $collection or
+    $self->logconfess('A defined collection argument is required');
+
+  $owner eq '' and
+    $self->logconfess('A non-empty owner argument is required');
+  $collection eq '' and
+    $self->logconfess('A non-empty collection argument is required');
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  $self->debug("Setting permissions on '$collection' to ",
+               "'$perm_str' for '$owner'");
+
+  my @acl = $self->get_collection_permissions($collection);
+
+  if (any { $_->{owner} eq $owner and
+            $_->{level} eq $perm_str } @acl) {
+    $self->debug("'$collection' already has permission ",
+                 "'$perm_str' for '$owner'");
+  }
+  else {
+    $self->acl_modifier->chmod_collection($perm_str, $owner, $collection);
+  }
+
+  return $collection;
+}
+
+=head2 get_collection_groups
+
+  Arg [1]    : iRODS data collection path
+  Arg [2]    : permission Str, one of 'null', 'read', 'write' or 'own',
+               optional
+
+  Example    : $irods->get_collection_groups($path)
+  Description: Return a list of the data access groups in the collection's ACL.
+               If a permission leve argument is supplied, only groups with
+               that level of access will be returned.
+  Returntype : Array
+
+=cut
+
+sub get_collection_groups {
+  my ($self, $collection, $level) = @_;
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  my @perms = $self->get_collection_permissions($collection);
+  if ($level) {
+    @perms = grep { $_->{level} eq $perm_str } @perms;
+  }
+
+  return sort grep { m{^$GROUP_PREFIX} } map { $_->{owner} } @perms;
 }
 
 =head2 get_collection_meta
@@ -474,8 +599,6 @@ sub get_collection_meta {
 
   $collection = File::Spec->canonpath($collection);
   $collection = $self->_ensure_absolute_path($collection);
-
-  # $self->list_collection($collection);
 
   return $self->meta_lister->list_collection_meta($collection);
 }
@@ -605,10 +728,11 @@ sub find_collections_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-C', @query);
-  my @raw_results =
-    WTSI::NPG::Runnable->new(executable  => $IMETA,
-                             arguments   => \@args,
-                             environment => $self->environment)->run;
+  my @raw_results = WTSI::NPG::Runnable->new
+    (executable  => $IMETA,
+     arguments   => \@args,
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
 
   my @results;
   foreach my $row (@raw_results) {
@@ -617,6 +741,9 @@ sub find_collections_by_meta {
     }
     elsif ($row =~ m{^collection:\s(\S*)}) {
       my $coll = $1;
+
+      $self->debug("Found collection (to filter by '$root') '$coll'");
+
       push @results, $coll;
     }
   }
@@ -679,7 +806,8 @@ sub add_object {
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => [$file, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -712,7 +840,8 @@ sub replace_object {
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
                            arguments   => ['-f', $file, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
 }
 
@@ -746,7 +875,8 @@ sub move_object {
 
   WTSI::NPG::Runnable->new(executable  => $IMV,
                            arguments   => [$source, $target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target
 }
 
@@ -773,8 +903,104 @@ sub remove_object {
 
   WTSI::NPG::Runnable->new(executable  => $IRM,
                            arguments   => [$target],
-                           environment => $self->environment)->run;
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
   return $target;
+}
+
+sub slurp_object {
+  my ($self, $target) = @_;
+
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  $self->debug("Slurping object '$target'");
+
+  my $runnable = WTSI::NPG::Runnable->new
+    (executable  => $IGET,
+     arguments   => [$target, '-'],
+     logger      => $self->logger)->run;
+
+  my $copy = decode('UTF-8', ${$runnable->stdout}, Encode::FB_CROAK);
+
+  return $copy;
+}
+
+sub get_object_permissions {
+  my ($self, $object) = @_;
+
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  return $self->lister->get_object_acl($object);
+}
+
+sub set_object_permissions {
+  my ($self, $level, $owner, $object) = @_;
+
+  defined $owner or
+    $self->logconfess('A defined owner argument is required');
+  defined $object or
+    $self->logconfess('A defined object argument is required');
+
+  $owner eq '' and
+    $self->logconfess('A non-empty owner argument is required');
+  $object eq '' and
+    $self->logconfess('A non-empty object argument is required');
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  $self->debug("Setting permissions on '$object' to '$perm_str' for '$owner'");
+  my @acl = $self->get_object_permissions($object);
+
+  if (any { $_->{owner} eq $owner and
+            $_->{level} eq $perm_str } @acl) {
+    $self->debug("'$object' already has permission '$perm_str' for '$owner'");
+  }
+  else {
+    $self->acl_modifier->chmod_object($perm_str, $owner, $object);
+  }
+
+  return $object;
+}
+
+=head2 get_object_groups
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : permission Str, one of 'null', 'read', 'write' or 'own',
+               optional
+
+  Example    : $irods->get_object_groups($path)
+  Description: Return a list of the data access groups in the object's ACL.
+               If a permission leve argument is supplied, only groups with
+               that level of access will be returned.
+  Returntype : Array
+
+=cut
+
+sub get_object_groups {
+  my ($self, $object, $level) = @_;
+
+  my $perm_str = defined $level ? $level : 'null';
+
+  grep { $perm_str eq $_ } @VALID_PERMISSIONS or
+    $self->logconfess("Invalid permission level '$perm_str'");
+
+  my @perms = $self->get_object_permissions($object);
+  if ($level) {
+    @perms = grep { $_->{level} eq $perm_str } @perms;
+  }
+
+  return sort grep { m{^$GROUP_PREFIX} } map { $_->{owner} } @perms;
 }
 
 =head2 get_object_meta
@@ -794,8 +1020,6 @@ sub get_object_meta {
     $self->logconfess('A defined object argument is required');
   $object eq '' and
     $self->logconfess('A non-empty object argument is required');
-
-  # $self->list_object($object);
 
   return $self->meta_lister->list_object_meta($object);
 }
@@ -885,7 +1109,7 @@ sub remove_object_avu {
   my @current_meta = $self->get_object_meta($object);
   if (!$self->_meta_exists($attribute, $value, $units, \@current_meta)) {
     $self->logconfess("AVU {'$attribute', '$value', $units_str} ",
-                      "does not exist exists for '$object'");
+                      "does not exist for '$object'");
   }
 
   return $self->meta_remover->modify_object_meta($object, $attribute,
@@ -901,7 +1125,8 @@ sub remove_object_avu {
                                             ['id' => 'ABCD1234'])
   Description: Find objects by their metadata, restricted to a parent
                collection.
-               Return a list of collections.
+               Return a list of objects, sorted by their data object name
+               component.
   Returntype : Array
 
 =cut
@@ -919,14 +1144,16 @@ sub find_objects_by_meta {
   my @query = $self->_make_imeta_query(@query_specs);
 
   my @args = ('-z', $zone, 'qu', '-d', @query);
-  my @raw_results =
-    WTSI::NPG::Runnable->new(executable  => $IMETA,
-                             arguments   => \@args,
-                             environment => $self->environment)->run;
+  my @raw_results = WTSI::NPG::Runnable->new
+    (executable  => $IMETA,
+     arguments   => \@args,
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
 
   my @results;
   my $coll;
   my $obj;
+
   foreach my $row (@raw_results) {
     if ($row =~ m{^----$}) {
       next;
@@ -939,17 +1166,24 @@ sub find_objects_by_meta {
 
       unless ($coll) {
         $self->logconfess("Failed to parse imeta output; missing collection ",
-                          "in [", join(', ', @raw_results), "]");
+                          "got object '$obj'");
       }
 
-      push @results, "$coll/$obj";
+      push @results, ["$coll", "$obj"];
       undef $coll;
       undef $row;
     }
   }
 
+  $self->debug("Found ", scalar @results, " objects (to filter by '$root')");
+
+  my @sorted = map  { $_->[0] . '/' . $_->[1] }
+               sort { $a->[1] cmp $b->[1] } @results;
+
+  $self->debug("Sorted ", scalar @sorted, " objects (to filter by '$root')");
+
   # imeta doesn't permit filtering by path, natively.
-  return grep { /^$root/ } @results;
+  return grep { /^$root/ } @sorted;
 }
 
 =head2 calculate_checksum
@@ -973,10 +1207,11 @@ sub calculate_checksum {
 
   $object = $self->_ensure_absolute_path($object);
 
-  my @raw_checksum =
-    WTSI::NPG::Runnable->new(executable  => $ICHKSUM,
-                             arguments   => [$object],
-                             environment => $self->environment)->run;
+  my @raw_checksum = WTSI::NPG::Runnable->new
+    (executable  => $ICHKSUM,
+     arguments   => [$object],
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   unless (@raw_checksum) {
     $self->logconfess("Failed to get iRODS checksum for '$object'");
   }
@@ -993,7 +1228,7 @@ sub calculate_checksum {
 
   Example    : $irods->validate_checksum_metadata('/my/path/lorem.txt')
   Description: Return true if the MD5 checksum in the metadata of an iRODS
-               object is identical to the MD5 caluclated by iRODS.
+               object is identical to the MD5 calculated by iRODS.
   Returntype : boolean
 
 =cut
@@ -1045,9 +1280,11 @@ sub md5sum {
   defined $file or $self->logconfess('A defined file argument is required');
   $file eq '' and $self->logconfess('A non-empty file argument is required');
 
-  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
-                                        arguments   => [$file],
-                                        environment => $self->environment)->run;
+  my @result = WTSI::NPG::Runnable->new
+    (executable  => $MD5SUM,
+     arguments   => [$file],
+     environment => $self->environment,
+     logger      => $self->logger)->run->split_stdout;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;
@@ -1135,6 +1372,15 @@ sub _make_imeta_query {
     }
     else {
       $operator = '=';
+    }
+
+    unless (defined $value) {
+      $self->logconfess("Invalid query value 'undef' in query spec ",
+                        "[$attribute, undef, $operator]");
+    }
+    if ($value eq '') {
+      $self->logconfess("Invalid query value '$value' in query spec ",
+                        "[$attribute, $value, $operator]");
     }
 
     if ($i > 0) {

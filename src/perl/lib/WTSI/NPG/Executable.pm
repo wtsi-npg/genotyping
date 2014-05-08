@@ -7,18 +7,18 @@ use IPC::Run;;
 use Moose::Role;
 
 has 'stdin' =>
-  (is      => 'ro',
-   isa     => 'ScalarRef',
+  (is      => 'rw',
+   isa     => 'ScalarRef[Str] | FileHandle | CodeRef',
    default => sub { my $x = ''; return \$x; });
 
 has 'stdout' =>
-  (is      => 'ro',
-   isa     => 'ScalarRef',
+  (is      => 'rw',
+   isa     => 'ScalarRef[Str] | FileHandle | CodeRef',
    default => sub { my $x = ''; return \$x; });
 
 has 'stderr' =>
-  (is      => 'ro',
-   isa     => 'ScalarRef',
+  (is      => 'rw',
+   isa     => 'ScalarRef[Str] | FileHandle | CodeRef',
    default => sub { my $x = ''; return \$x; });
 
 has 'environment' =>
@@ -52,6 +52,9 @@ WTSI::NPG::Executable
 
 A Role providing attributes to represent a single run of an external
 program by some method of IPC.
+
+STDIN, STDOUT and STDERR may be supplied as ScalarRefs, FileHandles or
+CodeRefs (filters).
 
 =head1 AUTHOR
 

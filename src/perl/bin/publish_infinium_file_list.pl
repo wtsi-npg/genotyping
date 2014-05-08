@@ -77,16 +77,15 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config)->connect(RaiseError => 1);
-  # $ifdb->log($log);
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config)->connect(RaiseError           => 1,
-                                  mysql_enable_utf8    => 1,
-                                  mysql_auto_reconnect => 1);
-  # $ssdb->log($log);
-
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
   my @files = <>;
   foreach my $file (@files) {
     chomp($file);
@@ -99,7 +98,8 @@ sub run {
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
-     infinium_db      => $ifdb);
+     infinium_db      => $ifdb,
+     logger           => $log);
   $publisher->publish($publish_dest);
 
   return 0;

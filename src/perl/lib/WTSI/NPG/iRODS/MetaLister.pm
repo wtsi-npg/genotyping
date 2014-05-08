@@ -3,10 +3,9 @@ use utf8;
 
 package WTSI::NPG::iRODS::MetaLister;
 
-use JSON;
 use Moose;
 
-with 'WTSI::NPG::Startable';
+extends 'WTSI::NPG::iRODS::Communicator';
 
 has '+executable' => (default => 'json-metalist');
 
@@ -34,9 +33,8 @@ sub list_collection_meta {
   $collection = File::Spec->canonpath($collection);
 
   my $spec = {collection => $collection};
-  my $json = JSON->new->utf8->encode($spec);
 
-  return $self->_list_path_meta($json);
+  return $self->_list_path_meta($spec);
 }
 
 sub list_object_meta {
@@ -54,47 +52,26 @@ sub list_object_meta {
 
   my $spec = {collection  => $collection,
               data_object => $data_name};
-  my $json = JSON->new->utf8->encode($spec);
 
-  return $self->_list_path_meta($json);
+  return $self->_list_path_meta($spec);
 }
 
 sub _list_path_meta {
-  my ($self, $path_spec) = @_;
+  my ($self, $spec) = @_;
 
-  defined $path_spec or
-    $self->logconfess('A defined JSON path spec argument is required');
+  defined $spec or
+    $self->logconfess('A defined JSON spec argument is required');
 
-  my $parser = JSON->new->utf8->max_size(4096);
-  my $result;
+  my $response = $self->communicate($spec);
+  $self->validate_response($response);
+  $self->report_error($response);
 
-  ${$self->stdin} .= $path_spec;
-  ${$self->stderr} = '';
-
-  $self->debug("Sending JSON path spec $path_spec to ", $self->executable);
-
-  eval {
-    # baton send JSON responses on a single line
-    $self->harness->pump until ${$self->stdout} =~ m{[\r\n]$};
-    $result = $parser->decode(${$self->stdout});
-    ${$self->stdout} = '';
-  };
-
-  if ($@) {
-    $self->error("JSON parse error on: '", ${$self->stdout}, "': ", $@);
-  }
-
-  # TODO -- factor out JSON protocol handling into a Role
-  if (exists $result->{error}) {
-    $self->logconfess($result->{error}->{message});
-  }
-
-  if (!exists $result->{avus}) {
+  if (!exists $response->{avus}) {
     $self->logconfess('The returned path spec did not have an "avus" key: ',
-                      JSON->new->utf8->encode($result));
+                      JSON->new->utf8->encode($response));
   }
 
-  return @{$result->{avus}};
+  return @{$response->{avus}};
 }
 
 __PACKAGE__->meta->make_immutable;

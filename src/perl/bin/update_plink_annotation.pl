@@ -11,7 +11,8 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::Plink qw(update_snp_locations
+use WTSI::NPG::Genotyping::Plink qw(update_placeholder 
+                                    update_snp_locations
                                     update_sample_genders);
 
 Log::Log4perl->easy_init($ERROR);
@@ -22,12 +23,14 @@ sub run {
   my $bed_file;
   my $sample_json;
   my $snp_json;
+  my $placeholder; 
   my $verbose;
 
   GetOptions('bed=s' => \$bed_file,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'samples=s' => \$sample_json,
              'snps=s' => \$snp_json,
+	     'placeholder=i' => \$placeholder,
              'verbose' => \$verbose);
 
   unless ($bed_file) {
@@ -35,22 +38,34 @@ sub run {
               -exitval => 2);
   }
 
-  unless ($sample_json or $snp_json) {
-    pod2usage(-msg => "A --samples and/or --snps argument is required\n",
+  unless ($sample_json or $snp_json or $placeholder) {
+    pod2usage(-msg => "At least one of --samples, --snps, or --placeholder is required\n",
               -exitval => 2);
+  }
+
+  # placeholder for missing data in .fam files must be 0 or -9
+  if (defined($placeholder) && $placeholder!=0 && $placeholder!=-9) {
+      pod2usage(-msg => "--placeholder argument must be one of (0, -9)\n",
+		-exitval => 2);
   }
 
   my $tmp_dir = tempdir(CLEANUP => 1);
   if ($sample_json) {
     my $num_updated = update_sample_genders($bed_file, $bed_file,
                                             $sample_json, $tmp_dir);
-    print STDERR "Updated the gender of $num_updated samples" if $verbose;
+    print STDERR "Updated the gender of $num_updated samples\n" if $verbose;
   }
 
   if ($snp_json) {
     my $num_updated = update_snp_locations($bed_file, $bed_file,
                                            $snp_json, $tmp_dir);
-    print STDERR "Updated the location of $num_updated SNPs" if $verbose;
+    print STDERR "Updated the location of $num_updated SNPs\n" if $verbose;
+  }
+
+  if (defined($placeholder)) {
+    my $num_updated = update_placeholder($bed_file, $bed_file, 
+                                         $placeholder, $tmp_dir);
+    print STDERR "Updated placeholders for $num_updated samples\n" if $verbose;
   }
 
   return;

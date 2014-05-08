@@ -18,6 +18,7 @@ our @EXPORT_OK = qw(collect_dirs
                     md5sum
                     modified_between
                     trim
+                    depad_well
                     user_session_log);
 
 our $MD5SUM = 'md5sum';
@@ -81,6 +82,36 @@ sub trim {
   $copy =~ s/\s*$//;
 
   return $copy;
+}
+
+=head2 depad_well
+
+  Arg [1]    : string
+
+  Example    : $depadded = depad_well('A01');
+  Description: Removes the leading '0' from well addresses so that
+               'A01' becomes 'A1' etc.
+  Returntype : Str
+
+=cut
+
+sub depad_well {
+  my ($str) = @_;
+
+  if(! defined $str) {
+    croak "The str argument was undefined";
+  }
+  if ($str !~ m{^[A-Z]\d\d?$}) {
+    croak "Unexpected well address '$str'. Cannot depad this.";
+  }
+  if ($str =~ m{^[A-Z]00$}) {
+    croak "Unexpected well address '$str'. Cannot depad this.";
+  }
+
+  my $depadded = $str;
+  $depadded =~ s/^([A-Z])0?(\d)$/$1$2/;
+
+  return $depadded;
 }
 
 =head2 user_session_log
@@ -278,8 +309,9 @@ sub md5sum {
   defined $file or croak 'A defined file argument is required';
   $file eq '' and croak 'A non-empty file argument is required';
 
-  my @result = WTSI::NPG::Runnable->new(executable  => $MD5SUM,
-                                        arguments   => [$file])->run;
+  my @result = WTSI::NPG::Runnable->new
+    (executable  => $MD5SUM,
+     arguments   => [$file])->run->split_stdout;
   my $raw = shift @result;
 
   my ($md5) = $raw =~ m{^(\S+)\s+.*}msx;

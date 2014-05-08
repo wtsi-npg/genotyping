@@ -99,8 +99,8 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config)->connect(RaiseError => 1);
-  # $ifdb->log($log);
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
 
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
@@ -130,7 +130,8 @@ sub run {
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
-     infinium_db      => $ifdb);
+     infinium_db      => $ifdb,
+     logger           => $log);
   $publisher->publish($publish_dest);
 
   return 0;

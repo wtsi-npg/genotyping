@@ -13,9 +13,8 @@ use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use JSON;
 
-use Test::More tests => 51;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/mergeJsonResults 
-  readFileToString readSampleInclusion/;
+use Test::More tests => 47;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readFileToString readSampleInclusion/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
@@ -29,102 +28,98 @@ my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test out
 my $dbname = "small_test.db";
 my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
 my $inclusionMaster = "$Bin/qc_test_data/sample_inclusion.json";
-my $mafhet = "$Bin/qc_test_data/small_test_maf_het.json";
+my $mafhet = "$Bin/qc_test_data/output_examples/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
 my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
-# The directories contains the R scripts and Perl scripts
+# The directories containing the R scripts and Perl scripts
 $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
-
-# FIXME - hacked this in because scripts are calling scripts here
-# The code being reused this way should be factored out into modules.
-$ENV{PERL5LIB} = join(':', "$Bin/../blib/lib", $ENV{PERL5LIB});
 
 # copy pipeline DB to temporary directory; edits are made to temporary copy, not "master" copy from github
 my $tempdir = tempdir(CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 my $dbfile = $tempdir."/".$dbname;
 
-# may later include datasets 'beta', 'gamma', etc.
-unless (-e $outDir && -d $outDir) { mkdir($outDir); }
-chdir($outDir) || croak "Cannot cd to output directory \"$outDir\"";
-system('rm -f *.png *.txt *.json *.html *.log *.csv *.pdf plate_heatmaps/* '.
-       'supplementary/*'); # remove any previous output
+if (-e $outDir) {
+    if (-d $outDir) {
+	system("rm -Rf $outDir/*"); # remove previous output
+    } else {
+	croak "Output path $outDir exists and is not a directory!"; 
+    }
+} else {
+    mkdir($outDir);
+}
 
 ### test creation of QC input files ### 
 
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --config $config $plink");
+$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --plink $plink --no_warning --db $dbfile");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";
-$status = system("$crHetFinder $plink");
+$status = system("$crHetFinder -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plink");
 is($status, 0, "snp_af_sample_cr_bed exit status");
 
 ## test duplicate check
-$status = system("$bin/check_duplicates_bed.pl $plink");
+$status = system("$bin/check_duplicates_bed.pl --dir $outDir $plink");
 is($status, 0, "check_duplicates_bed.pl exit status");
 
 ## test gender check
-$status = system("$bin/check_xhet_gender.pl --input=$plink");
+$status = system("$bin/check_xhet_gender.pl --input=$plink --output-dir=$outDir");
 is($status, 0, "check_xhet_gender.pl exit status");
 
 ## test collation into summary
 ## first, generate intensity metrics using simtools
-$cmd = "simtools qc --infile $sim --magnitude magnitude.txt ".
-    "--xydiff xydiff.txt";
+$cmd = "simtools qc --infile $sim --magnitude $outDir/magnitude.txt ".
+    "--xydiff $outDir/xydiff.txt";
 system($cmd);
-$status = system("$bin/write_qc_status.pl --dbpath=$dbfile --inipath=$iniPath");
-is($status, 0, "write_qc_status.pl exit status");
-## test output
-ok(jsonPathOK('qc_results.json'), "qc_results.json in valid format");
 
-## test merge of .json results
-my @mergeInputs = ('qc_results.json', $mafhet);
-my $merged = 'qc_merged.json';
-mergeJsonResults(\@mergeInputs, $merged);
-ok(jsonPathOK($merged), "Merged QC results in valid format");
+$cmd = "collate_qc_results.pl --input $outDir --status $outDir/qc_results.json --dbpath $dbfile --config $config"; 
+is(system($cmd), 0, "collate_qc_results.pl exit status");
+ok(jsonPathOK($outDir.'/qc_results.json'), "qc_results.json in valid format");
 
 ### test creation of plots ###
 
 ## PDF scatterplots for each metric
-$status = system("$bin/plot_metric_scatter.pl --dbpath=$dbfile");
+$status = system("$bin/plot_metric_scatter.pl --dbpath=$dbfile --inipath=$iniPath --config=$config --outdir=$outDir --qcdir=$outDir");
 is($status, 0, "plot_metric_scatter.pl exit status");
 
 # identity plot expected to be missing!
 my @metrics = qw(call_rate duplicate heterozygosity gender magnitude xydiff);
 foreach my $metric (@metrics) {
-    ok((-e 'scatter_'.$metric.'_000.pdf'), "PDF scatterplot exists: $metric");
+    my $plot = $outDir.'/scatter_'.$metric.'_000.pdf';
+    ok((-e $plot), "PDF scatterplot exists: $metric");
 }
 
 ## plate heatmap plots
 my @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
-    $cmd = "cat sample_cr_het.txt | $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDir/$heatMapDir --dbpath=$dbfile --inipath=$iniPath";
+    $cmd = "cat $outDir/sample_cr_het.txt | $bin/plate_heatmap_plots.pl --mode=$mode --out_dir=$outDir/$heatMapDir --dbpath=$dbfile --inipath=$iniPath";
     is(system($cmd), 0, "plate_heatmap_plots.pl exit status: mode $mode");
     for (my $i=0;$i<2;$i++) { 
-        my $png = "plate_heatmaps/plot_".$mode."_ssbc0000$i.png";
-        ok(pngPathOK($png), "PNG output $png in valid format");
+	my $png = 'plot_'.$mode.'_ssbc0000'.$i.'.png';
+        my $pngPath = $outDir."/plate_heatmaps/$png";
+        ok(pngPathOK($pngPath), "PNG output $png in valid format");
     }
 }
 
 ## plate heatmap index
-$cmd = "$bin/plate_heatmap_index.pl $testName $heatMapDir index.html";
+$cmd = "$bin/plate_heatmap_index.pl $testName $outDir/$heatMapDir index.html";
 is(system($cmd), 0, "plate_heatmap_index.pl exit status");
 ## plate heatmap index output
-ok(xmlPathOK('plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
+ok(xmlPathOK($outDir.'/plate_heatmaps/index.html'), "plate_heatmaps/index.html in valid XML format");
 
 ## cr/het density
-$cmd = "cat sample_cr_het.txt | $bin/plot_cr_het_density.pl --out_dir=. --title=$testName";
+$cmd = "cat $outDir/sample_cr_het.txt | $bin/plot_cr_het_density.pl --out_dir=$outDir --title=$testName";
 is(system($cmd), 0, "plot_cr_het_density.pl exit status");
 
 ## failure cause breakdown
-$cmd = "$bin/plot_fail_causes.pl --title=$testName --inipath=$iniPath";
+$cmd = "$bin/plot_fail_causes.pl --title=$testName --inipath=$iniPath  --config=$config --input $outDir/qc_results.json --cr-het $outDir/sample_cr_het.txt --output-dir $outDir";
 is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
@@ -134,56 +129,46 @@ my @png = qw /crHetDensityScatter.png  failScatterPlot.png
   crHetDensityHeatmap.png  failScatterDetail.png
   failsIndividual.png  hetHistogram.png/;
 foreach my $png (@png) {
-    ok(pngPathOK($png), "PNG output $png in valid format");
+    ok(pngPathOK($outDir.'/'.$png), "PNG output $png in valid format");
 }
 
-## test exclusion of invalid results
-$cmd = "$bin/filter_samples.pl --thresholds $filterConfig --in ".
-    "qc_merged.json --db $dbfile";
-is(system($cmd), 0, "Exit status of pre-filter script");
-my $incMasterRef = decode_json(readFileToString($inclusionMaster));
-my $incResultRef = readSampleInclusion($dbfile);
-is_deeply($incResultRef, $incMasterRef, 
-	  "Check sample inclusion status against master file");
 
-system('rm -f *.png *.txt *.json *.html plate_heatmaps/*'); # remove output from previous tests, again
+system("rm -Rf $outDir/*"); # remove output from previous tests
 system("cp $dbfileMasterA $tempdir");
 print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
 
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
-$cmd = "$bin/run_qc.pl --output-dir=. --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath"; 
+$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
 foreach my $png (@png) {
-    ok(pngPathOK("supplementary/".$png), "PNG output $png in valid format");
+    ok(pngPathOK($outDir."/supplementary/".$png), "PNG output $png in valid format");
 }
 
 my $heatMapsOK = 1;
 @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     for (my $i=0;$i<2;$i++) {
-        my $png = "plate_heatmaps/plot_".$mode."_ssbc0000$i.png";   
+        my $png = $outDir."/plate_heatmaps/plot_".$mode."_ssbc0000$i.png";   
         unless (pngPathOK($png)) {$heatMapsOK = 0; last; }
     }
-    unless (xmlPathOK('plate_heatmaps/index.html')) { $heatMapsOK = 0; }
+    unless (xmlPathOK($outDir.'/plate_heatmaps/index.html')) { $heatMapsOK = 0; }
 }
 ok($heatMapsOK, "Plate heatmap outputs OK");
 
 # check summary outputs
-ok(-r 'pipeline_summary.csv', "CSV summary found");
-ok(-r 'pipeline_summary.pdf', "PDF summary found");
+ok(-r $outDir.'/pipeline_summary.csv', "CSV summary found");
+ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
 
 ## test standalone report script
 print "\tTesting standalone report generation script.\n";
-system('rm -f pipeline_summary.*');
-$cmd = "$bin/write_qc_reports.pl --database $dbfile --input ".
-    "./supplementary";
+system("rm -f $outDir/pipeline_summary.pdf");
+$cmd = "$bin/write_qc_reports.pl --database $dbfile --prefix $outDir/pipeline_summary --input $outDir/supplementary";
 system($cmd);
-ok(-r 'pipeline_summary.csv', "CSV summary found from standalone script");
-ok(-r 'pipeline_summary.pdf', "PDF summary found from standalone script");
-system("rm -f pipeline_summary.log pipeline_summary.tex");
+ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found from standalone script");
+system("rm -f $outDir/pipeline_summary.log $outDir/pipeline_summary.tex");
 print "\tTest dataset $testName finished.\n";
 
 my $duration = time() - $start;

@@ -59,7 +59,7 @@ sub read_column_names {
 
   my $line = <$fh>;
   unless ($line) {
-    croak "Failed to find column name line\n";
+    confess "Failed to find column name line\n";
   }
 
   chomp($line);
@@ -90,7 +90,7 @@ sub find_column_indices {
   my $num_headers = scalar @$column_names;
 
   if ($num_cols > $num_headers) {
-    croak "Invalid arguments: cannot find $num_cols columns in a " .
+    confess "Invalid arguments: cannot find $num_cols columns in a " .
       "a total of of $num_headers columns\n";
   }
 
@@ -104,7 +104,7 @@ sub find_column_indices {
   my @found;
   foreach my $name (@$names) {
     unless (exists $header_lookup{$name}) {
-      croak "Unable to find column '$name' because it does not exist\n";
+      confess "Unable to find column '$name' because it does not exist\n";
     }
 
     push(@found, $header_lookup{$name});
@@ -144,7 +144,7 @@ sub filter_columns {
   } elsif ($op eq 'exclude') {
     @result = @remaining;
   } else {
-    croak "Invalid operation '$op'; expected one of [include, exclude]\n";
+    confess "Invalid operation '$op'; expected one of [include, exclude]\n";
   }
 
   return @result;

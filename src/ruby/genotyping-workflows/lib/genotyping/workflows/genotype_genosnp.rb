@@ -45,13 +45,13 @@ Arguments:
 - work_dir (String): The working directory, an absolute path.
 - other arguments (keys and values):
 
-    config: <path> of custom pipeline database .ini file. Optional.
-    manifest: <path> of the chip manifest file. Required.
-    chunk_size: <integer> number of samples to analyse in a single GenoSNP job.
-    Optional, defaults to 20.
-    memory: <integer> number of Mb to request for jobs.
-    queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
-    'normal'.
+    - config: <path> of custom pipeline database .ini file. Optional.
+    - manifest: <path> of the chip manifest file. Required.
+    - chunk_size: <integer> number of samples to analyse in a single GenoSNP job. Optional, defaults to 20.
+    - memory: <integer> number of Mb to request for jobs.
+    - queue: <normal | long etc.> An LSF queue hint. Optional, defaults to 'normal'.
+    - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
+
 
 e.g.
 
@@ -76,13 +76,14 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
-                               :select, :chunk_size)
+                               :select, :chunk_size, :fam_dummy)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest) 
       chunk_size = args.delete(:chunk_size) || 20
+      fam_dummy = args.delete(:fam_dummy) || -9
       gtconfig = args.delete(:config)
 
       args.delete(:memory)
@@ -130,12 +131,12 @@ Returns:
                                  gsargs, async)
       gschunks = gschunks.flatten if gschunks
       gsfile = update_annotation(merge_bed(gschunks, gsname, args, async),
-                                 sjson, njson, args, async)
+                                 sjson, njson, fam_dummy, args, async)
 
       if smfile
         qcargs = {:run => run_name }.merge(args)
-        gsquality = quality_control(dbfile, gsfile, 'genosnp_qc', 
-                                    qcargs, async)
+        output = File.join(work_dir, 'genosnp_qc')
+        gsquality = quality_control(dbfile, gsfile, output, qcargs, async)
       end
 
       [gsfile, gsquality] if [gsfile, gsquality].all?

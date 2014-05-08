@@ -19,17 +19,13 @@
 module Genotyping::Tasks
 
   RUN_QC = 'run_qc.pl'
-  HET_BY_MAF = 'het_by_maf.py'
-
-  # Returns true if the het_by_maf script is available.
-  def het_by_maf_available?()
-    system("which #{HET_BY_MAF} >/dev/null 2>&1")
-  end
+  CHECK_IDENTITY_BED = 'check_identity_bed.pl'
 
   module QualityControl
     include Genotyping::Tasks
 
     # Runs quality control on genotype call results.
+    # With appropriate args, will exclude failing samples from pipeline DB.
     #
     # Arguments:
     # - dbfile (String): The SQLite database file name.
@@ -80,46 +76,54 @@ module Genotyping::Tasks
     end # quality_control
 
 
-    # Find heterozygosity for high/low minor allele frequency
+    # Runs the identity check stand-alone on genotype call results.
     #
     # Arguments:
-    # - input (String): Plink binary dataset stem 
-    #   (path without .bed, .bim, .fam extension)
-    # - output (String): Path to output directory
-    # - threshold (float): Boundary between high and low MAF, between 0 and 1
+    # - dbfile (String): The SQLite database file name.
+    # - input (String): Path to the Plink BED file; corresponding BIM, FAM files are assumed to be present in the same directory
+    # - output (String): Path to directory to write results
     # - args (Hash): Arguments for the operation.
     # - async (Hash): Arguments for asynchronous management.
-    # 
+    #
     # Returns:
-    # - Path to output file
-
-    def het_by_maf(input, output, run_name, args={}, async={}, threshold=0.01)
-
+    # - boolean
+    def check_identity(dbfile, input, output, args = {}, async = {})
+      
       args, work_dir, log_dir = process_task_args(args)
 
-      unless het_by_maf_available?
-        raise "Plinktools het_by_maf script not available!"
-      end
-      
-      if args_available?(input, output, work_dir)
-        base = File.basename(input, File.extname(input)) # remove .bed suffix
-        outfile = File.join(output, run_name+'.gencall.het_by_maf.json')
-        cli_args = args.merge({:in => base,
-                               :out => outfile,
-                               :threshold => threshold})
-        margs = [input, output]
-        command = [HET_BY_MAF,
-                   cli_arg_map(cli_args, :prefix => '--') { |key|
-                     key.gsub(/_/, '-') }].flatten.join(' ')
-        task_id = task_identity(:het_by_maf, *margs)
-        log = File.join(log_dir, task_id + '.log')
-        async_task(margs, command, work_dir, log,
-                   :post => lambda {ensure_files([outfile,], :error => false)},
-                   :result => lambda { outfile },
-                   :async => async)
-      end
-    end
+      if args_available?(dbfile, input, output, work_dir)
 
+        base = File.basename(input, File.extname(input))
+        plink = File.join(File.dirname(input), base)
+        Dir.mkdir(output) unless File.exist?(output)
+
+        cli_args = args.merge({:db => dbfile,
+                               :plink => plink,
+                               :outdir => output})
+        margs = [dbfile, input, output]
+        
+
+        command = [CHECK_IDENTITY_BED,
+                   cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
+        task_id = task_identity(:check_identity, *margs)
+        log = File.join(log_dir, task_id + '.log')
+        
+        result_names = ['identity_check_failed_pairs.txt',
+                        'identity_check_gt.txt',
+                        'identity_check.json',
+                        'identity_check_results.txt'
+                       ]
+        results = Array.new
+        result_names.each{ |name| results.push(File.join(output, name)) }
+
+        async_task(margs, command, work_dir, log,
+                   :post => lambda {ensure_files(results, :error => false)},
+                   :result => lambda { true },
+                   :async => async)
+
+      end
+
+    end # check_identity
 
   end
 end

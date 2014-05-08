@@ -42,8 +42,8 @@ module Genotyping::Tasks
     # - output (String): The output files base name.
     # - args (Hash): Arguments for the operation.
     #
-    #   :start (Fixnum): The 0-based, half-open sample index at which to start.
-    #   :end (Fixnum): The 0-based, half-open SNP index at which to finish.
+    #   :start (Fixnum): The 0-based, closed sample index at which to start.
+    #   :end (Fixnum): The 0-based, closed sample index at which to finish.
     #   :size (Fixnum): The number of samples to process per chunk.
     #   :cutoff (Number): The GenoSNP cutoff argument.
     #   :plink (Boolean): Enable Plink BED format output.

@@ -1,3 +1,4 @@
+use utf8;
 
 package WTSI::NPG::Addressable;
 
@@ -9,8 +10,8 @@ has 'size' =>
   (is       => 'ro',
    isa      => 'Int',
    required => 1,
-   builder  => '_build_size',
-   lazy     => 1);
+   lazy     => 1,
+   builder  => '_build_size',);
 
 has 'addresses' =>
   (is       => 'ro',
@@ -49,9 +50,9 @@ sub _build_addresses {
   return [sort keys %{$self->content}];
 }
 
-1;
-
 no Moose;
+
+1;
 
 __END__
 

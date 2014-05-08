@@ -57,7 +57,7 @@ sub header_parse : Test(3) {
   cmp_ok($export->size, '==', 96, 'Number of samples == 96');
 }
 
-sub sample_assays : Test(97) {
+sub assay_results : Test(97) {
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $complete_file);
 
@@ -70,12 +70,12 @@ sub sample_assays : Test(97) {
 
   # Each sample should have 96 assay results
   foreach my $address (@sample_addresses) {
-    cmp_ok(@{$export->sample_assays($address)}, '==', 96,
+    cmp_ok(@{$export->assay_result_data($address)}, '==', 96,
            "Sample assay count at address $address");
   }
 }
 
-sub write_sample_assays : Test(192) {
+sub write_assay_result_data : Test(192) {
   my $export = WTSI::NPG::Genotyping::Fluidigm::ExportFile->new
     (file_name => $complete_file);
 
@@ -91,7 +91,7 @@ sub write_sample_assays : Test(192) {
     my $test_file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
                             $export->fluidigm_barcode);
 
-    cmp_ok($export->write_sample_assays($address, $test_file), '==', 96,
+    cmp_ok($export->write_assay_result_data($address, $test_file), '==', 96,
            "Number of records written to $test_file");
 
     ok(compare($test_file, $expected_file) == 0,

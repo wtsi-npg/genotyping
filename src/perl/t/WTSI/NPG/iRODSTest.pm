@@ -7,9 +7,11 @@ use strict;
 use warnings;
 use English;
 use File::Spec;
+use List::AllUtils qw(all any none);
+use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 109;
+use Test::More tests => 147;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -56,11 +58,13 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::iRODS');
 }
 
-sub find_zone_name : Test(2) {
+sub find_zone_name : Test(3) {
   my $irods = WTSI::NPG::iRODS->new;
 
   like($irods->find_zone_name('/Sanger1'), qr{^Sanger1});
   is($irods->find_zone_name('/no_such_zone'), 'no_such_zone');
+  ok($irods->find_zone_name('relative'),
+     'Falls back to current zone for relative paths');
 }
 
 sub working_collection : Test(4) {
@@ -86,7 +90,7 @@ sub group_exists : Test(2) {
   ok(!$irods->group_exists('no_such_group'), 'An absent group does not exist');
 }
 
-sub set_group_access : Test(4) {
+sub set_group_access : Test(7) {
   my $irods = WTSI::NPG::iRODS->new;
   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
 
@@ -98,23 +102,196 @@ sub set_group_access : Test(4) {
                                      $lorem_object) }
     'Expected to fail setting access for non-existent group';
 
+  my $r0 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r0, 'No public read access');
+
   ok($irods->set_group_access('read', 'public', $lorem_object));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r1, 'Added public read access');
+
   ok($irods->set_group_access(undef, 'public', $lorem_object));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r2, 'Removed public read access');
 }
 
-sub list_collection : Test(3) {
+sub get_object_permissions : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
+
+  my $perms = all { exists $_->{owner} &&
+                    exists $_->{level} }
+    $irods->get_object_permissions($lorem_object);
+  ok($perms, 'Permissions obtained');
+}
+
+sub set_object_permissions : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
+
+  dies_ok { $irods->set_object_permissions('no_such_permission', 'public',
+                                           $lorem_object) }
+    'Expected to fail setting access with an invalid permission argument';
+
+  dies_ok { $irods->set_object_permissions('read', 'no_such_group_exists',
+                                           $lorem_object) }
+    'Expected to fail setting access for non-existent group';
+
+  ok($irods->set_object_permissions('read', 'public', $lorem_object));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r1, 'Added public read access');
+
+  ok($irods->set_object_permissions(undef, 'public', $lorem_object));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_object_permissions($lorem_object);
+  ok($r2, 'Removed public read access');
+}
+
+sub get_object_groups : Test(6) {
+   my $irods = WTSI::NPG::iRODS->new;
+   my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
+
+   ok($irods->set_object_permissions('read', 'public', $lorem_object));
+   ok($irods->set_object_permissions('read', 'ss_0',   $lorem_object));
+   ok($irods->set_object_permissions('read', 'ss_10',  $lorem_object));
+
+   my $expected_all = ['ss_0', 'ss_10'];
+   my @found_all  = $irods->get_object_groups($lorem_object);
+   is_deeply(\@found_all, $expected_all, 'Expected all groups')
+     or diag explain \@found_all;
+
+   my $expected_read = ['ss_0', 'ss_10'];
+   my @found_read = $irods->get_object_groups($lorem_object, 'read');
+   is_deeply(\@found_read, $expected_read, 'Expected read groups')
+     or diag explain \@found_read;
+
+   my $expected_own = [];
+   my @found_own  = $irods->get_object_groups($lorem_object, 'own');
+   is_deeply(\@found_own, $expected_own, 'Expected own groups')
+     or diag explain \@found_own;
+}
+
+sub get_collection_permissions : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll = "$irods_tmp_coll/irods";
+
+  my $perms = all { exists $_->{owner} &&
+                    exists $_->{level} }
+    $irods->get_collection_permissions($coll);
+  ok($perms, 'Permissions obtained');
+}
+
+sub set_collection_permissions : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll = "$irods_tmp_coll/irods";
+
+  dies_ok { $irods->set_collection_permissions('no_such_permission', 'public',
+                                               $coll) }
+    'Expected to fail setting access with an invalid permission argument';
+
+  dies_ok { $irods->set_collection_permissions('read', 'no_such_group_exists',
+                                               $coll) }
+    'Expected to fail setting access for non-existent group';
+
+  ok($irods->set_collection_permissions('read', 'public', $coll));
+
+  my $r1 = any { exists $_->{owner} && $_->{owner} eq 'public' &&
+                 exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_collection_permissions($coll);
+  ok($r1, 'Added public read access');
+
+  ok($irods->set_collection_permissions(undef, 'public', $coll));
+
+  my $r2 = none { exists $_->{owner} && $_->{owner} eq 'public' &&
+                  exists $_->{level} && $_->{level} eq 'read' }
+    $irods->get_collection_permissions($coll);
+  ok($r2, 'Removed public read access');
+}
+
+sub get_collection_groups : Test(6) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $coll = "$irods_tmp_coll/irods";
+
+  ok($irods->set_collection_permissions('read', 'public', $coll));
+  ok($irods->set_collection_permissions('read', 'ss_0',   $coll));
+  ok($irods->set_collection_permissions('read', 'ss_10',  $coll));
+
+  my $expected_all = ['ss_0', 'ss_10'];
+  my @found_all  = $irods->get_collection_groups($coll);
+  is_deeply(\@found_all, $expected_all, 'Expected all groups')
+    or diag explain \@found_all;
+
+  my $expected_read = ['ss_0', 'ss_10'];
+  my @found_read = $irods->get_collection_groups($coll, 'read');
+  is_deeply(\@found_read, $expected_read, 'Expected read groups')
+    or diag explain \@found_read;
+
+  my $expected_own = [];
+  my @found_own  = $irods->get_collection_groups($coll, 'own');
+  is_deeply(\@found_own, $expected_own, 'Expected own groups')
+    or diag explain \@found_own;
+}
+
+sub list_collection : Test(5) {
   my $irods = WTSI::NPG::iRODS->new;
   my ($objs, $colls) = $irods->list_collection("$irods_tmp_coll/irods");
 
   is_deeply($objs, ["$irods_tmp_coll/irods/lorem.txt",
-                    "$irods_tmp_coll/irods/test.txt"]) or diag explain $objs;
+                    "$irods_tmp_coll/irods/test.txt",
+                    "$irods_tmp_coll/irods/utf-8.txt"]) or diag explain $objs;
 
-  is_deeply($colls, ["$irods_tmp_coll/irods/collect_files",
+  is_deeply($colls, ["$irods_tmp_coll/irods",
+                     "$irods_tmp_coll/irods/collect_files",
                      "$irods_tmp_coll/irods/md5sum",
                      "$irods_tmp_coll/irods/test"]) or diag explain $colls;
 
    ok(!$irods->list_collection('no_collection_exists'),
       'Failed to list a non-existent collection');
+
+  my ($objs_deep, $colls_deep) =
+    $irods->list_collection("$irods_tmp_coll/irods", 'RECURSE');
+
+  is_deeply($objs_deep, ["$irods_tmp_coll/irods/lorem.txt",
+                         "$irods_tmp_coll/irods/test.txt",
+                         "$irods_tmp_coll/irods/utf-8.txt",
+                         "$irods_tmp_coll/irods/collect_files/a/10.txt",
+                         "$irods_tmp_coll/irods/collect_files/a/x/1.txt",
+                         "$irods_tmp_coll/irods/collect_files/b/20.txt",
+                         "$irods_tmp_coll/irods/collect_files/b/y/2.txt",
+                         "$irods_tmp_coll/irods/collect_files/c/30.txt",
+                         "$irods_tmp_coll/irods/collect_files/c/z/3.txt",
+                         "$irods_tmp_coll/irods/md5sum/lorem.txt",
+                         "$irods_tmp_coll/irods/test/file1.txt",
+                         "$irods_tmp_coll/irods/test/file2.txt",
+                         "$irods_tmp_coll/irods/test/dir1/file3.txt",
+                         "$irods_tmp_coll/irods/test/dir2/file4.txt"])
+    or diag explain $objs_deep;
+
+  is_deeply($colls_deep, ["$irods_tmp_coll/irods",
+                          "$irods_tmp_coll/irods/collect_files",
+                          "$irods_tmp_coll/irods/collect_files/a",
+                          "$irods_tmp_coll/irods/collect_files/a/x",
+                          "$irods_tmp_coll/irods/collect_files/b",
+                          "$irods_tmp_coll/irods/collect_files/b/y",
+                          "$irods_tmp_coll/irods/collect_files/c",
+                          "$irods_tmp_coll/irods/collect_files/c/z",
+                          "$irods_tmp_coll/irods/md5sum",
+                          "$irods_tmp_coll/irods/test",
+                          "$irods_tmp_coll/irods/test/dir1",
+                          "$irods_tmp_coll/irods/test/dir2"])
+    or diag explain $colls_deep;
 }
 
 sub add_collection : Test(2) {
@@ -141,7 +318,8 @@ sub put_collection : Test(2) {
   is_deeply(\@contents,
             [["$irods_tmp_coll/put_collection/test/file1.txt",
               "$irods_tmp_coll/put_collection/test/file2.txt"],
-             ["$irods_tmp_coll/put_collection/test/dir1",
+             ["$irods_tmp_coll/put_collection/test",
+              "$irods_tmp_coll/put_collection/test/dir1",
               "$irods_tmp_coll/put_collection/test/dir2"]])
     or diag explain \@contents;
 }
@@ -529,6 +707,51 @@ sub hash_path : Test(2) {
 
   is($irods->hash_path("$data_path/md5sum/lorem.txt",
                        'aabbccxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'aa/bb/cc');
+}
+
+sub round_trip_utf8_avu : Test(5) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $attr  = "Τη γλώσσα μου έδωσαν ελληνική";
+  my $value = "το σπίτι φτωχικό στις αμμουδιές του Ομήρου";
+
+  my $test_object = "$irods_tmp_coll/irods/test.txt";
+  my @meta_before = $irods->get_object_meta($test_object);
+  cmp_ok(scalar @meta_before, '==', 0, 'No AVUs present');
+
+  my $expected_meta = [{attribute => $attr, value => $value}];
+  ok($irods->add_object_avu($test_object, $attr, $value), 'UTF-8 AVU added');
+
+  my @meta_after = $irods->get_object_meta($test_object);
+  cmp_ok(scalar @meta_after, '==', 1, 'One AVU added');
+
+  my $avu = $meta_after[0];
+  TODO : {
+    local $TODO = 'Temporarily disabled because of iRODS UTF-8 configuration';
+
+    ok(Unicode::Collate->new->eq($avu->{attribute}, $attr),
+       'Found UTF-8 attribute');
+    ok(Unicode::Collate->new->eq($avu->{value}, $value),
+       'Found UTF-8 value');
+  }
+}
+
+sub slurp_object : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $test_file = "$data_path/utf-8.txt";
+  my $test_object = "$irods_tmp_coll/irods/utf-8.txt";
+
+  my $data = $irods->slurp_object($test_object);
+
+  my $original = '';
+  open my $fin, '<:encoding(utf-8)', $test_file or die "Failed to open $!\n";
+  while (<$fin>) {
+    $original .= $_;
+  }
+  close $fin;
+
+  ok(Unicode::Collate->new->eq($data, $original), 'Slurped copy is identical');
 }
 
 1;

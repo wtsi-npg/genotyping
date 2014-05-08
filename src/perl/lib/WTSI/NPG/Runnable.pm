@@ -2,6 +2,7 @@ use utf8;
 
 package WTSI::NPG::Runnable;
 
+use Encode qw(decode);
 use English;
 use IPC::Run;
 use Moose;
@@ -11,11 +12,13 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::Executable';
 =head2 run
 
   Example    : WTSI::NPG::Runnable->new(executable => 'ls',
-                                        arguments  => ['/'])->run
-  Description: Run the executable with the supplied arguments and STDIN
-               string. Capture STDOUT and STDERR as strings and return an
-               array of STDOUT split on the output record separator.
-  Returntype : Array Str
+                                        arguments  => ['/'])->run;
+  Description: Run the executable with the supplied arguments and STDIN.
+               STDIN, STDOUT and STDERR may be accessed via the methods of
+               WTSI::NPG::Executable. Dies on no-zero exit of child. Returns
+               $self.
+
+  Returntype : WTSI::NPG::Runnable
 
 =cut
 
@@ -29,6 +32,7 @@ sub run {
   my $result;
   {
     local %ENV = %{$self->environment};
+
     $result = IPC::Run::run(\@cmd,
                             '<',  $self->stdin,
                             '>',  $self->stdout,
@@ -51,9 +55,51 @@ sub run {
     $self->debug("Execution of '$command' succeeded");
   }
 
-  my @stdout_records = split $INPUT_RECORD_SEPARATOR, ${$self->stdout};
+  return $self;
+}
 
-  return @stdout_records;
+=head2 split_stdout
+  Example    : WTSI::NPG::Runnable->new(executable => 'ls',
+                                        arguments  => ['/'])->run->split_stdout
+  Description: If $self->stdout is a ScalarRef, dereference and split on the
+               supplied delimiter (defaults to the input record separator).
+               Raises an error if $self->stdout is not a ScalarRef.
+
+  Returntype : Array[Str]
+
+=cut
+
+sub split_stdout {
+  my ($self) = @_;
+
+  ref $self->stdout eq 'SCALAR' or
+    $self->logconfess('The stdout attribute was not a scalar reference');
+
+  my $copy = decode('UTF-8', ${$self->stdout}, Encode::FB_CROAK);
+
+  return split $INPUT_RECORD_SEPARATOR, $copy;
+}
+
+=head2 split_stderr
+  Example    : WTSI::NPG::Runnable->new(executable => 'ls',
+                                        arguments  => ['/'])->run->split_stderr
+  Description: If $self->stderr is a ScalarRef, dereference and split on the
+               supplied delimiter (defaults to the input record separator).
+               Raises an error if $self->stderr is not a ScalarRef.
+
+  Returntype : Array[Str]
+
+=cut
+
+sub split_stderr {
+  my ($self) = @_;
+
+  ref $self->stderr eq 'SCALAR' or
+    $self->logconfess('The stderr attribute was not a scalar reference');
+
+  my $copy = decode('UTF-8', ${$self->stderr}, Encode::FB_CROAK);
+
+  return split $INPUT_RECORD_SEPARATOR, $copy;
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -42,6 +42,7 @@ sub run {
   my $verbose;
   my @filter_key;
   my @filter_value;
+  my $stdio;
 
   GetOptions('config=s'       => \$config,
              'debug'          => \$debug,
@@ -51,22 +52,33 @@ sub run {
              'help'           => sub { pod2usage(-verbose => 2,
                                                  -exitval => 0) },
              'logconf=s'      => \$log4perl_config,
-             'verbose'        => \$verbose);
+             'verbose'        => \$verbose,
+             ''               => \$stdio); # Permits a trailing '-' for STDIN
   $config ||= $DEFAULT_INI;
-
-  unless ($publish_dest) {
-    pod2usage(-msg => "A --dest argument is required\n",
-              -exitval => 2);
-  }
-
-  unless (scalar @filter_key == scalar @filter_value) {
-    pod2usage(-msg => "There must be equal numbers of filter keys and values\n",
-              -exitval => 2);
-  }
-
   my @filter;
-  while (@filter_key) {
-    push @filter, [pop @filter_key, pop @filter_value];
+
+  if ($stdio) {
+    if ($publish_dest or @filter_key) {
+      pod2usage(-msg => "The --dest and --filter-key options are " .
+                "incompatible with reading from STDIN\n",
+                -exitval => 2);
+    }
+  }
+  else {
+    unless ($publish_dest) {
+      pod2usage(-msg => "A --dest argument is required\n",
+                -exitval => 2);
+    }
+
+    unless (scalar @filter_key == scalar @filter_value) {
+      pod2usage(-msg => "There must be equal numbers of filter keys " .
+                "and values\n",
+                -exitval => 2);
+    }
+
+    while (@filter_key) {
+      push @filter, [pop @filter_key, pop @filter_value];
+    }
   }
 
   my $log;
@@ -88,26 +100,44 @@ sub run {
   }
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError           => 1,
-                                   mysql_enable_utf8    => 1,
-                                   mysql_auto_reconnect => 1);
+    (name    => 'sequencescape_warehouse',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-    (name   => 'snp',
-     inifile => $config)->connect(RaiseError => 1);
+    (name    => 'snp',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
 
   my $irods = WTSI::NPG::iRODS->new(logger => $log);
 
-  my @sequenom_data =
-    $irods->find_objects_by_meta($publish_dest,
-                                 [sequenom_plate => '%', 'like'],
-                                 [sequenom_well  => '%', 'like'],
-                                 @filter);
+  my @sequenom_data;
+  if ($stdio) {
+    while (my $line = <>) {
+      chomp $line;
+      push @sequenom_data, $line;
+    }
+  }
+  else {
+    @sequenom_data =
+      $irods->find_objects_by_meta($publish_dest,
+                                   [sequenom_plate => '%', 'like'],
+                                   [sequenom_well  => '%', 'like'],
+                                   @filter);
+  }
+
   my $total = scalar @sequenom_data;
   my $updated = 0;
 
-  $log->info("Updating metadata on $total data objects in '$publish_dest'");
+  if ($stdio) {
+    $log->info("Updating metadata on $updated/$total data objects in ",
+               "file list");
+  }
+  else {
+    $log->info("Updating metadata on $total data objects in '$publish_dest'");
+  }
 
   foreach my $data_object (@sequenom_data) {
     eval {
@@ -125,13 +155,18 @@ sub run {
     }
   }
 
-  $log->info("Updated metadata on $updated/$total data objects in ",
-             "'$publish_dest'");
+  if ($stdio) {
+    $log->info("Updated metadata on $updated/$total data objects in ",
+               "file list");
+  }
+  else {
+    $log->info("Updated metadata on $updated/$total data objects in ",
+               "'$publish_dest'");
+  }
 
-  $ssdb->disconnect();
-  $snpdb->disconnect();
+  $ssdb->disconnect;
+  $snpdb->disconnect;
 }
-
 
 __END__
 
@@ -161,6 +196,11 @@ the Sequenom plate from which it came by means of the sequenom_plate
 and sequenom_well metadata and adds relevant sample metadata taken
 from the Sequencescape warehouse. If the new metadata include study
 information, this is used to set access rights for the data in iRODS.
+
+This script will read iRODS paths from STDIN as an alternative to
+finding them via a metadata query. To do this, terminate the command
+line with the '-' option. In this mode, the --dest, --filter-key and
+--filter-value options are invalid.
 
 This script requires access to the SNP database in order to function.
 

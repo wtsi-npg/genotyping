@@ -7,7 +7,6 @@ use JSON;
 use File::Spec;
 use Moose::Role;
 
-use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
 use WTSI::NPG::iRODS;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotatable';
@@ -89,8 +88,11 @@ sub get_avu {
       my $fn = sub {
         my $avu = shift;
 
-        return sprintf("{'%s', '%s', '%s'}", $avu->{attribute}, $avu->{value},
-                       $avu->{units});
+        my $a = defined $avu->{attribute} ? $avu->{attribute} : 'undef';
+        my $v = defined $avu->{value}     ? $avu->{value}     : 'undef';
+        my $u = defined $avu->{units}     ? $avu->{units}     : 'undef';
+
+        return sprintf("{'%s', '%s', '%s'}", $a, $v, $u);
       };
 
       my $matched = join ", ", map { $fn->($_) } @exists;
@@ -139,24 +141,21 @@ sub find_in_metadata {
   return @exists;
 }
 
-=head2 expected_irods_groups
+=head2 expected_groups
 
   Arg [1]    : None
 
-  Example    : @groups = $path->expected_irods_groups
+  Example    : @groups = $path->expected_groups
   Description: Return an array of iRODS group names given metadata containing
-               >=1 study_id under the key $STUDY_ID_META_KEY
+               >=1 study_id under the key Annotation::study_id_attr
   Returntype : Array
 
 =cut
 
-sub expected_irods_groups {
+sub expected_groups {
   my ($self) = @_;
 
-  my @ss_study_avus = $self->find_in_metadata($STUDY_ID_META_KEY);
-  unless (@ss_study_avus) {
-    $self->logwarn("Did not find any study information in metadata");
-  }
+  my @ss_study_avus = $self->find_in_metadata($self->study_id_attr);
 
   my @groups;
   foreach my $avu (@ss_study_avus) {

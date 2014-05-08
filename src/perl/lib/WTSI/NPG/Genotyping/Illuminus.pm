@@ -5,15 +5,23 @@ package WTSI::NPG::Genotyping::Illuminus;
 use strict;
 use warnings;
 use Carp;
+use List::AllUtils qw(pairs);
 
+use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Utilities::DelimitedFiles qw(read_column_names
+                                            find_column_indices
                                             filter_columns);
+use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 use base 'Exporter';
-our @EXPORT_OK = qw(read_it_column_names
-                    update_it_columns
+our @EXPORT_OK = qw(filter_gt_columns
+                    find_female_columns
+                    get_it_sample_names
+                    nullify_females
                     read_gt_column_names
-                    filter_gt_columns
+                    read_it_column_names
+                    update_it_columns
+                    write_it_header
                     write_gt_calls);
 
 =head2 read_it_column_names
@@ -29,7 +37,7 @@ our @EXPORT_OK = qw(read_it_column_names
 =cut
 
 sub read_it_column_names {
-  my $fh = shift;
+  my ($fh) = @_;
 
   my @names = read_column_names($fh, "\t");
 
@@ -44,6 +52,32 @@ sub read_it_column_names {
   @names = @names[3..$#names];
 
   return \@names;
+}
+
+sub get_it_sample_names {
+  my ($column_names) = @_;
+
+  my $num_columns = scalar @$column_names;
+  unless ($num_columns % 2 == 0) {
+    die "Intensity data contained an odd number of columns: $num_columns\n";
+  }
+
+  my @sample_names;
+  foreach (pairs @$column_names) {
+    my ($name_a, $name_b) = @$_;
+    push @sample_names, common_stem($name_a, $name_b);
+  }
+
+  return \@sample_names;
+}
+
+sub write_it_header {
+  my ($fh, $column_names) = @_;
+
+  my @annotation_columns = qw(SNP Coor Alleles);
+  print $fh join("\t", @annotation_columns, @$column_names), "\n";
+
+  return scalar @$column_names;
 }
 
 =head2 update_it_columns
@@ -72,6 +106,7 @@ sub update_it_columns {
   my $num_lines = 0;
   while (my $line = <$in>) {
     chomp($line);
+
     my @fields = split(/\t/, $line);
 
     for (my $i = 0; $i < scalar @annotation_columns; ++$i) {
@@ -84,14 +119,71 @@ sub update_it_columns {
         $fields[$i] = $value;
       }
     }
-    print $out join("\t", @fields), "\n";
 
+    print $out join("\t", @fields), "\n";
     ++$num_lines;
   }
 
   return $num_lines;
 }
 
+sub find_female_columns {
+  my ($column_names, $samples) = @_;
+
+  my @females = grep { $_->{'gender'} eq 'Female'} @$samples;
+  my @female_sample_names = map { $_->{'uri'} } @females;
+
+  # Calculate the real sample names from the intensity data column
+  # names
+  my $sample_names = get_it_sample_names($column_names);
+
+  # Validate the input
+  my %sample_lookup = map { $_ => 1 } @$sample_names;
+  foreach my $fname (@female_sample_names) {
+    unless (exists $sample_lookup{$fname}) {
+      die "Intensity data did not contain columns for '$fname'\n";
+    }
+  }
+
+  # Calculate the intensity data column indices on which to operate
+  my %female_lookup = map { $_ => 1 } @female_sample_names;
+  my @female_column_indices;
+
+  my $column_a_index = 0;
+  foreach my $sname (@$sample_names) {
+    my $column_b_index = $column_a_index + 1;
+
+    if (exists $female_lookup{$sname}) {
+      push(@female_column_indices, $column_a_index, $column_b_index);
+    }
+
+    $column_a_index += 2;
+  }
+
+  return \@female_column_indices;
+}
+
+sub nullify_females {
+  my ($input, $command, $samples, $verbose) = @_;
+
+  my $fh = maybe_stdin($input);
+
+  my $column_names = read_it_column_names($fh);
+  my $females = find_female_columns($column_names, $samples);
+
+  if ($verbose) {
+    print STDERR "Nullifying intensities for females in columns: [",
+      join(", ", @$females), "]", "\n";
+  }
+
+  open(my $out, '|-', "$command") or die "Failed to open pipe to '$command'\n";
+  write_it_header($out, $column_names);
+
+  my $num_rows = update_it_columns($fh, $out, $females, '1.000');
+  close($out) or warn "Failed to close pipe to '$command'\n";
+
+  return $num_rows;
+}
 
 =head2 read_gt_column_names
 
