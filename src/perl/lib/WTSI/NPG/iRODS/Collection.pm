@@ -194,6 +194,12 @@ sub set_permissions {
   return $self;
 }
 
+sub get_groups {
+  my ($self, $level) = @_;
+
+  $self->irods->get_collection_groups($self->str, $level);
+}
+
 =head2 set_content_permissions
 
   Arg [1]    : permission Str, one of 'null', 'read', 'write' or 'own'

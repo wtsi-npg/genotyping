@@ -69,7 +69,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 6;
+use Test::More tests => 8;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -98,8 +98,13 @@ sub make_fixture : Test(setup) {
   # Add some existing secondary metadata to be superseded
   $irods->add_object_avu($irods_path, 'dcterms:identifier',   '9999999999');
   $irods->add_object_avu($irods_path, 'study_id',             '10');
+  $irods->add_object_avu($irods_path, 'study_id',             '100');
   $irods->add_object_avu($irods_path, 'sample_consent',       '1');
   $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
+
+  # Add some ss_ group permissions to be removed
+  $irods->set_object_permissions('read', 'ss_10',  $irods_path);
+  $irods->set_object_permissions('read', 'ss_100', $irods_path);
 }
 
 sub teardown : Test(teardown) {
@@ -124,7 +129,7 @@ sub metadata : Test(2) {
   is($sequenom_well->{value}, 'A10', 'Well metadata is present');
 }
 
-sub update_secondary_metadata : Test(2) {
+sub update_secondary_metadata : Test(4) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
@@ -138,11 +143,15 @@ sub update_secondary_metadata : Test(2) {
     (name => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
+  my $expected_groups_before = ['ss_10', 'ss_100'];
+  my @groups_before = $data_object->get_groups;
+  is_deeply(\@groups_before, $expected_groups_before, 'Groups before update')
+    or diag explain \@groups_before;
+
   ok($data_object->update_secondary_metadata($snpdb, $ssdb));
 
   my $expected_meta =
     [{attribute => 'dcterms:identifier',      value => '0123456789'},
-     {attribute => 'manual_qc',               value => 1},
      {attribute => 'sample',                  value => 'sample1' },
      {attribute => 'sample_accession_number', value => 'A0123456789'},
      {attribute => 'sample_cohort',           value => 'AAA111222333'},
@@ -158,4 +167,10 @@ sub update_secondary_metadata : Test(2) {
   my $meta = $data_object->metadata;
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
+
+  my $expected_groups_after = ['ss_0'];
+  my @groups_after = $data_object->get_groups;
+
+  is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
+    or diag explain \@groups_after;
 }

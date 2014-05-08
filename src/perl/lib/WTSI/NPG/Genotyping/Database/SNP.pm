@@ -3,6 +3,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Database::SNP;
 
+use Cache::Cache qw($EXPIRES_NEVER);
 use Moose;
 
 use WTSI::NPG::Genotyping::Call;
@@ -14,9 +15,9 @@ extends 'WTSI::NPG::Database';
 with 'WTSI::NPG::Cacheable';
 
 # Method names for MOP operations
-our $FIND_SEQUENOM_PLATE_ID = 'find_sequenom_plate_id';
-our $FIND_PLATE_STATUS      = 'find_plate_status';
-our $FIND_WELL_STATUS       = 'find_well_status';
+our $FIND_SEQUENOM_PLATE_ID  = 'find_sequenom_plate_id';
+our $FIND_PLATE_STATUS       = 'find_plate_status';
+our $FIND_PLATE_WELLS_STATUS = '_find_plate_wells_status';
 
 our $PLATE_STATUS_GENOTYPING_DONE   = 'Genotyping Done';
 our $PLATE_STATUS_GENOTYPING_FAILED = 'Genotyping Failed';
@@ -198,6 +199,68 @@ sub find_sequenom_calls {
   return \%result;
 }
 
+=head2 find_updated_plate_names
+
+  Arg [1]    : start DateTime
+  Arg [2]    : end DateTime. Optional, defaults to start
+
+  Example    : $db->find_updated_plate_names($then, $now)
+  Description: Returns a list of names of plates whose status has been set
+               to its current value between start and end dates, inclusive.
+               Only the date part of the DateTime arguments is significant;
+               these arguments are cloned and truncated prior to
+               comparison.
+  Returntype : ArrayRef[Str]
+
+=cut
+
+sub find_updated_plate_names {
+  my ($self, $start_date, $end_date) = @_;
+
+  defined $start_date or
+    $self->logconfess('The start_date argument was undefined');
+
+  $end_date ||= $start_date;
+
+  my $start = $start_date->clone->truncate(to => 'day');
+  my $end   = $end_date->clone->truncate(to => 'day');
+
+  # Note the DISTINCT; it appears that the plate can be entered
+  # multiple times with the same and can have multiple "current"
+  # statuses (which should all be the same).
+  my $query =
+    qq(SELECT DISTINCT
+         dp.plate_name
+       FROM
+         dna_plate          dp,
+         dnaplate_status    dps,
+         dnaplatestatusdict dpsd,
+         dptypedict         dptd
+       WHERE
+           trunc(dps.status_date) >= to_date(?, 'YYYY-MM-DD')
+       AND trunc(dps.status_date) <= to_date(?, 'YYYY-MM-DD')
+       AND dp.id_dnaplate   = dps.id_dnaplate
+       AND dp.plate_type    = dptd.id_dict
+       AND dptd.description = 'mspec'
+       AND dps.is_current   = 1
+       AND dps.status       = dpsd.id_dict);
+
+  if ($start->compare($end) > 0) {
+    $self->logconfess("Start date '$start' was after end date '$end'");
+  }
+
+  $self->trace("Executing: '$query' with args [$start, $end]");
+  my $sth = $self->dbh->prepare($query);
+  $sth->execute($start->ymd('-'), $end->ymd('-'));
+
+  my @plates;
+  while (my $row = $sth->fetchrow_arrayref) {
+    push(@plates, $row->[0]);
+  }
+
+  return \@plates;
+}
+
 =head2 find_plate_passed
 
   Arg [1]    : A plate name from the Sequenom LIMS
@@ -279,20 +342,23 @@ sub find_plate_status {
     $self->logconfess('A non-empty plate_name argument is required');
 
   my $query =
-    qq(SELECT
-         dpsd.description
-       FROM
-         dna_plate          dp,
-         dnaplate_status    dps,
-         dnaplatestatusdict dpsd,
-         dptypedict         dptd
-       WHERE
-       dp.plate_name = ?
-       AND dp.id_dnaplate   = dps.id_dnaplate
-       AND dp.plate_type    = dptd.id_dict
-       AND dptd.description = 'mspec'
-       AND dps.is_current   = 1
-       AND dps.status       = dpsd.id_dict);
+    qq(SELECT description FROM
+         (SELECT
+            dpsd.description, dps.status_date
+          FROM
+            dna_plate          dp,
+            dnaplate_status    dps,
+            dnaplatestatusdict dpsd,
+            dptypedict         dptd
+          WHERE
+            dp.plate_name = ?
+          AND dp.id_dnaplate   = dps.id_dnaplate
+          AND dp.plate_type    = dptd.id_dict
+          AND dptd.description = 'mspec'
+          AND dps.is_current   = 1
+          AND dps.status       = dpsd.id_dict
+          ORDER BY dps.status_date DESC)
+        WHERE ROWNUM <= 1);
 
   $self->trace("Executing: '$query' with args [$plate_name]");
   my $sth = $self->dbh->prepare($query);
@@ -360,24 +426,6 @@ sub find_well_failed {
   return $status eq $WELL_STATUS_GENOTYPING_FAILED;
 }
 
-around $FIND_WELL_STATUS => sub {
-  my ($orig, $self, $plate_name, $map) = @_;
-
-  defined $plate_name or
-    $self->logconfess('A defined plate_name argument is required');
-  $plate_name or
-    $self->logconfess('A non-empty plate_name argument is required');
-
-  defined $map or $self->logconfess('A defined map argument is required');
-  $map or $self->logconfess('A non-empty map argument is required');
-
-  my $cache = $self->get_method_cache($meta->get_method($FIND_WELL_STATUS),
-                                      {default_expires_in => 60});
-  my $key = $plate_name . $map;
-
-  return $self->get_with_cache($cache, $key, $orig, $plate_name, $map);
-};
-
 =head2 find_well_status
 
   Arg [1]    : A plate name from the Sequenom LIMS
@@ -409,6 +457,22 @@ sub find_well_status {
     return $self->_find_plate_wells_status($plate_name)->{$map};
   }
 }
+
+# Reduce database access to one hit per plate
+around $FIND_PLATE_WELLS_STATUS => sub {
+  my ($orig, $self, $plate_name) = @_;
+
+  defined $plate_name or
+    $self->logconfess('A defined plate_name argument is required');
+  $plate_name or
+    $self->logconfess('A non-empty plate_name argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_PLATE_WELLS_STATUS), {default_expires_in => 180});
+  my $key = $plate_name;
+
+  return $self->get_with_cache($cache, $key, $orig, $plate_name);
+};
 
 sub _find_plate_wells_status {
   my ($self, $plate_name) = @_;
