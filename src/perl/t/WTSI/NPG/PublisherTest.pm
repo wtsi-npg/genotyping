@@ -7,7 +7,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 8;
+use Test::More tests => 10;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -37,7 +37,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Publisher');
 }
 
-sub publish_file : Test(6) {
+sub publish_file : Test(8) {
   my $irods = WTSI::NPG::iRODS->new;
   my $publisher = WTSI::NPG::Publisher->new(irods => $irods);
   my $time = DateTime->from_epoch(epoch => 0);
@@ -85,7 +85,10 @@ sub publish_file : Test(6) {
      '8eb0180f3f882bb2e6d29998d1a0d323', 'Updated md5');
   ok($updated_lorem_obj->get_avu('dcterms:modified'),
      'Added modification time');
+  is($updated_lorem_obj->calculate_checksum,
+     '8eb0180f3f882bb2e6d29998d1a0d323', 'Updated file contents');
+  ok($updated_lorem_obj->validate_checksum_metadata,
+     'New md5 metadata matches file');
 
   ok(!$lorem_obj->is_present, 'Update moved data object');
 }
-

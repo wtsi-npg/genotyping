@@ -1191,7 +1191,8 @@ sub find_objects_by_meta {
   Arg [1]    : iRODS data object name
 
   Example    : $cs = $irods->calculate_checksum('/my/path/lorem.txt')
-  Description: Return the MD5 checksum of an iRODS data object.
+  Description: Return the MD5 checksum of an iRODS data object. Uses -f
+               to force it to be up to date.
   Returntype : Str
 
 =cut
@@ -1209,7 +1210,7 @@ sub calculate_checksum {
 
   my @raw_checksum = WTSI::NPG::Runnable->new
     (executable  => $ICHKSUM,
-     arguments   => [$object],
+     arguments   => [$object, '-f'],
      environment => $self->environment,
      logger      => $self->logger)->run->split_stdout;
   unless (@raw_checksum) {

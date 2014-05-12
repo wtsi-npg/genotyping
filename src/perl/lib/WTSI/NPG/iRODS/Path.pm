@@ -112,7 +112,7 @@ sub get_avu {
   Arg [2]    : value (optional)
   Arg [2]    : units (optional)
 
-  Example    : my @avus = $path->get_find_in_metadata('foo')
+  Example    : my @avus = $path->find_in_metadata('foo')
   Description: Return all matching AVUs
   Returntype : Array
 
