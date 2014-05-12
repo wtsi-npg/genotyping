@@ -1210,7 +1210,7 @@ sub calculate_checksum {
 
   my @raw_checksum = WTSI::NPG::Runnable->new
     (executable  => $ICHKSUM,
-     arguments   => [$object, '-f'],
+     arguments   => ['-f', $object],
      environment => $self->environment,
      logger      => $self->logger)->run->split_stdout;
   unless (@raw_checksum) {
