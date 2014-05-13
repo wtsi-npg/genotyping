@@ -102,6 +102,7 @@ has 'acl_modifier' =>
 our $IGROUPADMIN = 'igroupadmin';
 our $ICD     = 'icd';
 our $ICHKSUM = 'ichksum';
+our $ICP     = 'icp';
 our $IGET    = 'iget';
 our $IMETA   = 'imeta';
 our $IMKDIR  = 'imkdir';
@@ -843,6 +844,63 @@ sub replace_object {
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
+}
+
+=head2 copy_object
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : iRODS data object name
+  Arg [3]    : iRODS metadata attribute translator (optional)
+
+  Example    : $irods->copy_object('/my/path/lorem.txt', '/my/path/ipsum.txt',
+                                   sub { 'copy_' . $_ })
+  Description: Copy a data object, including all of its metadata. The
+               optional third argument is a callback that may be used to
+               translate metadata attributes during the copy.
+  Returntype : Str
+
+=cut
+
+sub copy_object {
+  my ($self, $source, $target, $translator) = @_;
+
+  defined $source or
+    $self->logconfess('A defined source (object) argument is required');
+  defined $target or
+    $self->logconfess('A defined target (object) argument is required');
+
+  $source eq '' and
+    $self->logconfess('A non-empty source (object) argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (object) argument is required');
+
+  if (defined $translator) {
+    ref $translator eq 'CODE' or
+      $self->logconfess("translator argument must be a CodeRef");
+  }
+
+  $source = $self->_ensure_absolute_path($source);
+  $target = $self->_ensure_absolute_path($target);
+  $self->debug("Copying object from '$source' to '$target'");
+
+  WTSI::NPG::Runnable->new(executable  => $ICP,
+                           arguments   => [$source, $target],
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
+
+  $self->debug("Copying metadata from '$source' to '$target'");
+
+  my @source_meta = $self->get_object_meta($source);
+  foreach my $avu (@source_meta) {
+    my $attr = $avu->{attribute};
+    if ($translator) {
+      $attr = $translator->($attr);
+    }
+
+    $self->add_object_avu($target, $attr, $avu->{value}, $avu->{units});
+  }
+
+  return $target
 }
 
 =head2 move_object
