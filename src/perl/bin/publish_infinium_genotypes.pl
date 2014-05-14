@@ -114,6 +114,13 @@ sub run {
      inifile => $config,
      logger  => $log)->connect(RaiseError => 1);
 
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name    => 'sequencescape_warehouse',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
+
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
   my $file_test = modified_between($begin->epoch, $end->epoch);
@@ -159,6 +166,7 @@ sub run {
     (publication_time => $now,
      data_files       => \@files,
      infinium_db      => $ifdb,
+     ss_warehouse_db  => $ssdb,
      logger           => $log);
   $publisher->publish($publish_dest);
 

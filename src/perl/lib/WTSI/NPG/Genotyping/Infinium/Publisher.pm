@@ -5,6 +5,7 @@ package WTSI::NPG::Genotyping::Infinium::Publisher;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 use WTSI::NPG::Genotyping::Infinium::ResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
@@ -40,6 +41,12 @@ has 'resultsets' =>
 has 'infinium_db' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::Database::Infinium',
+   required => 1);
+
+has 'ss_warehouse_db' =>
+  (is       => 'ro',
+   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'Object',
    required => 1);
 
 sub BUILD {
@@ -157,10 +164,18 @@ sub _publish_file {
 
   my @meta = $self->make_infinium_metadata($if_sample);
   my @fingerprint = $self->infinium_fingerprint(@meta);
-  my $data_object = $publisher->publish_file($filename, \@fingerprint,
-                                             $publish_dest,
-                                             $self->publication_time);
-  return $data_object;
+  my $data_path = $publisher->publish_file($filename, \@fingerprint,
+                                           $publish_dest,
+                                           $self->publication_time);
+
+  # Now that adding the secondary metadata is fast enough, we can
+  # run it inline here, so that the data are available
+  # immediately.
+  my $obj = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
+    ($self->irods, $data_path);
+  $obj->update_secondary_metadata($self->ss_warehouse_db);
+
+  return $data_path;
 }
 
 sub _build_resultsets {
