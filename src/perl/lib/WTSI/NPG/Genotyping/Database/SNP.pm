@@ -433,7 +433,8 @@ sub find_well_failed {
 
   Example    : $db->find_well_status('my_plate_name', 'A01')
   Description: Given the name of a Sequenom LIMS well, return the QC status
-               string used by SNP to denote pass/fail.
+               string used by SNP to denote pass/fail. This is 'OK' for a
+               pass and 'No call' for a fail.
 
   Returntype : Str
 
