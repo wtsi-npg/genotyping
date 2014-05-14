@@ -66,7 +66,7 @@ sub find_finished_plate_names {
   Description: Returns details of the Sequenom assay results for a plate.
                The plate's results are returned as a hashref keyed on well
                address. Each hash value is an arrayref of result records
-               which are themselves hashrefs with the folowwing keys and
+               which are themselves hashrefs with the following keys and
                values:
                {customer   => <customer name string>,
                 project    => <project name string>,

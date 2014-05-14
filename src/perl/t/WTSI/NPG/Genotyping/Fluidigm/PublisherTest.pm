@@ -1,6 +1,40 @@
 
 use utf8;
 
+{
+  package WTSI::NPG::Database::WarehouseStub;
+
+  use strict;
+  use warnings;
+  use Carp;
+
+  use base 'WTSI::NPG::Database';
+
+  sub find_fluidigm_sample_by_plate {
+    my ($self, $fluidigm_barcode, $well) = @_;
+
+    $well eq 'S01' or
+      confess "WarehouseStub expected well argument 'S01' but got '$well'";
+
+    return {internal_id        => 123456789,
+            sanger_sample_id   => '0123456789',
+            consent_withdrawn  => 0,
+            uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
+            name               => 'sample1',
+            common_name        => 'Homo sapiens',
+            supplier_name      => 'aaaaaaaaaa',
+            accession_number   => 'A0123456789',
+            gender             => 'Female',
+            cohort             => 'AAA111222333',
+            control            => 'XXXYYYZZZ',
+            study_id           => 0,
+            barcode_prefix     => 'DN',
+            barcode            => '0987654321',
+            plate_purpose_name => 'Fluidigm',
+            map                => 'S01'};
+  }
+}
+
 package WTSI::NPG::Genotyping::Fluidigm::PublisherTest;
 
 use strict;
@@ -8,7 +42,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 11;
+use Test::More tests => 44;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -21,12 +55,16 @@ use WTSI::NPG::iRODS;
 
 my $data_path = './t/fluidigm_publisher';
 my $fluidigm_directory = "$data_path/0123456789";
+my $fluidigm_repub_directory = "$data_path/repub/0123456789";
 my $snpset_file = 'qc.csv';
 
 my $resultset;
 my $irods_tmp_coll;
 
 my $pid = $$;
+
+# Database handle stubs
+my $ssdb;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
@@ -41,6 +79,10 @@ sub make_fixture : Test(setup) {
 
   $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_directory);
+
+  $ssdb = WTSI::NPG::Database::WarehouseStub->new
+    (name    => 'sequencescape_warehouse',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 }
 
 sub teardown : Test(teardown) {
@@ -59,15 +101,17 @@ sub constructor : Test(1) {
 
   new_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher',
          [publication_time => $publication_time,
-          resultset        => $resultset]);
+          resultset        => $resultset,
+          ss_warehouse_db  => $ssdb]);
 }
 
-sub publish : Test(4) {
+sub publish : Test(20) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
-     resultset        => $resultset);
+     resultset        => $resultset,
+     ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
   my $num_published = $publisher->publish($irods_tmp_coll,
@@ -92,39 +136,85 @@ sub publish : Test(4) {
   cmp_ok(scalar @chunked_data, '==', scalar @addresses_to_publish,
          "Number of chunks published with fluidigm_plate metadata");
 
-  @chunked_data =
+  my @chunked_audience =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [fluidigm_plate     => '1381735059'],
                                  [fluidigm_well      => 'S01'],
                                  [fluidigm_plex      => 'qc'],
                                  ['dcterms:audience' => "$audience%", 'like']);
-  cmp_ok(scalar @chunked_data, '==', 0,
+  cmp_ok(scalar @chunked_audience, '==', 0,
          "Number of chunks published with dcterms:audience metadata");
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'fluidigm_plate',          value => '1381735059'},
+     {attribute => 'fluidigm_well',           value => 'S01'},
+     {attribute => 'md5',
+      value     => 'f5f1aaa74edd3167a95b9081ebcc3a40' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $data_path = $chunked_data[0];
+  test_metadata($irods, $data_path, $expected_meta);
 }
 
-sub publish_overwrite : Test(2) {
+sub publish_overwrite : Test(19) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
-     resultset        => $resultset);
+     resultset        => $resultset,
+     ss_warehouse_db  => $ssdb);
+
+  my $repub_resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
+    (directory => $fluidigm_repub_directory);
+  my $republisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
+    (publication_time => $publication_time,
+     resultset        => $repub_resultset,
+     ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
-  # Publish
-  $publisher->publish($irods_tmp_coll, @addresses_to_publish);
-  # Publishing again should be a no-op
-  my $num_published = $publisher->publish($irods_tmp_coll,
-                                          @addresses_to_publish);
-  cmp_ok($num_published, '==', 1, "Number of chunks published");
+
+  cmp_ok($publisher->publish($irods_tmp_coll, @addresses_to_publish), '==', 1,
+         'Number of wells published');
+
+  cmp_ok($republisher->publish($irods_tmp_coll, @addresses_to_publish), '==', 1,
+         'Number of wells re-published');
 
   my $irods = WTSI::NPG::iRODS->new;
-  my @data_objects =
+  my @republished_data =
     $irods->find_objects_by_meta($irods_tmp_coll,
                                  [fluidigm_plate => '1381735059'],
                                  [fluidigm_well  => 'S01'],
                                  [fluidigm_plex  => 'qc']);
-  cmp_ok(scalar @data_objects, '==', scalar @addresses_to_publish,
-         "Number of chunks published with fluidigm_plate metadata");
+  cmp_ok(scalar @republished_data, '==', scalar @addresses_to_publish,
+         "Number of wells re-published with fluidigm_plate metadata");
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'fluidigm_plate',          value => '1381735059'},
+     {attribute => 'fluidigm_well',           value => 'S01'},
+     {attribute => 'md5',
+      value     => 'ac6f6e164a64a21ad8ec379b6d9226e6' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $data_path = $republished_data[0];
+  test_metadata($irods, $data_path, $expected_meta, 1);
 }
 
 sub publish_ambiguous_snpset : Test(1) {
@@ -142,7 +232,8 @@ sub publish_ambiguous_snpset : Test(1) {
   my $publication_time = DateTime->now;
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
-     resultset        => $resultset);
+     resultset        => $resultset,
+     ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
   ok(!$publisher->publish($irods_tmp_coll, @addresses_to_publish),
@@ -160,11 +251,34 @@ sub publish_ambiguous_metadata : Test(1) {
   my $publication_time = DateTime->now;
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
-     resultset        => $resultset);
+     resultset        => $resultset,
+     ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
   ok(!$publisher->publish($irods_tmp_coll, @addresses_to_publish),
      'Failed to publish with abmiguous SNP set metadata');
+}
+
+sub test_metadata {
+  my ($irods, $data_path, $expected_metadata, $is_modified) = @_;
+
+  my $data_object = WTSI::NPG::iRODS::DataObject->new($irods, $data_path);
+
+  ok($data_object->get_avu('dcterms:created'),  'Has dcterms:created');
+  ok($data_object->get_avu('dcterms:creator'),  'Has dcterms:creator');
+
+  if ($is_modified) {
+    ok($data_object->get_avu('dcterms:modified'), 'Has dcterms:modified');
+  }
+  else {
+    ok(!$data_object->get_avu('dcterms:modified'), 'Has no dcterms:modified');
+  }
+
+  foreach my $avu (@$expected_metadata) {
+    my $attr  = $avu->{attribute};
+    my $value = $avu->{value};
+    ok($data_object->find_in_metadata($attr, $value), "Found $attr => $value");
+  }
 }
 
 1;

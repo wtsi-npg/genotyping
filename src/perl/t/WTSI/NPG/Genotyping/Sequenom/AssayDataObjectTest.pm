@@ -4,10 +4,9 @@ use utf8;
 {
   package WTSI::NPG::Genotyping::Database::SNPStub;
 
-  use strict;
-  use warnings;
+  use Moose;
 
-  use base 'WTSI::NPG::Genotyping::Database::SNP';
+  extends 'WTSI::NPG::Genotyping::Database::SNP';
 
   Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -22,16 +21,21 @@ use utf8;
   sub find_well_status {
     return 'OK';
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
-  use warnings;
   use Carp;
+  use Moose;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
 
   Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -60,6 +64,12 @@ use utf8;
             plate_purpose_name => 'Sequenom',
             map                => 'A10'};
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 package WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest;

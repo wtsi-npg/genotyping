@@ -14,7 +14,7 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::SimplePublisher;
+use WTSI::NPG::Publisher;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
   'WTSI::NPG::Genotyping::Annotator';
@@ -69,6 +69,12 @@ has 'snpsets' =>
    required => 1,
    lazy     => 1,
    builder  => '_build_snpsets');
+
+has 'ss_warehouse_db' =>
+  (is       => 'ro',
+   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'Object',
+   required => 1);
 
 sub BUILD {
   my ($self) = @_;
@@ -131,7 +137,7 @@ sub publish_samples {
     @addresses = @{$export_file->addresses};
   }
 
-  my $publisher = WTSI::NPG::SimplePublisher->new
+  my $publisher = WTSI::NPG::Publisher->new
     (irods         => $self->irods,
      accountee_uid => $self->accountee_uid,
      logger        => $self->logger);
@@ -173,9 +179,14 @@ sub publish_samples {
       my $snpset = $self->_find_resultset_snpset($resultset);
       my $snpset_name = $self->_find_snpset_name($snpset);
 
-      WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-          ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
-                                              $snpset_name);
+      my $obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+        ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
+                                            $snpset_name);
+
+      # Now that adding the secondary metadata is fast enough, we can
+      # run it inline here, so that the data are available
+      # immediately.
+      $obj->update_secondary_metadata($self->ss_warehouse_db);
 
       ++$num_published;
     };
