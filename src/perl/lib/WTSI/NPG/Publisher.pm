@@ -157,6 +157,8 @@ sub publish_file {
         $target_obj->remove_avu($avu->{attribute}, $avu->{value});
       }
 
+      $irods->replace_object($file, $target_obj->str);
+
       push(@meta, $self->make_md5_metadata($file));
       push(@meta, $self->make_modification_metadata($time));
     }

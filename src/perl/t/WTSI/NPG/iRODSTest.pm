@@ -11,7 +11,7 @@ use List::AllUtils qw(all any none);
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 147;
+use Test::More tests => 162;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -518,6 +518,53 @@ sub replace_object : Test(3) {
     'Failed to replace an undefined object';
   dies_ok { $irods->replace_object(undef, $to_replace) }
     'Failed to replace an object with an undefined file';
+}
+
+sub copy_object : Test(15) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $num_attrs = 8;
+  my %meta = map { 'dattr' . $_ => 'dval' . $_ } 0 .. $num_attrs;
+
+  my $lorem_file = "$data_path/lorem.txt";
+  my $object_to_copy = "$irods_tmp_coll/lorem_to_copy.txt";
+  my $object_copied = "$irods_tmp_coll/lorem_copied.txt";
+  $irods->add_object($lorem_file, $object_to_copy);
+
+  foreach my $attr (keys %meta) {
+    is($irods->add_object_avu($object_to_copy, $attr, $meta{$attr}),
+       $object_to_copy);
+  }
+
+  my $expected_meta = [{attribute => 'copy_dattr0', value => 'dval0'},
+                       {attribute => 'copy_dattr1', value => 'dval1'},
+                       {attribute => 'copy_dattr2', value => 'dval2'},
+                       {attribute => 'copy_dattr3', value => 'dval3'},
+                       {attribute => 'copy_dattr4', value => 'dval4'},
+                       {attribute => 'copy_dattr5', value => 'dval5'},
+                       {attribute => 'copy_dattr6', value => 'dval6'},
+                       {attribute => 'copy_dattr7', value => 'dval7'},
+                       {attribute => 'copy_dattr8', value => 'dval8'}];
+
+  my $translator = sub { 'copy_' . $_[0] };
+
+  is($irods->copy_object($object_to_copy, $object_copied, $translator),
+     $object_copied, 'Copied a data object');
+
+  ok($irods->list_object($object_to_copy), 'Object was copied 1');
+  ok($irods->list_object($object_copied),  'Object was copied 2');
+
+  my @observed_meta = sort { $a->{attribute} cmp $b->{attribute} ||
+                             $a->{value}     cmp $b->{value} }
+    $irods->get_object_meta($object_copied);
+
+  is_deeply(\@observed_meta, $expected_meta,
+            'Copied object metadata found') or diag explain \@observed_meta;
+
+  dies_ok { $irods->copy_object($object_to_copy, undef) }
+    'Failed to copy an object to an undefined place';
+  dies_ok { $irods->copy_object(undef, $object_copied) }
+    'Failed to copy an undefined object';
 }
 
 sub move_object : Test(5) {

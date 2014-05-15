@@ -43,6 +43,7 @@ sub run {
   my $log4perl_config;
   my $publish_dest;
   my $verbose;
+  my $stdio;
 
   my @sources;
 
@@ -54,19 +55,30 @@ sub run {
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
              'source=s'   => \@sources,
-             'verbose'    => \$verbose);
+             'verbose'    => \$verbose,
+             ''           => \$stdio); # Permits a trailing '-' for STDIN
+
+  if ($stdio) {
+    if (@sources) {
+      pod2usage(-msg => "The --source option is " .
+                "incompatible with reading from STDIN\n",
+                -exitval => 2);
+    }
+  }
+  else {
+    unless (@sources) {
+      pod2usage(-msg => "A --source argument is required\n",
+                -exitval => 2);
+    }
+  }
 
   unless ($publish_dest) {
     pod2usage(-msg => "A --dest argument is required\n",
               -exitval => 2);
   }
-  unless (@sources) {
-    pod2usage(-msg => "A --source argument is required\n",
-              -exitval => 2);
-  }
 
-  $config ||= $DEFAULT_INI;
-  $days ||= $DEFAULT_DAYS;
+  $config   ||= $DEFAULT_INI;
+  $days     ||= $DEFAULT_DAYS;
   $days_ago ||= 0;
 
   my $log;
@@ -102,35 +114,59 @@ sub run {
      inifile => $config,
      logger  => $log)->connect(RaiseError => 1);
 
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name    => 'sequencescape_warehouse',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
+
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
   my $file_test = modified_between($begin->epoch, $end->epoch);
   my $file_regex = qr{.(gtc|idat)$}i;
   my $relative_depth = 2;
 
+  @sources = map { abs_path($_) } @sources;
+
   my @files;
-
-  foreach my $source (@sources) {
-    my $source_dir = abs_path($source);
-    $log->info("Publishing from '$source_dir' to '$publish_dest' Infinium ",
-               "results last modified between ",
-               $begin->iso8601, " and ", $end->iso8601);
-
-    foreach my $dir (collect_dirs($source_dir, $file_test, $relative_depth)) {
-      $log->debug("Checking directory '$dir'");
-      my @found = collect_files($dir, $file_test, $relative_depth, $file_regex);
-      $log->debug("Found ", scalar @found, " matching items in '$dir'");
-      push @files, @found;
+  if ($stdio) {
+    while (my $line = <>) {
+      chomp $line;
+      push @files, $line;
+    }
+  }
+  else {
+    foreach my $source (@sources) {
+      foreach my $dir (collect_dirs($source, $file_test, $relative_depth)) {
+        $log->debug("Checking directory '$dir'");
+        my @found = collect_files($dir, $file_test, $relative_depth,
+                                  $file_regex);
+        $log->debug("Found ", scalar @found, " matching items in '$dir'");
+        push @files, @found;
+      }
     }
   }
 
   @files = uniq(@files);
-  $log->debug("Found ", scalar @files, " unique files");
+  my $total = scalar @files;
+
+  if ($stdio) {
+    $log->info("Publishing $total files in file list");
+  }
+  else {
+    $log->info("Publishing from ", join(", ", @sources),
+               " to '$publish_dest' Infinium results last modified between ",
+               $begin->iso8601, " and ", $end->iso8601);
+
+    $log->debug("Publishing $total files");
+  }
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
      infinium_db      => $ifdb,
+     ss_warehouse_db  => $ssdb,
      logger           => $log);
   $publisher->publish($publish_dest);
 
@@ -145,8 +181,8 @@ publish_infinium_genotypes
 
 =head1 SYNOPSIS
 
-publish_sample_data [--config <database .ini file>] \
-   [--days-ago <n>] [--days <n>] \
+publish_infinium_genotypes [--config <database .ini file>]
+   [--days-ago <n>] [--days <n>]
    --source <directory> --dest <irods collection>
 
 Options:
