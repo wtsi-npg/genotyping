@@ -112,7 +112,7 @@ sub update_secondary_metadata : Test(4) {
     ($irods, "$irods_tmp_coll/1381735059/$data_file");
 
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $expected_groups_before = ['ss_10', 'ss_100'];

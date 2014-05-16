@@ -8,27 +8,59 @@ use utf8;
 
   extends 'WTSI::NPG::Genotyping::Database::Infinium';
 
+  has 'test_chip_design' =>
+    (is       => 'rw',
+     isa      => 'Str',
+     required => 0,
+     default  => sub { 'design1' });
+
   my $root = "./t/infinium_publisher";
-  my $sample =
-    {project           => 'project1',
-     plate             => 'plate1',
-     well              => 'A10',
-     sample            => 'sample1',
-     beadchip          => '012345689',
-     beadchip_section  => 'R01C01',
-     beadchip_design   => 'design1',
-     beadchip_revision => '1',
-     status            => 'Pass',
-     gtc_path          => "$root/gtc/0123456789/0123456789_R01C01.gtc",
-     idat_grn_path     => "$root/idat/0123456789/0123456789_R01C01_Grn.idat",
-     idat_red_path     => "$root/idat/0123456789/0123456789_R01C01_Red.idat"};
 
   sub find_scanned_sample {
-    return $sample;
+    my ($self, $filename) = @_;
+
+    return
+      {project           => 'project1',
+       plate             => 'plate1',
+       well              => 'A10',
+       sample            => 'sample1',
+       beadchip          => '012345689',
+       beadchip_section  => 'R01C01',
+       beadchip_design   => $self->test_chip_design,
+       beadchip_revision => '1',
+       status            => 'Pass',
+       gtc_path          => "$root/gtc/0123456789/0123456789_R01C01.gtc",
+       idat_grn_path     => "$root/idat/0123456789/0123456789_R01C01_Grn.idat",
+       idat_red_path     => "$root/idat/0123456789/0123456789_R01C01_Red.idat"}
   }
 
   sub find_called_sample {
-    return $sample;
+     my ($self, $filename) = @_;
+
+    return
+      {project           => 'project1',
+       plate             => 'plate1',
+       well              => 'A10',
+       sample            => 'sample1',
+       beadchip          => '012345689',
+       beadchip_section  => 'R01C01',
+       beadchip_design   => $self->test_chip_design,
+       beadchip_revision => '1',
+       status            => 'Pass',
+       gtc_path          => "$root/gtc/0123456789/0123456789_R01C01.gtc",
+       idat_grn_path     => "$root/idat/0123456789/0123456789_R01C01_Grn.idat",
+       idat_red_path     => "$root/idat/0123456789/0123456789_R01C01_Red.idat"}
+  }
+
+  sub is_methylation_chip_design {
+    my ($self, $chip_design) = @_;
+
+    if ($chip_design eq 'methylation_design1') {
+      return 1;
+    }
+    else {
+      return 0;
+    }
   }
 
   __PACKAGE__->meta->make_immutable;
@@ -86,7 +118,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 116;
+use Test::More tests => 159;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -136,6 +168,9 @@ my @data_files = ("$data_path/gtc/0123456789/0123456789_R01C01.gtc",
                   "$data_path/idat/0123456799/0123456799_R02C04_Grn.idat",
                   "$data_path/idat/0123456799/0123456799_R02C04_Red.idat");
 
+my @methyl_files = ("$data_path/idat/0123456799/0123456799_R02C04_Grn.idat",
+                    "$data_path/idat/0123456799/0123456799_R02C04_Red.idat");
+
 my @repub_files =
   ("$data_path/repub/gtc/0123456789/0123456789_R01C01.gtc",
    "$data_path/repub/idat/0123456789/0123456789_R01C01_Grn.idat",
@@ -181,7 +216,7 @@ sub constructor : Test(1) {
           publication_time => $publication_time]);
 }
 
-sub resultsets : Test(1) {
+sub resultsets : Test(2) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
@@ -191,7 +226,21 @@ sub resultsets : Test(1) {
      publication_time => $publication_time);
 
   cmp_ok(scalar @{$publisher->resultsets}, '==', 6,
-         'Found only complete resultsets');
+         'Found only complete resultsets 1');
+
+  my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
+    (name             => 'infinium',
+     test_chip_design => 'methylation_design1',
+     inifile          => $config)->connect(RaiseError => 1);
+
+ my $methyl_publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+   (data_files       => \@data_files,
+    infinium_db      => $ifdb_mod,
+    ss_warehouse_db  => $ssdb,
+    publication_time => $publication_time);
+
+  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 7,
+         'Found only complete resultsets 2');
 }
 
 sub publish : Test(55) {
@@ -239,6 +288,55 @@ sub publish : Test(55) {
      {attribute => 'study_id',                value => '0'}];
 
   foreach my $data_path (@gtc_files, @idat_files) {
+    test_metadata($irods, $data_path, $expected_meta);
+  }
+}
+
+sub publish_methylation : Test(42) {
+  my $publication_time = DateTime->now;
+
+  my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
+    (name             => 'infinium',
+     test_chip_design => 'methylation_design1',
+     inifile          => $config)->connect(RaiseError => 1);
+
+  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+    (data_files       => \@methyl_files,
+     infinium_db      => $ifdb_mod,
+     ss_warehouse_db  => $ssdb,
+     publication_time => $publication_time);
+
+  cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
+         'Number of resultsets prepared');
+
+  my $methyl_coll = "$irods_tmp_coll/methyl";
+  cmp_ok($publisher->publish($methyl_coll), '==', 2,
+         'Number of files published');
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my @idat_files = $irods->find_objects_by_meta($methyl_coll,
+                                                [infinium_plate => 'plate1'],
+                                                [infinium_well  => 'A10'],
+                                                [type           => 'idat']);
+  cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published');
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'infinium_plate',          value => 'plate1'},
+     {attribute => 'infinium_well',           value => 'A10'},
+     {attribute => 'md5',
+      value     => 'd41d8cd98f00b204e9800998ecf8427e'}, # MD5 of empty file
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  foreach my $data_path (@idat_files) {
     test_metadata($irods, $data_path, $expected_meta);
   }
 }

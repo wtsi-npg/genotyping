@@ -7,6 +7,31 @@ use Moose;
 
 extends 'WTSI::NPG::Database';
 
+with 'WTSI::NPG::Cacheable';
+
+# Method names for MOP operations
+our $FIND_PROJECT_CHIP_DESIGN   = 'find_project_chip_design';
+our $IS_METHYLATION_CHIP_DESIGN = 'is_methylation_chip_design';
+our $FIND_SCANNED_SAMPLE        = 'find_scanned_sample';
+our $FIND_CALLED_SAMPLE         = 'find_called_sample';
+
+my $meta = __PACKAGE__->meta;
+
+around $FIND_PROJECT_CHIP_DESIGN => sub {
+  my ($orig, $self, $project_title) = @_;
+
+ defined $project_title or
+    $self->logconfess('A defined project_title argument is required');
+  $project_title or
+    $self->logconfess('A non-empty project_title argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_PROJECT_CHIP_DESIGN), {default_expires_in => 600});
+  my $key = $project_title;
+
+  return $self->get_with_cache($cache, $key, $orig, $project_title);
+};
+
 =head2 find_project_chip_design
 
   Arg [1]    : string
@@ -21,7 +46,9 @@ sub find_project_chip_design {
   my ($self, $project_title) = @_;
 
   defined $project_title or
-    $self->logconfess('The project_title argument was undefined');
+    $self->logconfess('A defined project_title argument is required');
+  $project_title or
+    $self->logconfess('A non-empty project_title argument is required');
 
   my $query =
     qq(SELECT DISTINCT
@@ -56,6 +83,57 @@ sub find_project_chip_design {
   return @chip_designs;
 }
 
+around $IS_METHYLATION_CHIP_DESIGN => sub {
+  my ($orig, $self, $chip_design) = @_;
+
+ defined $chip_design or
+    $self->logconfess('A defined chip_design argument is required');
+  $chip_design or
+    $self->logconfess('A non-empty chip_design argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($IS_METHYLATION_CHIP_DESIGN),
+     {default_expires_in => 600});
+  my $key = $chip_design;
+
+  return $self->get_with_cache($cache, $key, $orig, $chip_design);
+};
+
+sub is_methylation_chip_design {
+  my ($self, $chip_design) = @_;
+
+ defined $chip_design or
+   $self->logconfess('A defined chip_design argument is required');
+  $chip_design or
+    $self->logconfess('A non-empty chip_design argument is required');
+
+  my $query =
+    qq(SELECT
+         pl.name
+       FROM
+         productdefinition pd,
+         productline       pl
+       WHERE
+         pd.product_name        = ?
+         AND pd.product_line_id = pl.product_line_id);
+
+  $self->trace("Executing: '$query' with args [$chip_design]");
+  my $sth = $self->dbh->prepare($query);
+  my $rc = $sth->execute($chip_design);
+
+  my @lines;
+  while (my ($name) = $sth->fetchrow_array) {
+    push(@lines, $name);
+  }
+
+  unless (@lines) {
+    $self->logconfess("Failed to find any product lines matching ",
+                      "chip design '$chip_design'");
+  }
+
+  return (grep { $_ eq 'Infinium HD Methylation' } @lines) ? 1 : 0
+}
+
 =head2 find_project_samples
 
   Arg [1]    : string
@@ -85,17 +163,17 @@ sub find_project_samples {
 
   my $query =
     qq(SELECT
-         projecti.item AS [project],
-         platei.item AS [plate],
-         well.alpha_coordinate AS [well],
-         samplei.item AS [sample],
-         chipi.item AS [beadchip],
+         projecti.item             AS [project],
+         platei.item               AS [plate],
+         well.alpha_coordinate     AS [well],
+         samplei.item              AS [sample],
+         chipi.item                AS [beadchip],
          samplesectd.section_label AS [beadchip_section],
-         productd.product_name AS [beadchip_design],
+         productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
-         statusav.appvalue AS [status],
-         callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name AS [idat_red_path],
+         statusav.appvalue         AS [status],
+         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
+         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
@@ -157,8 +235,8 @@ sub find_project_samples {
            ON callfile.status_id = statusav.appvalueid
 
          LEFT OUTER JOIN intensityfile redintensityfile
-           ON redintensityfile.imaging_event_id = callfile.imaging_event_id
-           AND redintensityfile.project_usage_id = projectuse.project_usage_id
+           -- ON redintensityfile.imaging_event_id  = callfile.imaging_event_id
+           ON redintensityfile.project_usage_id = projectuse.project_usage_id
          LEFT OUTER JOIN appvalue redchannelav
            ON redintensityfile.channel_id = redchannelav.appvalueid
 
@@ -168,8 +246,8 @@ sub find_project_samples {
            ON redparentdir.parent_directory_id = redappfile.parent_directory_id
 
          LEFT OUTER JOIN intensityfile greenintensityfile
-           ON greenintensityfile.imaging_event_id = callfile.imaging_event_id
-           AND greenintensityfile.project_usage_id = projectuse.project_usage_id
+           -- ON greenintensityfile.imaging_event_id = callfile.imaging_event_id
+           ON greenintensityfile.project_usage_id = projectuse.project_usage_id
          LEFT OUTER JOIN appvalue greenchannelav
            ON greenintensityfile.channel_id = greenchannelav.appvalueid
 
@@ -179,11 +257,11 @@ sub find_project_samples {
           ON greenparentdir.parent_directory_id = greenappfile.parent_directory_id
 
        WHERE
-          projecti.item = ?
-          AND projectav.appvaluetype = 'Project'
-	      AND sampleav.appvaluetype = 'Sample'
+          projecti.item                = ?
+          AND projectav.appvaluetype   = 'Project'
+	      AND sampleav.appvaluetype    = 'Sample'
 	      AND containerav.appvaluetype = 'SamplePlate'
-	      AND sectionav.appvaluetype = 'SampleSection'
+	      AND sectionav.appvaluetype   = 'SampleSection'
 
           AND (redchannelav.appvaluetype = 'Red'
                OR redchannelav.appvaluetype IS NULL)
@@ -211,6 +289,21 @@ sub find_project_samples {
   return \@samples;
 }
 
+around $FIND_SCANNED_SAMPLE => sub {
+  my ($orig, $self, $filename) = @_;
+
+  defined $filename or
+    $self->logconfess('A defined filename argument is required');
+  $filename or
+    $self->logconfess('A non-empty filename argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_SCANNED_SAMPLE), {default_expires_in => 600});
+  my $key = $filename;
+
+  return $self->get_with_cache($cache, $key, $orig, $filename);
+};
+
 =head2 find_scanned_sample
 
   Arg [1]    : string
@@ -237,22 +330,24 @@ sub find_project_samples {
 sub find_scanned_sample {
   my ($self, $filename) = @_;
 
-   defined $filename or
-     $self->logconfess('The filename argument was undefined');
+  defined $filename or
+    $self->logconfess('A defined filename argument is required');
+  $filename or
+    $self->logconfess('A non-empty filename argument is required');
 
   my $query =
     qq(SELECT
-         projecti.item AS [project],
-         platei.item AS [plate],
-         well.alpha_coordinate AS [well],
-         samplei.item AS [sample],
-         chipi.item AS [beadchip],
+         projecti.item             AS [project],
+         platei.item               AS [plate],
+         well.alpha_coordinate     AS [well],
+         samplei.item              AS [sample],
+         chipi.item                AS [beadchip],
          samplesectd.section_label AS [beadchip_section],
-         productd.product_name AS [beadchip_design],
+         productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
-         statusav.appvalue AS [status],
-         callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name AS [idat_red_path],
+         statusav.appvalue         AS [status],
+         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
+         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
@@ -267,6 +362,7 @@ sub find_scanned_sample {
            ON sampleassn.sample_container_id = samplecon.sample_container_id
          INNER JOIN item platei
            ON samplecon.itemid = platei.itemid
+
          INNER JOIN appvalue containerav
            ON platei.itemtypeid = containerav.appvalueid
          INNER JOIN samplewell well
@@ -368,6 +464,21 @@ sub find_scanned_sample {
   return shift @samples;
 }
 
+around $FIND_CALLED_SAMPLE => sub {
+  my ($orig, $self, $filename) = @_;
+
+  defined $filename or
+    $self->logconfess('A defined filename argument is required');
+  $filename or
+    $self->logconfess('A non-empty filename argument is required');
+
+  my $cache = $self->get_method_cache
+    ($meta->get_method($FIND_CALLED_SAMPLE), {default_expires_in => 600});
+  my $key = $filename;
+
+  return $self->get_with_cache($cache, $key, $orig, $filename);
+};
+
 =head2 find_called_sample
 
   Arg [1]    : string
@@ -394,22 +505,23 @@ sub find_called_sample {
   my ($self, $filename) = @_;
 
   defined $filename or
-    $self->logconfess('The filename argument was undefined');
+    $self->logconfess('A defined filename argument is required');
+  $filename or
+    $self->logconfess('A non-empty filename argument is required');
 
   my $query =
     qq(SELECT
-         projecti.item AS [project],
-         platei.item AS [plate],
-         well.alpha_coordinate AS [well],
-         samplei.item AS [sample],
-         chipi.item AS [beadchip],
+         projecti.item             AS [project],
+         platei.item               AS [plate],
+         well.alpha_coordinate     AS [well],
+         samplei.item              AS [sample],
+         chipi.item                AS [beadchip],
          samplesectd.section_label AS [beadchip_section],
-         productd.product_name AS [beadchip_design],
+         productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
-         statusav.appvalue AS [status],
-
-         callparentdir.path + '\\' + callappfile.file_name AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name AS [idat_red_path],
+         statusav.appvalue         AS [status],
+         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
+         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
