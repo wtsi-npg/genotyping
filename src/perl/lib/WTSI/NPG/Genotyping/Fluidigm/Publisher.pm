@@ -56,7 +56,8 @@ has 'reference_zone' =>
   (is       => 'ro',
    isa      => 'Str',
    required => 1,
-   writer => '_set_reference_zone');
+   default  => sub { return '/' },
+   writer   => '_set_reference_zone');
 
 has 'resultset' =>
   (is       => 'ro',
