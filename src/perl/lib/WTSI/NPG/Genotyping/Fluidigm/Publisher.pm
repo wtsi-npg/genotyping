@@ -56,7 +56,7 @@ has 'reference_zone' =>
   (is       => 'ro',
    isa      => 'Str',
    required => 1,
-   default  => '/');
+   writer => '_set_reference_zone');
 
 has 'resultset' =>
   (is       => 'ro',
@@ -81,6 +81,13 @@ sub BUILD {
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
+
+  # Ensure that a zone used as a surrogate for an iRODS path has a
+  # leading slash
+  my $zone = $self->reference_zone;
+  unless ($zone =~ m{^/}) {
+    $self->_set_reference_zone('/' . $zone);
+  }
 }
 
 =head2 publish

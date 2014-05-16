@@ -138,7 +138,7 @@ sub validate_checksum_metadata {
 
   Example    : $path->add_avu('foo', 'bar')
   Description: Add an AVU to an iRODS path (data object or collection)
-               Return self.
+               Return self. Clear the metadata cache.
   Returntype : WTSI::NPG::iRODS::DataObject
 
 =cut
@@ -169,7 +169,7 @@ sub add_avu {
 
   Example    : $path->remove_avu('foo', 'bar')
   Description: Remove an AVU from an iRODS path (data object or collection)
-               Return self.
+               Return self. Clear the metadata cache.
   Returntype : WTSI::NPG::iRODS::DataObject
 
 =cut
@@ -199,7 +199,7 @@ sub remove_avu {
   Example    : $path->supersede_avus('foo', 'bar')
   Description: Replace an AVU from an iRODS path (data object or collection)
                while removing any existing AVUs having under the same
-               attribute. Return self.
+               attribute. Return self. Clear the metadata cache.
   Returntype : WTSI::NPG::iRODS::DataObject
 
 =cut

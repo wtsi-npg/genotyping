@@ -78,7 +78,7 @@ sub absolute {
 
   Example    : $path->add_avu('foo', 'bar')
   Description: Add an AVU to an iRODS path (data object or collection)
-               Return self.
+               Return self. Clear the metadata cache.
   Returntype : WTSI::NPG::iRODS::Collection
 
 =cut
@@ -108,7 +108,7 @@ sub add_avu {
 
   Example    : $path->remove_avu('foo', 'bar')
   Description: Remove an AVU from an iRODS path (data object or collection)
-               Return self.
+               Return self. Clear the metadata cache.
   Returntype : WTSI::NPG::iRODS::Collection
 
 =cut

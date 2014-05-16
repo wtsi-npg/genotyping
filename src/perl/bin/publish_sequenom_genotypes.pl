@@ -12,7 +12,9 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
+use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Sequenom;
+use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::Sequenom::Publisher;
 
 my $embedded_conf = q(
@@ -100,6 +102,17 @@ sub run {
      inifile => $config,
      logger  => $log)->connect(RaiseError => 1);
 
+  my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+    (name    => 'snp',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError => 1);
+
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name   => 'sequencescape_warehouse',
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
+                                   mysql_auto_reconnect => 1);
+
   my @plate_names;
   if ($stdio) {
     while (my $line = <>) {
@@ -130,6 +143,8 @@ sub run {
       (publication_time => $now,
        plate_name       => $plate_name,
        sequenom_db      => $sqdb,
+       snp_db           => $snpdb,
+       ss_warehouse_db  => $ssdb,
        logger           => $log);
 
     $publisher->publish($publish_dest);
