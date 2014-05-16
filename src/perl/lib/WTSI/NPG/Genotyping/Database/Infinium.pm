@@ -38,7 +38,7 @@ around $FIND_PROJECT_CHIP_DESIGN => sub {
   Example    : $db->find_project_chip_design('my project name')
   Description: Returns Infinium chip design (product name) for a project
                name
-  Returntype : list of strings
+  Returntype : ArrayRef of strings
 
 =cut
 
@@ -60,11 +60,11 @@ sub find_project_chip_design {
          projectproduct pp,
          productdefinition pd
        WHERE
-         projecti.item = ?
-         AND project.itemid = projecti.itemid
-         AND projecti.itemtypeid = projectav.appvalueid
-         AND projectav.appvaluetype = 'Project'
-         AND project.project_id = pp.project_id
+         projecti.item                = ?
+         AND project.itemid           = projecti.itemid
+         AND projecti.itemtypeid      = projectav.appvalueid
+         AND projectav.appvaluetype   = 'Project'
+         AND project.project_id       = pp.project_id
          AND pp.product_definition_id = pd.product_definition_id);
 
   $self->trace("Executing: '$query' with args [$project_title]");
@@ -80,7 +80,7 @@ sub find_project_chip_design {
     $self->logconfess("No chip design was found for project '$project_title'");
   }
 
-  return @chip_designs;
+  return \@chip_designs;
 }
 
 around $IS_METHYLATION_CHIP_DESIGN => sub {
@@ -140,17 +140,18 @@ sub is_methylation_chip_design {
   Example    : $db->find_project_samples('my project name')
   Description: Returns sample details for a project. Each sample is returned
                as a hashref with the following keys and values:
-               { plate    => <Infinium LIMS plate barcode string>,
-                 well     => <well address string with 0-pad e.g A01>,
-                 sample   => <sample name string>,
-                 beadchip => <chip name string>,
-                 beadchip_section => <chip section name>,
-                 beadchip_design => <chip design name>,
+               { plate             => <Infinium LIMS plate barcode string>,
+                 well              => <well address string with 0-pad e.g A01>,
+                 sample            => <sample name string>,
+                 beadchip          => <chip name string>,
+                 beadchip_section  => <chip section name>,
+                 beadchip_design   => <chip design name>,
                  beadchip_revision => <chip revision name>,
-                 status   => <status string of 'Pass' for passed samples>,
-                 gtc_path => <path string of GTC format result file>,
-                 idat_grn_path => <path string of IDAT format result file>,
-                 idat_red_path => <path string of IDAT format result file> }
+                 status            => <status string of 'Pass' for passed
+                                       samples>,
+                 gtc_path          => <path string of GTC format result file>,
+                 idat_grn_path     => <path string of IDAT format result file>,
+                 idat_red_path     => <path string of IDAT format result file> }
   Returntype : arrayref of hashrefs
 
 =cut
@@ -172,8 +173,8 @@ sub find_project_samples {
          productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
          statusav.appvalue         AS [status],
-         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
+         callparentdir.path  + '\\' + callappfile.file_name  AS [gtc_path],
+         redparentdir.path   + '\\' + redappfile.file_name   AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
@@ -257,13 +258,13 @@ sub find_project_samples {
           ON greenparentdir.parent_directory_id = greenappfile.parent_directory_id
 
        WHERE
-          projecti.item                = ?
-          AND projectav.appvaluetype   = 'Project'
-	      AND sampleav.appvaluetype    = 'Sample'
-	      AND containerav.appvaluetype = 'SamplePlate'
-	      AND sectionav.appvaluetype   = 'SampleSection'
+          projecti.item                    = ?
+          AND projectav.appvaluetype       = 'Project'
+	      AND sampleav.appvaluetype        = 'Sample'
+	      AND containerav.appvaluetype     = 'SamplePlate'
+	      AND sectionav.appvaluetype       = 'SampleSection'
 
-          AND (redchannelav.appvaluetype = 'Red'
+          AND (redchannelav.appvaluetype   = 'Red'
                OR redchannelav.appvaluetype IS NULL)
           AND (greenchannelav.appvaluetype = 'Green'
                OR greenchannelav.appvaluetype IS NULL)
@@ -346,8 +347,8 @@ sub find_scanned_sample {
          productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
          statusav.appvalue         AS [status],
-         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
+         callparentdir.path  + '\\' + callappfile.file_name  AS [gtc_path],
+         redparentdir.path   + '\\' + redappfile.file_name   AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
@@ -433,14 +434,14 @@ sub find_scanned_sample {
           ON greenparentdir.parent_directory_id = greenappfile.parent_directory_id
 
        WHERE
-          projectav.appvaluetype = 'Project'
-	      AND sampleav.appvaluetype = 'Sample'
-	      AND containerav.appvaluetype = 'SamplePlate'
-	      AND sectionav.appvaluetype = 'SampleSection'
-          AND redappfile.file_name = ?
-          AND redchannelav.appvaluetype = 'Red'
+          projectav.appvaluetype          = 'Project'
+	      AND sampleav.appvaluetype       = 'Sample'
+	      AND containerav.appvaluetype    = 'SamplePlate'
+	      AND sectionav.appvaluetype      = 'SampleSection'
+          AND redappfile.file_name        = ?
+          AND redchannelav.appvaluetype   = 'Red'
           AND greenchannelav.appvaluetype = 'Green'
-          AND imagingevent.is_latest = 1
+          AND imagingevent.is_latest      = 1
 
        ORDER BY
           platei.item,
@@ -493,7 +494,8 @@ around $FIND_CALLED_SAMPLE => sub {
                  beadchip_section  => <chip section name>,
                  beadchip_design   => <chip design name>,
                  beadchip_revision => <chip revision name>,
-                 status            => <status string of 'Pass' for passed samples>,
+                 status            => <status string of 'Pass' for passed
+                                       samples>,
                  gtc_path          => <path string of GTC format result file>,
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file> }
@@ -520,8 +522,8 @@ sub find_called_sample {
          productd.product_name     AS [beadchip_design],
          productr.product_revision AS [beadchip_revision],
          statusav.appvalue         AS [status],
-         callparentdir.path + '\\' + callappfile.file_name   AS [gtc_path],
-         redparentdir.path + '\\' + redappfile.file_name     AS [idat_red_path],
+         callparentdir.path  + '\\' + callappfile.file_name  AS [gtc_path],
+         redparentdir.path   + '\\' + redappfile.file_name   AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path]
 
        FROM
@@ -606,14 +608,14 @@ sub find_called_sample {
           ON greenparentdir.parent_directory_id = greenappfile.parent_directory_id
 
        WHERE
-          projectav.appvaluetype = 'Project'
-	      AND sampleav.appvaluetype = 'Sample'
-	      AND containerav.appvaluetype = 'SamplePlate'
-	      AND sectionav.appvaluetype = 'SampleSection'
-          AND callappfile.file_name = ?
-          AND redchannelav.appvaluetype = 'Red'
+          projectav.appvaluetype          = 'Project'
+	      AND sampleav.appvaluetype       = 'Sample'
+	      AND containerav.appvaluetype    = 'SamplePlate'
+	      AND sectionav.appvaluetype      = 'SampleSection'
+          AND callappfile.file_name       = ?
+          AND redchannelav.appvaluetype   = 'Red'
           AND greenchannelav.appvaluetype = 'Green'
-          AND imagingevent.is_latest = 1
+          AND imagingevent.is_latest      = 1
 
        ORDER BY
           platei.item,
