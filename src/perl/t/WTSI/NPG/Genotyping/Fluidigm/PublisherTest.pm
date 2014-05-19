@@ -42,7 +42,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 44;
+use Test::More tests => 45;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -59,6 +59,7 @@ my $fluidigm_repub_directory = "$data_path/repub/0123456789";
 my $snpset_file = 'qc.csv';
 
 my $resultset;
+my $reference_zone;
 my $irods_tmp_coll;
 
 my $pid = $$;
@@ -68,12 +69,16 @@ my $ssdb;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
+
   $irods_tmp_coll = "FluidigmPublisherTest.$pid";
   $irods->add_collection($irods_tmp_coll);
   $irods->add_object("$data_path/$snpset_file", "$irods_tmp_coll/$snpset_file");
 
+  $reference_zone = WTSI::NPG::iRODS::Collection->new
+    ($irods, "$irods_tmp_coll" )->absolute->str;
+
   my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
-    ($irods,"$irods_tmp_coll/$snpset_file" )->absolute;
+    ($irods, "$irods_tmp_coll/$snpset_file" )->absolute;
   $snpset_obj->add_avu('fluidigm_plex', 'qc');
   $snpset_obj->add_avu('reference_name', 'Homo_sapiens (1000Genomes)');
 
@@ -102,6 +107,7 @@ sub constructor : Test(1) {
   new_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher',
          [publication_time => $publication_time,
           resultset        => $resultset,
+          reference_zone   => $reference_zone,
           ss_warehouse_db  => $ssdb]);
 }
 
@@ -111,6 +117,7 @@ sub publish : Test(20) {
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
      resultset        => $resultset,
+     reference_zone   => $reference_zone,
      ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
@@ -165,12 +172,13 @@ sub publish : Test(20) {
   test_metadata($irods, $data_path, $expected_meta);
 }
 
-sub publish_overwrite : Test(19) {
+sub publish_overwrite : Test(20) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
      resultset        => $resultset,
+     reference_zone   => $reference_zone,
      ss_warehouse_db  => $ssdb);
 
   my $repub_resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
@@ -178,15 +186,22 @@ sub publish_overwrite : Test(19) {
   my $republisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
      resultset        => $repub_resultset,
+     reference_zone   => $reference_zone,
      ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
 
+  # First publish
   cmp_ok($publisher->publish($irods_tmp_coll, @addresses_to_publish), '==', 1,
-         'Number of wells published');
+         'Number of wells published 1');
 
+  # Now re-publish with no changes to the data.
+  cmp_ok($publisher->publish($irods_tmp_coll, @addresses_to_publish), '==', 1,
+         'Number of wells re-published 1');
+
+  # Finally, re-publish with changes to the data.
   cmp_ok($republisher->publish($irods_tmp_coll, @addresses_to_publish), '==', 1,
-         'Number of wells re-published');
+         'Number of wells re-published 2');
 
   my $irods = WTSI::NPG::iRODS->new;
   my @republished_data =
@@ -233,6 +248,7 @@ sub publish_ambiguous_snpset : Test(1) {
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
      resultset        => $resultset,
+     reference_zone   => $reference_zone,
      ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
@@ -252,6 +268,7 @@ sub publish_ambiguous_metadata : Test(1) {
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
     (publication_time => $publication_time,
      resultset        => $resultset,
+     reference_zone   => $reference_zone,
      ss_warehouse_db  => $ssdb);
 
   my @addresses_to_publish = qw(S01);
