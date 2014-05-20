@@ -11,7 +11,7 @@ use List::AllUtils qw(all any none);
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 162;
+use Test::More tests => 164;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -56,6 +56,13 @@ sub teardown : Test(teardown) {
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::iRODS');
+}
+
+sub absolute_path : Test(2) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  is($irods->absolute_path('/path'), '/path');
+  like($irods->absolute_path('path'), qr{^/Sanger1.*path$});
 }
 
 sub find_zone_name : Test(3) {

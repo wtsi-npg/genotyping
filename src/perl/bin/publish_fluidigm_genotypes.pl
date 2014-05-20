@@ -13,6 +13,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
+use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
@@ -29,26 +30,33 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
+our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
 
 run() unless caller();
 sub run {
+  my $config;
   my $days;
   my $days_ago;
   my $debug;
   my $log4perl_config;
   my $publish_dest;
+  my $reference_path;
   my $source;
   my $verbose;
 
-  GetOptions('days=i'      => \$days,
-             'days-ago=i'  => \$days_ago,
-             'debug'       => \$debug,
-             'dest=s'      => \$publish_dest,
-             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'   => \$log4perl_config,
-             'source=s'    => \$source,
-             'verbose'     => \$verbose);
+  GetOptions('config=s'         => \$config,
+             'days=i'           => \$days,
+             'days-ago=i'       => \$days_ago,
+             'debug'            => \$debug,
+             'dest=s'           => \$publish_dest,
+             'help'             => sub { pod2usage(-verbose => 2,
+                                                   -exitval => 0) },
+             'logconf=s'        => \$log4perl_config,
+             'reference-path=s' => \$reference_path,
+             'source=s'         => \$source,
+             'verbose'          => \$verbose);
 
   unless ($source) {
     pod2usage(-msg => "A --source argument is required\n",
@@ -60,7 +68,8 @@ sub run {
               -exitval => 2);
   }
 
-  $days ||= $DEFAULT_DAYS;
+  $config   ||= $DEFAULT_INI;
+  $days     ||= $DEFAULT_DAYS;
   $days_ago ||= 0;
 
   my $log;
@@ -81,6 +90,12 @@ sub run {
     }
   }
 
+  my $ssdb = WTSI::NPG::Database::Warehouse->new
+    (name   => 'sequencescape_warehouse',
+     inifile =>  $config)->connect(RaiseError           => 1,
+                                   mysql_enable_utf8    => 1,
+                                   mysql_auto_reconnect => 1);
+
   my $now = DateTime->now();
   my $end;
   if ($days_ago > 0) {
@@ -99,13 +114,12 @@ sub run {
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
-  my @path = grep { $_ ne '' } File::Spec->splitdir($publish_dest);
-  my $reference_zone = '/' . shift @path;
+  $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              " results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
-  $log->info("Using reference zone '$reference_zone'");
+  $log->info("Using reference path '$reference_path'");
 
   foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
                                 $dir_regex)) {
@@ -116,7 +130,8 @@ sub run {
     my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
       (publication_time => $now,
        resultset        => $resultset,
-       reference_zone   => $reference_zone,
+       reference_path   => $reference_path,
+       ss_warehouse_db  => $ssdb,
        logger           => $log);
     $publisher->irods->logger($log);
 

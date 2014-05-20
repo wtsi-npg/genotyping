@@ -157,7 +157,7 @@ sub run {
                                mysql_enable_utf8    => 1,
                                mysql_auto_reconnect => 1);
 
-  my @chip_designs = $ifdb->find_project_chip_design($project_title);
+  my @chip_designs = @{$ifdb->find_project_chip_design($project_title)};
   unless (@chip_designs) {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
