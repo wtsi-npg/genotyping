@@ -52,12 +52,12 @@ has 'reference_name' =>
      return 'Homo_sapiens (1000Genomes)'
    });
 
-has 'reference_zone' =>
+has 'reference_path' =>
   (is       => 'ro',
    isa      => 'Str',
    required => 1,
    default  => sub { return '/' },
-   writer   => '_set_reference_zone');
+   writer   => '_set_reference_path');
 
 has 'resultset' =>
   (is       => 'ro',
@@ -83,12 +83,11 @@ sub BUILD {
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
 
-  # Ensure that a zone used as a surrogate for an iRODS path has a
-  # leading slash
-  my $zone = $self->reference_zone;
-  unless ($zone =~ m{^/}) {
-    $self->_set_reference_zone('/' . $zone);
-  }
+  # Ensure that the iRODS path is absolute so that its zone can be
+  # determined.
+  my $abs_path = $self->irods->absolute_path($self->reference_path);
+
+  $self->_set_reference_path($abs_path);
 }
 
 =head2 publish
@@ -156,6 +155,7 @@ sub publish_samples {
     ([$self->fluidigm_plate_name_attr => $export_file->fluidigm_barcode],
      [$self->dcterms_audience_attr    => $self->audience_uri->as_string]);
 
+  # Publish the unsplit file
   $publisher->publish_file($self->resultset->export_file, \@meta,
                            $publish_dest,
                            $self->publication_time);
@@ -256,7 +256,7 @@ sub _build_snpsets {
   my ($self) = @_;
 
   my @snpset_paths = $self->irods->find_objects_by_meta
-    ($self->reference_zone,
+    ($self->reference_path,
      [$self->fluidigm_plex_name_attr    => '%', 'like'],
      [$self->reference_genome_name_attr => $self->reference_name]);
 

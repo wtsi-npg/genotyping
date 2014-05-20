@@ -146,6 +146,28 @@ around 'working_collection' => sub {
   return $self->$orig;
 };
 
+
+=head2 absolute_path
+
+  Arg [1]    : An iRODS path.
+
+  Example    : $irods->absolute_path('./path')
+  Description: Return an absolute iRODS path given a path.
+  Returntype : Str
+
+=cut
+
+sub absolute_path {
+  my ($self, $path) = @_;
+
+  defined $path or $self->logconfess('A defined path argument is required');
+  $path or $self->logconfess('A non-empty path argument is required');
+
+  $path = File::Spec->canonpath($path);
+
+  return $self->_ensure_absolute_path($path);
+}
+
 =head2 find_zone_name
 
   Arg [1]    : An absolute iRODS path.

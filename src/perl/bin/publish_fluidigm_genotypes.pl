@@ -32,6 +32,7 @@ my $embedded_conf = q(
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
+our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
 
 run() unless caller();
 sub run {
@@ -41,7 +42,7 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
-  my $reference_zone;
+  my $reference_path;
   my $source;
   my $verbose;
 
@@ -53,7 +54,7 @@ sub run {
              'help'             => sub { pod2usage(-verbose => 2,
                                                    -exitval => 0) },
              'logconf=s'        => \$log4perl_config,
-             'reference-zone=s' => \$reference_zone,
+             'reference-path=s' => \$reference_path,
              'source=s'         => \$source,
              'verbose'          => \$verbose);
 
@@ -113,13 +114,12 @@ sub run {
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
-  my @path = grep { $_ ne '' } File::Spec->splitdir($publish_dest);
-  $reference_zone ||= shift @path;
+  $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              " results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
-  $log->info("Using reference zone '$reference_zone'");
+  $log->info("Using reference path '$reference_path'");
 
   foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
                                 $dir_regex)) {
@@ -130,7 +130,7 @@ sub run {
     my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
       (publication_time => $now,
        resultset        => $resultset,
-       reference_zone   => $reference_zone,
+       reference_path   => $reference_path,
        ss_warehouse_db  => $ssdb,
        logger           => $log);
     $publisher->irods->logger($log);
