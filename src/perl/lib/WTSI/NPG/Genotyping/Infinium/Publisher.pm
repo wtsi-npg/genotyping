@@ -3,8 +3,10 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Infinium::Publisher;
 
+use List::AllUtils qw(sum);
 use Moose;
 
+use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 use WTSI::NPG::Genotyping::Infinium::ResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
@@ -42,6 +44,12 @@ has 'infinium_db' =>
    isa      => 'WTSI::NPG::Genotyping::Database::Infinium',
    required => 1);
 
+has 'ss_warehouse_db' =>
+  (is       => 'ro',
+   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'Object',
+   required => 1);
+
 sub BUILD {
   my ($self) = @_;
 
@@ -67,13 +75,16 @@ sub publish_samples {
   $publish_dest = File::Spec->canonpath($publish_dest);
 
   my $num_published = 0;
-  my $total = scalar @{$self->resultsets} * 3;
+  my $total = sum map { $_->size } @{$self->resultsets};
 
   $self->debug("Publishing $total Infinium files from a possible $total");
 
   foreach my $resultset (@{$self->resultsets}) {
     $num_published += $self->_publish_idat_files($resultset, $publish_dest);
-    $num_published += $self->_publish_gtc_file($resultset, $publish_dest);
+
+    unless ($resultset->is_methylation) {
+      $num_published += $self->_publish_gtc_file($resultset, $publish_dest);
+    }
   }
 
   $self->info("Published $num_published/$total Infinium files ",
@@ -157,10 +168,18 @@ sub _publish_file {
 
   my @meta = $self->make_infinium_metadata($if_sample);
   my @fingerprint = $self->infinium_fingerprint(@meta);
-  my $data_object = $publisher->publish_file($filename, \@fingerprint,
-                                             $publish_dest,
-                                             $self->publication_time);
-  return $data_object;
+  my $data_path = $publisher->publish_file($filename, \@fingerprint,
+                                           $publish_dest,
+                                           $self->publication_time);
+
+  # Now that adding the secondary metadata is fast enough, we can
+  # run it inline here, so that the data are available
+  # immediately.
+  my $obj = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
+    ($self->irods, $data_path);
+  $obj->update_secondary_metadata($self->ss_warehouse_db);
+
+  return $data_path;
 }
 
 sub _build_resultsets {
@@ -178,10 +197,10 @@ sub _build_resultsets {
       $self->debug("Collating section $section");
 
       my @fileset = @{$filesets->{$beadchip}{$section}};
-      unless (scalar @fileset == 3) {
+      unless (scalar @fileset >= 2) {
         $self->warn("Failed to collate a resultset for beadchip ",
                     "'$beadchip' section '$section' because it did not ",
-                    "contain exactly 3 files: [",
+                    "contain at least 2 files: [",
                     join(", ", sort @fileset), "]");
         next SECTION;
       }
@@ -200,20 +219,53 @@ sub _build_resultsets {
         }
       }
 
-      if ($gtc && $red && $grn) {
+      if ($red && $grn) {
         $self->debug("Collating a new resultset for $beadchip $section");
+        my $collated = 0;
 
-        push @resultsets, WTSI::NPG::Genotyping::Infinium::ResultSet->new
-          (beadchip         => $beadchip,
-           beadchip_section => $section,
-           gtc_file         => $gtc,
-           red_idat_file    => $red,
-           grn_idat_file    => $grn);
-      }
-      else {
-        $self->warn("Failed to collate a resultset for beadchip ",
-                    "'$beadchip' section '$section' because its file set was ",
-                    "incomplete: [GTC: '$gtc', Red: '$red', Green: '$grn']");
+        my @initargs = (beadchip         => $beadchip,
+                        beadchip_section => $section,
+                        red_idat_file    => $red,
+                        grn_idat_file    => $grn);
+
+        # Identify methylation studies; these do not have a GTC file
+        my ($vol, $dirs, $red_filename) = File::Spec->splitpath($red);
+        my $if_sample = $self->infinium_db->find_scanned_sample($red_filename);
+        unless ($if_sample) {
+          $self->logconfess("Failed to find a sample in the LIMS for ",
+                            "'$red_filename'");
+        }
+
+        my $chip_design = $if_sample->{beadchip_design};
+        unless ($chip_design) {
+          $self->logconfess("Failed to find the chip design of beadchip '",
+                            $beadchip, "' section '$section'");
+        }
+
+        my $is_methylation = $self->infinium_db->is_methylation_chip_design
+          ($chip_design);
+
+        push @initargs, is_methylation => $is_methylation;
+        if ($is_methylation) {
+          $collated = 1;
+        }
+        elsif ($gtc) {
+          push @initargs, gtc_file => $gtc;
+          $collated = 1;
+        }
+
+        if ($collated) {
+          push @resultsets, WTSI::NPG::Genotyping::Infinium::ResultSet->new
+            (@initargs);
+        }
+        else {
+          my $desc = $is_methylation ? 'methylation beadchip ' : 'beadchip ';
+
+          $self->warn("Failed to collate a resultset for ", $desc,
+                      "'$beadchip' section '$section' because ",
+                      "its file set was incomplete: ",
+                      "[GTC: '$gtc', Red: '$red', Green: '$grn']");
+        }
       }
     }
   }
@@ -225,7 +277,8 @@ sub _build_filesets {
   my ($self) = @_;
 
   # Each hash chain $filesets{beadchip}{section} points to an array
-  # containing the names of the 3 files in the set
+  # containing the names of the 2 (for methylation) or 3 files in the
+  # set
   my %filesets;
 
   foreach my $path (sort  @{$self->data_files}) {

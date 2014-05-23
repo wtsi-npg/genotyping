@@ -4,11 +4,11 @@ use utf8;
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
   use warnings;
   use Carp;
+  use Moose;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
 
   sub find_infinium_sample_by_plate {
     my ($self, $infinium_barcode, $map) = @_;
@@ -33,6 +33,12 @@ use utf8;
             plate_purpose_name => 'Infinium',
             map                => 'A10'};
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 package WTSI::NPG::Genotyping::Infinium::InfiniumDataObjectTest;

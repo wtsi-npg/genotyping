@@ -78,7 +78,6 @@ sub publish_file {
   # Find existing copies of this file
   my @existing = grep { my ($vol, $dirs, $name) = File::Spec->splitpath($_);
                         $name eq $filename } @matching;
-  my $existing_obj;
 
   if (scalar @existing >1) {
     $self->logconfess("While publishing '$target' identified by ",
@@ -88,77 +87,66 @@ sub publish_file {
   }
 
   if (@existing) {
-    $existing_obj = WTSI::NPG::iRODS::DataObject->new($irods, $existing[0]);
+    my $existing_obj = WTSI::NPG::iRODS::DataObject->new($irods, $existing[0]);
     $self->warn("While publishing '", $target_obj->str, "' identified by ",
                 $meta_str, " found existing sample data: '",
                 $existing_obj->str, "' identified by ",
                 $existing_obj->meta_str);
 
-    unless ($existing_obj->find_in_metadata('md5')) {
-      $self->warn("Checksum metadata for existing sample data '",
-                  $existing_obj->str, "' is missing");
-      $self->info("Adding missing checksum metadata for existing sample data '",
-                  $existing_obj->str, "'");
-
-      my $existing_md5 = $existing_obj->calculate_checksum;
-      $existing_obj->add_avu('md5', $existing_md5);
-    }
-
-    unless ($existing_obj->validate_checksum_metadata) {
-      $self->error("Checksum metadata for existing sample data '",
-                   $existing_obj->str, "' is out of date");
-    }
-  }
-
-  # Even with different MD5 values, the new and old data objects could
-  # have the same path because we use only the first 3 bytes of the
-  # hash string to define the collection path and the file basenames
-  # are identical.
-
-  if ($target_obj->is_present) {
-    my $target_md5 = $target_obj->calculate_checksum;
-    $self->debug("Checksum of existing target '", $target_obj->str,
-                 "' is '$target_md5'");
-    if ($md5 eq $target_md5) {
-      $self->info("Skipping publication of '", $target_obj->str,
-                  "' because the checksum is unchanged");
-    }
-    else {
-      $self->info("Republishing '", $target_obj->str, "' in situ ",
-                  "because the checksum is changed");
-      $irods->replace_object($file, $target_obj->str);
-
-      foreach my $avu ($target_obj->find_in_metadata('md5')) {
-        $target_obj->remove_avu($avu->{attribute}, $avu->{value});
-      }
-
-      push(@meta, $self->make_md5_metadata($file));
-      push(@meta, $self->make_modification_metadata($time));
-    }
-  }
-  elsif (@existing) {
+    # Tidy existing file checksum before proceeding
+    $self->_ensure_checksum($existing_obj);
     my $existing_md5 = $existing_obj->calculate_checksum;
     $self->debug("Checksum of existing object '", $existing_obj->str,
                  "' is '$existing_md5'");
-    if ($md5 eq $existing_md5) {
-      $self->info("Skipping publication of '", $target_obj->str,
-                  "' because existing object '", $existing_obj->str,
-                  "' exists with the same checksum");
-    }
-    else {
-      $self->info("Moving '", $existing_obj->str, ' to ',
-                  $target_obj->str, "' and republishing over it ",
-                  "because the checksum is changed from ",
-                  "'$existing_md5' to '$md5'");
-      # The following moves any metadata too
-      $irods->move_object($existing_obj->str, $target_obj->str);
 
-      foreach my $avu ($target_obj->find_in_metadata('md5')) {
-        $target_obj->remove_avu($avu->{attribute}, $avu->{value});
+    # There is a file with matching metadata at the target path already
+    if ($target_obj->str eq $existing_obj->str) {
+      if ($md5 eq $existing_md5) {
+        $self->info("Skipping publication of '", $target_obj->str,
+                    "' because existing object '", $existing_obj->str,
+                    "' exists with the same checksum");
       }
+      else {
+        $self->info("Republishing '", $existing_obj->str, "' in situ ",
+                    "because the checksum is changed");
 
-      push(@meta, $self->make_md5_metadata($file));
-      push(@meta, $self->make_modification_metadata($time));
+        $irods->replace_object($file, $existing_obj->str);
+        foreach my $avu ($target_obj->find_in_metadata('md5')) {
+          $target_obj->remove_avu($avu->{attribute}, $avu->{value});
+        }
+
+        push(@meta, $self->make_md5_metadata($file));
+        push(@meta, $self->make_modification_metadata($time));
+      }
+    }
+    # There is a file with matching metadata, not at the target path
+    else {
+      if ($md5 eq $existing_md5) {
+        $self->info("Moving existing object '", $existing_obj->str,
+                    "' to new location '", $target_obj->str,
+                    "' without changing its content because the checksum ",
+                    "is unchanged");
+        # The following moves any metadata too
+        $irods->move_object($existing_obj->str, $target_obj->str);
+      }
+      else {
+        $self->info("Moving '", $existing_obj->str, ' to ',
+                    $target_obj->str, "' and republishing over it ",
+                    "because the checksum is changed from ",
+                    "'$existing_md5' to '$md5'");
+        # The following moves any metadata too
+        $irods->move_object($existing_obj->str, $target_obj->str);
+
+        foreach my $avu ($target_obj->find_in_metadata('md5')) {
+          $target_obj->remove_avu($avu->{attribute}, $avu->{value});
+        }
+
+        # Overwrite with the updated data
+        $irods->replace_object($file, $target_obj->str);
+
+        push(@meta, $self->make_md5_metadata($file));
+        push(@meta, $self->make_modification_metadata($time));
+      }
     }
   }
   else {
@@ -180,6 +168,25 @@ sub publish_file {
   }
 
   return $target;
+}
+
+sub _ensure_checksum {
+  my ($self, $data_object) = @_;
+
+  unless ($data_object->find_in_metadata('md5')) {
+    $self->warn("Checksum metadata for existing sample data '",
+                $data_object->str, "' is missing");
+    $self->info("Adding missing checksum metadata for existing sample data '",
+                $data_object->str, "'");
+
+    my $existing_md5 = $data_object->calculate_checksum;
+    $data_object->add_avu('md5', $existing_md5);
+  }
+
+  unless ($data_object->validate_checksum_metadata) {
+    $self->error("Checksum metadata for existing sample data '",
+                 $data_object->str, "' is out of date");
+  }
 }
 
 __PACKAGE__->meta->make_immutable;

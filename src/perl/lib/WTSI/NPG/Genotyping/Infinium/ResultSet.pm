@@ -7,12 +7,14 @@ use Moose;
 
 with 'WTSI::NPG::Loggable';
 
-has 'beadchip'         => (is => 'ro', isa => 'Str', required => 1);
-has 'beadchip_section' => (is => 'ro', isa => 'Str', required => 1);
+has 'beadchip'         => (is => 'ro', isa => 'Str',  required => 1);
+has 'beadchip_section' => (is => 'ro', isa => 'Str',  required => 1);
 
-has 'gtc_file'         => (is => 'ro', isa => 'Str', required => 1);
-has 'red_idat_file'    => (is => 'ro', isa => 'Str', required => 1);
-has 'grn_idat_file'    => (is => 'ro', isa => 'Str', required => 1);
+has 'gtc_file'         => (is => 'ro', isa => 'Str',  required => 0);
+has 'red_idat_file'    => (is => 'ro', isa => 'Str',  required => 1);
+has 'grn_idat_file'    => (is => 'ro', isa => 'Str',  required => 1);
+
+has 'is_methylation'   => (is => 'ro', isa => 'Bool', required => 0);
 
 sub BUILD {
   my ($self) = @_;
@@ -26,9 +28,15 @@ sub BUILD {
                       "'");
   }
 
-  unless (-e $self->gtc_file) {
-    $self->logconfess("The GTC file '", $self->gtc_file,
-                      "' does not exist");
+  if ($self->is_methylation && $self->gtc_file) {
+    $self->logconfess("A methylation result set cannot contain a GTC file: '",
+                      $self->gtc_file, "'");
+  }
+
+  if ($self->gtc_file) {
+    unless (-e $self->gtc_file) {
+      $self->logconfess("The GTC file '", $self->gtc_file, "' does not exist");
+    }
   }
 
   unless (-e $self->grn_idat_file) {
@@ -40,6 +48,12 @@ sub BUILD {
     $self->logconfess("The Red idat file '", $self->red_idat_file,
                       "' does not exist");
   }
+}
+
+sub size {
+  my ($self) = @_;
+
+  return $self->is_methylation ? 2 : 3;
 }
 
 __PACKAGE__->meta->make_immutable;
