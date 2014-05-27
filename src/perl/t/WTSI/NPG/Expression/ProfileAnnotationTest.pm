@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 7;
+use Test::More tests => 10;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -32,29 +32,31 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Expression::ProfileAnnotation');
 }
 
-sub constructor : Test(1) {
+sub constructor : Test(3) {
   new_ok('WTSI::NPG::Expression::ProfileAnnotation',
          [file_name => "$data_path/$annotation_file"]);
+
+  new_ok('WTSI::NPG::Expression::ProfileAnnotation',
+         ["$data_path/$annotation_file"]);
+
+  # Invalid format, but should be able to construct
+  new_ok('WTSI::NPG::Expression::ProfileAnnotation',
+         ["$data_path/$no_norm_file"]);
 }
 
-sub guess : Test(4) {
+sub is_valid : Test(5) {
   ok(WTSI::NPG::Expression::ProfileAnnotation->new
-     ("$data_path/$annotation_file")->guess);
+     ("$data_path/$annotation_file")->is_valid);
 
   ok(!WTSI::NPG::Expression::ProfileAnnotation->new
-     ("$data_path/$no_norm_file")->guess);
+     ("$data_path/$no_norm_file")->is_valid);
 
-  my $profile = WTSI::NPG::Expression::ProfileAnnotation->new
-    ("$data_path/$annotation_file");
+  ok(!WTSI::NPG::Expression::ProfileAnnotation->new
+     ("$data_path/$cubic_norm_file")->is_valid);
 
-  # Test disambiguation when there are multiple hints. This is used
-  # when there are an undefined mixture of files in a directory
-  $profile->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
-  $profile->add_hint(WTSI::NPG::Expression::ProfileHint->new);
+   ok(!WTSI::NPG::Expression::ProfileAnnotation->new
+     ("$data_path/$quantile_norm_file")->is_valid);
 
-  # These formats are ambiguous to a degree where voting is required
-  ok($profile->guess);
-
-  #$profile->voting_enabled(1);
-  ok($profile->guess);
+  ok(!WTSI::NPG::Expression::ProfileAnnotation->new
+     ("$data_path/$control_file")->is_valid);
 }
