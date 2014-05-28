@@ -40,7 +40,6 @@ sub run {
   my $log4perl_config;
   my $output;
   my $publish_dest;
-  my $type;
   my $validate,
   my $verbose;
 
@@ -60,7 +59,6 @@ sub run {
   }
 
   $config ||= $DEFAULT_INI;
-  $type = lc($type);
   if ($output && $output ne '-') { $output = abs_path($output); } 
 
   my $log;
@@ -97,7 +95,7 @@ sub run {
   my @files = <>;
   foreach my $file (@files) {
     chomp($file);
-    my ($filename, $directories, $suffix) = fileparse($file, $type);
+    my ($filename, $directories, $suffix) = fileparse($file);
   }
 
   @files = uniq(@files);
