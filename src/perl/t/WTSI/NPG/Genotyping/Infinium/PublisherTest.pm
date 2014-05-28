@@ -233,13 +233,15 @@ sub resultsets : Test(2) {
      test_chip_design => 'methylation_design1',
      inifile          => $config)->connect(RaiseError => 1);
 
- my $methyl_publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-   (data_files       => \@data_files,
+  my $methyl_publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+    (data_files       => \@data_files,
     infinium_db      => $ifdb_mod,
     ss_warehouse_db  => $ssdb,
     publication_time => $publication_time);
-}
 
+  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 7,
+	 'Found only complete resultsets 2');
+}
 sub dryrun : Test(4) {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::InfiniumStub->new
@@ -481,4 +483,3 @@ sub validate : Test(3) {
 }
 
 1;
-
