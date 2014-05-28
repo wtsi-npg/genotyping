@@ -36,8 +36,9 @@ around $FIND_SEQUENOM_PLATE_ID => sub {
 
   my $cache = $self->get_method_cache
     ($meta->get_method($FIND_SEQUENOM_PLATE_ID), {default_expires_in => 600});
+  my $key = $plate_name;
 
-  return $self->get_with_cache($cache, $plate_name, $orig, $plate_name);
+  return $self->get_with_cache($cache, $key, $orig, $plate_name);
 };
 
 =head2 find_sequenom_plate_id
@@ -317,8 +318,9 @@ around $FIND_PLATE_STATUS => sub {
 
   my $cache = $self->get_method_cache($meta->get_method($FIND_PLATE_STATUS),
                                       {default_expires_in => 600});
+  my $key = $plate_name;
 
-  return $self->get_with_cache($cache, $plate_name, $orig, $plate_name);
+  return $self->get_with_cache($cache, $key, $orig, $plate_name);
 };
 
 =head2 find_plate_status

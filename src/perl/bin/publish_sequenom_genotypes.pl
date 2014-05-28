@@ -27,7 +27,7 @@ my $embedded_conf = q(
 );
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $DEFAULT_DAYS = 7;
+our $DEFAULT_DAYS = 30;
 
 run() unless caller();
 
@@ -121,7 +121,9 @@ sub run {
     }
   }
   else {
-    @plate_names = @{$sqdb->find_finished_plate_names($begin, $end)};
+    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    @plate_names = find_plates_to_publish($sqdb, $begin, $end, $irods,
+                                          $publish_dest, $log);
   }
 
   my $total = scalar @plate_names;
@@ -155,6 +157,36 @@ sub run {
   return 0;
 }
 
+# Compare with data in iRODS. If any plate has less than the full
+# complement of files in iRODS (one per well) then re-publish the
+# plate.
+sub find_plates_to_publish {
+  my ($sqdb, $begin, $end, $irods, $publish_dest, $log) = @_;
+
+  my @to_publish;
+
+  my @plate_names = @{$sqdb->find_finished_plate_names($begin, $end)};
+  foreach my $plate_name (@plate_names) {
+    my @wells = @{$sqdb->find_plate_result_wells($plate_name)};
+
+    my @data_objects = $irods->find_objects_by_meta
+      ($publish_dest,
+       ['sequenom_plate', $plate_name],
+       ['sequenom_well', '%', 'like']);
+
+    my $num_wells        = scalar @wells;
+    my $num_data_objects = scalar @data_objects;
+
+    $log->info("Plate '$plate_name' data objects published previously: ",
+               "$num_data_objects/$num_wells");
+
+    if ($num_data_objects < $num_wells) {
+      push @to_publish, $plate_name;
+    }
+  }
+
+  return @to_publish;
+}
 
 __END__
 
