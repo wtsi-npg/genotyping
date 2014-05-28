@@ -166,6 +166,7 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
+MANIFEST.orig
 README
 t/cacheable.t
 t/collation.t
