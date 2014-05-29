@@ -74,11 +74,8 @@ lib/WTSI/NPG/Expression/Annotator.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifest.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV1.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV2.pm
-lib/WTSI/NPG/Expression/ControlProfileHint.pm
 lib/WTSI/NPG/Expression/InfiniumDataObject.pm
 lib/WTSI/NPG/Expression/ProfileAnnotation.pm
-lib/WTSI/NPG/Expression/ProfileAnnotationHint.pm
-lib/WTSI/NPG/Expression/ProfileHint.pm
 lib/WTSI/NPG/Expression/Publisher.pm
 lib/WTSI/NPG/Expression/ResultSet.pm
 lib/WTSI/NPG/Expression/SampleProbeProfile.pm
@@ -148,9 +145,7 @@ lib/WTSI/NPG/iRODS/ACLModifier.pm
 lib/WTSI/NPG/iRODS/Collection.pm
 lib/WTSI/NPG/iRODS/Communicator.pm
 lib/WTSI/NPG/iRODS/DataObject.pm
-lib/WTSI/NPG/iRODS/FileHint.pm
 lib/WTSI/NPG/iRODS/GroupAdmin.pm
-lib/WTSI/NPG/iRODS/Guessable.pm
 lib/WTSI/NPG/iRODS/Lister.pm
 lib/WTSI/NPG/iRODS/MetaLister.pm
 lib/WTSI/NPG/iRODS/MetaModifier.pm
