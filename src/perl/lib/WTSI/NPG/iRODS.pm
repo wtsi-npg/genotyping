@@ -862,7 +862,7 @@ sub replace_object {
   $self->debug("Replacing object '$target' with '$file'");
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
-                           arguments   => ['-f', $file, $target],
+                           arguments   => ['-f', '-k', $file, $target],
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
