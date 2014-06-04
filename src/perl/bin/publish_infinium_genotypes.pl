@@ -183,7 +183,7 @@ publish_infinium_genotypes
 
 publish_infinium_genotypes [--config <database .ini file>]
    [--days-ago <n>] [--days <n>]
-   --source <directory> --dest <irods collection>
+   --source <directory> --dest <irods collection> [ - < STDIN]
 
 Options:
 
@@ -201,6 +201,7 @@ Options:
   --source      The root directory to search for sample data. Multiple
                 source arguments may be given.
   --verbose     Print messages while processing. Optional.
+  -             Read from STDIN.
 
 =head1 DESCRIPTION
 
@@ -208,6 +209,11 @@ Searches one or more a directories recursively for idat and GTC sample
 data files that have been modified within the n days prior to a
 specific time.  Any files identified are published to iRODS with
 metadata obtained from LIMS.
+
+This script also accepts lists of specific files on STDIN, as an
+alternative to searching for files by modification time. To do this,
+terminate the command line with the '-' option. In this mode, the
+--source, --days and --days-ago options are invalid.
 
 =head1 AUTHOR
 
