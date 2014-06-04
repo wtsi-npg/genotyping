@@ -13,6 +13,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => 'QC1Hip-86',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
