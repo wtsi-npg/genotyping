@@ -454,7 +454,8 @@ sub resultsMafHet {
     my $high = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'het_by_maf'};
     if (!(-r $inPath)) {
-	croak "Cannot read MAF heterozygosity input \"$inPath\": $!";
+	carp "Omitting MAF heterozygosity; cannot read input \"$inPath\": $!";
+	return 0;
     }
     my %data = %{decode_json(readFileToString($inPath))};
     my %results;
