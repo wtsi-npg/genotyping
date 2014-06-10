@@ -19,6 +19,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
@@ -42,7 +43,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 45;
+use Test::More tests => 47;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -111,7 +112,7 @@ sub constructor : Test(1) {
           ss_warehouse_db  => $ssdb]);
 }
 
-sub publish : Test(20) {
+sub publish : Test(21) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
@@ -164,6 +165,7 @@ sub publish : Test(20) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
@@ -172,7 +174,7 @@ sub publish : Test(20) {
   test_metadata($irods, $data_path, $expected_meta);
 }
 
-sub publish_overwrite : Test(20) {
+sub publish_overwrite : Test(21) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
@@ -224,6 +226,7 @@ sub publish_overwrite : Test(20) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
