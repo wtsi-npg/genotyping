@@ -65,38 +65,35 @@ sub test_publish_snpset : Test(1) {
 sub test_publish_infinium_genotypes : Test(3) {
   my $gtc_path  = "$data_path/publish_infinium_genotypes/coreex_bbgahs/gtc";
   my $idat_path = "$data_path/publish_infinium_genotypes/coreex_bbgahs/idat";
+  my $raw_data_list = "$data_path/publish_infinium_genotypes/coreex_bbgahs.txt";
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--days-ago 0",
-            "--days 10000",
+            "--days 1",
+            "--project foo",
             "--dest $irods_tmp_coll",
-            "2>/dev/null") != 0, 'Requires --source');
+            "2>/dev/null") != 0, '--project conflicts with --days');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
-            "--source $gtc_path",
-            "--source $idat_path",
             "--days-ago 0",
-            "--days 10000",
+            "--days 0",
             "2>/dev/null") != 0, 'Requires --dest');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
-            "--source $gtc_path",
-            "--source $idat_path",
-            "--days-ago 0",
-            "--days 10000",
-            "--dest $irods_tmp_coll") == 0, 'Published Infinium genotypes');
+            "--dest $irods_tmp_coll",
+            "- < $raw_data_list") == 0,
+     'Published Infinium genotypes from a file list');
 }
 
 sub test_update_infinium_metadata : Test(2) {
   my $gtc_path  = "$data_path/publish_infinium_genotypes/coreex_bbgahs/gtc";
   my $idat_path = "$data_path/publish_infinium_genotypes/coreex_bbgahs/idat";
+  my $raw_data_list = "$data_path/publish_infinium_genotypes/coreex_bbgahs.txt";
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
-            "--source $gtc_path",
-            "--source $idat_path",
-            "--days-ago 0",
-            "--days 10000",
-            "--dest $irods_tmp_coll") == 0, 'Published Infinium genotypes');
+            "--dest $irods_tmp_coll",
+            "- < $raw_data_list") == 0,
+     'Published Infinium genotypes from a file list');
 
   ok(system(join q{ }, "$UPDATE_INFINIUM_METADATA",
             "--dest $irods_tmp_coll") == 0, 'Updated Infinium metadata');
@@ -108,6 +105,8 @@ sub test_publish_infinium_analysis : Test(7) {
 
   my $gtc_path  = "$data_path/publish_infinium_genotypes/coreex_bbgahs/gtc";
   my $idat_path = "$data_path/publish_infinium_genotypes/coreex_bbgahs/idat";
+  my $raw_data_list = "$data_path/publish_infinium_genotypes/coreex_bbgahs.txt";
+
   my $analysis_path = "$data_path/publish_infinium_analysis/analysis";
 
   my $selected_samples_file =
@@ -122,11 +121,9 @@ sub test_publish_infinium_analysis : Test(7) {
   my $qc_platform = 'Sequenom';
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
-            "--source $gtc_path",
-            "--source $idat_path",
-            "--days-ago 0",
-            "--days 10000",
-            "--dest $archive_coll") == 0, 'Published Infinium genotypes');
+            "--dest $archive_coll",
+            "-", "<", "$raw_data_list") == 0,
+     'Published Infinium genotypes from a file list');
 
   ok(system(join q{ }, "$UPDATE_INFINIUM_METADATA",
             "--dest $archive_coll") == 0, 'Updated Infinium metadata');

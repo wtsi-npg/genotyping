@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use DateTime;
 use Getopt::Long;
+use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -127,14 +128,13 @@ sub run {
       push @plate_names, $line;
     }
   }
-  elsif ($force) {
-    @plate_names = @{$sqdb->find_finished_plate_names($begin, $end)};
-  }
   else {
     my $irods = WTSI::NPG::iRODS->new(logger => $log);
     @plate_names = find_plates_to_publish($sqdb, $begin, $end, $irods,
-                                          $publish_dest, $log);
+                                          $publish_dest, $force, $log);
   }
+
+  @plate_names = uniq @plate_names;
 
   my $total = scalar @plate_names;
   my $published = 0;
@@ -172,27 +172,32 @@ sub run {
 # complement of files in iRODS (one per well) then re-publish the
 # plate.
 sub find_plates_to_publish {
-  my ($sqdb, $begin, $end, $irods, $publish_dest, $log) = @_;
-
-  my @to_publish;
+  my ($sqdb, $begin, $end, $irods, $publish_dest, $force, $log) = @_;
 
   my @plate_names = @{$sqdb->find_finished_plate_names($begin, $end)};
-  foreach my $plate_name (@plate_names) {
-    my @wells = @{$sqdb->find_plate_result_wells($plate_name)};
 
-    my @data_objects = $irods->find_objects_by_meta
-      ($publish_dest,
-       ['sequenom_plate', $plate_name],
-       ['sequenom_well', '%', 'like']);
+  my @to_publish;
+  if ($force) {
+    @to_publish = @plate_names;
+  }
+  else {
+    foreach my $plate_name (@plate_names) {
+      my @wells = @{$sqdb->find_plate_result_wells($plate_name)};
 
-    my $num_wells        = scalar @wells;
-    my $num_data_objects = scalar @data_objects;
+      my @data_objects = $irods->find_objects_by_meta
+        ($publish_dest,
+         ['sequenom_plate', $plate_name],
+         ['sequenom_well', '%', 'like']);
 
-    $log->info("Plate '$plate_name' data objects published previously: ",
-               "$num_data_objects/$num_wells");
+      my $num_wells        = scalar @wells;
+      my $num_data_objects = scalar @data_objects;
 
-    if ($num_data_objects < $num_wells) {
-      push @to_publish, $plate_name;
+      $log->info("Plate '$plate_name' data objects published previously: ",
+                 "$num_data_objects/$num_wells");
+
+      if ($num_data_objects < $num_wells) {
+        push @to_publish, $plate_name;
+      }
     }
   }
 
