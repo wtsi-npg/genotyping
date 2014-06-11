@@ -17,9 +17,7 @@ use Pod::Usage;
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Infinium::Publisher;
-use WTSI::NPG::Utilities qw(collect_files
-                            collect_dirs
-                            modified_between);
+use WTSI::NPG::iRODS;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -31,7 +29,7 @@ my $embedded_conf = q(
 );
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $DEFAULT_DAYS = 7;
+our $DEFAULT_DAYS = 14;
 
 run() unless caller();
 
@@ -40,36 +38,44 @@ sub run {
   my $days;
   my $days_ago;
   my $debug;
+  my $force;
   my $log4perl_config;
+  my $project;
   my $publish_dest;
   my $verbose;
   my $stdio;
-
-  my @sources;
 
   GetOptions('config=s'   => \$config,
              'days=i'     => \$days,
              'days-ago=i' => \$days_ago,
              'debug'      => \$debug,
              'dest=s'     => \$publish_dest,
+             'force'      => \$force,
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
-             'source=s'   => \@sources,
+             'project=s'  => \$project,
              'verbose'    => \$verbose,
              ''           => \$stdio); # Permits a trailing '-' for STDIN
 
-  if ($stdio) {
-    if (@sources) {
-      pod2usage(-msg => "The --source option is " .
-                "incompatible with reading from STDIN\n",
-                -exitval => 2);
-    }
+  if ($stdio && ($days || $days_ago)) {
+    pod2usage(-msg => "The --days and --days-ago options are " .
+              "incompatible with reading from STDIN\n",
+              -exitval => 2);
   }
-  else {
-    unless (@sources) {
-      pod2usage(-msg => "A --source argument is required\n",
-                -exitval => 2);
-    }
+  if ($stdio && $project) {
+    pod2usage(-msg => "The --project option is " .
+              "incompatible with reading from STDIN\n",
+              -exitval => 2);
+  }
+  if ($stdio && $force) {
+    pod2usage(-msg => "The --force option is " .
+              "incompatible with reading from STDIN\n",
+              -exitval => 2);
+  }
+  if ($project && ($days || $days_ago)) {
+    pod2usage(-msg => "The --days and --days-ago options are " .
+              "incompatible with the --project option\n",
+              -exitval => 2);
   }
 
   unless ($publish_dest) {
@@ -109,6 +115,9 @@ sub run {
     $end = $now;
   }
 
+  my $begin = DateTime->from_epoch
+    (epoch => $end->epoch)->subtract(days => $days);
+
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
      inifile => $config,
@@ -121,14 +130,6 @@ sub run {
                                mysql_enable_utf8    => 1,
                                mysql_auto_reconnect => 1);
 
-  my $begin = DateTime->from_epoch
-    (epoch => $end->epoch)->subtract(days => $days);
-  my $file_test = modified_between($begin->epoch, $end->epoch);
-  my $file_regex = qr{.(gtc|idat)$}i;
-  my $relative_depth = 2;
-
-  @sources = map { abs_path($_) } @sources;
-
   my @files;
   if ($stdio) {
     while (my $line = <>) {
@@ -137,27 +138,24 @@ sub run {
     }
   }
   else {
-    foreach my $source (@sources) {
-      foreach my $dir (collect_dirs($source, $file_test, $relative_depth)) {
-        $log->debug("Checking directory '$dir'");
-        my @found = collect_files($dir, $file_test, $relative_depth,
-                                  $file_regex);
-        $log->debug("Found ", scalar @found, " matching items in '$dir'");
-        push @files, @found;
-      }
-    }
+    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    @files = find_files_to_publish($ifdb, $begin, $end, $project, $irods,
+                                   $publish_dest, $force, $log);
   }
 
-  @files = uniq(@files);
+  @files = uniq @files;
   my $total = scalar @files;
 
   if ($stdio) {
     $log->info("Publishing $total files in file list");
   }
+  elsif ($project) {
+    $log->info("Publishing to '$publish_dest' Infinium results in project ",
+               "'$project'");
+  }
   else {
-    $log->info("Publishing from ", join(", ", @sources),
-               " to '$publish_dest' Infinium results last modified between ",
-               $begin->iso8601, " and ", $end->iso8601);
+    $log->info("Publishing to '$publish_dest' Infinium results ",
+               "scanned between ", $begin->iso8601, " and ", $end->iso8601);
 
     $log->debug("Publishing $total files");
   }
@@ -173,6 +171,81 @@ sub run {
   return 0;
 }
 
+sub find_files_to_publish {
+  my ($ifdb, $begin, $end, $project, $irods, $publish_dest, $force, $log) = @_;
+
+  my @samples;
+
+  if ($project) {
+    $log->debug("Finding scanned samples in project '$project' ...");
+    @samples = @{$ifdb->find_project_samples($project)};
+  }
+  else {
+    $log->debug("Finding samples scanned between ", $begin->iso8601,
+                " and ", $end->iso8601);
+    @samples = @{$ifdb->find_scanned_samples_by_date($begin, $end)};
+  }
+
+  my @to_publish;
+
+  foreach my $if_sample (@samples) {
+    my $chip    = $if_sample->{beadchip};
+    my $section = $if_sample->{beadchip_section};
+    my $red     = $if_sample->{idat_red_path};
+    my $grn     = $if_sample->{idat_grn_path};
+    # May be NULL if not called yet, or if a methylation chip
+    my $gtc     = $if_sample->{gtc_path};
+
+    my @files;
+    foreach my $file (($red, $grn, $gtc)) {
+      if ($file) {
+        push @files, _map_netapp_path($file);
+      }
+    }
+
+    if ($force) {
+      push @to_publish, @files;
+    }
+    else {
+      my @data_objects = $irods->find_objects_by_meta
+        ($publish_dest,
+         ['beadchip', $chip],
+         ['beadchip_section', $section]);
+
+      my $num_files        = scalar @files;
+      my $num_data_objects = scalar @data_objects;
+
+      $log->info("Beadchip '$chip' section '$section' data objects published ",
+                 "previously: $num_data_objects/$num_files");
+
+      if ($num_data_objects < $num_files) {
+        push @to_publish, @files;
+      }
+    }
+  }
+
+  return @to_publish;
+}
+
+sub _map_netapp_path {
+  my ($netapp_path) = @_;
+
+  my $mapped_path = '';
+
+  if ($netapp_path) {
+    $mapped_path = $netapp_path;
+    $mapped_path =~ s{\\}{/}gmsx;
+    $mapped_path =~ s{//}{/}msx;
+    $mapped_path =~ s{netapp\d[ab]/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
+
+    $mapped_path =~ s{_r(\d+)c(\d+)_}{_R$1C$2_}msx;
+    $mapped_path =~ s{grn}{Grn}msx;
+    $mapped_path =~ s{red}{Red}msx;
+  }
+
+  return $mapped_path;
+}
+
 __END__
 
 =head1 NAME
@@ -182,8 +255,8 @@ publish_infinium_genotypes
 =head1 SYNOPSIS
 
 publish_infinium_genotypes [--config <database .ini file>]
-   [--days-ago <n>] [--days <n>]
-   --source <directory> --dest <irods collection> [ - < STDIN]
+   [--days-ago <n>] [--days <n>] --dest <irods collection> [--force]
+   [--project <project name>] [ - < STDIN]
 
 Options:
 
@@ -198,8 +271,7 @@ Options:
   --dest        The data destination root collection in iRODS.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
-  --source      The root directory to search for sample data. Multiple
-                source arguments may be given.
+  --project     The name of a genotyping project in the Infinium LIMS.
   --verbose     Print messages while processing. Optional.
   -             Read from STDIN.
 
