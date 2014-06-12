@@ -81,6 +81,7 @@ sub test_publish_infinium_genotypes : Test(3) {
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $irods_tmp_coll",
+            "--verbose",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 }
@@ -103,9 +104,9 @@ sub test_publish_infinium_analysis : Test(7) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $dbfile = "$tmpdir/test_publish_infinium_analysis.db";
 
-  my $gtc_path  = "$data_path/publish_infinium_genotypes/coreex_bbgahs/gtc";
-  my $idat_path = "$data_path/publish_infinium_genotypes/coreex_bbgahs/idat";
-  my $raw_data_list = "$data_path/publish_infinium_genotypes/coreex_bbgahs.txt";
+  my $gtc_path  = "$data_path/publish_infinium_analysis/coreex_bbgahs/gtc";
+  my $idat_path = "$data_path/publish_infinium_analysis/coreex_bbgahs/idat";
+  my $raw_data_list = "$data_path/publish_infinium_analysis/coreex_bbgahs.txt";
 
   my $analysis_path = "$data_path/publish_infinium_analysis/analysis";
 
@@ -134,9 +135,7 @@ sub test_publish_infinium_analysis : Test(7) {
             "--dbfile $dbfile",
             "--run $run",
             "--supplier $supplier",
-            "--project '$project'",
-            "--qc-platform $qc_platform",
-            "--maximum 10") == 0, 'Ready infinium');
+            "--project '$project'") == 0, 'Ready infinium');
 
   # Withdraw all samples
   ok(system(join q{ }, "$READY_SAMPLES",
@@ -186,21 +185,18 @@ sub test_ready_infinium : Test(8) {
             "--dbfile $dbfile",
             "--supplier $supplier",
             "--project '$project'",
-            "--qc-platform $qc_platform",
             "2>/dev/null") != 0, 'Requires --run');
 
   ok(system(join q{ }, "$READY_INFINIUM",
             "--dbfile $dbfile",
             "--run $run",
             "--project '$project'",
-            "--qc-platform $qc_platform",
             "2>/dev/null") != 0, 'Requires --supplier');
 
   ok(system(join q{ }, "$READY_INFINIUM",
             "--dbfile $dbfile ",
             "--run $run",
             "--supplier $supplier",
-            "--qc-platform $qc_platform",
             "2>/dev/null") != 0, 'Requires --project');
 
   ok(system(join q{ }, "$READY_INFINIUM",
@@ -208,15 +204,7 @@ sub test_ready_infinium : Test(8) {
             "--run $run",
             "--supplier $supplier",
             "--project '$project'",
-            "2>/dev/null") != 0, 'Requires --qc-platform');
-
-  ok(system(join q{ }, "$READY_INFINIUM",
-            "--dbfile $dbfile",
-            "--run $run",
-            "--supplier $supplier",
-            "--project '$project'",
-            "--qc-platform $qc_platform",
-            "--maximum 10") == 0, 'Basic use');
+            "--qc-platform $qc_platform") == 0, 'Basic use');
   ok(-e "$dbfile");
 }
 
@@ -235,9 +223,7 @@ sub test_ready_samples : Test(3) {
             "--dbfile $dbfile",
             "--run $run",
             "--supplier $supplier",
-            "--project '$project'",
-            "--qc-platform $qc_platform",
-            "--maximum 10") == 0);
+            "--project '$project'") == 0);
 
   ok(system("$READY_SAMPLES --dbfile $dbfile") == 0, 'List samples');
 }

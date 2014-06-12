@@ -227,15 +227,17 @@ sub find_project_samples {
 
   my $query =
     qq(SELECT DISTINCT
-         projecti.item              AS [project],
-         platei.item                AS [plate],
-         well.alpha_coordinate      AS [well],
-         samplei.item               AS [sample],
-         chipi.item                 AS [beadchip],
-         samplesectd.section_label  AS [beadchip_section],
-         productd.product_name      AS [beadchip_design],
-         productr.product_revision  AS [beadchip_revision],
-         statusav.appvalue          AS [status],
+         projecti.item                  AS [project],
+         platei.item                    AS [plate],
+         left(well.alpha_coordinate,1)  AS [plate_row],
+         right(well.alpha_coordinate,2) AS [plate_column],
+         well.alpha_coordinate          AS [well],
+         samplei.item                   AS [sample],
+         chipi.item                     AS [beadchip],
+         samplesectd.section_label      AS [beadchip_section],
+         productd.product_name          AS [beadchip_design],
+         productr.product_revision      AS [beadchip_revision],
+         statusav.appvalue              AS [status],
          callparentdir.path  + '\\' + callappfile.file_name  AS [gtc_path],
          redparentdir.path   + '\\' + redappfile.file_name   AS [idat_red_path],
          greenparentdir.path + '\\' + greenappfile.file_name AS [idat_grn_path],
@@ -299,7 +301,8 @@ sub find_project_samples {
 
      ORDER BY
         platei.item,
-        well.alpha_coordinate,
+        plate_row,
+        plate_column,
         pcontent.latest_image_date DESC);
 
   # Note: The clauses

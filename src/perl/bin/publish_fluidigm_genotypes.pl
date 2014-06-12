@@ -68,9 +68,10 @@ sub run {
               -exitval => 2);
   }
 
-  $config   ||= $DEFAULT_INI;
-  $days     ||= $DEFAULT_DAYS;
-  $days_ago ||= 0;
+  $config         ||= $DEFAULT_INI;
+  $days           ||= $DEFAULT_DAYS;
+  $days_ago       ||= 0;
+  $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
   my $log;
 
@@ -113,8 +114,6 @@ sub run {
   my $dir_regex = qr{^[0-9]{10}$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
-
-  $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              " results finished between ",
