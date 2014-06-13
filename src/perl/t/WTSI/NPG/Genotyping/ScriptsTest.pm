@@ -81,7 +81,6 @@ sub test_publish_infinium_genotypes : Test(3) {
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $irods_tmp_coll",
-            "--verbose",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 }
