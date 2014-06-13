@@ -201,29 +201,29 @@ sub findMetricResults {
     my @metricNames = @{ shift() };
     my %allResults;
     foreach my $name (@metricNames) {
-	my %results;
+	my $resultsRef;
 	if ($name eq $CR_NAME) {
-	    %results = resultsCallRate($inputDir);
+	    $resultsRef = resultsCallRate($inputDir);
 	} elsif ($name eq $DUP_NAME) {
-	    %results = resultsDuplicate($inputDir);
+	    $resultsRef = resultsDuplicate($inputDir);
 	} elsif ($name eq $GENDER_NAME) {
-	    %results = resultsGender($inputDir);
+	    $resultsRef = resultsGender($inputDir);
 	} elsif ($name eq $HET_NAME) {
-	    %results = resultsHet($inputDir);
+	    $resultsRef = resultsHet($inputDir);
 	} elsif ($name eq $HMH_NAME) {
-	    %results = resultsHighMafHet($inputDir);
+	    $resultsRef = resultsHighMafHet($inputDir);
 	} elsif ($name eq $ID_NAME) {
-	    %results = resultsIdentity($inputDir);
+	    $resultsRef = resultsIdentity($inputDir);
 	} elsif ($name eq $LMH_NAME) {
-	    %results = resultsLowMafHet($inputDir);
+	    $resultsRef = resultsLowMafHet($inputDir);
 	} elsif ($name eq $MAG_NAME) {
-	    %results = resultsMagnitude($inputDir);
+	    $resultsRef = resultsMagnitude($inputDir);
 	} elsif ($name eq $XYD_NAME) {
-	    %results = resultsXydiff($inputDir);
+	    $resultsRef = resultsXydiff($inputDir);
 	} else {
 	    croak "Unknown metric name $name for results: $!";
 	}
-	$allResults{$name} = \%results;
+	if ($resultsRef) { $allResults{$name} = $resultsRef; }
     }
     return \%allResults;
 }
@@ -387,7 +387,7 @@ sub resultsDuplicate {
     }
     $z->close();
     # read call rates and find keep/discard status
-    my %cr = resultsCallRate($inputDir);
+    my %cr = %{resultsCallRate($inputDir)};
     my %results;
     foreach my $sam (keys(%max)) {
 	my $keep = 0;
@@ -399,7 +399,7 @@ sub resultsDuplicate {
 	}
 	$results{$sam} = [$max{$sam}, $keep];
     }
-    return %results;
+    return \%results;
 }
 
 sub resultsGender {
@@ -417,7 +417,7 @@ sub resultsGender {
 	my ($sample, $xhet, $inferred, $supplied) = @$ref;
 	$results{$sample} = [$xhet, $inferred, $supplied];
     }
-    return %results;
+    return \%results;
 }
 
 sub resultsHet {
@@ -439,7 +439,7 @@ sub resultsIdentity {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
     my %data = %{decode_json(readFileToString($inPath))};
-    return %{$data{'results'}};
+    return $data{'results'};
 }
 
 
@@ -454,7 +454,8 @@ sub resultsMafHet {
     my $high = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'het_by_maf'};
     if (!(-r $inPath)) {
-	croak "Cannot read MAF heterozygosity input \"$inPath\": $!";
+	carp "Omitting MAF heterozygosity; cannot read input \"$inPath\": $!";
+	return 0;
     }
     my %data = %{decode_json(readFileToString($inPath))};
     my %results;
@@ -463,14 +464,15 @@ sub resultsMafHet {
 	if ($high) { $results{$sample} = $data{$sample}{'high_maf_het'}[1]; }
 	else { $results{$sample} = $data{$sample}{'low_maf_het'}[1]; }
     }
-    return %results;
+    return \%results;
 }
 
 sub resultsMagnitude {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'magnitude'};
     if (!(-e $inPath)) { 
-	croak "Input path for magnitude \"$inPath\" does not exist: $!";
+	carp "Omitting magnitude; input \"$inPath\" does not exist: $!";
+	return 0; # magnitude of intensity is optional
     }
     my $index = 1;
     return resultsSpaceDelimited($inPath, $index);
@@ -488,14 +490,15 @@ sub resultsSpaceDelimited {
 	my $metric = $fields[$index];
 	$results{$uri} = $metric;
     }
-    return %results;
+    return \%results;
 }
 
 sub resultsXydiff {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'xydiff'};
     if (!(-e $inPath)) { 
-	croak "Input path for xydiff \"$inPath\" does not exist: $!";
+	carp "Omitting xydiff; input \"$inPath\" does not exist: $!";
+	return 0;
     }
     my $index = 1;
     return resultsSpaceDelimited($inPath, $index);

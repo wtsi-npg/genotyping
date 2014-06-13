@@ -16,7 +16,10 @@ use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $AUTOCALL_PASS = 'Pass';
@@ -28,6 +31,10 @@ our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
 
 our $SEQUENOM_QC_PLEX = '/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv';
+
+our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
+our $DEFAULT_DATA_PATH      = '/seq/fluidigm';
+
 
 my $uid = `whoami`;
 chomp($uid);
@@ -61,35 +68,36 @@ sub run {
   my $namespace;
   my $project_title;
   my $qc_platform;
+  my $reference_path;
   my $run_name;
   my $supplier_name;
   my $verbose;
 
-  GetOptions('chip-design=s' => \$chip_design,
-             'config=s'      => \$config,
-             'dbfile=s'      => \$dbfile,
-             'debug'         => \$debug,
-             'help'          => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'     => \$log4perl_config,
-             'maximum=i'     => \$maximum,
-             'namespace=s'   => \$namespace,
-             'project=s'     => \$project_title,
-             'qc-platform=s' => \$qc_platform,
-             'run=s'         => \$run_name,
-             'supplier=s'    => \$supplier_name,
-             'verbose'       => \$verbose);
+  GetOptions('chip-design=s'    => \$chip_design,
+             'config=s'         => \$config,
+             'dbfile=s'         => \$dbfile,
+             'debug'            => \$debug,
+             'help'             => sub { pod2usage(-verbose => 2,
+                                                   -exitval => 0) },
+             'logconf=s'        => \$log4perl_config,
+             'maximum=i'        => \$maximum,
+             'namespace=s'      => \$namespace,
+             'project=s'        => \$project_title,
+             'qc-platform=s'    => \$qc_platform,
+             'reference-path=s' => \$reference_path,
+             'run=s'            => \$run_name,
+             'supplier=s'       => \$supplier_name,
+             'verbose'          => \$verbose);
 
-  $config ||= $DEFAULT_INI;
-  $namespace ||= $WTSI_NAMESPACE;
+  $config         ||= $DEFAULT_INI;
+  $namespace      ||= $WTSI_NAMESPACE;
+  $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
   unless ($dbfile) {
     pod2usage(-msg => "A --dbfile argument is required\n", -exitval => 2);
   }
   unless ($project_title) {
     pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
-  }
-  unless ($qc_platform) {
-    pod2usage(-msg => "A --qc-platform argument is required\n", -exitval => 2);
   }
   unless ($run_name) {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
@@ -103,12 +111,6 @@ sub run {
   }
   unless ($namespace =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
-  }
-
-  $qc_platform = lc $qc_platform;
-  unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
-    pod2usage(-msg => "Invalid qc-platform '$qc_platform' " .
-              "expected one of [$FLUIDIGM, $SEQUENOM]\n", -exitval => 2);
   }
 
   my $log;
@@ -129,10 +131,21 @@ sub run {
     }
   }
 
+  if ($qc_platform) {
+    $qc_platform = lc $qc_platform;
+    unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
+      pod2usage(-msg => "Invalid qc-platform '$qc_platform' " .
+                "expected one of [$FLUIDIGM, $SEQUENOM]\n", -exitval => 2);
+    }
+  }
+  else {
+    $log->warn("No QC platform selected. Proceeding without fetching QC data");
+  }
+
   if ($verbose) {
     my $db = $dbfile;
     $db ||= 'configured database';
-    print STDERR "Updating $db using config from $config\n";
+    $log->info("Updating $db using config from $config");
   }
 
   my @initargs = (name    => 'pipeline',
@@ -223,6 +236,7 @@ sub run {
        print_pre_report($supplier, $project_title, $namespace, $snpset)
          if $verbose;
 
+       # FIXME -- cache this in the database handle
        my %cache;
        my @samples;
 
@@ -329,27 +343,37 @@ sub run {
 
          last SAMPLE if defined $maximum && scalar @samples == $maximum;
        }
-
        unless (@samples) {
          print_post_report($pipedb, $project_title, $num_untracked_plates,
                            $num_consent_withdrawn_samples);
          die "Failed to find any samples for project '$project_title'\n";
        }
 
-       if ($qc_platform eq $SEQUENOM) {
-         my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-           (name    => 'snp',
-            inifile => $config,
-            logger  => $log)->connect(RaiseError => 1);
+       if ($qc_platform) {
+         $log->debug("Inserting QC data for platform '$qc_platform'");
+         if ($qc_platform eq $SEQUENOM) {
+           $log->debug("Inserting Sequenom QC data from SNP");
 
-         insert_sequenom_calls($pipedb, $snpdb, \@samples);
-       }
-       elsif ($qc_platform eq $FLUIDIGM) {
-         my $irods = WTSI::NPG::iRODS->new(logger => $log);
-         insert_fluidigm_calls($pipedb, $irods, \@samples);
+           my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+             (name    => 'snp',
+              inifile => $config,
+              logger  => $log)->connect(RaiseError => 1);
+
+           insert_sequenom_calls($pipedb, $snpdb, \@samples);
+         }
+         elsif ($qc_platform eq $FLUIDIGM) {
+           $log->debug("Inserting Fluidigm QC data from iRODS");
+
+           my $irods = WTSI::NPG::iRODS->new;
+           insert_fluidigm_calls($pipedb, $irods, \@samples, $reference_path,
+                                 $log);
+         }
+         else {
+           die "Unexpected QC platform '$qc_platform'\n";
+         }
        }
        else {
-         die "Unexpected QC platform '$qc_platform'\n";
+         $log->debug("Not inserting QC data; no QC platform specified");
        }
      });
 
@@ -373,7 +397,7 @@ sub validate_snpset {
 }
 
 sub insert_fluidigm_calls {
-  my ($pipedb, $irods, $samples) = @_;
+  my ($pipedb, $irods, $samples, $reference_path, $log) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   my $snpset = $pipedb->snpset->find({name => 'qc'});
@@ -382,12 +406,22 @@ sub insert_fluidigm_calls {
   $snpset or die "The Fluidigm SNP set 'qc' is unknown\n";
 
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-    (irods => $irods);
+    (irods          => $irods,
+     data_path      => $DEFAULT_DATA_PATH,
+     reference_path => $reference_path,
+     logger         => $log);
 
   foreach my $sample (@$samples) {
     my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', 'qc',
                                        $sample->sanger_sample_id);
-    insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+
+    if ($calls) {
+      insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+    }
+    else {
+      warn("Failed to find any Fluidigm results for '",
+           $sample->sanger_sample_id, "'");
+    }
   }
 }
 
@@ -474,7 +508,7 @@ sub print_post_report {
   print STDERR "Added dataset for '$proj':\n";
   print STDERR "  $num_plates plates ($untracked missing from Warehouse)\n";
   print STDERR "  $num_samples samples ($unconsented consent withdrawn)\n";
-  print STDERR "  $num_calls Sequenom SNP calls\n";
+  print STDERR "  $num_calls QC SNP calls\n";
 
   return;
 }
@@ -489,7 +523,7 @@ ready_infinium
 
 ready_infinium [--config <database .ini file>] [--chip-design <name>] \
    [--namespace <sample namespace>] [--maximum <n>] \
-   --dbfile <SQLite file> --project <project name> --qc-platform <name> \
+   --dbfile <SQLite file> --project <project name> [--qc-platform <name>] \
    --run <pipeline run name> --supplier <supplier name> [--verbose]
 
 Options:
@@ -503,7 +537,7 @@ Options:
   --namespace   The namespace for the imported sample names. Optional,
                 defaults to 'wtsi'.
   --project     The name of the Infinium LIMS project to import.
-  --qc-platform The QC genotyping platform. Fluidigm or Sequenom.
+  --qc-platform The QC genotyping platform. Fluidigm or Sequenom. Optional.
   --run         The pipeline run name in the database which will be created
                 or added to.
   --supplier    The name of the sample supplier.

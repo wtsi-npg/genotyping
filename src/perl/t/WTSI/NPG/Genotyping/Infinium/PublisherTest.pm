@@ -88,6 +88,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
@@ -118,7 +119,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 166;
+use Test::More tests => 173;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -275,7 +276,7 @@ sub dryrun : Test(4) {
   cmp_ok(scalar @idat_files, '==', 0, 'IDAT files not published in dry run');
 }
 
-sub publish : Test(55) {
+sub publish : Test(58) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
@@ -315,6 +316,7 @@ sub publish : Test(55) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
@@ -324,7 +326,7 @@ sub publish : Test(55) {
   }
 }
 
-sub publish_methylation : Test(42) {
+sub publish_methylation : Test(43) {
   my $publication_time = DateTime->now;
 
   my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
@@ -364,6 +366,7 @@ sub publish_methylation : Test(42) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
@@ -373,7 +376,7 @@ sub publish_methylation : Test(42) {
   }
 }
 
-sub publish_overwrite : Test(57) {
+sub publish_overwrite : Test(60) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
@@ -426,6 +429,7 @@ sub publish_overwrite : Test(57) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];

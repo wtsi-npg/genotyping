@@ -55,7 +55,7 @@ sub BUILD {
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
-  
+
 }
 
 sub dry_run {
@@ -76,13 +76,13 @@ sub dry_run_samples {
     my $idat_ok = $self->_dryrun_idat_files($resultset);
     my $gtc_ok = $self->_dryrun_gtc_file($resultset);
     if ($idat_ok + $gtc_ok == 3) {
-      foreach my $file ($resultset->grn_idat_file, 
-			$resultset->red_idat_file,
-			$resultset->gtc_file) {
-	$num_ready++;
-	if ($out) { print $out $file."\n"; }
+      foreach my $file ($resultset->grn_idat_file,
+                        $resultset->red_idat_file,
+                        $resultset->gtc_file) {
+        $num_ready++;
+        if ($out) { print $out $file."\n"; }
       }
-    } 
+    }
   }
   if ($out && $output ne '-') {
     close $out || $self->logcroak("Cannot close output '$output'");
@@ -103,6 +103,7 @@ sub publish_samples {
 
   my $num_published = 0;
   my $total = sum map { $_->size } @{$self->resultsets};
+  $total ||= 0;
 
   $self->debug("Starting to publish $total Infinium files");
 
@@ -134,10 +135,11 @@ sub validate_samples {
   my $out = $self->_open_output_handle($output);
   my @descriptions = _descriptions();
   foreach my $resultset (@{$self->resultsets}) {
-    foreach my $file ($resultset->grn_idat_file, 
-		      $resultset->red_idat_file,
-		      $resultset->gtc_file) {
-      my ($file, $irods_file, $status) = @{$self->_validate_file($file, $publish_dest)};
+    foreach my $file ($resultset->grn_idat_file,
+                      $resultset->red_idat_file,
+                      $resultset->gtc_file) {
+      my ($file, $irods_file, $status) =
+        @{$self->_validate_file($file, $publish_dest)};
       if ($status == 0) { $num_valid++; }
       my @fields = ($file, $irods_file, $status, $descriptions[$status]);
       if ($out) { print $out join("\t", @fields)."\n"; }
@@ -156,7 +158,7 @@ sub _dryrun_gtc_file {
   my $if_sample;
   my $num_ready = 0;
   if (!(-e $gtc_file)) {
-      $self->warn("Input GTC file $gtc_file does not exist");
+    $self->warn("Input GTC file $gtc_file does not exist");
   } else {
     eval {
       $if_sample = $self->infinium_db->find_called_sample($gtc_filename);
@@ -187,15 +189,15 @@ sub _dryrun_idat_files {
   ($vol, $dirs, $red_name) = File::Spec->splitpath($red_file);
   ($vol, $dirs, $grn_name) = File::Spec->splitpath($grn_file);
   eval {
-      $if_sample = $self->infinium_db->find_scanned_sample($red_name);
+    $if_sample = $self->infinium_db->find_scanned_sample($red_name);
   };
   if (!($if_sample) || $@) {
-      $self->warn("Query error for IDAT $red_name in Infinium LIMS");
-      $self->warn("Cannot publish IDAT $grn_name due to LIMS error");
+    $self->warn("Query error for IDAT $red_name in Infinium LIMS");
+    $self->warn("Cannot publish IDAT $grn_name due to LIMS error");
   } elsif ($missing_files==0) {
-      $self->debug("File $red_name OK for publication");
-      $self->debug("File $grn_name OK for publication");
-      $num_ready = 2;
+    $self->debug("File $red_name OK for publication");
+    $self->debug("File $grn_name OK for publication");
+    $num_ready = 2;
   }
   return $num_ready;
 }
@@ -204,10 +206,11 @@ sub _open_output_handle {
   my ($self, $output) = @_;
   my $out;
   if ($output) {
-    if ($output eq '-') { 
+    if ($output eq '-') {
       $out = *STDOUT;
     } else {
-      open $out, ">", $output || $self->logcroak("Cannot open output '$output'");
+      open $out, ">", $output ||
+        $self->logcroak("Cannot open output '$output'");
     }
   }
   return $out;
@@ -431,8 +434,8 @@ sub _build_filesets {
 }
 
 sub _descriptions {
-  # return a list of upload status descriptions  
-  my @descriptions = qw/UPLOAD_OK SOURCE_MISSING DEST_MISSING 
+  # return a list of upload status descriptions
+  my @descriptions = qw/UPLOAD_OK SOURCE_MISSING DEST_MISSING
                         METADATA_MD5_ERROR SOURCE_MD5_ERROR/;
   return @descriptions;
 }
@@ -442,23 +445,23 @@ sub _validate_file {
   # gather information on source and destination files, if available
   my ($file_exists, $listing, $valid_meta, $file_md5, $irods_md5);
   unless ($publish_dest =~ /\/$/) { $publish_dest .= '/'; }
-  if (-e $file) { 
+  if (-e $file) {
       $file_exists = 1;
-      $file_md5 = $self->irods->md5sum($file); 
+      $file_md5 = $self->irods->md5sum($file);
       $publish_dest .= $self->irods->hash_path($file).'/'.fileparse($file);
       $listing = eval { $self->irods->list_object($publish_dest) };
       if ($listing) {
-	  $valid_meta = eval {
-	      $self->irods->validate_checksum_metadata($publish_dest);
-	  };
-	  $irods_md5 = eval { 
-	      $self->irods->calculate_checksum($publish_dest);
-	  };      
-	  if (!defined($valid_meta)) {
-	      $self->warn("Unable to validate metadata: ", $@);
-	  } elsif (!defined($irods_md5)) {
-	      $self->warn("Unable to calculate iRODS checksum: ", $@);
-	  }
+        $valid_meta = eval {
+          $self->irods->validate_checksum_metadata($publish_dest);
+        };
+        $irods_md5 = eval {
+          $self->irods->calculate_checksum($publish_dest);
+        };
+        if (!defined($valid_meta)) {
+          $self->warn("Unable to validate metadata: ", $@);
+        } elsif (!defined($irods_md5)) {
+          $self->warn("Unable to calculate iRODS checksum: ", $@);
+        }
       }
   } else {
       $publish_dest = 'UNKNOWN';
@@ -466,7 +469,7 @@ sub _validate_file {
   $self->debug("Validating publication of $file to $publish_dest");
   # assign status to file
   my $status = 0;
-  if (! $file_exists) { 
+  if (! $file_exists) {
     $status = 1;
   } elsif (! $listing) {
     $status = 2;
@@ -484,7 +487,6 @@ sub _validate_file {
 }
 
 sub _validate_publish_dest {
-
   my ($self, $publish_dest) = @_;
 
   defined $publish_dest or
