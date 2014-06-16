@@ -328,6 +328,9 @@ sub find_project_samples {
   # by ordering the results by descending scan date and returning only
   # the first row we encounter for each sample.
 
+  # Further note: it is possible for chips to be scanned, but have no
+  # latest scan date?! We deal with this in the Perl code.
+
   my %samples;
   my @samples;
 
@@ -351,18 +354,32 @@ sub find_project_samples {
     if ($num_elts > 1) {
       $self->info("Sample '$sample' has $num_elts scans");
 
+      my @date_defined;
       foreach my $elt (@elts) {
-        unless (defined $elt->{image_iso_date}) {
-          $self->logconfess("Unable to choose which scan record to use for ",
-                            "sample '$sample' because there is no scan date ",
-                            "recorded and there are $num_elts scans");
+        if (defined $elt->{image_iso_date}) {
+          push @date_defined, $elt;
+          $self->warn("Found a scan record for sample '$sample' dated ",
+                      $elt->{image_iso_date});
+        }
+        else {
+          $self->warn("Found a scan record for sample '$sample' with ",
+                      "no date; ignoring it");
         }
       }
 
-      @elts = sort { $b->{image_iso_date} cmp $a->{image_iso_date} } @elts;
+      my $num_dated_elts = scalar @date_defined;
+      if ($num_dated_elts == 0) {
+        $self->logconfess("All $num_elts scans for sample '$sample' were ",
+                          "undated; unable to choose which to use");
+      }
+
+      @elts = sort { $b->{image_iso_date}
+                       cmp
+                         $a->{image_iso_date} } @date_defined;
 
       $self->warn("For sample '$sample' selecting latest scan dated ",
-                  $elts[0]->{image_iso_date}, " from $num_elts scans");
+                  $elts[0]->{image_iso_date}, " from $num_dated_elts ",
+                  "dated scans");
     }
 
     push @samples, $elts[0];
