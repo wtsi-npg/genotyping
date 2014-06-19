@@ -48,7 +48,9 @@ sub run {
       $self->logconfess("Execution of '$command' died from signal: $signal");
     }
     else {
-      $self->logconfess("Execution of '$command' failed with exit code: $exit");
+      $self->logconfess("Execution of '$command' failed with exit code: ",
+                        "$exit and STDERR '", join(" ", $self->split_stderr),
+                        "'");
     }
   }
   else {

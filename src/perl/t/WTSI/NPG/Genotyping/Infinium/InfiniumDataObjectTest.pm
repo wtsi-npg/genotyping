@@ -4,11 +4,10 @@ use utf8;
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
-  use warnings;
   use Carp;
+  use Moose;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
 
   sub find_infinium_sample_by_plate {
     my ($self, $infinium_barcode, $map) = @_;
@@ -19,6 +18,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
@@ -33,6 +33,12 @@ use utf8;
             plate_purpose_name => 'Infinium',
             map                => 'A10'};
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 package WTSI::NPG::Genotyping::Infinium::InfiniumDataObjectTest;
@@ -133,6 +139,7 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'},

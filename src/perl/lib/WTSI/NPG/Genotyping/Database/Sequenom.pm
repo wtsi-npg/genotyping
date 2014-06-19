@@ -13,12 +13,16 @@ extends 'WTSI::NPG::Database';
   Arg [1]    : start DateTime
   Arg [2]    : end DateTime. Optional, defaults to start
 
-  Example    : $db->find_finished_plate_names($then, $now)
+  Example    : my @names = @{$db->find_finished_plate_names($then, $now)}
   Description: Returns a list of names of plates finished between start and end
                dates, inclusive. Only the date part of the DateTime arguments is
                significant; these arguments are cloned and truncated prior to
                comparison.
-  Returntype : arrayref of string
+
+               NB: The LIMS does not update the timestamp when the plate status
+               changes to 'finished'. This means that the results of this method
+               will always be approximate.
+  Returntype : ArrayRef[Str]
 
 =cut
 
@@ -58,15 +62,57 @@ sub find_finished_plate_names {
   return \@plates;
 }
 
+=head2 find_plate_result_wells
+
+  Arg [1]    : string
+
+  Example    : my @wells = @{$db->find_plate_result_wells('plate name')}
+  Description: Returns a list of all the well names that have result data
+               associated with them.
+
+  Returntype : ArrayRef[Str]
+
+=cut
+
+sub find_plate_result_wells {
+  my ($self, $plate_name) = @_;
+
+  defined $plate_name or
+    $self->logconfess('The plate_name argument was undefined');
+
+  my $query =
+    qq(SELECT DISTINCT
+         al.well AS "well"
+       FROM SEQUENOM.PLATE pl, SEQUENOM.SR_ALLELOTYPE_2 al
+       WHERE
+         pl.plate_id = ?
+       AND pl.plate_id = al.plate
+       AND pl.status = 'finished'
+       AND al.oligo_type <> 'P'
+       AND al.allele <> 'Pausing Peak'
+       ORDER BY al.well);
+
+  $self->trace("Executing: '$query' with args [$plate_name]");
+  my $sth = $self->dbh->prepare($query);
+  $sth->execute($plate_name);
+
+  my @wells;
+  while (my $well = $sth->fetchrow_hashref) {
+    push(@wells, $well->{well});
+  }
+
+  return \@wells;
+}
+
 =head2 find_plate_results
 
   Arg [1]    : string
 
-  Example    : $db->find_plate_results('plate name')
+  Example    : my @results = @{$db->find_plate_results('plate name')}
   Description: Returns details of the Sequenom assay results for a plate.
                The plate's results are returned as a hashref keyed on well
                address. Each hash value is an arrayref of result records
-               which are themselves hashrefs with the folowwing keys and
+               which are themselves hashrefs with the following keys and
                values:
                {customer   => <customer name string>,
                 project    => <project name string>,

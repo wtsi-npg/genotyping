@@ -6,6 +6,7 @@ package main;
 
 use strict;
 use warnings;
+use Cwd qw(abs_path);
 use DateTime;
 use File::Basename;
 use Getopt::Long;
@@ -35,16 +36,21 @@ run() unless caller();
 sub run {
   my $config;
   my $debug;
+  my $dry_run;
   my $log4perl_config;
+  my $output;
   my $publish_dest;
-  my $type;
+  my $validate,
   my $verbose;
 
   GetOptions('config=s'   => \$config,
              'debug'      => \$debug,
              'dest=s'     => \$publish_dest,
+             'dry-run'    => \$dry_run,
              'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
              'logconf=s'  => \$log4perl_config,
+	     'output=s'   => \$output,
+	     'validate'   => \$validate,
              'verbose'    => \$verbose);
 
   unless ($publish_dest) {
@@ -53,7 +59,7 @@ sub run {
   }
 
   $config ||= $DEFAULT_INI;
-  $type = lc($type);
+  if ($output && $output ne '-') { $output = abs_path($output); } 
 
   my $log;
 
@@ -89,7 +95,7 @@ sub run {
   my @files = <>;
   foreach my $file (@files) {
     chomp($file);
-    my ($filename, $directories, $suffix) = fileparse($file, $type);
+    my ($filename, $directories, $suffix) = fileparse($file);
   }
 
   @files = uniq(@files);
@@ -100,7 +106,18 @@ sub run {
      data_files       => \@files,
      infinium_db      => $ifdb,
      logger           => $log);
-  $publisher->publish($publish_dest);
+
+  if ($dry_run && $validate) {
+      $log->logcroak("Can specify at most one of --dry-run and --validate");
+  } elsif ($dry_run) {
+      $log->debug("Starting dry run");
+      $publisher->dry_run($publish_dest, $output);
+  } elsif ($validate) {
+      $publisher->validate($publish_dest, $output);
+  } else {
+      $log->debug("Starting publication");
+      $publisher->publish($publish_dest);
+  }
 
   return 0;
 }
@@ -114,21 +131,33 @@ publish_infinium_file_list
 =head1 SYNOPSIS
 
 publish_infinium_file_list [--config <database .ini file>] \
-   --dest <irods collection> < <files>
+   --dest <irods collection> [--dry-run] [--help] [--logconf <log4perl config>]
+   [--output <destination file or -> ] [--validate] [--verbose] < <files>
 
 Options:
 
   --config      Load database configuration from a user-defined .ini file.
                 Optional, defaults to $HOME/.npg/genotyping.ini
   --dest        The data destination root collection in iRODS.
+  --dry-run     Attempt to determine if inputs are valid. Does *not* actually
+                publish any files. Not compatible with --validate. Output is 
+                a list of publishable files, one per line.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
+  --output      In --dry-run or --validate mode, write output to the 
+                given file, or '-' for STDOUT. If this option is omitted, 
+                output is not written.
+  --validate    Validate upload of files which have already been published 
+                to iRODS. Not compatible with --dry-run. Output is tab 
+                delimited text, giving source, destination, status code, and 
+                status description for each input.
   --verbose     Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
-Publishes filed named on STDIN to iRODS with metadata obtained from
-LIMS.
+Default behaviour is to publishe files named on STDIN to iRODS with metadata 
+obtained from LIMS. Can also perform a dry run to check if metadata exists 
+in the LIMS, or validate that files have been uploaded successfully.
 
 =head1 METHODS
 
@@ -136,11 +165,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012-2014 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

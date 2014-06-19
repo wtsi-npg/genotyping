@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 12;
+use Test::More tests => 16;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -24,6 +24,7 @@ my $no_norm_file       = 'no_norm_Sample_Probe_Profile.txt';
 my $cubic_norm_file    = 'cubic_norm_Sample_Probe_Profile.txt';
 my $quantile_norm_file = 'quantile_norm_Sample_Probe_Profile.txt';
 my $control_file       = 'Control_Probe_Profile.txt';
+my $annotation_file    = 'profile_annotation.txt';
 
 my $pid = $$;
 
@@ -31,7 +32,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Expression::SampleProbeProfile');
 }
 
-sub constructor : Test(3) {
+sub constructor : Test(4) {
   new_ok('WTSI::NPG::Expression::SampleProbeProfile',
          [file_name => "$data_path/$no_norm_file"]);
 
@@ -43,25 +44,24 @@ sub constructor : Test(3) {
          ["$data_path/$control_file"]);
 }
 
-sub guess : Test(3) {
+sub is_valid : Test(5) {
   ok(WTSI::NPG::Expression::SampleProbeProfile->new
-     ("$data_path/$no_norm_file")->guess);
+     ("$data_path/$no_norm_file")->is_valid);
+
+  ok(WTSI::NPG::Expression::SampleProbeProfile->new
+     ("$data_path/$cubic_norm_file")->is_valid);
+
+  ok(WTSI::NPG::Expression::SampleProbeProfile->new
+     ("$data_path/$quantile_norm_file")->is_valid);
 
   ok(!WTSI::NPG::Expression::SampleProbeProfile->new
-     ("$data_path/$control_file")->guess);
+     ("$data_path/$control_file")->is_valid);
 
-  my $profile = WTSI::NPG::Expression::SampleProbeProfile->new
-    ("$data_path/$no_norm_file");
-
-  # Test disambiguation when there are multiple hints. This is used
-  # when there are an undefined mixture of files in a directory
-  $profile->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
-  $profile->add_hint(WTSI::NPG::Expression::ProfileAnnotationHint->new);
-
-  ok($profile->guess);
+  ok(!WTSI::NPG::Expression::SampleProbeProfile->new
+     ("$data_path/$annotation_file")->is_valid);
 }
 
-sub normalisation_method : Test(4) {
+sub normalisation_method : Test(5) {
   my $x = WTSI::NPG::Expression::SampleProbeProfile->new
     ("$data_path/$no_norm_file");
 
@@ -79,5 +79,9 @@ sub normalisation_method : Test(4) {
 
   dies_ok { WTSI::NPG::Expression::SampleProbeProfile->new
       ("$data_path/$control_file")->normalisation_method }
-    'Invalid file format';
+    'Invalid file format 1';
+
+  dies_ok { WTSI::NPG::Expression::SampleProbeProfile->new
+      ("$data_path/$annotation_file")->normalisation_method }
+    'Invalid file format 2';
 }

@@ -4,12 +4,17 @@ use utf8;
 {
   package WTSI::NPG::Genotyping::Database::SNPStub;
 
-  use strict;
-  use warnings;
+  use Moose;
 
-  use base 'WTSI::NPG::Genotyping::Database::SNP';
+  extends 'WTSI::NPG::Genotyping::Database::SNP';
 
   Log::Log4perl::init('./etc/log4perl_tests.conf');
+
+  has 'test_well_status' =>
+    (is       => 'rw',
+     isa      => 'Str',
+     required => 0,
+     default  => sub { 'OK' });
 
   sub find_sequenom_plate_id {
     return 123456789;
@@ -20,18 +25,25 @@ use utf8;
   }
 
   sub find_well_status {
-    return 'OK';
+    my ($self) = @_;
+
+    return $self->test_well_status;
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
-  use warnings;
   use Carp;
+  use Moose;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
 
   Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -46,6 +58,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
@@ -60,6 +73,12 @@ use utf8;
             plate_purpose_name => 'Sequenom',
             map                => 'A10'};
   }
+
+  __PACKAGE__->meta->make_immutable;
+
+  no Moose;
+
+  1;
 }
 
 package WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest;
@@ -69,7 +88,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 8;
+use Test::More tests => 15;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -158,6 +177,7 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'sequenom_plate',          value => 'plate1'},
@@ -173,4 +193,34 @@ sub update_secondary_metadata : Test(4) {
 
   is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
     or diag explain \@groups_after;
+}
+
+sub update_qc_metadata : Test(7) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/$data_file");
+
+  my $snpdb = WTSI::NPG::Genotyping::Database::SNPStub->new
+    (name    => 'snp',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
+
+  ok(!$data_object->get_avu('manual_qc'), 'Has no manual_qc');
+  ok($data_object->update_qc_metadata($snpdb));
+
+  my $qc_pass = $data_object->get_avu('manual_qc');
+  ok($qc_pass, 'Has manual_qc');
+  is($qc_pass->{value}, '1', 'Passed manual_qc');
+
+  my $mod_snpdb = WTSI::NPG::Genotyping::Database::SNPStub->new
+    (name             => 'snp',
+     test_well_status => 'No call',
+     inifile          => File::Spec->catfile($ENV{HOME},
+                                             '.npg/genotyping.ini'));
+
+  ok($data_object->update_qc_metadata($mod_snpdb));
+
+  my $qc_fail = $data_object->get_avu('manual_qc');
+  ok($qc_fail, 'Has manual_qc');
+  is($qc_fail->{value}, '0', 'Failed manual_qc');
 }

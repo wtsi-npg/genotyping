@@ -114,6 +114,9 @@ sub make_sample_metadata {
   if (defined $ss_sample->{control}) {
     push(@meta, [$self->sample_control_attr => $ss_sample->{control}]);
   }
+  if (defined $ss_sample->{donor_id}) {
+    push(@meta, [$self->sample_donor_id_attr => $ss_sample->{donor_id}]);
+  }
   if (defined $ss_sample->{common_name}) {
     push(@meta, [$self->sample_common_name_attr => $ss_sample->{common_name}]);
   }

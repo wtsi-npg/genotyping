@@ -14,7 +14,7 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::SimplePublisher;
+use WTSI::NPG::Publisher;
 
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
   'WTSI::NPG::Genotyping::Annotator';
@@ -52,11 +52,12 @@ has 'reference_name' =>
      return 'Homo_sapiens (1000Genomes)'
    });
 
-has 'reference_zone' =>
+has 'reference_path' =>
   (is       => 'ro',
    isa      => 'Str',
    required => 1,
-   default  => '/');
+   default  => sub { return '/' },
+   writer   => '_set_reference_path');
 
 has 'resultset' =>
   (is       => 'ro',
@@ -70,11 +71,23 @@ has 'snpsets' =>
    lazy     => 1,
    builder  => '_build_snpsets');
 
+has 'ss_warehouse_db' =>
+  (is       => 'ro',
+   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'Object',
+   required => 1);
+
 sub BUILD {
   my ($self) = @_;
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
+
+  # Ensure that the iRODS path is absolute so that its zone can be
+  # determined.
+  my $abs_path = $self->irods->absolute_path($self->reference_path);
+
+  $self->_set_reference_path($abs_path);
 }
 
 =head2 publish
@@ -131,7 +144,7 @@ sub publish_samples {
     @addresses = @{$export_file->addresses};
   }
 
-  my $publisher = WTSI::NPG::SimplePublisher->new
+  my $publisher = WTSI::NPG::Publisher->new
     (irods         => $self->irods,
      accountee_uid => $self->accountee_uid,
      logger        => $self->logger);
@@ -142,6 +155,7 @@ sub publish_samples {
     ([$self->fluidigm_plate_name_attr => $export_file->fluidigm_barcode],
      [$self->dcterms_audience_attr    => $self->audience_uri->as_string]);
 
+  # Publish the unsplit file
   $publisher->publish_file($self->resultset->export_file, \@meta,
                            $publish_dest,
                            $self->publication_time);
@@ -173,9 +187,14 @@ sub publish_samples {
       my $snpset = $self->_find_resultset_snpset($resultset);
       my $snpset_name = $self->_find_snpset_name($snpset);
 
-      WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-          ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
-                                              $snpset_name);
+      my $obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+        ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
+                                            $snpset_name);
+
+      # Now that adding the secondary metadata is fast enough, we can
+      # run it inline here, so that the data are available
+      # immediately.
+      $obj->update_secondary_metadata($self->ss_warehouse_db);
 
       ++$num_published;
     };
@@ -237,7 +256,7 @@ sub _build_snpsets {
   my ($self) = @_;
 
   my @snpset_paths = $self->irods->find_objects_by_meta
-    ($self->reference_zone,
+    ($self->reference_path,
      [$self->fluidigm_plex_name_attr    => '%', 'like'],
      [$self->reference_genome_name_attr => $self->reference_name]);
 

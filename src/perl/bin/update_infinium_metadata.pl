@@ -96,10 +96,11 @@ sub run {
   }
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
-     inifile =>  $config)->connect(RaiseError           => 1,
-                                   mysql_enable_utf8    => 1,
-                                   mysql_auto_reconnect => 1);
+    (name    => 'sequencescape_warehouse',
+     inifile => $config,
+     logger  => $log)->connect(RaiseError           => 1,
+                               mysql_enable_utf8    => 1,
+                               mysql_auto_reconnect => 1);
   my $irods = WTSI::NPG::iRODS->new(logger => $log);
 
   my @infinium_data;

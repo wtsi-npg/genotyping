@@ -37,8 +37,22 @@ has 'plate_name' =>
 
 has 'sequenom_db' =>
   (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::Database::Sequenom',
+   # isa      => 'WTSI::NPG::Genotyping::Database::Sequenom',
+   isa      => 'Object',
    required => 1);
+
+has 'snp_db' =>
+  (is       => 'ro',
+   #  isa      => 'WTSI::NPG::Database::Genotyping::SNP',
+   isa      => 'Object',
+   required => 1);
+
+has 'ss_warehouse_db' =>
+  (is       => 'ro',
+   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'Object',
+   required => 1);
+
 
 sub BUILD {
   my ($self) = @_;
@@ -138,9 +152,15 @@ sub publish_samples {
 
       $self->debug("Found results to be of SNP set '$snpset_name'");
 
-      WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
-          ($self->irods, $rods_path)->add_avu($self->sequenom_plex_name_attr,
-                                              $snpset_name);
+      my $obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+        ($self->irods, $rods_path);
+      $obj->add_avu($self->sequenom_plex_name_attr, $snpset_name);
+
+      # Now that adding the secondary metadata is fast enough, we can
+      # run it inline here, so that the data are available
+      # immediately.
+      $obj->update_secondary_metadata($self->snp_db,
+                                      $self->ss_warehouse_db);
 
       unlink $file;
       ++$num_published;
