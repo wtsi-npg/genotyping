@@ -23,6 +23,7 @@ bin/print_simfile_header.pl
 bin/publish_expression_analysis.pl
 bin/publish_fluidigm_genotypes.pl
 bin/publish_infinium_analysis.pl
+bin/publish_infinium_file_list.pl
 bin/publish_infinium_genotypes.pl
 bin/publish_sequenom_genotypes.pl
 bin/publish_snpset.pl
@@ -74,11 +75,8 @@ lib/WTSI/NPG/Expression/Annotator.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifest.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV1.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV2.pm
-lib/WTSI/NPG/Expression/ControlProfileHint.pm
 lib/WTSI/NPG/Expression/InfiniumDataObject.pm
 lib/WTSI/NPG/Expression/ProfileAnnotation.pm
-lib/WTSI/NPG/Expression/ProfileAnnotationHint.pm
-lib/WTSI/NPG/Expression/ProfileHint.pm
 lib/WTSI/NPG/Expression/Publisher.pm
 lib/WTSI/NPG/Expression/ResultSet.pm
 lib/WTSI/NPG/Expression/SampleProbeProfile.pm
@@ -148,9 +146,7 @@ lib/WTSI/NPG/iRODS/ACLModifier.pm
 lib/WTSI/NPG/iRODS/Collection.pm
 lib/WTSI/NPG/iRODS/Communicator.pm
 lib/WTSI/NPG/iRODS/DataObject.pm
-lib/WTSI/NPG/iRODS/FileHint.pm
 lib/WTSI/NPG/iRODS/GroupAdmin.pm
-lib/WTSI/NPG/iRODS/Guessable.pm
 lib/WTSI/NPG/iRODS/Lister.pm
 lib/WTSI/NPG/iRODS/MetaLister.pm
 lib/WTSI/NPG/iRODS/MetaModifier.pm
@@ -328,6 +324,10 @@ t/fluidigm_publisher/0123456789/Data/aramis.tif
 t/fluidigm_publisher/0123456789/Data/athos.tif
 t/fluidigm_publisher/0123456789/Data/porthos.tif
 t/fluidigm_publisher/qc.csv
+t/fluidigm_publisher/repub/0123456789/0123456789.csv
+t/fluidigm_publisher/repub/0123456789/Data/aramis.tif
+t/fluidigm_publisher/repub/0123456789/Data/athos.tif
+t/fluidigm_publisher/repub/0123456789/Data/porthos.tif
 t/fluidigm_resultset.t
 t/fluidigm_resultset/complete/0123456789/0123456789.csv
 t/fluidigm_resultset/complete/0123456789/Data/aramis.tif
@@ -403,6 +403,9 @@ t/infinium_publisher/idat/0123456799/0123456799_R02C02_Grn.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C02_Red.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C04_Grn.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C04_Red.idat
+t/infinium_publisher/repub/gtc/0123456789/0123456789_R01C01.gtc
+t/infinium_publisher/repub/idat/0123456789/0123456789_R01C01_Grn.idat
+t/infinium_publisher/repub/idat/0123456789/0123456789_R01C01_Red.idat
 t/infinium_resultset.t
 t/infinium_resultset/0123456789_R01C01.gtc
 t/infinium_resultset/0123456789_R01C01_Grn.idat
@@ -509,6 +512,7 @@ t/scripts/publish_expression_analysis/infinium/9425128065_L_Grn.xml
 t/scripts/publish_expression_analysis/manifest/hipsci_12samples_2014-02-12.txt
 t/scripts/publish_expression_analysis/results/cubic_norm_Sample_Probe_Profile.txt
 t/scripts/publish_infinium_analysis/analysis/analysis.txt
+t/scripts/publish_infinium_analysis/coreex_bbgahs.txt
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R02C01.gtc
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R02C02.gtc
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R04C01.gtc
@@ -525,6 +529,7 @@ t/scripts/publish_infinium_analysis/coreex_bbgahs/idat/1/9298751015_R04C02_Red.i
 t/scripts/publish_infinium_analysis/coreex_bbgahs/idat/1/9298751015_R06C01_Grn.idat
 t/scripts/publish_infinium_analysis/coreex_bbgahs/idat/1/9298751015_R06C01_Red.idat
 t/scripts/publish_infinium_analysis/samples_to_include.txt
+t/scripts/publish_infinium_genotypes/coreex_bbgahs.txt
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/gtc/1/9298751015_R01C01.gtc
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/gtc/1/9298751015_R02C01.gtc
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/gtc/1/9298751015_R02C02.gtc
@@ -626,3 +631,4 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
+

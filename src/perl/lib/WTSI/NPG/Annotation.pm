@@ -13,6 +13,7 @@ our %METADATA_ATTR =
    sample_cohort           => 'sample_cohort',
    sample_control          => 'sample_control',
    sample_consent          => 'sample_consent',
+   sample_donor_id         => 'sample_donor_id',
    study_id                => 'study_id',
    study_title             => 'study_title',
    reference_genome_name   => 'reference_name',

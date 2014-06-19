@@ -13,6 +13,13 @@ use WTSI::NPG::iRODS;
 with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotation',
   'WTSI::NPG::Genotyping::Annotation';
 
+has 'data_path' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => sub { return '/' },
+   writer   => '_set_data_path');
+
 has 'irods' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::iRODS',
@@ -21,11 +28,26 @@ has 'irods' =>
      return WTSI::NPG::iRODS->new;
    });
 
+has 'reference_path' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1,
+   default  => sub { return '/' },
+   writer   => '_set_reference_path');
+
 sub BUILD {
   my ($self) = @_;
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
+
+  # Ensure that the iRODS path is absolute so that its zone can be
+  # determined.
+  my $abs_ref_path = $self->irods->absolute_path($self->reference_path);
+  $self->_set_reference_path($abs_ref_path);
+
+  my $abs_data_path = $self->irods->absolute_path($self->data_path);
+  $self->_set_data_path($abs_data_path);
 }
 
 =head2 get_snpset
@@ -47,7 +69,7 @@ sub get_snpset {
      $self->logconfess('The reference_name argument was empty');
 
    my @obj_paths = $self->irods->find_objects_by_meta
-     ('/',
+     ($self->reference_path,
       [$self->fluidigm_plex_name_attr    => $snpset_name],
       [$self->reference_genome_name_attr => $reference_name]);
 
@@ -89,7 +111,7 @@ sub get_assay_resultsets {
                "with plex '$snpset_name'");
 
   my @obj_paths = $self->irods->find_objects_by_meta
-    ('/',
+    ($self->data_path,
      [$self->fluidigm_plex_name_attr => $snpset_name],
      [$self->dcterms_identifier_attr => $sample_identifier], @query_specs);
 
@@ -156,28 +178,40 @@ sub get_calls {
   my ($self, $reference_name, $snpset_name, $sample_identifier,
       @query_specs) = @_;
 
+  my @calls;
+
+  $self->debug("Finding a Fluidigm resultset for sample '$sample_identifier' ",
+               "using SNP set '$snpset_name' on reference '$reference_name'");
+
   my $resultset = $self->get_assay_resultset
     ($snpset_name, $sample_identifier, @query_specs);
-  my $snpset = $self->get_snpset($snpset_name, $reference_name);
 
-  my @calls;
-  foreach my $result (@{$resultset->assay_results}) {
-    if (!$result->is_control) {
-      my @snps = $snpset->named_snp($result->snp_assayed);
-      unless (@snps) {
-        $self->logconfess("Failed to get '", $resultset->str, "' calls ",
-                          "for SNP '", $result->snp_assayed, "' ",
-                          "on reference '$reference_name': this SNP is not ",
-                          "present in SNP set '", $snpset->str, "'");
+  if ($resultset) {
+    my $snpset = $self->get_snpset($snpset_name, $reference_name);
+
+    foreach my $result (@{$resultset->assay_results}) {
+      if (!$result->is_control) {
+        my @snps = $snpset->named_snp($result->snp_assayed);
+        unless (@snps) {
+          $self->logconfess("Failed to get '", $resultset->str, "' calls ",
+                            "for SNP '", $result->snp_assayed, "' ",
+                            "on reference '$reference_name': this SNP is not ",
+                            "present in SNP set '", $snpset->str, "'");
+        }
+
+        my $snp = shift @snps;
+        my $call = WTSI::NPG::Genotyping::Call->new
+          (genotype => $result->converted_call,
+           snp      => $snp);
+
+        push @calls, $call;
       }
-
-      my $snp = shift @snps;
-      my $call = WTSI::NPG::Genotyping::Call->new
-        (genotype => $result->converted_call,
-         snp      => $snp);
-
-      push @calls, $call;
     }
+  }
+  else {
+    $self->debug("Failed to find a Fluidigm resultset for sample ",
+                 "'$sample_identifier' using SNP set '$snpset_name' on ",
+                 "reference '$reference_name'");
   }
 
   return \@calls;

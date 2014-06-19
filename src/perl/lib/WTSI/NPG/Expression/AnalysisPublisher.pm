@@ -226,14 +226,13 @@ sub publish_analysis_file {
     # Test file to see whether it a type we recognise
     my $profile    = WTSI::NPG::Expression::SampleProbeProfile->new($filename);
     my $annotation = WTSI::NPG::Expression::ProfileAnnotation->new($filename);
-    $annotation->add_hint(WTSI::NPG::Expression::ControlProfileHint->new);
 
-    if ($profile->guess) {
+    if ($profile->is_valid) {
       push @fingerprint,
         $self->make_profile_metadata($profile->normalisation_method,
                                      'sample', 'probe');
     }
-    elsif ($annotation->guess) {
+    elsif ($annotation->is_valid) {
       push @fingerprint, $self->make_profile_annotation_metadata('annotation');
     }
   }

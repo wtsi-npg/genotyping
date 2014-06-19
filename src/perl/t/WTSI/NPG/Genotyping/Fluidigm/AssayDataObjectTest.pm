@@ -19,6 +19,7 @@ use utf8;
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
+            donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
@@ -132,6 +133,7 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'sample_common_name',      value => 'Homo sapiens'},
      {attribute => 'sample_consent',          value => '1'},
      {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
      {attribute => 'sample_id',               value => '123456789'},
      {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
      {attribute => 'study_id',                value => '0'}];
