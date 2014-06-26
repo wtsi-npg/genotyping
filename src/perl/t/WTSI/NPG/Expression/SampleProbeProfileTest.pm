@@ -14,8 +14,6 @@ Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 BEGIN { use_ok('WTSI::NPG::Expression::SampleProbeProfile'); }
 
-use WTSI::NPG::Expression::ControlProfileHint;
-use WTSI::NPG::Expression::ProfileAnnotationHint;
 use WTSI::NPG::Expression::SampleProbeProfile;
 
 my $data_path = './t/expression_analysis_publisher/data/analysis';
