@@ -14,7 +14,7 @@ with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 
 has 'name' =>
-  (is       => 'rw',
+  (is       => 'ro',
    isa      => 'Str',
    required => 1,
    default  => sub { return ''} );
