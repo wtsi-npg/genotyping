@@ -6,6 +6,7 @@ package WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 use JSON;
 use Log::Log4perl::Level;
 use Moose;
+use WTSI::NPG::Runnable;
 
 with 'WTSI::NPG::Loggable';
 
@@ -16,47 +17,51 @@ with 'WTSI::NPG::Loggable';
 our $MAX_DISCORDANCE_KEY = 'MAX_DISCORDANCE';
 our $PAIRWISE_DISCORDANCE_KEY = 'PAIRWISE_DISCORDANCE';
 
-has 'input' => (
-    is           => 'ro',
-    isa          => 'Str',
-);
-
-has 'debug_mode' => ( # not called 'debug' to avoid name clash
-    is        => 'ro',
-    isa       => 'Bool',
-    default   => 0,
-    );
-
-has 'verbose' => (
-    is        => 'ro',
-    isa       => 'Bool',
-    default   => 0,
-    );
-
-sub BUILD {
-  my $self = shift;
-  if ($self->debug_mode) { $self->logger->level($DEBUG); }
-  elsif ($self->verbose) { $self->logger->level($INFO); }
-  else { $self->logger->level($WARN); }
-  my $input = $self->input();
-  if (!(-e $input && -f $input)) {
-      $self->logcroak("Invalid input path: \"$input\"");
-  }
-}
+has 'environment' =>
+    (is       => 'ro',
+     isa      => 'HashRef',
+     required => 1,
+     default  => sub { \%ENV });
 
 sub run {
     # run 'bcftools gtcheck' on the input; capture and parse the output
+    # input is EITHER a VCF file as a single string, OR path to a VCF file
+    # designate input type with the $from_stdin argument
     my $self = shift;
-    my $input = $self->input();
+    my $input = shift;
+    my $from_stdin = shift; # 1 if input is string for STDIN, 0 otherwise
+    unless ($input) {
+        $self->logcroak("No input supplied for bcftools gtcheck");
+    }
     my $bcftools = $self->_find_bcftools();
-    my $cmd = "$bcftools gtcheck $input -G 1";
-    $self->logger->info("Running bcftools command: $cmd");
-    my $result = `$cmd`;
-    $self->logger->debug("bcftools command output:\n$result");
-    my @lines = split("\n", $result);
+    $self->logger->info("Running bcftools command: $bcftools");
+    my (@args, @raw_results);
+    if ($from_stdin) {
+        unless ($self->_valid_vcf_fileformat($input)) {
+            $self->logcroak("VCF input string for STDIN is not valid");
+        }
+        @args = ('gtcheck', '-', '-G', 1);
+        @raw_results = WTSI::NPG::Runnable->new
+            (executable  => $bcftools,
+             arguments   => \@args,
+             environment => $self->environment,
+             logger      => $self->logger,
+             stdin       => \$input)->run->split_stdout;
+    } elsif (!(-e $input)){
+        $self->logcroak("Input path '$input' does not exist");
+    } else {
+        @args = ('gtcheck', $input, '-G', 1);
+        @raw_results = WTSI::NPG::Runnable->new
+            (executable  => $bcftools,
+             arguments   => \@args,
+             environment => $self->environment,
+             logger      => $self->logger)->run->split_stdout;
+    }
+    $self->logger->info("bcftools arguments: ".join(" ", @args));
+    $self->logger->debug("bcftools command output:\n".join("", @raw_results));
     my %results;
     my $max = 0; # maximum pairwise discordance
-    foreach my $line (@lines) {
+    foreach my $line (@raw_results) {
         if ($line !~ /^CN/) { next; }
         my @words = split(/\s+/, $line);
         my $discordance = $words[1];
@@ -88,10 +93,9 @@ sub write_results_json {
     my $outPath = shift;
     my %output = ($MAX_DISCORDANCE_KEY => $maxDiscord,
                   $PAIRWISE_DISCORDANCE_KEY => $resultsRef);
-    open my $out, ">", $outPath || $self->logcroak("Cannot open output $outPath");
+    open my $out, '>:encoding(utf8)', $outPath || $self->logcroak("Cannot open output $outPath");
     print $out encode_json(\%output);
     close $out || $self->logcroak("Cannot open output $outPath");
-    if ($self->verbose) { print encode_json(\%output)."\n"; }
     return 1;
 }
 
@@ -104,7 +108,7 @@ sub write_results_text {
     my $maxDiscord = shift;
     my $outPath = shift;
     my @samples = sort(keys(%results));
-    open my $out, ">", $outPath || $self->logcroak("Cannot open output $outPath");
+    open my $out, '>:encoding(utf8)', $outPath || $self->logcroak("Cannot open output $outPath");
     printf $out "# $MAX_DISCORDANCE_KEY: %.5f\n", $maxDiscord;
     print $out "# sample_i\tsample_j\tpairwise_discordance\n";
     foreach my $sample_i (@samples) {
@@ -114,15 +118,19 @@ sub write_results_text {
             printf $out "%s\t%s\t%.5f\n", @fields;
         }
     }
-    close $out || $self->logcroak("Cannot open output $outPath");
+    close $out || $self->logcroak("Cannot close output $outPath");
     return 1;
 }
-
 
 sub _find_bcftools {
     # check existence and version of the bcftools executable
     my $self = shift;
-    my $bcftools = `which bcftools`;
+    my @raw_results = WTSI::NPG::Runnable->new
+        (executable  => 'which',
+         arguments   => ['bcftools',],
+         environment => $self->environment,
+         logger      => $self->logger)->run->split_stdout;
+    my $bcftools = shift @raw_results;
     chomp $bcftools;
     if (!$bcftools) { $self->logcroak("Cannot find bcftools executable"); }
     my $version_string = `bcftools --version`;
@@ -130,6 +138,16 @@ sub _find_bcftools {
         $self->logger->logwarn("Must have bcftools version >= 0.2.0-rc9");
     }
     return $bcftools;
+}
+
+sub _valid_vcf_fileformat {
+    # Check if VCF string starts with a valid fileformat line
+    # Eg. ##fileformat=VCFv4.1
+    # Intended as a simple sanity check; does not validate rest of VCF
+    my $self = shift;
+    my $input = shift;
+    my $valid = $input =~ /^##fileformat=VCFv[0-9]+\.[0-9]+/;
+    return $valid;
 }
 
 no Moose;

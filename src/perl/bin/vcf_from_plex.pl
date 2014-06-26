@@ -7,7 +7,6 @@ package main;
 use strict;
 use warnings;
 use Carp;
-use File::Temp qw(tempdir);
 use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
@@ -37,20 +36,23 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
-my ($input, $plexType, $plexDir, $vcfPath, $jsonOut, $textOut, $log,
-    $logConfig, $verbose, $debug);
+my ($input, $plexType, $plexDir, $vcfPath, $gtCheck, $jsonOut, $textOut,
+    $log, $logConfig, $verbose, $debug, $manifest, $chromosome_json);
 
-GetOptions('debug'       => \$debug,
-           'help'        => sub { pod2usage(-verbose => 2,
-                                            -exitval => 0) },
-           'input=s'     => \$input,
-           'json=s'      => \$jsonOut,
-           'logconf=s'   => \$logConfig,
-           'plex_dir=s'  => \$plexDir,
-           'plex_type=s' => \$plexType,
-           'text=s'      => \$textOut,
-           'vcf=s'       => \$vcfPath,
-           'verbose'     => \$verbose,
+GetOptions('chromosomes=s'     => \$chromosome_json,
+           'debug'             => \$debug,
+           'help'              => sub { pod2usage(-verbose => 2,
+                                                -exitval => 0) },
+           'input=s'           => \$input,
+           'json=s'            => \$jsonOut,
+           'logconf=s'         => \$logConfig,
+           'manifest=s'        => \$manifest,
+           'plex_dir=s'        => \$plexDir,
+           'plex_type=s'       => \$plexType,
+           'text=s'            => \$textOut,
+           'vcf=s'             => \$vcfPath,
+           'gtcheck'           => \$gtCheck,
+           'verbose'           => \$verbose,
        );
 
 if ($logConfig) {
@@ -59,12 +61,12 @@ if ($logConfig) {
 } else {
     Log::Log4perl::init(\$embedded_conf);
     $log = Log::Log4perl->get_logger('npg.vcf.plex');
-    if ($verbose) {
-        $log->level($INFO);
-    }
-    elsif ($debug) {
-        $log->level($DEBUG);
-    }
+}
+if ($verbose) {
+    $log->level($INFO);
+}
+elsif ($debug) {
+    $log->level($DEBUG);
 }
 
 my $in;
@@ -97,24 +99,24 @@ if ($plexType eq 'sequenom') {
     $log->logcroak("Must specify either 'sequenom' or 'fluidigm' as plex type");
 }
 
-unless ($vcfPath) {
-    my $tmpDir = tempdir('vcf_from_plex_XXXXXX', CLEANUP => 1);
-    $vcfPath = $tmpDir."/qc_plex.vcf";
-}
-
 my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(inputs => \@inputs, verbose => $verbose, input_type => $plexType, $plexDirOpt => $plexDir);
-$converter->convert($vcfPath);
-my $gtcheck = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(input => $vcfPath, verbose => $verbose);
-my ($resultRef, $maxDiscord) = $gtcheck->run();
-my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
-$log->info($msg);
-if ($jsonOut) {
-    $log->info("Writing JSON output to $jsonOut");
-    $gtcheck->write_results_json($resultRef, $maxDiscord, $jsonOut);
-}
-if ($textOut) {
-    $log->info("Writing text output to $textOut");
-    $gtcheck->write_results_text($resultRef, $maxDiscord, $textOut);
+my $vcf = $converter->convert($vcfPath);
+
+if ($gtCheck) {
+    my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(verbose => $verbose);
+    my ($resultRef, $maxDiscord) = $checker->run($vcf, 1);
+    my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
+    $log->info($msg);
+    if ($jsonOut) {
+        $log->info("Writing JSON output to $jsonOut");
+        $checker->write_results_json($resultRef, $maxDiscord, $jsonOut);
+    }
+    if ($textOut) {
+        $log->info("Writing text output to $textOut");
+        $checker->write_results_text($resultRef, $maxDiscord, $textOut);
+    }
+} elsif ($textOut || $jsonOut) {
+    $log->logwarn("Warning: Text/JSON output of concordance metrics will not be written unless the --gtcheck option is in effect. Run with --help for details.");
 }
 
 
@@ -130,19 +132,36 @@ vcf_from_plex (options)
 
 Options:
 
+  --chromosomes=PATH  Path to a JSON file with chromosome lengths, used to
+                      produce the VCF header. PATH must be on the local
+                      filesystem (not iRODS). Optional for iRODS inputs,
+                      required otherwise.
+  --gtcheck           Run the bcftools gtcheck function to find consistency
+                      of calls between samples; computes pairwise difference
+                      metrics. Metrics are written to file if --json and/or
+                      --text is specified.
   --help              Display this help and exit
-  --input=PATH        List of iRODS paths to Sequenom or Fluidigm "CSV" data
-                      files, one per line. File locations will be read from
-                      the given PATH, or from standard input if PATH is
-                      omitted or equal to '-'. The two types of file format
-                      may not be mixed. Required.
+  --input=PATH        List of input paths, one per line. The inputs may be
+                      on a locally mounted filesystem, or locations of iRODS
+                      data objects. In the former case, the --chromosomes
+                      and --manifest options must be specified;
+                      otherwise default values can be found from iRODS
+                      metadata. The inputs are Sequenom or Fluidigm "CSV"
+                      files. The input list is read from the given PATH, or
+                      from standard input if PATH is omitted or equal to '-'.
+                      Fluidigm and Sequenom file formats may not be mixed.
+  --manifest=PATH     Path to the tab-separated manifest file giving SNP
+                      information for the QC plex. PATH must be on the local
+                      filesystem (not iRODS). Optional for iRODS inputs,
+                      required otherwise.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
   --plex_dir=PATH     Directory containing QC plex manifest files.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
-                      is not written.
-  --json=PATH         Path for JSON output of metrics computed from VCF file.
+                      is not written. If equal to '-', output is written to
+                      STDOUT.
+  --json=PATH         Path for JSON output of gtcheck metrics.
                       Optional; if not given, JSON is not written.
-  --text=PATH         Path for text output of metrics computed from VCF file.
+  --text=PATH         Path for text output of gtcheck metrics.
                       Optional; if not given, text is not written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
   --verbose           Print additional status information to STDERR.

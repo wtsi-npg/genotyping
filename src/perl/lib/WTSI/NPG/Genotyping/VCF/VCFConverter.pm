@@ -4,6 +4,7 @@ use utf8;
 package WTSI::NPG::Genotyping::VCF::VCFConverter;
 
 use DateTime;
+use JSON;
 use List::AllUtils qw(uniq);
 use Log::Log4perl::Level;
 use Moose;
@@ -17,6 +18,17 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::NPG::Loggable';
+
+our $GRCH37_GENOME = 'GRCh37';
+our $SEQUENOM_TYPE = 'sequenom';
+our $FLUIDIGM_TYPE = 'fluidigm';
+our $CHROMOSOME_JSON_KEY = 'chromosome_json';
+
+has 'genome' => (
+    is           => 'ro',
+    isa          => 'Str',
+    default      => $GRCH37_GENOME,
+);
 
 has 'irods'   =>
     (is       => 'ro',
@@ -50,6 +62,16 @@ has 'fluidigm_plex_dir' => (
     default      => '/seq/fluidigm/multiplexes',
 );
 
+has 'snpset_path' => ( # path to local (non-iRODS) SNP manifest
+    is           => 'ro',
+    isa          => 'Str',
+);
+
+has 'chromosome_length_path' => ( # path to local (non-iRODS) chromosome JSON
+    is           => 'ro',
+    isa          => 'Str',
+);
+
 has 'resultsets' =>
     (is       => 'rw',
      isa      => 'ArrayRef', # Array of Sequenom OR Fluigidm AssayResultSet
@@ -76,61 +98,94 @@ sub BUILD {
   my @results;
   my $total = 0;
   my $input_type = $self->input_type;
-  if ($input_type ne 'sequenom' && $input_type ne 'fluidigm') {
+  if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
       $self->logcroak("Unknown input data type: '$input_type'");
   }
-  foreach my $irods_file (@inputs) {
+  foreach my $input (@inputs) {
       my $resultSet;
-      if ($input_type eq 'sequenom') {
-	  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new($self->irods, $irods_file);
-	  $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(data_object => $data_object);
+      if ($self->irods->list_object($input)) { # process iRODS input
+          if ($input_type eq $SEQUENOM_TYPE) {
+              my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new($self->irods, $input);
+              $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(data_object => $data_object);
+          } else {
+              my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new($self->irods, $input);
+              $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(data_object => $data_object);
+          }
+      } elsif (-e $input) { # process non-iRODS input
+          if ($input_type eq $SEQUENOM_TYPE) {
+              $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new($input);
+          } else {
+              $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new($input);
+          }
       } else {
-	  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new($self->irods, $irods_file);
-	  $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(data_object => $data_object);
+          $self->logcroak("Input '$input' does not exist in iRODS or local filesystem");
       }
       $total += scalar(@{$resultSet->assay_results()});
       push(@results, $resultSet);
   }
   $self->resultsets(\@results);
-  if ($self->verbose) { print "Found $total assay results\n"; }
+  if ($self->verbose) { print STDERR "Found $total assay results\n"; }
 }
 
 sub convert {
-    # convert one or more 'CSV' sample result files to a VCF file
+    # convert one or more 'CSV' sample result files to VCF format
+    # optionally, write VCF to a file or STDOUT
+    # return VCF output lines as a string
     my $self = shift;
-    my $output = shift; # TODO allow output to STDOUT (or string?)
-
-    my $snpset_name = $self->_get_snpset_name($self->inputs);
-    my $snpset_ipath = $self->_get_snpset_ipath($self->inputs, $snpset_name);
-    my $snpset_obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $snpset_ipath);
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
-    $snpset->name($snpset_name);
-    my $total = scalar(@{$snpset->snps()});
-    if ($self->verbose) { print "Found $total SNPs in snpset\n"; }
-    my @out_lines = $self->generate_vcf($snpset);
+    my $output = shift;
+    my @out_lines = $self->generate_vcf();
     if ($self->sort) {
         @out_lines = $self->_sort_output_lines(\@out_lines);
     }
-    open my $out, ">", $output || $self->logcroak("Cannot open output '$output'");
-    print $out join("\n", @out_lines)."\n";
-    close $out, ">", $output || $self->logcroak("Cannot open output '$output'");
-
+    my $out;
+    my $outString = join("\n", @out_lines)."\n";
+    if ($output) {
+        $self->logger->info("Printing VCF output to $output");
+        if ($output eq '-') {
+            $out = *STDOUT;
+        } else {
+            open $out, '>:encoding(utf8)', $output || $self->logcroak("Cannot open output '$output'");
+        }
+        print $out $outString;
+        if ($output ne '-') {
+            close $out || $self->logcroak("Cannot close output '$output'");
+        }
+    }
+    return $outString;
 }
 
 sub generate_vcf {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my $self = shift;
-    my $snpset = shift;
-    my $resultsRef = shift;
-    $resultsRef ||= $self->resultsets;
+    my $resultsRef = $self->resultsets;
     my ($callsRef, $samplesRef) = $self->_parse_calls_samples($resultsRef);
     my %calls = %{$callsRef};
     my $read_depth = 1; # placeholder
     my $qscore = 40;    # placeholder genotype quality
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
-    push(@output, $self->_generate_vcf_header($snpset, \@samples));
-    if ($self->verbose) { print scalar(@samples)." samples found.\n"; }
+    my ($chroms, $snpset);
+    if ($self->snpset_path) { # manifest path supplied as argument
+        $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->snpset_path);
+        if (!$self->chromosome_length_path) {
+            $self->logcroak("Must specify path to chromosome length JSON for SNP set ".$self->snpset_path);
+        }
+        $chroms = $self->_read_json($self->chromosome_length_path);
+    } else { # find manifest from iRODS metadata
+        my $snpset_name = $self->_get_snpset_name($self->inputs);
+        my $snpset_ipath = $self->_get_snpset_ipath($self->inputs, $snpset_name);
+        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $snpset_ipath);
+        $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
+        if ($self->chromosome_length_path) {
+            $chroms = $self->_read_json($self->chromosome_length_path);
+        } else {
+            $chroms = $self->_chromosome_lengths_irods($snpset_obj);
+        }
+    }
+    my $total = scalar(@{$snpset->snps()});
+    if ($self->verbose) { print STDERR "Found $total SNPs in snpset\n"; }
+    push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
+    if ($self->verbose) { print STDERR scalar(@samples)." samples found.\n"; }
     foreach my $snp (@{$snpset->snps}) {
 	my $ref = $snp->ref_allele();
 	my $alt = $snp->alt_allele();
@@ -172,7 +227,7 @@ sub _call_to_vcf {
 	return '';
     } elsif ($call =~ /[^ACGTN:]/) {
 	$self->logcroak("Characters other than ACGTN in genotype '$call'");
-    } elsif ($self->input_type() eq 'fluidigm') {
+    } elsif ($self->input_type() eq $FLUIDIGM_TYPE) {
         $call =~ s/://g;
     }
     my %complement = ('A' => 'T',
@@ -211,6 +266,21 @@ sub _call_to_vcf {
     return $new_call;
 }
 
+sub _chromosome_lengths_irods {
+    # get reference to a hash of chromosome lengths
+    # read from JSON file, identified by snpset metadata in iRODS
+    my $self = shift;
+    my $snpset_obj = shift;
+    my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
+    if (scalar(@avus)!=1) {
+        $self->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value in iRODS metadata for SNP set file");
+    }
+    my %avu = %{ shift(@avus) };
+    my $chromosome_json = $avu{'value'};
+    my $data_object = WTSI::NPG::iRODS::DataObject->new($self->irods, $chromosome_json);
+    return decode_json($data_object->slurp());
+}
+
 sub _convert_chromosome {
     # convert the chromosome field to standard GRCh37 format
     # chromsome names: 1, 2, 3, ... , 22, X, Y
@@ -233,6 +303,7 @@ sub _convert_chromosome {
 sub _generate_vcf_header {
     my $self = shift;
     my $snpset = shift;
+    my %lengths = %{ shift() };
     my @samples = @{ shift() };
     if ($self->verbose) { print "Header snpset: ".$snpset->name()."\n"; }
     my $dt = DateTime->now(time_zone=>'local');
@@ -240,15 +311,10 @@ sub _generate_vcf_header {
     push(@header, '##fileformat=VCFv4.0');
     push(@header, '##fileDate='.$dt->ymd(''));
     push(@header, '##source=WTSI::NPG::Genotyping::Sequenom::VCFConverter');
-    # minimal contig tag, stops bcftools from complaining
-    my @chromosomes = qw/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
-                         21 22 X Y/;
-    my @lengths = (249250621, 243199373, 198022430, 191154276, 180915260, 171115067, 159138663, 146364022, 141213431, 135534747, 135006516, 133851895, 115169878, 107349540, 102531392, 90354753, 81195210, 78077248, 59128983, 63025520, 48129895, 51304566, 155270560, 59373566); # GRCh37 chromosome lengths
-    for (my $i=0; $i<@chromosomes; $i++) {
-        my $chr = $chromosomes[$i];
-        my $len = $lengths[$i];
-        unless ($chr && $len) { $self->logcroak(); }
-        push(@header, "##contig=<ID=$chr,length=$len,species=\"Homo sapiens\">");
+    # add contig tags with chromosome lengths to prevent bcftools warnings
+    my @chromosomes = sort(keys(%lengths));
+    foreach my $chr (@chromosomes) {
+        push(@header, "##contig=<ID=$chr,length=$lengths{$chr},species=\"Homo sapiens\">");
     }
     push(@header, '##INFO=<ID=ORIGINAL_STRAND,Number=1,Type=String,Description="Direction of strand in input file">');
     push(@header, '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">');
@@ -264,13 +330,15 @@ sub _get_snpset_ipath {
     my $self = shift;
     my $inputsRef = shift;
     my $snpset_name = shift;
-    my $genomeRef = 'GRCh37';
+    my $genome_suffix; # suffix not necessarily equal to genome
+    if ($self->genome eq $GRCH37_GENOME) { $genome_suffix = $GRCH37_GENOME; }
+    else { $self->logcroak("Unknown genome designation: ".$self->genome); }
     if ($self->verbose) { print "SNP set name: $snpset_name\n"; }
     my $snpset_ipath;
-    if ($self->input_type eq 'sequenom') {
-        $snpset_ipath = $self->sequenom_plex_dir.'/'.$snpset_name.'_snp_set_info_'.$genomeRef.'.tsv';
-    } elsif ($self->input_type eq 'fluidigm') {
-        $snpset_ipath = $self->fluidigm_plex_dir.'/'.$snpset_name.'_fluidigm_snp_info_'.$genomeRef.'.tsv';
+    if ($self->input_type eq $SEQUENOM_TYPE) {
+        $snpset_ipath = $self->sequenom_plex_dir.'/'.$snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
+    } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
+        $snpset_ipath = $self->fluidigm_plex_dir.'/'.$snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
     } else {
         $self->logcroak("Unknown data type: ".$self->input_type);
     }
@@ -308,7 +376,7 @@ sub _parse_calls_samples {
     foreach my $resultSet (@{$self->resultsets()}) {
 	foreach my $ar (@{$resultSet->assay_results()}) {
             my ($sam_id, $snp_id);
-	    if ($self->input_type eq 'sequenom'){
+	    if ($self->input_type eq $SEQUENOM_TYPE){
                 $sam_id = $ar->sample_id();
                 # assume assay_id of the form [plex name]-[snp name]
                 my @terms = split("\-", $ar->assay_id());
@@ -321,7 +389,7 @@ sub _parse_calls_samples {
 		$calls{$snp_id}{$sam_id} ne $ar->genotype_id()) {
 		$self->logcroak("Conflicting genotype IDs for SNP $snp_id, sample $sam_id:".$calls{$snp_id}{$sam_id}.", ".$ar->genotype_id());
 	    }
-            if ($self->input_type eq 'sequenom') {
+            if ($self->input_type eq $SEQUENOM_TYPE) {
                 $calls{$snp_id}{$sam_id} = $ar->genotype_id();
             } else {
                 $calls{$snp_id}{$sam_id} = $ar->converted_call();
@@ -332,6 +400,15 @@ sub _parse_calls_samples {
     return (\%calls, \%samples);
 }
 
+sub _read_json {
+    # read given path into a string and decode as JSON
+    my $self = shift;
+    my $input = shift;
+    open my $in, '<:encoding(utf8)', $input || $self->logcroak("Cannot open input '$input'");
+    my $data = decode_json(join("", <$in>));
+    close $in || $self->logcroak("Cannot close input '$input'");
+    return $data;
+}
 
 sub _sort_output_lines {
     # sort output lines by chromosome & position (1st, 2nd fields)
