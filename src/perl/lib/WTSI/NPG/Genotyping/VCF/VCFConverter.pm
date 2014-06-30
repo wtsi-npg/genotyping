@@ -38,17 +38,20 @@ has 'irods'   =>
 	 return WTSI::NPG::iRODS->new;
      });
 
-has 'inputs' => (
-    is        => 'ro',
-    isa       => 'ArrayRef[Str]',
-    required  => 1
-    );
-
 has 'input_type' => (
     is           => 'ro',
     isa          => 'Str',
     default      => 'sequenom', # sequenom or fluidigm
 );
+
+has 'sequenom_type' => ( is  => 'ro',
+                         isa => 'Str',
+                         default => $SEQUENOM_TYPE );
+
+
+has 'fluidigm_type' => ( is  => 'ro',
+                         isa => 'Str',
+                         default => $FLUIDIGM_TYPE );
 
 has 'sequenom_plex_dir' => (
     is           => 'ro',
@@ -77,54 +80,23 @@ has 'resultsets' =>
      isa      => 'ArrayRef', # Array of Sequenom OR Fluigidm AssayResultSet
     );
 
-has 'sort' => (
+has 'sort' => ( # sort the sample names before output?
     is        => 'ro',
     isa       => 'Bool',
     default   => 1,
     );
 
-has 'verbose' => (
-    is        => 'ro',
-    isa       => 'Bool',
-    default   => 0,
-    );
-
 sub BUILD {
   my $self = shift;
-  my @inputs = @{ $self->inputs };
-  $self->logger->level($WARN);
   # Make our iRODS handle use our logger by default
   $self->irods->logger($self->logger);
   my @results;
-  my $total = 0;
   my $input_type = $self->input_type;
   if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
       $self->logcroak("Unknown input data type: '$input_type'");
   }
-  foreach my $input (@inputs) {
-      my $resultSet;
-      if ($self->irods->list_object($input)) { # process iRODS input
-          if ($input_type eq $SEQUENOM_TYPE) {
-              my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new($self->irods, $input);
-              $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(data_object => $data_object);
-          } else {
-              my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new($self->irods, $input);
-              $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(data_object => $data_object);
-          }
-      } elsif (-e $input) { # process non-iRODS input
-          if ($input_type eq $SEQUENOM_TYPE) {
-              $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new($input);
-          } else {
-              $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new($input);
-          }
-      } else {
-          $self->logcroak("Input '$input' does not exist in iRODS or local filesystem");
-      }
-      $total += scalar(@{$resultSet->assay_results()});
-      push(@results, $resultSet);
-  }
-  $self->resultsets(\@results);
-  if ($self->verbose) { print STDERR "Found $total assay results\n"; }
+  my $total = scalar( $self->resultsets() );
+  $self->logger->info("Found $total assay results\n");
 }
 
 sub convert {
@@ -172,8 +144,8 @@ sub generate_vcf {
         }
         $chroms = $self->_read_json($self->chromosome_length_path);
     } else { # find manifest from iRODS metadata
-        my $snpset_name = $self->_get_snpset_name($self->inputs);
-        my $snpset_ipath = $self->_get_snpset_ipath($self->inputs, $snpset_name);
+        my $snpset_name = $self->_get_snpset_name();
+        my $snpset_ipath = $self->_get_snpset_ipath($snpset_name);
         my $snpset_obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $snpset_ipath);
         $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
         if ($self->chromosome_length_path) {
@@ -183,9 +155,7 @@ sub generate_vcf {
         }
     }
     my $total = scalar(@{$snpset->snps()});
-    if ($self->verbose) { print STDERR "Found $total SNPs in snpset\n"; }
     push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
-    if ($self->verbose) { print STDERR scalar(@samples)." samples found.\n"; }
     foreach my $snp (@{$snpset->snps}) {
 	my $ref = $snp->ref_allele();
 	my $alt = $snp->alt_allele();
@@ -305,7 +275,6 @@ sub _generate_vcf_header {
     my $snpset = shift;
     my %lengths = %{ shift() };
     my @samples = @{ shift() };
-    if ($self->verbose) { print "Header snpset: ".$snpset->name()."\n"; }
     my $dt = DateTime->now(time_zone=>'local');
     my @header = ();
     push(@header, '##fileformat=VCFv4.0');
@@ -328,12 +297,10 @@ sub _generate_vcf_header {
 
 sub _get_snpset_ipath {
     my $self = shift;
-    my $inputsRef = shift;
     my $snpset_name = shift;
     my $genome_suffix; # suffix not necessarily equal to genome
     if ($self->genome eq $GRCH37_GENOME) { $genome_suffix = $GRCH37_GENOME; }
     else { $self->logcroak("Unknown genome designation: ".$self->genome); }
-    if ($self->verbose) { print "SNP set name: $snpset_name\n"; }
     my $snpset_ipath;
     if ($self->input_type eq $SEQUENOM_TYPE) {
         $snpset_ipath = $self->sequenom_plex_dir.'/'.$snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
@@ -342,7 +309,6 @@ sub _get_snpset_ipath {
     } else {
         $self->logcroak("Unknown data type: ".$self->input_type);
     }
-    if ($self->verbose) { print "SNP set iRODS path: $snpset_ipath\n"; }
     unless ($self->irods->list_object($snpset_ipath)) {
 	$self->logconfess("No iRODS listing for snpset $snpset_ipath");
     }
@@ -353,8 +319,6 @@ sub _get_snpset_name {
     # get SNPset name for given sample Sequenom result files in iRODS
     # raise error if not all inputs have same SNPset
     my $self = shift;
-    my @inputs = @{ shift() };
-     # want to create an AssayResultSet for each input
     my @snpsets = ();
     foreach my $resultSet (@{$self->resultsets()}) {
 	my $snpsetName = $resultSet->snpset_name();
