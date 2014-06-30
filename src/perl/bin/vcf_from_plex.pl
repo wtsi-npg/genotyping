@@ -36,7 +36,7 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
-my ($input, $inputType, $plexDir, $vcfPath, $gtCheck, $jsonOut, $textOut,
+my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
     $log, $logConfig, $verbose, $use_irods, $debug, $manifest,
     $chromosome_json);
 
@@ -52,7 +52,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'json=s'            => \$jsonOut,
            'logconf=s'         => \$logConfig,
            'manifest=s'        => \$manifest,
-           'plex_dir=s'        => \$plexDir,
+           'plex_coll=s'       => \$plexColl,
            'plex_type=s'       => \$inputType,
            'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
@@ -60,6 +60,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'verbose'           => \$verbose,
        );
 
+### set up logging ###
 if ($logConfig) {
     Log::Log4perl::init($logConfig);
     $log = Log::Log4perl->get_logger('npg.vcf.plex');
@@ -74,18 +75,38 @@ elsif ($debug) {
     $log->level($DEBUG);
 }
 
-my $plexDirOpt;
-if ($inputType eq $SEQUENOM_TYPE) {
-    $plexDirOpt = 'sequenom_plex_dir';
-    $plexDir ||= '/seq/sequenom/multiplexes';
-} elsif ($inputType eq $FLUIDIGM_TYPE) {
-    $plexDirOpt = 'fluidigm_plex_dir';
-    $plexDir ||= '/seq/fluidigm/multiplexes';
-} else {
+### process command-line options and make sanity checks ###
+if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
     $log->logcroak(
-        "Must specify either $SEQUENOM_TYPE or $FLUIDIGM_TYPE as plex type");
+        "Must specify $SEQUENOM_TYPE or $FLUIDIGM_TYPE as plex type");
+}
+my $plexCollOpt;
+if ($use_irods) {
+    if ($inputType eq $SEQUENOM_TYPE) {
+        $plexCollOpt = 'sequenom_plex_coll';
+        $plexColl ||= '/seq/sequenom/multiplexes';
+    } elsif ($inputType eq $FLUIDIGM_TYPE) {
+        $plexCollOpt = 'fluidigm_plex_coll';
+        $plexColl ||= '/seq/fluidigm/multiplexes';
+    }
+} else {
+    if ($plexColl) {
+        my $msg = "plex_coll option does not apply to non-iRODS input ".
+            "and will be ignored";
+        $log->warn($msg);
+    }
+    if (!$manifest) {
+        $log->logcroak("--manifest is required for non-iRODS input");
+    } elsif (!(-e $manifest)) {
+        $log->logcroak("Manifest path '$manifest' does not exist");
+    } elsif (!$chromosome_json) {
+        $log->logcroak("--chromosomes is required for non-iRODS input");
+    } elsif (!(-e $chromosome_json)) {
+        $log->logcroak("Chromosome path '$chromosome_json' does not exist");
+    }
 }
 
+### read inputs ###
 my $in;
 if (!($input) || $input eq '-') {
     $log->debug("Input from STDIN");
@@ -105,7 +126,7 @@ if ($input ne '-') {
     close $in || $log->logcroak("Cannot close input '$input'");
 }
 
-# construct AssayResultSet objects from the given inputs
+### construct AssayResultSet objects from the given inputs ###
 my (@results);
 my $total = 0;
 if ($use_irods) {
@@ -142,7 +163,16 @@ if ($use_irods) {
 }
 $log->info("Found $total assay results");
 
-my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@results, input_type => $inputType, $plexDirOpt => $plexDir);
+### convert to VCF, and do genotype consistency check if requested ###
+my $converter;
+if ($use_irods) {
+    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
+        resultsets => \@results, input_type => $inputType,
+        $plexCollOpt => $plexColl);
+} else {
+    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
+        resultsets => \@results, input_type => $inputType);
+}
 my $vcf = $converter->convert($vcfPath);
 
 if ($gtCheck) {
@@ -193,12 +223,18 @@ Options:
                       files. The input list is read from the given PATH, or
                       from standard input if PATH is omitted or equal to '-'.
                       Fluidigm and Sequenom file formats may not be mixed.
+  --irods             Indicates that inputs are in iRODS. If absent, inputs
+                      are assumed to be in the local filesystem, and the
+                      --manifest and --chromosomes options are required.
   --manifest=PATH     Path to the tab-separated manifest file giving SNP
                       information for the QC plex. PATH must be on the local
                       filesystem (not iRODS). Optional for iRODS inputs,
                       required otherwise.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
-  --plex_dir=PATH     Directory containing QC plex manifest files.
+  --plex_coll=PATH    Path of an iRODS data collection containing QC plex
+                      manifest files. Optional, defaults to
+                      /seq/$PLEX_NAME/multiplexes. Has no effect for
+                      non-iRODS inputs.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.
