@@ -53,13 +53,13 @@ has 'fluidigm_type' => ( is  => 'ro',
                          isa => 'Str',
                          default => $FLUIDIGM_TYPE );
 
-has 'sequenom_plex_dir' => (
+has 'sequenom_plex_coll' => (
     is           => 'ro',
     isa          => 'Str',
     default      => '/seq/sequenom/multiplexes',
 );
 
-has 'fluidigm_plex_dir' => (
+has 'fluidigm_plex_coll' => (
     is           => 'ro',
     isa          => 'Str',
     default      => '/seq/fluidigm/multiplexes',
@@ -303,9 +303,9 @@ sub _get_snpset_ipath {
     else { $self->logcroak("Unknown genome designation: ".$self->genome); }
     my $snpset_ipath;
     if ($self->input_type eq $SEQUENOM_TYPE) {
-        $snpset_ipath = $self->sequenom_plex_dir.'/'.$snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
+        $snpset_ipath = $self->sequenom_plex_coll.'/'.$snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
     } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
-        $snpset_ipath = $self->fluidigm_plex_dir.'/'.$snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
+        $snpset_ipath = $self->fluidigm_plex_coll.'/'.$snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
     } else {
         $self->logcroak("Unknown data type: ".$self->input_type);
     }
