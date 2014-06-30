@@ -36,19 +36,24 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
-my ($input, $plexType, $plexDir, $vcfPath, $gtCheck, $jsonOut, $textOut,
-    $log, $logConfig, $verbose, $debug, $manifest, $chromosome_json);
+my ($input, $inputType, $plexDir, $vcfPath, $gtCheck, $jsonOut, $textOut,
+    $log, $logConfig, $verbose, $use_irods, $debug, $manifest,
+    $chromosome_json);
+
+my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
+my $FLUIDIGM_TYPE = 'fluidigm';
 
 GetOptions('chromosomes=s'     => \$chromosome_json,
            'debug'             => \$debug,
            'help'              => sub { pod2usage(-verbose => 2,
                                                 -exitval => 0) },
            'input=s'           => \$input,
+           'irods'             => \$use_irods,
            'json=s'            => \$jsonOut,
            'logconf=s'         => \$logConfig,
            'manifest=s'        => \$manifest,
            'plex_dir=s'        => \$plexDir,
-           'plex_type=s'       => \$plexType,
+           'plex_type=s'       => \$inputType,
            'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
            'gtcheck'           => \$gtCheck,
@@ -67,6 +72,18 @@ if ($verbose) {
 }
 elsif ($debug) {
     $log->level($DEBUG);
+}
+
+my $plexDirOpt;
+if ($inputType eq $SEQUENOM_TYPE) {
+    $plexDirOpt = 'sequenom_plex_dir';
+    $plexDir ||= '/seq/sequenom/multiplexes';
+} elsif ($inputType eq $FLUIDIGM_TYPE) {
+    $plexDirOpt = 'fluidigm_plex_dir';
+    $plexDir ||= '/seq/fluidigm/multiplexes';
+} else {
+    $log->logcroak(
+        "Must specify either $SEQUENOM_TYPE or $FLUIDIGM_TYPE as plex type");
 }
 
 my $in;
@@ -88,18 +105,44 @@ if ($input ne '-') {
     close $in || $log->logcroak("Cannot close input '$input'");
 }
 
-my $plexDirOpt;
-if ($plexType eq 'sequenom') {
-    $plexDirOpt = 'sequenom_plex_dir';
-    $plexDir ||= '/seq/sequenom/multiplexes';
-} elsif ($plexType eq 'fluidigm') {
-    $plexDirOpt = 'fluidigm_plex_dir';
-    $plexDir ||= '/seq/fluidigm/multiplexes';
+# construct AssayResultSet objects from the given inputs
+my (@results);
+my $total = 0;
+if ($use_irods) {
+    my $irods = WTSI::NPG::iRODS->new;
+    foreach my $input (@inputs) {
+        my $resultSet;
+        if ($inputType eq $SEQUENOM_TYPE) {
+            my $d_obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
+                $irods, $input);
+            $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                data_object => $d_obj);
+        } else {
+            my $d_obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new(
+                $irods, $input);
+            $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                data_object => $d_obj);
+        }
+        $total += scalar(@{$resultSet->assay_results()});
+        push(@results, $resultSet);
+    }
 } else {
-    $log->logcroak("Must specify either 'sequenom' or 'fluidigm' as plex type");
+    foreach my $input (@inputs) {
+        my $resultSet;
+        if ($inputType eq $SEQUENOM_TYPE) {
+            $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                $input);
+        } else {
+            $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                $input);
+        }
+        $total += scalar(@{$resultSet->assay_results()});
+        push(@results, $resultSet);
+    }
 }
+$log->info("Found $total assay results");
 
-my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(inputs => \@inputs, verbose => $verbose, input_type => $plexType, $plexDirOpt => $plexDir);
+my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@results, input_type => $inputType, $plexDirOpt => $plexDir);
 my $vcf = $converter->convert($vcfPath);
 
 if ($gtCheck) {
