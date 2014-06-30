@@ -72,7 +72,7 @@ sub fluidigm_file_test : Test(6) {
 sub fluidigm_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
-    my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@inputs, input_type => 'fluidigm', 'fluidigm_plex_dir' => $irods_tmp_coll);
+    my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@inputs, input_type => 'fluidigm', 'fluidigm_plex_coll' => $irods_tmp_coll);
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
     ok($converter->convert($vcf), "Converted Fluidigm results to VCF with input from iRODS");
     _test_fluidigm_gtcheck($vcf);
@@ -102,7 +102,7 @@ sub sequenom_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my (@inputs, $converter, $output);
     @inputs = _upload_sequenom();
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@inputs, input_type => 'sequenom', 'sequenom_plex_dir' => $irods_tmp_coll);
+    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(resultsets => \@inputs, input_type => 'sequenom', 'sequenom_plex_coll' => $irods_tmp_coll);
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
     ok($converter->convert($vcf), "Converted Sequenom results to VCF with input from iRODS");
     _test_sequenom_gtcheck($vcf);
@@ -119,7 +119,7 @@ sub script_test : Test(5) {
     close $out || log->logcroak("Cannot close output $sequenomList");
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
-    my $cmd = "$script --input - --plex_type sequenom --plex_dir $irods_tmp_coll --gtcheck --text $tmpText --json $tmpJson --irods < $sequenomList";
+    my $cmd = "$script --input - --plex_type sequenom --plex_coll $irods_tmp_coll --gtcheck --text $tmpText --json $tmpJson --irods < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $tmpText, "text output written");
     ok(-e $tmpJson, "JSON output written");
@@ -132,7 +132,7 @@ sub script_test : Test(5) {
     close $in || log->logcroak("Cannot close input $tmpJson");
     is_deeply($outJson, $refJson, "Output and expected data structures match");
     # as above, but with VCF output to STDOUT
-     $cmd = "$script --input - --plex_type sequenom --plex_dir $irods_tmp_coll --gtcheck --text $tmpText --json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
+     $cmd = "$script --input - --plex_type sequenom --plex_coll $irods_tmp_coll --gtcheck --text $tmpText --json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
 }
 
