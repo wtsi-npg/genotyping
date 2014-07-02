@@ -133,9 +133,9 @@ sub make_pipedb {
         sqlite_unicode => 1,
         on_connect_do  => 'PRAGMA foreign_keys = ON')->populate;
 
-  my $snpset    = $pipedb->snpset->find({name => 'HumanExome-12v1'});
-  my $autocall  = $pipedb->method->find({name => 'Autocall'});
-  my $withdrawn = $pipedb->state->find({name => 'withdrawn'});
+  my $snpset   = $pipedb->snpset->find({name => 'HumanExome-12v1'});
+  my $autocall = $pipedb->method->find({name => 'Autocall'});
+  my $excluded = $pipedb->state->find({name => 'excluded'});
 
   $pipedb->in_transaction
     (sub {
@@ -165,7 +165,7 @@ sub make_pipedb {
 
          # Exclude the third sample from publication
          if ($i == 2) {
-           $sample->add_to_states($withdrawn);
+           $sample->add_to_states($excluded);
            $sample->include_from_state;
            $sample->update;
          }

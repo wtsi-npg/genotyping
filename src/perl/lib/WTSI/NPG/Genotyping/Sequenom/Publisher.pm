@@ -37,19 +37,19 @@ has 'plate_name' =>
 
 has 'sequenom_db' =>
   (is       => 'ro',
-   # isa      => 'WTSI::NPG::Genotyping::Database::Sequenom',
+   isa      => 'WTSI::NPG::Genotyping::Database::Sequenom',
    isa      => 'Object',
    required => 1);
 
 has 'snp_db' =>
   (is       => 'ro',
-   #  isa      => 'WTSI::NPG::Database::Genotyping::SNP',
+   isa      => 'WTSI::NPG::Database::Genotyping::SNP',
    isa      => 'Object',
    required => 1);
 
 has 'ss_warehouse_db' =>
   (is       => 'ro',
-   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'WTSI::NPG::Database::Warehouse',
    isa      => 'Object',
    required => 1);
 
