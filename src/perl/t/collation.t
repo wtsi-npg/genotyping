@@ -13,8 +13,8 @@ use JSON;
 use WTSI::NPG::Genotyping::QC::Collation qw(collate);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readFileToString readSampleInclusion);
 
-my $tempdir = tempdir("/tmp/qc_report_tXXXXXX", CLEANUP => 0);
-print "TEMPDIR $tempdir\n";
+my $tempdir = tempdir("/tmp/qc_report_tXXXXXX", CLEANUP => 1);
+
 my ($dir, $inputDir, $configPath, $dbPath, $iniPath, $jsonResults, 
     $jsonMetrics, $resultsMaster, $metricsMaster, $verbose,
     $csvPath, $exclude, $jsonMaster, $thresholdPath, $dbName, $md5, $fh);
