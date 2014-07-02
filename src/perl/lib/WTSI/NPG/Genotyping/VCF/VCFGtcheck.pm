@@ -93,7 +93,8 @@ sub write_results_json {
     my $outPath = shift;
     my %output = ($MAX_DISCORDANCE_KEY => $maxDiscord,
                   $PAIRWISE_DISCORDANCE_KEY => $resultsRef);
-    open my $out, '>:encoding(utf8)', $outPath || $self->logcroak("Cannot open output $outPath");
+    open my $out, '>:encoding(utf8)', $outPath || 
+        $self->logcroak("Cannot open output $outPath");
     print $out encode_json(\%output);
     close $out || $self->logcroak("Cannot open output $outPath");
     return 1;
@@ -108,7 +109,8 @@ sub write_results_text {
     my $maxDiscord = shift;
     my $outPath = shift;
     my @samples = sort(keys(%results));
-    open my $out, '>:encoding(utf8)', $outPath || $self->logcroak("Cannot open output $outPath");
+    open my $out, '>:encoding(utf8)', $outPath || 
+        $self->logcroak("Cannot open output $outPath");
     printf $out "# $MAX_DISCORDANCE_KEY: %.5f\n", $maxDiscord;
     print $out "# sample_i\tsample_j\tpairwise_discordance\n";
     foreach my $sample_i (@samples) {
@@ -134,7 +136,8 @@ sub _find_bcftools {
     chomp $bcftools;
     if (!$bcftools) { $self->logcroak("Cannot find bcftools executable"); }
     my $version_string = `bcftools --version`;
-    if ($version_string !~ /^bcftools 0\.2\.0-rc9/) {
+    if ($version_string =~ /^bcftools 0\.[01]$/ ||
+            $version_string =~ /^bcftools 0\.2\.0-rc[12345678]$/) {
         $self->logger->logwarn("Must have bcftools version >= 0.2.0-rc9");
     }
     return $bcftools;

@@ -35,7 +35,7 @@ has 'irods'   =>
      isa      => 'WTSI::NPG::iRODS',
      required => 1,
      default  => sub {
-	 return WTSI::NPG::iRODS->new;
+     return WTSI::NPG::iRODS->new;
      });
 
 has 'input_type' => (
@@ -116,7 +116,8 @@ sub convert {
         if ($output eq '-') {
             $out = *STDOUT;
         } else {
-            open $out, '>:encoding(utf8)', $output || $self->logcroak("Cannot open output '$output'");
+            open $out, '>:encoding(utf8)', $output ||
+                $self->logcroak("Cannot open output '$output'");
         }
         print $out $outString;
         if ($output ne '-') {
@@ -140,13 +141,16 @@ sub generate_vcf {
     if ($self->snpset_path) { # manifest path supplied as argument
         $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->snpset_path);
         if (!$self->chromosome_length_path) {
-            $self->logcroak("Must specify path to chromosome length JSON for SNP set ".$self->snpset_path);
+            $self->logcroak(
+                "Must specify path to chromosome length JSON for SNP set ",
+                $self->snpset_path);
         }
         $chroms = $self->_read_json($self->chromosome_length_path);
     } else { # find manifest from iRODS metadata
         my $snpset_name = $self->_get_snpset_name();
         my $snpset_ipath = $self->_get_snpset_ipath($snpset_name);
-        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $snpset_ipath);
+        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
+            ($self->irods, $snpset_ipath);
         $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
         if ($self->chromosome_length_path) {
             $chroms = $self->_read_json($self->chromosome_length_path);
@@ -157,46 +161,49 @@ sub generate_vcf {
     my $total = scalar(@{$snpset->snps()});
     push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
     foreach my $snp (@{$snpset->snps}) {
-	my $ref = $snp->ref_allele();
-	my $alt = $snp->alt_allele();
+        my $ref = $snp->ref_allele();
+        my $alt = $snp->alt_allele();
         my $chrom = $self->_convert_chromosome($snp->chromosome());
-	my @fields = ( $chrom,                    # CHROM
-		       $snp->position(),          # POS
-		       $snp->name(),              # ID
-		       $ref,                      # REF
-		       $alt,                      # ALT
-		       '.', '.',                  # QUAL, FILTER
-		       'ORIGINAL_STRAND='.$snp->strand(),  # INFO
-		       'GT:GQ:DP',                # FORMAT
-	    );
-	foreach my $sample (@samples) {
-	    my $call_raw = $calls{$snp->name}{$sample};
-	    my $call = $self->_call_to_vcf($call_raw, $ref, $alt,
-					   $snp->strand());
+        my @fields = ( $chrom,                    # CHROM
+                       $snp->position(),          # POS
+                       $snp->name(),              # ID
+                       $ref,                      # REF
+                       $alt,                      # ALT
+                       '.', '.',                  # QUAL, FILTER
+                       'ORIGINAL_STRAND='.$snp->strand(),  # INFO
+                       'GT:GQ:DP',                # FORMAT
+                   );
+        foreach my $sample (@samples) {
+            my $call_raw = $calls{$snp->name}{$sample};
+            my $call = $self->_call_to_vcf($call_raw, $ref, $alt,
+                                           $snp->strand());
             $call_raw ||= ".";
-	    $call ||= ".";
-	    my @sample_fields = ($call, $qscore, $read_depth);
-	    push(@fields, join(':', @sample_fields));
-	}
-	push(@output, join("\t", @fields));
+            $call ||= ".";
+            my @sample_fields = ($call, $qscore, $read_depth);
+            push(@fields, join(':', @sample_fields));
+        }
+        push(@output, join("\t", @fields));
     }
     return @output;
 }
 
 sub _call_to_vcf {
     # convert the CSV genotype call to a VCF version
-    # Sequenom CSV call may be of the form A, C, or AC; same or opposite strand to ref
+    # Sequenom CSV call may be of the form A, C, or AC
+    #  may be same or opposite strand to ref
     # Fluidigm will be of the form A:A, C:C, or A:C
     # VCF call is of the form 1/1, 0/0, or 1/0 for ref/alt
     # may have a 'no call'; if so return empty string
     #
-    # Special case: Fluidigm gender markers have identical 'ref' and 'alt' values. But we may have data which does not match the ref or alt value. In this case we return a no call.
+    # Special case: Fluidigm gender markers have identical 'ref' and 'alt'
+    # values. But we may have data which does not match the ref or alt value.
+    # In this case we return a no call.
     my $self = shift;
     my ($call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
-	return '';
+    return '';
     } elsif ($call =~ /[^ACGTN:]/) {
-	$self->logcroak("Characters other than ACGTN in genotype '$call'");
+    $self->logcroak("Characters other than ACGTN in genotype '$call'");
     } elsif ($self->input_type() eq $FLUIDIGM_TYPE) {
         $call =~ s/://g;
     }
@@ -204,34 +211,37 @@ sub _call_to_vcf {
                       'C' => 'G',
                       'G' => 'C',
                       'T' => 'A',
-	              'N' => 'N');
+                      'N' => 'N');
     my $reverse;
     if ($strand eq '+') { $reverse = 0; }
     elsif ($strand eq '-') { $reverse = 1; }
     else { $self->logcroak("Unknown strand value '$strand'"); }
     my $new_call;
     if (length($call) == 1) {
-	if ($reverse) { $call = $complement{$call}; }
-	if ($call eq 'N') { $new_call = ''; }
+        if ($reverse) { $call = $complement{$call}; }
+        if ($call eq 'N') { $new_call = ''; }
         elsif ($ref eq $alt && $call ne $ref) { $new_call = ''; }
-	elsif ($call eq $ref) { $new_call = '0/0'; }
-	elsif ($call eq $alt) { $new_call = '1/1'; }
-	else { $self->logcroak("Non-null call '$call' does not match reference '$ref' or alternate '$alt'"); }
+        elsif ($call eq $ref) { $new_call = '0/0'; }
+        elsif ($call eq $alt) { $new_call = '1/1'; }
+        else { $self->logcroak("Non-null call '$call' does not match ",
+                               "reference '$ref' or alternate '$alt'"); }
     } elsif (length($call) == 2) {
-	my @alleles = split(//, $call);
-	my @new_alleles;
+        my @alleles = split(//, $call);
+        my @new_alleles;
         my $alleles_ok = 1;
-	foreach my $allele (@alleles) {
-	    if ($reverse) { $allele = $complement{$allele}; }
-	    if ($allele eq $ref) { push(@new_alleles, '0'); }
-	    elsif ($allele eq $alt) { push(@new_alleles, '1'); }
+        foreach my $allele (@alleles) {
+            if ($reverse) { $allele = $complement{$allele}; }
+            if ($allele eq $ref) { push(@new_alleles, '0'); }
+            elsif ($allele eq $alt) { push(@new_alleles, '1'); }
             elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
-	    else { $self->logcroak("Non-null call '$allele' does not match reference '$ref' or alternate '$alt'");  }
-	}
-	if ($alleles_ok) { $new_call = join('/', @new_alleles); }
+            else { $self->logcroak("Non-null call '$allele' does not match ",
+                                   "reference '$ref' or alternate '$alt'");  }
+        }
+        if ($alleles_ok) { $new_call = join('/', @new_alleles); }
         else { $new_call = ''; } # special case; failed gender marker
     } else {
-	$self->logcroak("Call '$call' is wrongly formatted, must have exactly one or two allele values");
+        $self->logcroak("Call '$call' is wrongly formatted, must have ",
+                        "exactly one or two allele values");
     }
     return $new_call;
 }
@@ -243,11 +253,13 @@ sub _chromosome_lengths_irods {
     my $snpset_obj = shift;
     my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
     if (scalar(@avus)!=1) {
-        $self->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value in iRODS metadata for SNP set file");
+        $self->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value",
+                        " in iRODS metadata for SNP set file");
     }
     my %avu = %{ shift(@avus) };
     my $chromosome_json = $avu{'value'};
-    my $data_object = WTSI::NPG::iRODS::DataObject->new($self->irods, $chromosome_json);
+    my $data_object = WTSI::NPG::iRODS::DataObject->new
+        ($self->irods, $chromosome_json);
     return decode_json($data_object->slurp());
 }
 
@@ -283,12 +295,19 @@ sub _generate_vcf_header {
     # add contig tags with chromosome lengths to prevent bcftools warnings
     my @chromosomes = sort(keys(%lengths));
     foreach my $chr (@chromosomes) {
-        push(@header, "##contig=<ID=$chr,length=$lengths{$chr},species=\"Homo sapiens\">");
+        my $line = "##contig=<ID=$chr,length=$lengths{$chr},".
+            "species=\"Homo sapiens\">";
+        push(@header, $line);
     }
-    push(@header, '##INFO=<ID=ORIGINAL_STRAND,Number=1,Type=String,Description="Direction of strand in input file">');
-    push(@header, '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">');
-    push(@header, '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">');
-    push(@header, '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">');
+    my @lines = (
+        '##INFO=<ID=ORIGINAL_STRAND,Number=1,Type=String,'.
+            'Description="Direction of strand in input file">',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,'.
+            'Description="Genotype Quality">',
+        '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">',
+    );
+    foreach my $line (@lines) { push(@header, $line); }
     my @colHeads = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
     push(@colHeads, @samples);
     push(@header, "#".join("\t", @colHeads));
@@ -303,14 +322,16 @@ sub _get_snpset_ipath {
     else { $self->logcroak("Unknown genome designation: ".$self->genome); }
     my $snpset_ipath;
     if ($self->input_type eq $SEQUENOM_TYPE) {
-        $snpset_ipath = $self->sequenom_plex_coll.'/'.$snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
+        $snpset_ipath = $self->sequenom_plex_coll.'/'.
+            $snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
     } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
-        $snpset_ipath = $self->fluidigm_plex_coll.'/'.$snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
+        $snpset_ipath = $self->fluidigm_plex_coll.'/'.
+            $snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
     } else {
         $self->logcroak("Unknown data type: ".$self->input_type);
     }
     unless ($self->irods->list_object($snpset_ipath)) {
-	$self->logconfess("No iRODS listing for snpset $snpset_ipath");
+        $self->logconfess("No iRODS listing for snpset $snpset_ipath");
     }
     return $snpset_ipath;
 }
@@ -321,12 +342,12 @@ sub _get_snpset_name {
     my $self = shift;
     my @snpsets = ();
     foreach my $resultSet (@{$self->resultsets()}) {
-	my $snpsetName = $resultSet->snpset_name();
-	push(@snpsets, $snpsetName);
+        my $snpsetName = $resultSet->snpset_name();
+        push(@snpsets, $snpsetName);
     }
     @snpsets = uniq(@snpsets);
     if (@snpsets != 1) {
-	$self->logconfess("Must have exactly one SNP set in metadata");
+        $self->logconfess("Must have exactly one SNP set in metadata");
     }
     return $snpsets[0];
 }
@@ -338,9 +359,9 @@ sub _parse_calls_samples {
     my (%calls, %samples);
     # generate a hash of calls by SNP and sample, and list of sample IDs
     foreach my $resultSet (@{$self->resultsets()}) {
-	foreach my $ar (@{$resultSet->assay_results()}) {
+        foreach my $ar (@{$resultSet->assay_results()}) {
             my ($sam_id, $snp_id);
-	    if ($self->input_type eq $SEQUENOM_TYPE){
+            if ($self->input_type eq $SEQUENOM_TYPE){
                 $sam_id = $ar->sample_id();
                 # assume assay_id of the form [plex name]-[snp name]
                 my @terms = split("\-", $ar->assay_id());
@@ -349,17 +370,17 @@ sub _parse_calls_samples {
                 $sam_id = $ar->sample_name();
                 $snp_id = $ar->snp_assayed();
             }
-	    if ($calls{$snp_id}{$sam_id} && 
-		$calls{$snp_id}{$sam_id} ne $ar->genotype_id()) {
-		$self->logcroak("Conflicting genotype IDs for SNP $snp_id, sample $sam_id:".$calls{$snp_id}{$sam_id}.", ".$ar->genotype_id());
-	    }
+            if ($calls{$snp_id}{$sam_id} && 
+                    $calls{$snp_id}{$sam_id} ne $ar->genotype_id()) {
+                $self->logcroak("Conflicting genotype IDs for SNP $snp_id, sample $sam_id:".$calls{$snp_id}{$sam_id}.", ".$ar->genotype_id());
+            }
             if ($self->input_type eq $SEQUENOM_TYPE) {
                 $calls{$snp_id}{$sam_id} = $ar->genotype_id();
             } else {
                 $calls{$snp_id}{$sam_id} = $ar->converted_call();
             }
-	    $samples{$sam_id} = 1;
-	}
+            $samples{$sam_id} = 1;
+        }
     }
     return (\%calls, \%samples);
 }
@@ -368,7 +389,8 @@ sub _read_json {
     # read given path into a string and decode as JSON
     my $self = shift;
     my $input = shift;
-    open my $in, '<:encoding(utf8)', $input || $self->logcroak("Cannot open input '$input'");
+    open my $in, '<:encoding(utf8)', $input || 
+        $self->logcroak("Cannot open input '$input'");
     my $data = decode_json(join("", <$in>));
     close $in || $self->logcroak("Cannot close input '$input'");
     return $data;
