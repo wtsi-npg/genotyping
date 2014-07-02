@@ -46,7 +46,7 @@ is(@{$countRef}, 13, "Find pass/fail count table text");
 is(@{$rateRef}, 13, "Find pass/fail rate table text"); 
 
 ok(WTSI::NPG::Genotyping::QC::Reports::writeSummaryLatex
-   ($texPath, $resultPath, $idPath, $config, $dbPath, $gtPath, $tempdir, 
+   ($texPath, $resultPath, $idPath, $config, $dbPath, $gtPath, $tempdir,
     $introPath, $qcName, $title, $author), "Write summary .tex");
 
 if (-e $pdfPath) { system("rm -f $pdfPath"); }
@@ -55,7 +55,7 @@ ok(WTSI::NPG::Genotyping::QC::Reports::texToPdf($texPath), "Convert .tex to .pdf
 
 ok((-e $pdfPath), "PDF file exists");
 
-ok(createReports($texPath, $resultPath, $idPath, $config, $dbPath, $gtPath, 
-                 $tempdir, $introPath, $qcName, $title, $author), 
-   "Main method to create CSV and PDF reports");
+ok(createReports($texPath, $resultPath, $idPath, $config, $dbPath, $gtPath,
+                 $tempdir, $introPath, $qcName, $title, $author),
+   "Main method to create PDF reports");
 
