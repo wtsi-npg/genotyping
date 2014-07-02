@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 66;
+use Test::More tests => 69;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -103,7 +103,7 @@ sub populate : Test(7) {
 
 sub state : Test(2) {
   ok($db->state->find({name => 'autocall_pass'}, 'Pass state found'));
-  ok($db->state->find({name => 'autocall_fail'}, 'Fail state found'));
+  ok($db->state->find({name => 'gtc_unavailable'}, 'Fail state found'));
 }
 
 sub snpset : Test(1) {
@@ -133,7 +133,6 @@ sub add_datasets : Test(6) {
   my $run = $db->piperun->find_or_create({name       => 'test',
                                           start_time => time()});
 
-  my @datasets;
   foreach my $i (1..3) {
     my $dataset = $run->add_to_datasets
       ({if_project   => sprintf("%s_%d", $project_base, $i),
@@ -141,7 +140,6 @@ sub add_datasets : Test(6) {
         snpset       => $snpset});
 
     ok($dataset, "dataset $i inserted");
-    push @datasets, $dataset;
   }
 
   ok($run->validate_datasets, 'A piperun validated');
@@ -226,31 +224,28 @@ sub transaction : Test(8) {
   cmp_ok(scalar $datasets[0]->samples, '==', 1000, 'Successful rollback');
 }
 
-sub state_changes : Test(20) {
+sub state_changes : Test(23) {
   my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
                                                     namespace => 'wtsi'});
   my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
-  my $run = $db->piperun->find_or_create({name       => 'transaction_test',
+  my $run = $db->piperun->find_or_create({name       => 'states_test',
                                           start_time => time()});
 
-  my @datasets;
-  foreach my $i (1..3) {
-    my $dataset = $run->add_to_datasets
-      ({if_project   => sprintf("%s_%d", $project_base, $i),
-        datasupplier => $supplier,
-        snpset       => $snpset});
-    push @datasets, $dataset;
-  }
+  my $dataset = $run->add_to_datasets
+    ({if_project   => 'state_test_project',
+      datasupplier => $supplier,
+      snpset       => $snpset});
 
-  my $pass = $db->state->find({name => 'autocall_pass'});
-  my $fail = $db->state->find({name => 'autocall_fail'});
-  my $pi_approved = $db->state->find({name => 'pi_approved'});
+  my $pass =              $db->state->find({name => 'autocall_pass'});
+  my $fail =              $db->state->find({name => 'gtc_unavailable'});
+  my $pi_approved =       $db->state->find({name => 'pi_approved'});
+  my $pi_excluded =       $db->state->find({name => 'pi_excluded'});
   my $consent_withdrawn = $db->state->find({name => 'consent_withdrawn'});
-  my $withdrawn = $db->state->find({name => 'withdrawn'});
+  my $excluded =          $db->state->find({name => 'excluded'});
 
   $db->in_transaction(sub {
-                        foreach my $i (1..1000) {
-                          my $sample = $datasets[0]->add_to_samples
+                        foreach my $i (1..10) {
+                          my $sample = $dataset->add_to_samples
                             ({name     => sprintf("%s_%d", $sample_base, $i),
                               beadchip => 'ABC123456',
                               include  => 1});
@@ -258,7 +253,7 @@ sub state_changes : Test(20) {
                         }
                       });
 
-  my $passed_sample1 = ($datasets[0]->samples)[0];
+  my $passed_sample1 = ($dataset->samples)[0];
   my $sample_id1 = $passed_sample1->id_sample;
 
   # Test removing and adding states
@@ -268,9 +263,9 @@ sub state_changes : Test(20) {
 
   $passed_sample1->add_to_states($fail);
   cmp_ok(scalar $passed_sample1->states, '==', 1,
-         'autocall_fail state added 1');
-  ok((grep { $_->name eq 'autocall_fail' } $passed_sample1->states),
-     'autocall_fail state added 2');
+         'gtc_unavailable state added 1');
+  ok((grep { $_->name eq 'gtc_unavailable' } $passed_sample1->states),
+     'gtc_unavailable state added 2');
 
   # Test that changing states allows inclusion policy to be updated
   ok($passed_sample1->include, 'Passed sample included');
@@ -279,7 +274,11 @@ sub state_changes : Test(20) {
 
   my $failed_sample1 = $db->sample->find({id_sample => $sample_id1});
   ok($failed_sample1, 'Found a failed sample');
-  ok(!$failed_sample1->include, 'Sample excluded after autocall_fail');
+  ok(!$failed_sample1->include, 'Sample excluded after gtc_unavailable');
+
+  # Swap failed to excluded
+  $failed_sample1->remove_from_states($fail);
+  $failed_sample1->add_to_states($excluded);
 
   # Test that pi_approved state overrides exclusion
   $failed_sample1->add_to_states($pi_approved);
@@ -295,7 +294,7 @@ sub state_changes : Test(20) {
   # Test that consent_withdrawn overrides everything
   $failed_sample1->add_to_states($consent_withdrawn);
   cmp_ok(scalar $failed_sample1->states, '==', 3,
-         'consent-withdrawn state added 1');
+         'consent_withdrawn state added 1');
   ok((grep { $_->name eq 'consent_withdrawn' } $failed_sample1->states),
      'consent_withdrawn state added 2');
   $failed_sample1->include_from_state;
@@ -304,36 +303,50 @@ sub state_changes : Test(20) {
   $failed_sample1 = $db->sample->find({id_sample => $sample_id1});
   ok(!$failed_sample1->include, 'Sample excluded after consent_withdrawn');
 
-  my $passed_sample2 = ($datasets[0]->samples)[1];
+  my $passed_sample2 = ($dataset->samples)[1];
   my $sample_id2 = $passed_sample2->id_sample;
 
-  $passed_sample2->add_to_states($withdrawn);
+  $passed_sample2->add_to_states($excluded);
   cmp_ok(scalar $passed_sample2->states, '==', 2,
-         'withdrawn state added 1');
-  ok((grep { $_->name eq 'withdrawn' } $passed_sample2->states),
-     'withdrawn state added 2');
+         'excluded state added 1');
+  ok((grep { $_->name eq 'excluded' } $passed_sample2->states),
+     'excluded state added 2');
 
-  # Test that withdrawn results in sample exclusion
+  # Test that excluded results in sample exclusion
   ok($passed_sample2->include);
   $passed_sample2->include_from_state;
   $passed_sample2->update;
 
-  my $withdrawn_sample2 = $db->sample->find({id_sample => $sample_id2});
-  ok($withdrawn_sample2);
-  ok(!$withdrawn_sample2->include, 'Sample excluded after withdrawn');
+  my $excluded_sample2 = $db->sample->find({id_sample => $sample_id2});
+  ok($excluded_sample2);
+  ok(!$excluded_sample2->include, 'Sample exclusion after excluded');
 
   # Test that pi_approved state overrides exclusion
-  $withdrawn_sample2->add_to_states($pi_approved);
-  cmp_ok(scalar $passed_sample2->states, '==', 3,
+  $excluded_sample2->add_to_states($pi_approved);
+  cmp_ok(scalar $excluded_sample2->states, '==', 3,
          'pi_approved state added 1');
-  ok((grep { $_->name eq 'pi_approved' } $withdrawn_sample2->states),
+  ok((grep { $_->name eq 'pi_approved' } $excluded_sample2->states),
      'pi_approved state added 2');
-  $withdrawn_sample2->include_from_state;
-  $withdrawn_sample2->update;
+  $excluded_sample2->include_from_state;
+  $excluded_sample2->update;
 
-  $withdrawn_sample2 = $db->sample->find({id_sample => $sample_id2});
-  ok($withdrawn_sample2->include,
-     'withdrawn sample included after pi_approved');
+  $excluded_sample2 = $db->sample->find({id_sample => $sample_id2});
+  ok($excluded_sample2->include,
+     'excluded sample included after pi_approved');
+
+  my $passed_sample3 = ($dataset->samples)[2];
+  my $sample_id3 = $passed_sample3->id_sample;
+
+  # Test that pi_excluded state overrides inclusion
+  $passed_sample3->add_to_states($pi_excluded);
+  is(scalar $passed_sample3->states, 2, 'pi_excluded state added 1');
+  ok((grep { $_->name eq 'pi_excluded' } $passed_sample3->states),
+     'pi_excluded state added 2');
+  $passed_sample3->include_from_state;
+  $passed_sample3->update;
+
+  $passed_sample1 = $db->sample->find({id_sample => $sample_id3});
+  ok(!$passed_sample3->include, 'Sample excluded after pi_excluded');
 }
 
 1;

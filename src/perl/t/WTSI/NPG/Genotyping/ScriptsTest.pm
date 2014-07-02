@@ -136,20 +136,20 @@ sub test_publish_infinium_analysis : Test(7) {
             "--supplier $supplier",
             "--project '$project'") == 0, 'Ready infinium');
 
-  # Withdraw all samples
+  # Exclude all samples
   ok(system(join q{ }, "$READY_SAMPLES",
             "--dbfile $dbfile",
             "--select autocall_pass",
             "|",
             "$READY_SAMPLES",
             "--dbfile $dbfile",
-            "--add withdrawn") == 0, 'Withdrew all samples');
+            "--add excluded") == 0, 'Excluded all samples');
 
   # Restore only samples that have test data in iRODS
   ok(system(join q{ }, "$READY_SAMPLES",
             "--dbfile $dbfile",
             "--input $selected_samples_file",
-            "--remove withdrawn") == 0, 'Restored some samples');
+            "--remove excluded") == 0, 'Restored some samples');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_ANALYSIS",
             "--dbfile $dbfile",
