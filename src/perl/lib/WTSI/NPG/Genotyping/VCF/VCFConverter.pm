@@ -99,13 +99,26 @@ sub BUILD {
   $self->logger->info("Found $total assay results\n");
 }
 
+
+=head2 convert
+
+  Arg [1]    : Path for VCF output (optional)
+
+  Example    : $vcf_string = $converter->convert('/home/foo/output.vcf')
+  Description: Convert the sample results stored in $self->resultsets to a
+               single VCF format file. If the output argument is equal to '-',
+               VCF will be printed to STDOUT; if a different output argument
+               is given, it is used as the path for an output file; if the
+               output argument is omitted, output will not be written. Return
+               value is a string containing the VCF output.
+  Returntype : Str
+
+=cut
+
 sub convert {
-    # convert one or more 'CSV' sample result files to VCF format
-    # optionally, write VCF to a file or STDOUT
-    # return VCF output lines as a string
     my $self = shift;
     my $output = shift;
-    my @out_lines = $self->generate_vcf();
+    my @out_lines = $self->_generate_vcf_complete();
     if ($self->sort) {
         @out_lines = $self->_sort_output_lines(\@out_lines);
     }
@@ -125,66 +138,6 @@ sub convert {
         }
     }
     return $outString;
-}
-
-sub generate_vcf {
-    # generate VCF data given a SNPSet and one or more AssayResultSets
-    my $self = shift;
-    my $resultsRef = $self->resultsets;
-    my ($callsRef, $samplesRef) = $self->_parse_calls_samples($resultsRef);
-    my %calls = %{$callsRef};
-    my $read_depth = 1; # placeholder
-    my $qscore = 40;    # placeholder genotype quality
-    my @output; # lines of text for output
-    my @samples = sort(keys(%{$samplesRef}));
-    my ($chroms, $snpset);
-    if ($self->snpset_path) { # manifest path supplied as argument
-        $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->snpset_path);
-        if (!$self->chromosome_length_path) {
-            $self->logcroak(
-                "Must specify path to chromosome length JSON for SNP set ",
-                $self->snpset_path);
-        }
-        $chroms = $self->_read_json($self->chromosome_length_path);
-    } else { # find manifest from iRODS metadata
-        my $snpset_name = $self->_get_snpset_name();
-        my $snpset_ipath = $self->_get_snpset_ipath($snpset_name);
-        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
-            ($self->irods, $snpset_ipath);
-        $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
-        if ($self->chromosome_length_path) {
-            $chroms = $self->_read_json($self->chromosome_length_path);
-        } else {
-            $chroms = $self->_chromosome_lengths_irods($snpset_obj);
-        }
-    }
-    my $total = scalar(@{$snpset->snps()});
-    push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
-    foreach my $snp (@{$snpset->snps}) {
-        my $ref = $snp->ref_allele();
-        my $alt = $snp->alt_allele();
-        my $chrom = $self->_convert_chromosome($snp->chromosome());
-        my @fields = ( $chrom,                    # CHROM
-                       $snp->position(),          # POS
-                       $snp->name(),              # ID
-                       $ref,                      # REF
-                       $alt,                      # ALT
-                       '.', '.',                  # QUAL, FILTER
-                       'ORIGINAL_STRAND='.$snp->strand(),  # INFO
-                       'GT:GQ:DP',                # FORMAT
-                   );
-        foreach my $sample (@samples) {
-            my $call_raw = $calls{$snp->name}{$sample};
-            my $call = $self->_call_to_vcf($call_raw, $ref, $alt,
-                                           $snp->strand());
-            $call_raw ||= ".";
-            $call ||= ".";
-            my @sample_fields = ($call, $qscore, $read_depth);
-            push(@fields, join(':', @sample_fields));
-        }
-        push(@output, join("\t", @fields));
-    }
-    return @output;
 }
 
 sub _call_to_vcf {
@@ -280,6 +233,66 @@ sub _convert_chromosome {
         $self->logcroak("Unknown chromosome string: \"$input\"");
     }
     return $output;
+}
+
+sub _generate_vcf_complete {
+    # generate VCF data given a SNPSet and one or more AssayResultSets
+    my $self = shift;
+    my $resultsRef = $self->resultsets;
+    my ($callsRef, $samplesRef) = $self->_parse_calls_samples($resultsRef);
+    my %calls = %{$callsRef};
+    my $read_depth = 1; # placeholder
+    my $qscore = 40;    # placeholder genotype quality
+    my @output; # lines of text for output
+    my @samples = sort(keys(%{$samplesRef}));
+    my ($chroms, $snpset);
+    if ($self->snpset_path) { # manifest path supplied as argument
+        $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->snpset_path);
+        if (!$self->chromosome_length_path) {
+            $self->logcroak(
+                "Must specify path to chromosome length JSON for SNP set ",
+                $self->snpset_path);
+        }
+        $chroms = $self->_read_json($self->chromosome_length_path);
+    } else { # find manifest from iRODS metadata
+        my $snpset_name = $self->_get_snpset_name();
+        my $snpset_ipath = $self->_get_snpset_ipath($snpset_name);
+        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
+            ($self->irods, $snpset_ipath);
+        $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
+        if ($self->chromosome_length_path) {
+            $chroms = $self->_read_json($self->chromosome_length_path);
+        } else {
+            $chroms = $self->_chromosome_lengths_irods($snpset_obj);
+        }
+    }
+    my $total = scalar(@{$snpset->snps()});
+    push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
+    foreach my $snp (@{$snpset->snps}) {
+        my $ref = $snp->ref_allele();
+        my $alt = $snp->alt_allele();
+        my $chrom = $self->_convert_chromosome($snp->chromosome());
+        my @fields = ( $chrom,                    # CHROM
+                       $snp->position(),          # POS
+                       $snp->name(),              # ID
+                       $ref,                      # REF
+                       $alt,                      # ALT
+                       '.', '.',                  # QUAL, FILTER
+                       'ORIGINAL_STRAND='.$snp->strand(),  # INFO
+                       'GT:GQ:DP',                # FORMAT
+                   );
+        foreach my $sample (@samples) {
+            my $call_raw = $calls{$snp->name}{$sample};
+            my $call = $self->_call_to_vcf($call_raw, $ref, $alt,
+                                           $snp->strand());
+            $call_raw ||= ".";
+            $call ||= ".";
+            my @sample_fields = ($call, $qscore, $read_depth);
+            push(@fields, join(':', @sample_fields));
+        }
+        push(@output, join("\t", @fields));
+    }
+    return @output;
 }
 
 sub _generate_vcf_header {
@@ -425,3 +438,32 @@ no Moose;
 1;
 
 __END__
+
+=head1 NAME
+
+WTSI::NPG::Genotyping::VCF::VCFConverter
+
+=head1 DESCRIPTION
+
+A class for conversion of output files from the Fluidigm/Sequenom genotyping
+platforms to VCF format.
+
+=head1 AUTHOR
+
+Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
