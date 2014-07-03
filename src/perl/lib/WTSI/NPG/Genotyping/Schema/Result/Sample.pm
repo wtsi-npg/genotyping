@@ -25,6 +25,8 @@ __PACKAGE__->add_columns
                          is_nullable => 0 },
    'supplier_name',    { data_type => 'text',
                          is_nullable => 1 },
+   'cohort',           { data_type => 'text',
+                         is_nullable => 1 },
    'rowcol',           { data_type => 'text',
                          is_nullable => 1 },
    'include',          { data_type => 'integer',

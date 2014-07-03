@@ -126,9 +126,10 @@ sub dbSampleInfo {
             # query for rowcol, supplier name, chip no.
             foreach my $sample (@samples) {
                 my @info = (
-                    $sample->supplier_name,
                     $sample->rowcol,
-                    $sample->beadchip);
+                    $sample->beadchip,
+		    $sample->supplier_name,
+		    $sample->cohort);
                 foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
                     if ($info[$i] eq "") { $info[$i] = "NA"; } 
                 }
@@ -560,8 +561,8 @@ sub writeCsv {
     push(@lines, @{$linesRef});
     my %metrics = %{$metricsRef};
     # use %metrics to construct appropriate CSV header
-    my @headers = qw/run project data_supplier snpset supplier_name rowcol 
-                     beadchip_number sample include plate well pass/;
+    my @headers = qw/run project data_supplier snpset rowcol beadchip_number 
+                     supplier_name cohort sample include plate well pass/;
     foreach my $name (@METRIC_NAMES) {
 	my @suffixes;
 	if (!$metrics{$name}) { 
