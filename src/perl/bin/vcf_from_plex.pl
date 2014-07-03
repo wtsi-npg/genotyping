@@ -177,7 +177,7 @@ my $vcf = $converter->convert($vcfPath);
 
 if ($gtCheck) {
     my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(verbose => $verbose);
-    my ($resultRef, $maxDiscord) = $checker->run($vcf, 1);
+    my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
     my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
     $log->info($msg);
     if ($jsonOut) {
