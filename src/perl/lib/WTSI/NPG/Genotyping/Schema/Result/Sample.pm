@@ -98,6 +98,11 @@ sub validate_states {
         (grep { $_->name eq 'pi_approved' } @states)) {
       $valid = 0;
     }
+
+    if ((grep { $_->name eq 'autocall_pass' } @states) &&
+        (grep { $_->name eq 'autocall_fail' } @states)) {
+      $valid = 0;
+    }
   }
 
   return $valid;
@@ -126,19 +131,24 @@ sub include_from_state {
   # Default is to exclude
   $self->include(0);
 
-  # An autocall_pass flips the sample to included
-  if (grep { $_->name eq 'autocall_pass' }     @states) { $self->include(1) };
+  # An autocall_pass flips the sample to included.
+  if    (grep { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'autocall_fail' }  @states) { $self->include(0) };
 
-  # excluded flips the sample to excluded, even if autocall_pass
+  # An explicit state of excluded flips the sample to excluded, even
+  # if autocall_pass.
   if (grep { $_->name eq 'excluded' }          @states) { $self->include(0) };
 
-  # pi_approved / excluded overrides any of the above
-  if    (grep { $_->name eq 'pi_excluded' }    @states) { $self->include(0) }
-  elsif (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) };
+  # If the sample has been superseded, it should be excluded.
+  if (grep { $_->name eq 'repicked' }          @states) { $self->include(0) };
 
-  # Consent withdrawn overrides everything above
+  # pi_approved / excluded overrides any of the above.
+  if    (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'pi_excluded' }    @states) { $self->include(0) };
+
+  # Consent withdrawn overrides everything above.
   if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) };
-  # Also, if the data are unavailable, we cannot analyse
+  # Also, if the data are unavailable, we cannot analyse.
   if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) };
 
   return $self->include;
@@ -177,7 +187,7 @@ sub gtc {
 
   my $file;
   my $result = $self->results->find({'method.name' =>'Autocall'},
-                                    {join => 'method'});
+                                    {join          => 'method'});
 
   if ($result && $result->value) {
     $file = $result->value;
@@ -207,7 +217,7 @@ sub idat {
   }
 
   my @result = $self->results->search({'method.name' =>'Infinium'},
-                                      {join => 'method'});
+                                      {join          => 'method'});
   my @values = map { $_->value } @result;
 
   my @files;

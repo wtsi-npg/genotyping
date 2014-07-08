@@ -202,6 +202,7 @@ sub run {
   my $autocall = $pipedb->method->find({name => 'Autocall'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
   my $autocall_pass     = $pipedb->state->find({name => 'autocall_pass'});
+  my $autocall_fail     = $pipedb->state->find({name => 'autocall_fail'});
   my $idat_unavailable  = $pipedb->state->find({name => 'idat_unavailable'});
   my $gtc_unavailable   = $pipedb->state->find({name => 'gtc_unavailable'});
   my $consent_withdrawn = $pipedb->state->find({name => 'consent_withdrawn'});
@@ -299,9 +300,11 @@ sub run {
            $sample->add_to_genders($gender, {method => $supplied});
          }
 
-         if ($if_status && $if_status eq $AUTOCALL_PASS) {
-           $sample->add_to_states($autocall_pass);
+         my $autocall_state = $autocall_pass;
+         unless ($if_status && $if_status eq $AUTOCALL_PASS) {
+           $autocall_state = $autocall_fail;
          }
+         $sample->add_to_states($autocall_state);
 
          my $plate = $pipedb->plate->find_or_create
            ({if_barcode => $if_barcode,
