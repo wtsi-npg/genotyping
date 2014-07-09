@@ -240,10 +240,8 @@ sub excludedSampleCsv {
 sub findMetricResults {
     # find QC results in metric-major order, return a hash reference
     # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
-    # duplicate threshold is needed to find subsets of samples
     my $inputDir = shift;
     my @metricNames = @{ shift() };
-    my $duplicateThreshold = shift;
     my %allResults;
     foreach my $name (@metricNames) {
     my $resultsRef;
@@ -698,8 +696,7 @@ sub collate {
     processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
 
     # 1) find metric values (and write to file if required)
-    my $metricResultsRef = findMetricResults($inputDir, \@metricNames,
-                                             $thresholdConfig{$DUP_NAME});
+    my $metricResultsRef = findMetricResults($inputDir, \@metricNames);
     my $sampleResultsRef = transposeResults($metricResultsRef);
     if ($verbose) { print "Found metric values.\n"; }
     if ($metricsJson) { writeJson($metricsJson, $sampleResultsRef);  }
