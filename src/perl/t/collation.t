@@ -57,7 +57,7 @@ open $fh, "<", $dbTemp || croak "Cannot open temporary DB $dbTemp";
 binmode($fh);
 while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close temporary DB $dbTemp";
-is($md5->hexdigest, '8de0f28ce17e1b6e4f29142249570003',
+is($md5->hexdigest, '3633c71caf5fb38884f8285710df3af7',
    "MD5 checksum of DB after sample exclusion");
 
 sub checkOutputs {
