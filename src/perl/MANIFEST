@@ -39,6 +39,7 @@ bin/update_infinium_metadata.pl
 bin/update_plink_annotation.pl
 bin/update_sequenom_metadata.pl
 bin/update_sequenom_qc_metadata.pl
+bin/vcf_from_plex.pl
 bin/write_qc_reports.pl
 bin/write_snp_metadata.pl
 bin/xydiff.pl
@@ -139,6 +140,8 @@ lib/WTSI/NPG/Genotyping/Sequenom/Publisher.pm
 lib/WTSI/NPG/Genotyping/SNP.pm
 lib/WTSI/NPG/Genotyping/SNPSet.pm
 lib/WTSI/NPG/Genotyping/SNPSetPublisher.pm
+lib/WTSI/NPG/Genotyping/VCF/VCFConverter.pm
+lib/WTSI/NPG/Genotyping/VCF/VCFGtcheck.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/iRODS.pm
@@ -162,7 +165,6 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 lib/WTSI/NPG/Utilities/IO.pm
 MANIFEST			This list of files
-MANIFEST.orig
 README
 t/cacheable.t
 t/collation.t
@@ -588,6 +590,20 @@ t/utilities/collect_files/b/y/2.txt
 t/utilities/collect_files/c/30.txt
 t/utilities/collect_files/c/z/3.txt
 t/utilities/lorem.txt
+t/vcf.t
+t/vcf/chromosome_lengths_GRCh37.json
+t/vcf/fluidigm_001.csv
+t/vcf/fluidigm_002.csv
+t/vcf/fluidigm_003.csv
+t/vcf/fluidigm_004.csv
+t/vcf/pairwise_discordance_fluidigm.json
+t/vcf/pairwise_discordance_sequenom.json
+t/vcf/qc_fluidigm_snp_info_GRCh37.tsv
+t/vcf/sequenom_001.csv
+t/vcf/sequenom_002.csv
+t/vcf/sequenom_003.csv
+t/vcf/sequenom_004.csv
+t/vcf/W30467_snp_set_info_GRCh37.tsv
 t/WTSI/NPG/CacheableTest.pm
 t/WTSI/NPG/Database/WarehouseTest.pm
 t/WTSI/NPG/DatabaseTest.pm
@@ -622,6 +638,7 @@ t/WTSI/NPG/Genotyping/Sequenom/AssayResultTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/PublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
+t/WTSI/NPG/Genotyping/VCF/VCFTest.pm
 t/WTSI/NPG/Genotyping/UpdatePlinkAnnotationTest.pm
 t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/iRODS/CollectionTest.pm

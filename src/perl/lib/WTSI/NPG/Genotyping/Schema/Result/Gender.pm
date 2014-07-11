@@ -4,7 +4,6 @@ package WTSI::NPG::Genotyping::Schema::Result::Gender;
 
 use strict;
 use warnings;
-use Carp;
 
 use base 'DBIx::Class::Core';
 

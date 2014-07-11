@@ -57,7 +57,7 @@ open $fh, "<", $dbTemp || croak "Cannot open temporary DB $dbTemp";
 binmode($fh);
 while (<$fh>) { $md5->add($_); }
 close $fh || croak "Cannot close temporary DB $dbTemp";
-is($md5->hexdigest, '055d38827973b944e071ed0d42ea140f', 
+is($md5->hexdigest, '3633c71caf5fb38884f8285710df3af7',
    "MD5 checksum of DB after sample exclusion");
 
 sub checkOutputs {
@@ -73,7 +73,7 @@ sub checkOutputs {
     $master = decode_json(readFileToString($resultsMaster));
     is_deeply($output, $master, "JSON results data equivalent to master copy");
     ok(-e $csvPath, "CSV results path exists");
-    ok(checkCsv($csvPath, 101, 32), "Correct row/column totals in .csv file");
+    ok(checkCsv($csvPath, 101, 33), "Correct row/column totals in .csv file");
 }
 
 

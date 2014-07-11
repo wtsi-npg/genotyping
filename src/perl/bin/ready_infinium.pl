@@ -175,7 +175,6 @@ sub run {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
   }
-
   if ($chip_design) {
     unless (grep { /^$chip_design$/ } @chip_designs) {
       die "Invalid chip design '$chip_design' design. Valid designs are: [ "
@@ -202,11 +201,11 @@ sub run {
   my $infinium = $pipedb->method->find({name => 'Infinium'});
   my $autocall = $pipedb->method->find({name => 'Autocall'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
-  my $autocall_pass    = $pipedb->state->find({name => 'autocall_pass'});
-  my $autocall_fail    = $pipedb->state->find({name => 'autocall_fail'});
-  my $idat_unavailable = $pipedb->state->find({name => 'idat_unavailable'});
-  my $gtc_unavailable  = $pipedb->state->find({name => 'gtc_unavailable'});
-  my $withdrawn        = $pipedb->state->find({name => 'consent_withdrawn'});
+  my $autocall_pass     = $pipedb->state->find({name => 'autocall_pass'});
+  my $autocall_fail     = $pipedb->state->find({name => 'autocall_fail'});
+  my $idat_unavailable  = $pipedb->state->find({name => 'idat_unavailable'});
+  my $gtc_unavailable   = $pipedb->state->find({name => 'gtc_unavailable'});
+  my $consent_withdrawn = $pipedb->state->find({name => 'consent_withdrawn'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_title})) {
@@ -261,10 +260,6 @@ sub run {
          }
          my $address = $pipedb->address->find({label1 => $if_well});
          my $ss_sample = $ss_plate->{$address->label2};
-         my $ss_supply = $ss_plate->{'supplier_name'};
-         unless (defined($ss_supply)) {
-           $ss_supply = ""; # field may be null
-         }
 
          # Untracked
          my $ss_id = $ss_sample->{sanger_sample_id} ||
@@ -277,6 +272,10 @@ sub run {
            $ss_barcode = $untracked_plates{$if_barcode};
          }
 
+	 my $ss_supply = $ss_sample->{supplier_name};
+	 unless (defined($ss_supply)) { $ss_supply = ""; }
+	 my $ss_cohort = $ss_sample->{cohort};
+	 unless (defined($ss_cohort)) { $ss_cohort = ""; }
          my $ss_gender = $ss_sample->{gender};
          my $ss_consent_withdrawn = $ss_sample->{consent_withdrawn};
          my $gender = $pipedb->gender->find({name => $ss_gender}) || $gender_na;
@@ -287,6 +286,7 @@ sub run {
                                      beadchip         => $if_chip,
                                      include          => 0,
                                      supplier_name    => $ss_supply,
+				     cohort           => $ss_cohort,
                                      rowcol           => $if_rowcol});
 
          # If consent has been withdrawn, do not analyse and do not
@@ -294,7 +294,7 @@ sub run {
          if ($ss_consent_withdrawn) {
            ++$num_consent_withdrawn_samples;
            $sample->add_to_genders($gender_na, {method => $supplied});
-           $sample->add_to_states($withdrawn);
+           $sample->add_to_states($consent_withdrawn);
          }
          else {
            $sample->add_to_genders($gender, {method => $supplied});

@@ -7,11 +7,12 @@ use strict;
 use warnings;
 use English;
 use File::Spec;
+use File::Temp qw(tempdir);
 use List::AllUtils qw(all any none);
 use Unicode::Collate;
 
 use base qw(Test::Class);
-use Test::More tests => 164;
+use Test::More tests => 172;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -349,6 +350,21 @@ sub move_collection : Test(5) {
     'Failed to move an undefined collection';
 }
 
+sub get_collection : Test(4) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $coll = "$irods_tmp_coll/irods";
+  my $tmpdir = tempdir(CLEANUP => 1);
+
+  ok($irods->get_collection($coll, $tmpdir), 'Got a collection');
+  ok(-d "$tmpdir/irods", 'Collection was downloaded');
+
+  dies_ok { $irods->get_collection('/no_such_collection', $tmpdir) }
+    'Failed to download a non-existent collection';
+  dies_ok { $irods->get_collection(undef, $tmpdir) }
+    'Failed to donwload an undefined collection';
+}
+
 sub remove_collection : Test(4) {
   my $irods = WTSI::NPG::iRODS->new;
 
@@ -592,6 +608,21 @@ sub move_object : Test(5) {
     'Failed to move an object to an undefined place';
   dies_ok { $irods->move_object(undef, $object_moved) }
     'Failed to move an undefined object';
+}
+
+sub get_object : Test(4) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $lorem_object = "$irods_tmp_coll/irods/lorem.txt";
+  my $tmpdir = tempdir(CLEANUP => 1);
+
+  ok($irods->get_object($lorem_object, $tmpdir), 'Got an object');
+  ok(-f "$tmpdir/lorem.txt", 'Object was downloaded');
+
+  dies_ok { $irods->get_object('/no_such_object', $tmpdir) }
+    'Failed to download a non-existent object';
+  dies_ok { $irods->get_object(undef, $tmpdir) }
+    'Failed to download an undefined object';
 }
 
 sub remove_object : Test(4) {

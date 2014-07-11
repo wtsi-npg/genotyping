@@ -26,7 +26,7 @@ sub run {
   my ($self) = @_;
 
   my @cmd = ($self->executable, @{$self->arguments});
-  my $command = join q{ }, @cmd;
+  my $command = join q{, }, @cmd;
   $self->debug("Running '$command'");
 
   my $result;

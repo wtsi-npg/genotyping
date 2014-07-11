@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping::Schema::Result::Sample;
 
 use strict;
 use warnings;
+use Carp;
 use URI;
 
 use base 'DBIx::Class::Core';
@@ -23,6 +24,8 @@ __PACKAGE__->add_columns
                          is_foreign_key => 1,
                          is_nullable => 0 },
    'supplier_name',    { data_type => 'text',
+                         is_nullable => 1 },
+   'cohort',           { data_type => 'text',
                          is_nullable => 1 },
    'rowcol',           { data_type => 'text',
                          is_nullable => 1 },
@@ -63,6 +66,48 @@ __PACKAGE__->has_many('related_samples',
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
 
 
+sub update {
+  my ($self, @args) = @_;
+
+  unless ($self->validate_states) {
+    croak "Sample '", $self->name, " has invalid states: [" .
+      join(", ", sort map { $_->name } $self->states) . "]";
+  }
+  $self->next::method(@args);
+
+  return $self;
+}
+
+=head2 validate_states
+
+  Arg [1]    : None
+  Example    : $sample->validate_states
+  Description: Return true if the sample states are valid. Checks for
+               criteria that are not constrained by the relational schema.
+  Returntype : boolean, true if sample has valid states.
+
+=cut
+
+sub validate_states {
+  my ($self) = @_;
+
+  my @states = $self->states;
+  my $valid = 1;
+  if (scalar @states > 1) {
+    if ((grep { $_->name eq 'pi_excluded' } @states) &&
+        (grep { $_->name eq 'pi_approved' } @states)) {
+      $valid = 0;
+    }
+
+    if ((grep { $_->name eq 'autocall_pass' } @states) &&
+        (grep { $_->name eq 'autocall_fail' } @states)) {
+      $valid = 0;
+    }
+  }
+
+  return $valid;
+}
+
 =head2 include_from_state
 
   Arg [1]    : None
@@ -70,30 +115,40 @@ __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
   Description: Modifies $self based on its state to indicate whether or not
                it is to be included in analysis.
   Returntype : boolean, true if sample is included in analysis.
-  Caller     : general
 
 =cut
 
 sub include_from_state {
   my ($self) = @_;
 
+  unless ($self->validate_states) {
+    croak "Sample '", $self->name, " has invalid states: [" .
+      join(", ", sort map { $_->name } $self->states) . "]";
+  }
+
   my @states = $self->states;
 
   # Default is to exclude
   $self->include(0);
 
-  # An autocall_pass flips the sample to included
-  if (grep { $_->name eq 'autocall_pass' }     @states) { $self->include(1) };
+  # An autocall_pass flips the sample to included.
+  if    (grep { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'autocall_fail' }  @states) { $self->include(0) };
 
-  # withdrawn flips the sample to excluded, even if autocall_pass
-  if (grep { $_->name eq 'withdrawn' }         @states) { $self->include(0) };
+  # An explicit state of excluded flips the sample to excluded, even
+  # if autocall_pass.
+  if (grep { $_->name eq 'excluded' }          @states) { $self->include(0) };
 
-  # pi_approved overrides any of the above
-  if (grep { $_->name eq 'pi_approved' }       @states) { $self->include(1) };
+  # If the sample has been superseded, it should be excluded.
+  if (grep { $_->name eq 'repicked' }          @states) { $self->include(0) };
 
-  # Consent withdrawn overrides everything above
+  # pi_approved / excluded overrides any of the above.
+  if    (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
+  elsif (grep { $_->name eq 'pi_excluded' }    @states) { $self->include(0) };
+
+  # Consent withdrawn overrides everything above.
   if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) };
-  # Also, if the data are unavailable, we cannot analyse
+  # Also, if the data are unavailable, we cannot analyse.
   if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) };
 
   return $self->include;
@@ -105,7 +160,6 @@ sub include_from_state {
   Example    : $sample->uri
   Description: Returns a URI for the sample.
   Returntype : URI object.
-  Caller     : general
 
 =cut
 
@@ -125,7 +179,6 @@ sub uri {
   Example    : $sample->gtc
   Description: Returns the path of the sample GTC file.
   Returntype : string file path
-  Caller     : general
 
 =cut
 
@@ -134,7 +187,7 @@ sub gtc {
 
   my $file;
   my $result = $self->results->find({'method.name' =>'Autocall'},
-                                    {join => 'method'});
+                                    {join          => 'method'});
 
   if ($result && $result->value) {
     $file = $result->value;
@@ -152,21 +205,19 @@ sub gtc {
   Example    : $sample->gtc
   Description: Returns the path of the IDAT file for one of the two channels
   Returntype : string file path
-  Caller     : general
 
 =cut
 
 sub idat {
   my ($self, $channel) = @_;
 
-  $channel or $self->log->logconfess('A channel argument is required');
+  $channel or confess('A channel argument is required');
   unless ($channel =~ m{^red|green$}msx) {
-    $self->log->logconfess("Invalid channel argument '$channel' ",
-                           "must be one of [red, green]");
+    confess "Invalid channel argument '$channel' must be one of [red, green]";
   }
 
   my @result = $self->results->search({'method.name' =>'Infinium'},
-                                      {join => 'method'});
+                                      {join          => 'method'});
   my @values = map { $_->value } @result;
 
   my @files;
