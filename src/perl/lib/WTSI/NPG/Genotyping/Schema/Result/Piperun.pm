@@ -35,7 +35,6 @@ __PACKAGE__->has_many('datasets',
                Piperun. Validity in this context means that this Snpset
                is the same as any which may be present in the Piperun already.
   Returntype : boolean
-  Caller     : general
 
 =cut
 
@@ -43,7 +42,7 @@ sub validate_snpset {
   my ($self, $snpset) = @_;
 
   my @snpsets = map { $_->snpset } $self->datasets;
-  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}i } @snpsets;
 
   my $valid = 1;
   if (@infinium_snpsets) {
@@ -63,7 +62,6 @@ sub validate_snpset {
   Description: Returns true if the datasets in this Piperun all use the same
                Snpset.
   Returntype : boolean
-  Caller     : general
 
 =cut
 
@@ -72,7 +70,7 @@ sub validate_datasets {
 
   my @snpsets = map { $_->snpset } $self->datasets;
 
-  my @infinium_snpsets = grep { $_->name ne 'Sequenom' } @snpsets;
+  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}i } @snpsets;
   my @snpset_names = map { $_->name } @infinium_snpsets;
 
   my $valid = 1;
@@ -91,8 +89,8 @@ sub validate_datasets {
 
     if (@mismatched) {
       $valid = 0;
-      $self->log->logwarn("Invalid piperun; datasets have mixed SNP sets: [",
-                          join(", ", @mismatched), "]");
+      warn "Invalid piperun; datasets have mixed SNP sets: [",
+        join(", ", @mismatched), "]";
     }
   }
 

@@ -46,16 +46,16 @@ has 'infinium_db' =>
 
 has 'ss_warehouse_db' =>
   (is       => 'ro',
-   # isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'WTSI::NPG::Database::Warehouse',
    isa      => 'Object',
    required => 1);
+
 
 sub BUILD {
   my ($self) = @_;
 
   # Make our irods handle use our logger by default
   $self->irods->logger($self->logger);
-
 }
 
 sub dry_run {

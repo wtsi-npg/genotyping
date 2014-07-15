@@ -175,7 +175,6 @@ sub run {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
   }
-
   if ($chip_design) {
     unless (grep { /^$chip_design$/ } @chip_designs) {
       die "Invalid chip design '$chip_design' design. Valid designs are: [ "
@@ -202,11 +201,11 @@ sub run {
   my $infinium = $pipedb->method->find({name => 'Infinium'});
   my $autocall = $pipedb->method->find({name => 'Autocall'});
   my $supplied = $pipedb->method->find({name => 'Supplied'});
-  my $autocall_pass    = $pipedb->state->find({name => 'autocall_pass'});
-  my $autocall_fail    = $pipedb->state->find({name => 'autocall_fail'});
-  my $idat_unavailable = $pipedb->state->find({name => 'idat_unavailable'});
-  my $gtc_unavailable  = $pipedb->state->find({name => 'gtc_unavailable'});
-  my $withdrawn        = $pipedb->state->find({name => 'consent_withdrawn'});
+  my $autocall_pass     = $pipedb->state->find({name => 'autocall_pass'});
+  my $autocall_fail     = $pipedb->state->find({name => 'autocall_fail'});
+  my $idat_unavailable  = $pipedb->state->find({name => 'idat_unavailable'});
+  my $gtc_unavailable   = $pipedb->state->find({name => 'gtc_unavailable'});
+  my $consent_withdrawn = $pipedb->state->find({name => 'consent_withdrawn'});
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_title})) {
@@ -295,7 +294,7 @@ sub run {
          if ($ss_consent_withdrawn) {
            ++$num_consent_withdrawn_samples;
            $sample->add_to_genders($gender_na, {method => $supplied});
-           $sample->add_to_states($withdrawn);
+           $sample->add_to_states($consent_withdrawn);
          }
          else {
            $sample->add_to_genders($gender, {method => $supplied});
