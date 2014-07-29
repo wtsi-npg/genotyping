@@ -9,6 +9,12 @@ use utf8;
 
   extends 'WTSI::NPG::Database';
 
+  has 'test_consent_withdrawn' =>
+    (is       => 'rw',
+     isa      => 'Int',
+     required => 0,
+     default  => 0);
+
   sub find_infinium_sample_by_plate {
     my ($self, $infinium_barcode, $map) = @_;
 
@@ -17,7 +23,7 @@ use utf8;
 
     return {internal_id        => 123456789,
             sanger_sample_id   => '0123456789',
-            consent_withdrawn  => 0,
+            consent_withdrawn  => $self->test_consent_withdrawn,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
@@ -48,7 +54,8 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 9;
+use List::AllUtils qw(none);
+use Test::More tests => 13;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -119,7 +126,7 @@ sub update_secondary_metadata : Test(4) {
     ($irods, $gtc_irods_path);
 
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $expected_groups_before = ['ss_10', 'ss_100'];
@@ -151,6 +158,52 @@ sub update_secondary_metadata : Test(4) {
 
   my $expected_groups_after = ['ss_0'];
   my @groups_after = $data_object->get_groups;
+
+  is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
+    or diag explain \@groups_after;
+}
+
+sub update_consent_withdrawn : Test(4) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $gtc_irods_path = "$irods_tmp_coll/$gtc_file";
+  my $data_object = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
+    ($irods, $gtc_irods_path);
+
+  my $ssdb_mod = WTSI::NPG::Database::WarehouseStub->new
+    (name    => 'sequencescape_warehouse',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_consent_withdrawn => 1);
+
+  my $expected_groups_before = ['ss_10', 'ss_100'];
+  my @groups_before = $data_object->get_groups;
+  is_deeply(\@groups_before, $expected_groups_before, 'Groups before update')
+    or diag explain \@groups_before;
+
+  ok($data_object->update_secondary_metadata($ssdb_mod));
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'infinium_plate',          value => 'plate1'},
+     {attribute => 'infinium_well',           value => 'A10'},
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '0'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'},
+     {attribute => 'type',                    value => 'gtc'}];
+
+  my $meta = $data_object->metadata;
+  is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
+    or diag explain $meta;
+
+  my $expected_groups_after = [];
+  my @groups_after = $data_object->get_groups('read');
 
   is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
     or diag explain \@groups_after;
