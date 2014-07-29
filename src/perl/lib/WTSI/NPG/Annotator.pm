@@ -79,7 +79,15 @@ sub make_sample_metadata {
   }
 
   if (defined $ss_sample->{consent_withdrawn}) {
-    push(@meta, [$self->sample_consent_attr => !$ss_sample->{consent_withdrawn}]);
+    my $flag;
+    if ($ss_sample->{consent_withdrawn}) {
+      $flag = 0;
+    }
+    else {
+      $flag = 1;
+    }
+
+    push(@meta, [$self->sample_consent_attr => $flag]);
   }
   else {
     $self->logcluck(sprintf($message_template, 'consent_withdrawn'));
