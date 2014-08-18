@@ -25,6 +25,7 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
+our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
 has 'genome' => (
     is           => 'ro',
@@ -318,7 +319,7 @@ sub _generate_vcf_header {
         '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">',
     );
     foreach my $line (@lines) { push(@header, $line); }
-    my @colHeads = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
+    my @colHeads = @COLUMN_HEADS;
     push(@colHeads, @samples);
     push(@header, "#".join("\t", @colHeads));
     return @header;
