@@ -23,6 +23,8 @@ our $GRCH37_GENOME = 'GRCh37';
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
+our $X_CHROM_NAME = 'X';
+our $Y_CHROM_NAME = 'Y';
 
 has 'genome' => (
     is           => 'ro',
@@ -116,8 +118,7 @@ sub BUILD {
 =cut
 
 sub convert {
-    my $self = shift;
-    my $output = shift;
+    my ($self, $output) = @_;
     my @out_lines = $self->_generate_vcf_complete();
     if ($self->sort) {
         @out_lines = $self->_sort_output_lines(\@out_lines);
@@ -151,8 +152,7 @@ sub _call_to_vcf {
     # Special case: Fluidigm gender markers have identical 'ref' and 'alt'
     # values. But we may have data which does not match the ref or alt value.
     # In this case we return a no call.
-    my $self = shift;
-    my ($call, $ref, $alt, $strand) = @_;
+    my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
     return '';
     } elsif ($call =~ /[^ACGTN:]/) {
@@ -202,8 +202,7 @@ sub _call_to_vcf {
 sub _chromosome_lengths_irods {
     # get reference to a hash of chromosome lengths
     # read from JSON file, identified by snpset metadata in iRODS
-    my $self = shift;
-    my $snpset_obj = shift;
+    my ($self, $snpset_obj) = @_;
     my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
     if (scalar(@avus)!=1) {
         $self->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value",
@@ -219,8 +218,7 @@ sub _chromosome_lengths_irods {
 sub _convert_chromosome {
     # convert the chromosome field to standard GRCh37 format
     # chromsome names: 1, 2, 3, ... , 22, X, Y
-    my $self= shift;
-    my $input = shift;
+    my ($self, $input) = @_;
     my $output;
     if ($input =~ /^[0-9]+$/ && $input >= 1 && $input <= 22 ) {
         $output = $input; # already in numeric chromosome format
@@ -296,10 +294,9 @@ sub _generate_vcf_complete {
 }
 
 sub _generate_vcf_header {
-    my $self = shift;
-    my $snpset = shift;
-    my %lengths = %{ shift() };
-    my @samples = @{ shift() };
+    my ($self, $snpset, $lengthsRef, $samplesRef) = @_;
+    my %lengths = %{$lengthsRef};
+    my @samples = @{$samplesRef};
     my $dt = DateTime->now(time_zone=>'local');
     my @header = ();
     push(@header, '##fileformat=VCFv4.0');
@@ -328,8 +325,7 @@ sub _generate_vcf_header {
 }
 
 sub _get_snpset_ipath {
-    my $self = shift;
-    my $snpset_name = shift;
+    my ($self, $snpset_name) = @_;
     my $genome_suffix; # suffix not necessarily equal to genome
     if ($self->genome eq $GRCH37_GENOME) { $genome_suffix = $GRCH37_GENOME; }
     else { $self->logcroak("Unknown genome designation: ".$self->genome); }
@@ -367,8 +363,8 @@ sub _get_snpset_name {
 
 sub _parse_calls_samples {
     # parse calls and sample IDs from reference to an array of ResultSets
-    my $self = shift;
-    my @results = @{ shift() };
+    my ($self, $resultsRef) = @_;
+    my @results = @{$resultsRef};
     my (%calls, %samples);
     # generate a hash of calls by SNP and sample, and list of sample IDs
     foreach my $resultSet (@{$self->resultsets()}) {
@@ -400,8 +396,7 @@ sub _parse_calls_samples {
 
 sub _read_json {
     # read given path into a string and decode as JSON
-    my $self = shift;
-    my $input = shift;
+    my ($self, $input) = @_;
     open my $in, '<:encoding(utf8)', $input || 
         $self->logcroak("Cannot open input '$input'");
     my $data = decode_json(join("", <$in>));
@@ -412,8 +407,8 @@ sub _read_json {
 sub _sort_output_lines {
     # sort output lines by chromosome & position (1st, 2nd fields)
     # header lines are unchanged
-    my $self = shift;
-    my @input = @{ shift() };
+    my ($self, $inputRef) = @_;
+    my @input = @{$inputRef};
     my (@output, %chrom, %pos, @data);
     foreach my $line (@input) {
         if ($line =~ /^#/) {
@@ -422,8 +417,8 @@ sub _sort_output_lines {
             push(@data, $line);
             my @fields = split(/\s+/, $line);
             my $chr = shift(@fields);
-            if ($chr eq 'X') { $chr = 23; }
-            elsif ($chr eq 'Y') { $chr = 24; }
+            if ($chr eq $X_CHROM_NAME) { $chr = 23; }
+            elsif ($chr eq $Y_CHROM_NAME) { $chr = 24; }
             $chrom{$line} = $chr;
             $pos{$line} = shift(@fields);
         }
