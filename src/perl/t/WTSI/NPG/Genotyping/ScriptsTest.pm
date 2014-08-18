@@ -11,7 +11,7 @@ use Log::Log4perl;
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 27;
+use Test::More tests => 28;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -19,6 +19,7 @@ use WTSI::NPG::iRODS;
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 our $PUBLISH_SNPSET              = './bin/publish_snpset.pl';
+our $PUBLISH_FLUIDIGM_GENOTYPES  = './bin/publish_fluidigm_genotypes.pl';
 
 our $PUBLISH_INFINIUM_GENOTYPES  = './bin/publish_infinium_genotypes.pl';
 our $UPDATE_INFINIUM_METADATA    = './bin/update_infinium_metadata.pl';
@@ -60,6 +61,20 @@ sub test_publish_snpset : Test(1) {
             "--snpset-name $snpset_name",
             "--snpset-platform $snpset_platform",
             "--source $data_file") == 0, 'Published SNPSet');
+}
+
+sub test_publish_fluidigm_genotypes : Test(1) {
+  my $raw_data_path = "$data_path/publish_fluidigm_genotypes";
+
+  # Includes a directory with a missing CSV file to check that the
+  # script exits successfully when ths happens.
+  ok(system(join q{ }, "$PUBLISH_FLUIDIGM_GENOTYPES",
+            "--days-ago 0",
+            "--days 1000000",
+            "--dest $irods_tmp_coll",
+            "--source $raw_data_path",
+            "2>/dev/null"),
+     'Published Fluidigm genotypes');
 }
 
 sub test_publish_infinium_genotypes : Test(3) {
