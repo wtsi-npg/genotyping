@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
+use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -38,15 +39,17 @@ my $embedded_conf = "
 
 my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
     $log, $logConfig, $verbose, $use_irods, $debug, $manifest,
-    $chromosome_json);
+    $snpset_path, $chromosome_json);
 
 my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 my $FLUIDIGM_TYPE = 'fluidigm';
+my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 
 GetOptions('chromosomes=s'     => \$chromosome_json,
+           'snpset=s'          => \$snpset_path,
            'debug'             => \$debug,
            'help'              => sub { pod2usage(-verbose => 2,
-                                                -exitval => 0) },
+                                                  -exitval => 0) },
            'input=s'           => \$input,
            'irods'             => \$use_irods,
            'json=s'            => \$jsonOut,
@@ -80,8 +83,13 @@ if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
     $log->logcroak(
         "Must specify $SEQUENOM_TYPE or $FLUIDIGM_TYPE as plex type");
 }
-my $plexCollOpt;
+unless ($snpset_path) { 
+    $log->logcroak("Must specify a snpset path in iRODS or local filesystem");
+}
+my ($snpset, $chroms, $plexCollOpt);
 if ($use_irods) {
+    my $irods = WTSI::NPG::iRODS->new();
+    $irods->logger($log);
     if ($inputType eq $SEQUENOM_TYPE) {
         $plexCollOpt = 'sequenom_plex_coll';
         $plexColl ||= '/seq/sequenom/multiplexes';
@@ -89,12 +97,21 @@ if ($use_irods) {
         $plexCollOpt = 'fluidigm_plex_coll';
         $plexColl ||= '/seq/fluidigm/multiplexes';
     }
+    my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
+        ($irods, $snpset_path);
+    $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
+    if ($chromosome_json) {
+        $chroms = _read_json($chromosome_json);
+    } else {
+        $chroms = _chromosome_lengths_irods($irods, $snpset_obj);
+    }
 } else {
     if ($plexColl) {
         my $msg = "plex_coll option does not apply to non-iRODS input ".
             "and will be ignored";
         $log->warn($msg);
     }
+    $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
     if (!$manifest) {
         $log->logcroak("--manifest is required for non-iRODS input");
     } elsif (!(-e $manifest)) {
@@ -104,6 +121,7 @@ if ($use_irods) {
     } elsif (!(-e $chromosome_json)) {
         $log->logcroak("Chromosome path '$chromosome_json' does not exist");
     }
+    $chroms = _read_json($chromosome_json);
 }
 
 ### read inputs ###
@@ -168,10 +186,12 @@ my $converter;
 if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
+        snpset => $snpset, chromosome_lengths => $chroms,
         $plexCollOpt => $plexColl);
 } else {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
-        resultsets => \@results, input_type => $inputType);
+        resultsets => \@results, input_type => $inputType,
+        snpset => $snpset, chromosome_lengths => $chroms);
 }
 my $vcf = $converter->convert($vcfPath);
 
@@ -190,6 +210,32 @@ if ($gtCheck) {
     }
 } elsif ($textOut || $jsonOut) {
     $log->logwarn("Warning: Text/JSON output of concordance metrics will not be written unless the --gtcheck option is in effect. Run with --help for details.");
+}
+
+sub _chromosome_lengths_irods {
+    # get reference to a hash of chromosome lengths
+    # read from JSON file, identified by snpset metadata in iRODS
+    my ($irods, $snpset_obj) = @_;
+    my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
+    if (scalar(@avus)!=1) {
+        $log->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value",
+                       " in iRODS metadata for SNP set file");
+    }
+    my %avu = %{ shift(@avus) };
+    my $chromosome_json = $avu{'value'};
+    my $data_object = WTSI::NPG::iRODS::DataObject->new
+        ($irods, $chromosome_json);
+    return decode_json($data_object->slurp());
+}
+
+sub _read_json {
+    # read given path into a string and decode as JSON
+    my $input = shift;
+    open my $in, '<:encoding(utf8)', $input ||
+        log->logcroak("Cannot open input '$input'");
+    my $data = decode_json(join("", <$in>));
+    close $in || $log->logcroak("Cannot close input '$input'");
+    return $data;
 }
 
 
@@ -235,6 +281,8 @@ Options:
                       manifest files. Optional, defaults to
                       /seq/$PLEX_NAME/multiplexes. Has no effect for
                       non-iRODS inputs.
+  --snpset            Path to a tab-separated file representing the plex SNP
+                      set.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.

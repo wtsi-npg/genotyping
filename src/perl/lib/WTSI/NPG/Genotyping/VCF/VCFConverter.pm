@@ -23,9 +23,17 @@ our $GRCH37_GENOME = 'GRCh37';
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
+our $DEFAULT_READ_DEPTH = 1;
+our $DEFAULT_QUALITY = 40;
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
+
+has 'chromosome_lengths' => ( # must be compatible with given snpset
+    is           => 'ro',
+    isa          => 'HashRef',
+    required     => 1,
+);
 
 has 'genome' => (
     is           => 'ro',
@@ -47,15 +55,6 @@ has 'input_type' => (
     default      => 'sequenom', # sequenom or fluidigm
 );
 
-has 'sequenom_type' => ( is  => 'ro',
-                         isa => 'Str',
-                         default => $SEQUENOM_TYPE );
-
-
-has 'fluidigm_type' => ( is  => 'ro',
-                         isa => 'Str',
-                         default => $FLUIDIGM_TYPE );
-
 has 'sequenom_plex_coll' => (
     is           => 'ro',
     isa          => 'Str',
@@ -68,14 +67,10 @@ has 'fluidigm_plex_coll' => (
     default      => '/seq/fluidigm/multiplexes',
 );
 
-has 'snpset_path' => ( # path to local (non-iRODS) SNP manifest
+has 'snpset' => ( # pipeline SNPSet object
     is           => 'ro',
-    isa          => 'Str',
-);
-
-has 'chromosome_length_path' => ( # path to local (non-iRODS) chromosome JSON
-    is           => 'ro',
-    isa          => 'Str',
+    isa          => 'WTSI::NPG::Genotyping::SNPSet',
+    required => 1,
 );
 
 has 'resultsets' =>
@@ -200,22 +195,6 @@ sub _call_to_vcf {
     return $new_call;
 }
 
-sub _chromosome_lengths_irods {
-    # get reference to a hash of chromosome lengths
-    # read from JSON file, identified by snpset metadata in iRODS
-    my ($self, $snpset_obj) = @_;
-    my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
-    if (scalar(@avus)!=1) {
-        $self->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value",
-                        " in iRODS metadata for SNP set file");
-    }
-    my %avu = %{ shift(@avus) };
-    my $chromosome_json = $avu{'value'};
-    my $data_object = WTSI::NPG::iRODS::DataObject->new
-        ($self->irods, $chromosome_json);
-    return decode_json($data_object->slurp());
-}
-
 sub _convert_chromosome {
     # convert the chromosome field to standard GRCh37 format
     # chromsome names: 1, 2, 3, ... , 22, X, Y
@@ -236,37 +215,18 @@ sub _convert_chromosome {
 
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
-    my $self = shift;
+    my ($self, @args) = @_;
     my $resultsRef = $self->resultsets;
     my ($callsRef, $samplesRef) = $self->_parse_calls_samples($resultsRef);
     my %calls = %{$callsRef};
-    my $read_depth = 1; # placeholder
-    my $qscore = 40;    # placeholder genotype quality
+    my $read_depth = $DEFAULT_READ_DEPTH; # placeholder
+    my $qscore = $DEFAULT_QUALITY;        # placeholder genotype quality
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
     my ($chroms, $snpset);
-    if ($self->snpset_path) { # manifest path supplied as argument
-        $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->snpset_path);
-        if (!$self->chromosome_length_path) {
-            $self->logcroak(
-                "Must specify path to chromosome length JSON for SNP set ",
-                $self->snpset_path);
-        }
-        $chroms = $self->_read_json($self->chromosome_length_path);
-    } else { # find manifest from iRODS metadata
-        my $snpset_name = $self->_get_snpset_name();
-        my $snpset_ipath = $self->_get_snpset_ipath($snpset_name);
-        my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
-            ($self->irods, $snpset_ipath);
-        $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
-        if ($self->chromosome_length_path) {
-            $chroms = $self->_read_json($self->chromosome_length_path);
-        } else {
-            $chroms = $self->_chromosome_lengths_irods($snpset_obj);
-        }
-    }
+    $snpset = $self->snpset;
     my $total = scalar(@{$snpset->snps()});
-    push(@output, $self->_generate_vcf_header($snpset, $chroms, \@samples));
+    push(@output, $self->_generate_vcf_header(\@samples));
     foreach my $snp (@{$snpset->snps}) {
         my $ref = $snp->ref_allele();
         my $alt = $snp->alt_allele();
@@ -295,8 +255,8 @@ sub _generate_vcf_complete {
 }
 
 sub _generate_vcf_header {
-    my ($self, $snpset, $lengthsRef, $samplesRef) = @_;
-    my %lengths = %{$lengthsRef};
+    my ($self, $samplesRef) = @_;
+    my %lengths = %{$self->chromosome_lengths};
     my @samples = @{$samplesRef};
     my $dt = DateTime->now(time_zone=>'local');
     my @header = ();
@@ -323,43 +283,6 @@ sub _generate_vcf_header {
     push(@colHeads, @samples);
     push(@header, "#".join("\t", @colHeads));
     return @header;
-}
-
-sub _get_snpset_ipath {
-    my ($self, $snpset_name) = @_;
-    my $genome_suffix; # suffix not necessarily equal to genome
-    if ($self->genome eq $GRCH37_GENOME) { $genome_suffix = $GRCH37_GENOME; }
-    else { $self->logcroak("Unknown genome designation: ".$self->genome); }
-    my $snpset_ipath;
-    if ($self->input_type eq $SEQUENOM_TYPE) {
-        $snpset_ipath = $self->sequenom_plex_coll.'/'.
-            $snpset_name.'_snp_set_info_'.$genome_suffix.'.tsv';
-    } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
-        $snpset_ipath = $self->fluidigm_plex_coll.'/'.
-            $snpset_name.'_fluidigm_snp_info_'.$genome_suffix.'.tsv';
-    } else {
-        $self->logcroak("Unknown data type: ".$self->input_type);
-    }
-    unless ($self->irods->list_object($snpset_ipath)) {
-        $self->logconfess("No iRODS listing for snpset $snpset_ipath");
-    }
-    return $snpset_ipath;
-}
-
-sub _get_snpset_name {
-    # get SNPset name for given sample Sequenom result files in iRODS
-    # raise error if not all inputs have same SNPset
-    my $self = shift;
-    my @snpsets = ();
-    foreach my $resultSet (@{$self->resultsets()}) {
-        my $snpsetName = $resultSet->snpset_name();
-        push(@snpsets, $snpsetName);
-    }
-    @snpsets = uniq(@snpsets);
-    if (@snpsets != 1) {
-        $self->logconfess("Must have exactly one SNP set in metadata");
-    }
-    return $snpsets[0];
 }
 
 sub _parse_calls_samples {
