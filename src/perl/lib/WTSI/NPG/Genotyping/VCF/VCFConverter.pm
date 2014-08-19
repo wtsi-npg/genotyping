@@ -55,18 +55,6 @@ has 'input_type' => (
     default      => 'sequenom', # sequenom or fluidigm
 );
 
-has 'sequenom_plex_coll' => (
-    is           => 'ro',
-    isa          => 'Str',
-    default      => '/seq/sequenom/multiplexes',
-);
-
-has 'fluidigm_plex_coll' => (
-    is           => 'ro',
-    isa          => 'Str',
-    default      => '/seq/fluidigm/multiplexes',
-);
-
 has 'snpset' => ( # pipeline SNPSet object
     is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',

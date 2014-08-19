@@ -38,7 +38,7 @@ my $embedded_conf = "
 ";
 
 my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
-    $log, $logConfig, $verbose, $use_irods, $debug, $manifest,
+    $log, $logConfig, $verbose, $use_irods, $debug,
     $snpset_path, $chromosome_json);
 
 my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
@@ -54,8 +54,6 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'irods'             => \$use_irods,
            'json=s'            => \$jsonOut,
            'logconf=s'         => \$logConfig,
-           'manifest=s'        => \$manifest,
-           'plex_coll=s'       => \$plexColl,
            'plex_type=s'       => \$inputType,
            'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
@@ -86,17 +84,10 @@ if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
 unless ($snpset_path) { 
     $log->logcroak("Must specify a snpset path in iRODS or local filesystem");
 }
-my ($snpset, $chroms, $plexCollOpt);
+my ($snpset, $chroms);
 if ($use_irods) {
     my $irods = WTSI::NPG::iRODS->new();
     $irods->logger($log);
-    if ($inputType eq $SEQUENOM_TYPE) {
-        $plexCollOpt = 'sequenom_plex_coll';
-        $plexColl ||= '/seq/sequenom/multiplexes';
-    } elsif ($inputType eq $FLUIDIGM_TYPE) {
-        $plexCollOpt = 'fluidigm_plex_coll';
-        $plexColl ||= '/seq/fluidigm/multiplexes';
-    }
     my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
         ($irods, $snpset_path);
     $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
@@ -106,17 +97,8 @@ if ($use_irods) {
         $chroms = _chromosome_lengths_irods($irods, $snpset_obj);
     }
 } else {
-    if ($plexColl) {
-        my $msg = "plex_coll option does not apply to non-iRODS input ".
-            "and will be ignored";
-        $log->warn($msg);
-    }
     $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
-    if (!$manifest) {
-        $log->logcroak("--manifest is required for non-iRODS input");
-    } elsif (!(-e $manifest)) {
-        $log->logcroak("Manifest path '$manifest' does not exist");
-    } elsif (!$chromosome_json) {
+    if (!$chromosome_json) {
         $log->logcroak("--chromosomes is required for non-iRODS input");
     } elsif (!(-e $chromosome_json)) {
         $log->logcroak("Chromosome path '$chromosome_json' does not exist");
@@ -186,8 +168,7 @@ my $converter;
 if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
-        snpset => $snpset, chromosome_lengths => $chroms,
-        $plexCollOpt => $plexColl);
+        snpset => $snpset, chromosome_lengths => $chroms);
 } else {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
@@ -263,7 +244,7 @@ Options:
   --input=PATH        List of input paths, one per line. The inputs may be
                       on a locally mounted filesystem, or locations of iRODS
                       data objects. In the former case, the --chromosomes
-                      and --manifest options must be specified;
+                      and --snpset options must be specified;
                       otherwise default values can be found from iRODS
                       metadata. The inputs are Sequenom or Fluidigm "CSV"
                       files. The input list is read from the given PATH, or
@@ -271,18 +252,12 @@ Options:
                       Fluidigm and Sequenom file formats may not be mixed.
   --irods             Indicates that inputs are in iRODS. If absent, inputs
                       are assumed to be in the local filesystem, and the
-                      --manifest and --chromosomes options are required.
-  --manifest=PATH     Path to the tab-separated manifest file giving SNP
-                      information for the QC plex. PATH must be on the local
-                      filesystem (not iRODS). Optional for iRODS inputs,
-                      required otherwise.
+                      --snpset and --chromosomes options are required.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
-  --plex_coll=PATH    Path of an iRODS data collection containing QC plex
-                      manifest files. Optional, defaults to
-                      /seq/$PLEX_NAME/multiplexes. Has no effect for
-                      non-iRODS inputs.
-  --snpset            Path to a tab-separated file representing the plex SNP
-                      set.
+  --snpset            Path to a tab-separated manifest file with information
+                      on the SNPs in the QC plex. Path must be in iRODS if the
+                      --irods option is in effect, or on the local filesystem 
+                      otherwise.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.

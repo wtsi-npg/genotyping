@@ -153,8 +153,7 @@ sub script_test : Test(5) {
     my $tmpText = "$tmp/sequenom.txt";
     my $snpset_ipath = $irods_tmp_coll."/W30467_snp_set_info_GRCh37.tsv";
     my $cmd = "$script --input - --plex_type sequenom ".
-        "--snpset $snpset_ipath ".
-        "--plex_coll $irods_tmp_coll --gtcheck --text $tmpText ".
+        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
         "--json $tmpJson --irods < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $tmpText, "text output written");
@@ -170,8 +169,7 @@ sub script_test : Test(5) {
     is_deeply($outJson, $refJson, "Output and expected data structures match");
     # as above, but with VCF output to STDOUT
      $cmd = "$script --input - --plex_type sequenom ".
-         "--snpset $snpset_ipath ".
-         "--plex_coll $irods_tmp_coll --gtcheck --text $tmpText ".
+         "--snpset $snpset_ipath --gtcheck --text $tmpText ".
          "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
 }
