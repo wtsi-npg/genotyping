@@ -143,10 +143,7 @@ sub script_test : Test(5) {
     # simple test of command-line script
     my $script = 'bin/vcf_from_plex.pl';
     my $irods = WTSI::NPG::iRODS->new;
-    # input list contains paths in temp collection, must write on the fly
-    #system("echo 1; ils $irods_tmp_coll");
     my @inputs = _upload_sequenom();
-    #system("echo 2; ils $irods_tmp_coll");
     my $sequenomList = "$tmp/sequenom_inputs.txt";
     open my $out, ">", $sequenomList || 
         log->logcroak("Cannot open output $sequenomList");
@@ -155,9 +152,6 @@ sub script_test : Test(5) {
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
     my $snpset_name = "/W30467_snp_set_info_GRCh37.tsv";
-    #print STDERR "Ready to add snpset object to iRODS\n";
-    #$irods->add_object($data_path.$snpset_name, $irods_tmp_coll.$snpset_name);
-    #print STDERR "Added snpset object to iRODS\n";
     my $cmd = "$script --input - --plex_type sequenom ".
         "--snpset ".$irods_tmp_coll.$snpset_name." ".
         "--plex_coll $irods_tmp_coll --gtcheck --text $tmpText ".
