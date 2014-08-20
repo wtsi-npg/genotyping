@@ -62,19 +62,11 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
        );
 
 ### set up logging ###
-if ($logConfig) {
-    Log::Log4perl::init($logConfig);
-    $log = Log::Log4perl->get_logger('npg.vcf.plex');
-} else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.vcf.plex');
-}
-if ($verbose) {
-    $log->level($INFO);
-}
-elsif ($debug) {
-    $log->level($DEBUG);
-}
+if ($logConfig) { Log::Log4perl::init($logConfig); } 
+else { Log::Log4perl::init(\$embedded_conf); }
+$log = Log::Log4perl->get_logger('npg.vcf.plex');
+if ($verbose) { $log->level($INFO); }
+elsif ($debug) { $log->level($DEBUG); }
 
 ### process command-line options and make sanity checks ###
 if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
