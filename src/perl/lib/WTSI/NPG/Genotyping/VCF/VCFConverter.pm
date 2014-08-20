@@ -72,6 +72,12 @@ has 'sort' => ( # sort the sample names before output?
     default   => 1,
     );
 
+has 'normalize_chromosome' => ( # normalize the chromosome name to GRCh37?
+    is        => 'ro',
+    isa       => 'Bool',
+    default   => 1,
+);
+
 sub BUILD {
   my $self = shift;
   # Make our iRODS handle use our logger by default
@@ -183,24 +189,6 @@ sub _call_to_vcf {
     return $new_call;
 }
 
-sub _convert_chromosome {
-    # convert the chromosome field to standard GRCh37 format
-    # chromsome names: 1, 2, 3, ... , 22, X, Y
-    my ($self, $input) = @_;
-    my $output;
-    if ($input =~ /^[0-9]+$/ && $input >= 1 && $input <= 22 ) {
-        $output = $input; # already in numeric chromosome format
-    } elsif ($input eq 'X' || $input eq 'Y') {
-        $output = $input; # already in standard X/Y format
-    } elsif ($input =~ /^Chr/) {
-        $input =~ s/Chr//g; # strip off 'Chr' prefix
-        $output = $self->_convert_chromosome($input);
-    } else {
-        $self->logcroak("Unknown chromosome string: \"$input\"");
-    }
-    return $output;
-}
-
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
@@ -218,7 +206,10 @@ sub _generate_vcf_complete {
     foreach my $snp (@{$snpset->snps}) {
         my $ref = $snp->ref_allele();
         my $alt = $snp->alt_allele();
-        my $chrom = $self->_convert_chromosome($snp->chromosome());
+        my $chrom = $snp->chromosome();
+        if ($self->normalize_chromosome) {
+            $chrom = $self->_normalize_chromosome_name($chrom);
+        }
         my @fields = ( $chrom,                    # CHROM
                        $snp->position(),          # POS
                        $snp->name(),              # ID
@@ -271,6 +262,24 @@ sub _generate_vcf_header {
     push(@colHeads, @samples);
     push(@header, "#".join("\t", @colHeads));
     return @header;
+}
+
+sub _normalize_chromosome_name {
+    # convert the chromosome field to standard GRCh37 format
+    # chromsome names: 1, 2, 3, ... , 22, X, Y
+    my ($self, $input) = @_;
+    my $output;
+    if ($input =~ /^[0-9]+$/ && $input >= 1 && $input <= 22 ) {
+        $output = $input; # already in numeric chromosome format
+    } elsif ($input eq 'X' || $input eq 'Y') {
+        $output = $input; # already in standard X/Y format
+    } elsif ($input =~ /^Chr/) {
+        $input =~ s/Chr//g; # strip off 'Chr' prefix
+        $output = $self->_normalize_chromosome_name($input);
+    } else {
+        $self->logcroak("Unknown chromosome string: \"$input\"");
+    }
+    return $output;
 }
 
 sub _parse_calls_samples {

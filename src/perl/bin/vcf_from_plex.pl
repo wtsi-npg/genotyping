@@ -39,7 +39,7 @@ my $embedded_conf = "
 
 my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
     $log, $logConfig, $verbose, $use_irods, $debug,
-    $snpset_path, $chromosome_json);
+    $snpset_path, $chromosome_json, $raw_chromosome, $normalize_chromosome);
 
 my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 my $FLUIDIGM_TYPE = 'fluidigm';
@@ -59,6 +59,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'vcf=s'             => \$vcfPath,
            'gtcheck'           => \$gtCheck,
            'verbose'           => \$verbose,
+           'raw_chromosome'    => \$raw_chromosome,
        );
 
 ### set up logging ###
@@ -97,6 +98,7 @@ if ($use_irods) {
     }
     $chroms = _read_json($chromosome_json);
 }
+$normalize_chromosome = !($raw_chromosome);
 
 ### read inputs ###
 my $in;
@@ -160,11 +162,13 @@ my $converter;
 if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
-        snpset => $snpset, chromosome_lengths => $chroms);
+        snpset => $snpset, chromosome_lengths => $chroms,
+        normalize_chromosome => $normalize_chromosome);
 } else {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
-        snpset => $snpset, chromosome_lengths => $chroms);
+        snpset => $snpset, chromosome_lengths => $chroms,
+        normalize_chromosome => $normalize_chromosome);
 }
 my $vcf = $converter->convert($vcfPath);
 
@@ -258,6 +262,10 @@ Options:
   --text=PATH         Path for text output of gtcheck metrics.
                       Optional; if not given, text is not written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
+  --raw_chromosome    Do not normalize chromosome IDs in the VCF body to
+                      the standard GRCh37 format (ie. 1,2,3,...,22,X,Y).
+                      WARNING: If this option is in effect, chromosome names
+                      in the VCF header and body may be inconsistent.
   --verbose           Print additional status information to STDERR.
 
 
