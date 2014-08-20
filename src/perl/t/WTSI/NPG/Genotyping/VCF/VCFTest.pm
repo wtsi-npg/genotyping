@@ -35,6 +35,12 @@ use WTSI::NPG::Genotyping::VCF::VCFConverter;
 use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 
 my $data_path = './t/vcf';
+my $sequenom_snpset_name = 'W30467_snp_set_info_GRCh37.tsv';
+my $sequenom_snpset_path = $data_path.'/'.$sequenom_snpset_name;
+my $fluidigm_snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
+my $chromosome_json_name = 'chromosome_lengths_GRCh37.json';
+my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
+
 my $irods_tmp_coll;
 my $pid = $$;
 
@@ -45,8 +51,7 @@ sub setup: Test(setup) {
     $irods->add_collection($irods_tmp_coll);
     $irods_tmp_coll = $irods->absolute_path($irods_tmp_coll);
     # read chromosome lengths
-    my $chromosome_json = $data_path."/chromosome_lengths_GRCh37.json";
-    $chromosome_lengths = _read_json($chromosome_json);
+    $chromosome_lengths = _read_json($chromosome_json_path);
 }
 
 sub teardown : Test(teardown) {
@@ -60,8 +65,7 @@ sub fluidigm_file_test : Test(6) {
     foreach my $name (@fluidigm_csv) {
         push(@csv, abs_path($data_path."/".$name));
     }
-    my $snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my @inputs;
     foreach my $csvPath (@csv) {
         my $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
@@ -82,8 +86,7 @@ sub fluidigm_file_test : Test(6) {
 sub fluidigm_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
-    my $snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
         (resultsets => \@inputs,
          input_type => 'fluidigm',
@@ -102,8 +105,7 @@ sub sequenom_file_test : Test(6) {
     foreach my $name (@sequenom_csv) { 
         push(@csv, abs_path($data_path."/".$name));
     }
-    my $snpset_path = $data_path."/W30467_snp_set_info_GRCh37.tsv";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my @inputs;
     foreach my $csvPath (@csv) {
         my $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
@@ -125,8 +127,7 @@ sub sequenom_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my (@inputs, $converter, $output);
     @inputs = _upload_sequenom();
-    my $snpset_path = $data_path."/W30467_snp_set_info_GRCh37.tsv";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
         (resultsets => \@inputs,
          input_type => 'sequenom',
@@ -151,7 +152,7 @@ sub script_test : Test(6) {
     close $out || log->logcroak("Cannot close output $sequenomList");
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
-    my $snpset_ipath = $irods_tmp_coll."/W30467_snp_set_info_GRCh37.tsv";
+    my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --plex_type sequenom ".
         "--snpset $snpset_ipath --gtcheck --text $tmpText ".
         "--json $tmpJson --irods < $sequenomList";
@@ -173,12 +174,10 @@ sub script_test : Test(6) {
         "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
     # as above, but with non-irods input
-    my $snpset_path = $data_path."/W30467_snp_set_info_GRCh37.tsv";
-    my $chromosome_path = $data_path."/chromosome_lengths_GRCh37.json";
     $sequenomList = $data_path."/sequenom_inputs.txt";
     $cmd = "$script --input - --plex_type sequenom ".
-    "--snpset $snpset_path --gtcheck --text $tmpText ".
-    "--chromosomes $chromosome_path ".
+    "--snpset $sequenom_snpset_path --gtcheck --text $tmpText ".
+    "--chromosomes $chromosome_json_path ".
     "--json $tmpJson --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with non-iRODS input");
 
@@ -267,8 +266,6 @@ sub _upload_plex_files {
     my $manifest_value = shift;
     my $data_type = shift;
     my $manifest_key = $data_type.'_plex';
-    my $chromosome_json_name = "chromosome_lengths_GRCh37.json";
-    my $chromosome_json_path = "$data_path/$chromosome_json_name";
     my @inputs;
     foreach my $csv (@csv_files) {
         my $ipath = "$irods_tmp_coll/$csv";
