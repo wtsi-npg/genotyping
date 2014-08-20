@@ -248,7 +248,7 @@ Options:
   --plex_type=NAME    Either fluidigm or sequenom. Required.
   --snpset            Path to a tab-separated manifest file with information
                       on the SNPs in the QC plex. Path must be in iRODS if the
-                      --irods option is in effect, or on the local filesystem 
+                      --irods option is in effect, or on the local filesystem
                       otherwise.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
