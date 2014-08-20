@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
 
+with 'WTSI::NPG::Loggable';
+
 has 'assay'          => (is => 'ro', isa => 'Str', required => 1);
 has 'snp_assayed'    => (is => 'ro', isa => 'Str', required => 1);
 has 'x_allele'       => (is => 'ro', isa => 'Str', required => 1);
@@ -85,6 +87,68 @@ sub compact_call {
 
   return $compact;
 }
+
+=head2 normalized_call
+
+  Arg [1]    : None
+
+  Example    : $call = $result->normalized_call()
+  Description: Method to return the genotype call, in a string representation
+               of the form AA, AC, CC, or NN. Name and behaviour of method are
+               intended to be consistent across all 'AssayResultSet' classes
+               (for Sequenom, Fluidigm, etc).
+  Returntype : Str
+
+=cut
+
+sub normalized_call {
+    my ($self) = @_;
+    my $call = $self->compact_call(); # removes the : from raw input call
+    if ($call eq $NO_CALL) { 
+        $call = 'NN'; 
+    } elsif ($call !~ /[ACGTN][ACGTN]/ ) {
+        my $msg = "Illegal genotype call '$call' for sample ".
+            $self->normalized_sample_id().", SNP ".self->normalized_snp_id;
+        $self->logcroak($msg);
+    }
+    return $call;
+}
+
+=head2 normalized_sample_id
+
+  Arg [1]    : None
+
+  Example    : $sample_identifier = $result->normalized_sample_id()
+  Description: Method to return the sample ID. Name and behaviour of method
+               are intended to be consistent across all 'AssayResultSet'
+               classes (for Sequenom, Fluidigm, etc).
+  Returntype : Str
+
+=cut
+
+sub normalized_sample_id {
+    my ($self) = @_;
+    return $self->sample_name();
+}
+
+
+=head2 normalized_snp_id
+
+  Arg [1]    : None
+
+  Example    : $snp_identifier = $result->normalized_snp_id()
+  Description: Method to return the SNP (assay) ID. Name and behaviour of
+               method are intended to be consistent across all 'AssayResultSet'
+               classes (for Sequenom, Fluidigm, etc).
+  Returntype : Str
+
+=cut
+
+sub normalized_snp_id {
+    my ($self) = @_;
+    return $self->snp_assayed();
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

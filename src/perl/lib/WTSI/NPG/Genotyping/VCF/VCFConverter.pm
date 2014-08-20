@@ -19,7 +19,6 @@ use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::NPG::Loggable';
 
-our $GRCH37_GENOME = 'GRCh37';
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
@@ -33,12 +32,6 @@ has 'chromosome_lengths' => ( # must be compatible with given snpset
     is           => 'ro',
     isa          => 'HashRef',
     required     => 1,
-);
-
-has 'genome' => (
-    is           => 'ro',
-    isa          => 'Str',
-    default      => $GRCH37_GENOME,
 );
 
 has 'irods'   =>
@@ -132,23 +125,11 @@ sub convert {
 }
 
 sub _call_to_vcf {
-    # convert the CSV genotype call to a VCF version
-    # Sequenom CSV call may be of the form A, C, or AC
-    #  may be same or opposite strand to ref
-    # Fluidigm will be of the form A:A, C:C, or A:C
-    # VCF call is of the form 1/1, 0/0, or 1/0 for ref/alt
-    # may have a 'no call'; if so return empty string
-    #
-    # Special case: Fluidigm gender markers have identical 'ref' and 'alt'
-    # values. But we may have data which does not match the ref or alt value.
-    # In this case we return a no call.
+    # input a 'normalized' call from an AssayResult (Sequenom or Fluidigm)
+    # convert to VCF representation
     my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
-    return '';
-    } elsif ($call =~ /[^ACGTN:]/) {
-    $self->logcroak("Characters other than ACGTN in genotype '$call'");
-    } elsif ($self->input_type() eq $FLUIDIGM_TYPE) {
-        $call =~ s/://g;
+        return '';
     }
     my %complement = ('A' => 'T',
                       'C' => 'G',
@@ -159,33 +140,19 @@ sub _call_to_vcf {
     if ($strand eq '+') { $reverse = 0; }
     elsif ($strand eq '-') { $reverse = 1; }
     else { $self->logcroak("Unknown strand value '$strand'"); }
-    my $new_call;
-    if (length($call) == 1) {
-        if ($reverse) { $call = $complement{$call}; }
-        if ($call eq 'N') { $new_call = ''; }
-        elsif ($ref eq $alt && $call ne $ref) { $new_call = ''; }
-        elsif ($call eq $ref) { $new_call = '0/0'; }
-        elsif ($call eq $alt) { $new_call = '1/1'; }
-        else { $self->logcroak("Non-null call '$call' does not match ",
-                               "reference '$ref' or alternate '$alt'"); }
-    } elsif (length($call) == 2) {
-        my @alleles = split(//, $call);
-        my @new_alleles;
-        my $alleles_ok = 1;
-        foreach my $allele (@alleles) {
-            if ($reverse) { $allele = $complement{$allele}; }
-            if ($allele eq $ref) { push(@new_alleles, '0'); }
-            elsif ($allele eq $alt) { push(@new_alleles, '1'); }
-            elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
-            else { $self->logcroak("Non-null call '$allele' does not match ",
-                                   "reference '$ref' or alternate '$alt'");  }
-        }
-        if ($alleles_ok) { $new_call = join('/', @new_alleles); }
-        else { $new_call = ''; } # special case; failed gender marker
-    } else {
-        $self->logcroak("Call '$call' is wrongly formatted, must have ",
-                        "exactly one or two allele values");
+    my (@new_alleles, $new_call);
+    my @alleles = split(//, $call);
+    my $alleles_ok = 1;
+    foreach my $allele (@alleles) {
+        if ($reverse) { $allele = $complement{$allele}; }
+        if ($allele eq $ref) { push(@new_alleles, '0'); }
+        elsif ($allele eq $alt) { push(@new_alleles, '1'); }
+        elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
+        else { $self->logcroak("Non-null call '$allele' does not match ",
+                               "reference '$ref' or alternate '$alt'");  }
     }
+    if ($alleles_ok) { $new_call = join('/', @new_alleles); }
+    else { $new_call = ''; } # special case; failed gender marker
     return $new_call;
 }
 
@@ -284,30 +251,24 @@ sub _normalize_chromosome_name {
 
 sub _parse_calls_samples {
     # parse calls and sample IDs from reference to an array of ResultSets
+    #  use 'normalized' methods to get snp, sample, call in standard format
+    # for either Fluidigm or Sequenom
     my ($self, $resultsRef) = @_;
     my @results = @{$resultsRef};
     my (%calls, %samples);
     # generate a hash of calls by SNP and sample, and list of sample IDs
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
-            my ($sam_id, $snp_id);
-            if ($self->input_type eq $SEQUENOM_TYPE){
-                $sam_id = $ar->sample_id();
-                # assume assay_id of the form [plex name]-[snp name]
-                my @terms = split("\-", $ar->assay_id());
-                $snp_id = pop(@terms);
+            my $sam_id = $ar->normalized_sample_id();
+            my $snp_id = $ar->normalized_snp_id();
+            my $call = $ar->normalized_call();
+            my $previous_call = $calls{$snp_id}{$sam_id};
+            if ($previous_call && $previous_call ne $call) {
+                my $msg = 'Conflicting genotype calls for SNP '.$snp_id.
+                    ' sample '.$sam_id.': '.$call.', '.$previous_call;
+                $self->logcroak($msg);
             } else {
-                $sam_id = $ar->sample_name();
-                $snp_id = $ar->snp_assayed();
-            }
-            if ($calls{$snp_id}{$sam_id} && 
-                    $calls{$snp_id}{$sam_id} ne $ar->genotype_id()) {
-                $self->logcroak("Conflicting genotype IDs for SNP $snp_id, sample $sam_id:".$calls{$snp_id}{$sam_id}.", ".$ar->genotype_id());
-            }
-            if ($self->input_type eq $SEQUENOM_TYPE) {
-                $calls{$snp_id}{$sam_id} = $ar->genotype_id();
-            } else {
-                $calls{$snp_id}{$sam_id} = $ar->converted_call();
+                $calls{$snp_id}{$sam_id} = $call;
             }
             $samples{$sam_id} = 1;
         }
