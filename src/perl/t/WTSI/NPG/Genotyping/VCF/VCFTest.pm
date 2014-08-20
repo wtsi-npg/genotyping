@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 31;
+use Test::More tests => 32;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -139,11 +139,11 @@ sub sequenom_irods_test : Test(6) {
     _test_sequenom_gtcheck($vcf);
 }
 
-sub script_test : Test(5) {
+sub script_test : Test(6) {
     # simple test of command-line script
     my $script = 'bin/vcf_from_plex.pl';
     my $irods = WTSI::NPG::iRODS->new;
-    my @inputs = _upload_sequenom();
+    my @inputs = _upload_sequenom(); # write list of iRODS inputs
     my $sequenomList = "$tmp/sequenom_inputs.txt";
     open my $out, ">", $sequenomList || 
         log->logcroak("Cannot open output $sequenomList");
@@ -168,10 +168,20 @@ sub script_test : Test(5) {
     close $in || log->logcroak("Cannot close input $tmpJson");
     is_deeply($outJson, $refJson, "Output and expected data structures match");
     # as above, but with VCF output to STDOUT
-     $cmd = "$script --input - --plex_type sequenom ".
-         "--snpset $snpset_ipath --gtcheck --text $tmpText ".
-         "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
+    $cmd = "$script --input - --plex_type sequenom ".
+        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
+        "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
+    # as above, but with non-irods input
+    my $snpset_path = $data_path."/W30467_snp_set_info_GRCh37.tsv";
+    my $chromosome_path = $data_path."/chromosome_lengths_GRCh37.json";
+    $sequenomList = $data_path."/sequenom_inputs.txt";
+    $cmd = "$script --input - --plex_type sequenom ".
+    "--snpset $snpset_path --gtcheck --text $tmpText ".
+    "--chromosomes $chromosome_path ".
+    "--json $tmpJson --vcf - < $sequenomList > /dev/null";
+    is(system($cmd), 0, "$cmd exits successfully with non-iRODS input");
+
 }
 
 sub _read_json {
