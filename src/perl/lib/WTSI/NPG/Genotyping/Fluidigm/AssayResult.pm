@@ -22,6 +22,7 @@ has 'str'            => (is => 'ro', isa => 'Str', required => 1);
 our $EMPTY_NAME          = '[ Empty ]';
 our $NO_TEMPLATE_CONTROL = 'NTC';
 our $NO_CALL             = 'No Call';
+our $INVALID_NAME        = 'Invalid';
 
 =head2 is_control
 
@@ -29,6 +30,18 @@ our $NO_CALL             = 'No Call';
 
   Example    : $result->is_control
   Description: Return whether the result is for a control assay.
+
+               It is not clear from the Fluidigm documentation how
+               no-template controls are canonically represented.
+               There seem to be several ways in play, currently:
+
+               a) The snp_assayed column is empty
+               b) The sample_name column contains the token '[ Empty ]'
+               c) The type, auto and converted_call columns contain the
+                  token 'NTC'
+
+               or some combination of the above.
+
   Returntype : Bool
 
 =cut
@@ -36,17 +49,9 @@ our $NO_CALL             = 'No Call';
 sub is_control {
   my ($self) = @_;
 
-  # It is not clear how no-template controls are being
-  # represented. There seem to be several ways in play, currently:
-  #
-  # a) The snp_assayed column is empty
-  # b) The sample_name column contains the token '[ Empty ]'
-  # c) The type, auto, call and converted_call columns contain the token 'NTC'
-  #
-  # or some combination of the above.
 
-  return ($self->snp_assayed eq '' or
-          $self->sample_name eq $EMPTY_NAME or
+  return ($self->snp_assayed eq ''          ||
+          $self->sample_name eq $EMPTY_NAME ||
           $self->type        eq $NO_TEMPLATE_CONTROL);
 }
 
@@ -56,6 +61,21 @@ sub is_control {
 
   Example    : $result->is_call
   Description: Return whether the result has called a genotype.
+
+               It is not clear from the Fluidigm documentation how
+               no-calls are canonically represented.
+               There seem to be several ways in play, currently:
+
+               a) the final column contains the token 'No Call'
+               b) the converted_call column contains the token 'No Call'
+
+               or both of the above.
+
+               The auto column can contain 'No Call', but looking at example
+               results, the Fluidigm PDF summary report totals count these
+               as calls, provided the value in the converted_call columsn is
+               NOT 'No Call'
+
   Returntype : Bool
 
 =cut
@@ -63,7 +83,8 @@ sub is_control {
 sub is_call {
   my ($self) = @_;
 
-  $self->final ne $NO_CALL;
+  return ($self->final          ne $NO_CALL &&
+          $self->converted_call ne $NO_CALL);
 }
 
 =head2 compact_call

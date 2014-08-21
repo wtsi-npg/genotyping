@@ -11,7 +11,7 @@ use Log::Log4perl;
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 28;
+use Test::More tests => 29;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -63,8 +63,20 @@ sub test_publish_snpset : Test(1) {
             "--source $data_file") == 0, 'Published SNPSet');
 }
 
-sub test_publish_fluidigm_genotypes : Test(1) {
+sub test_publish_fluidigm_genotypes : Test(2) {
   my $raw_data_path = "$data_path/publish_fluidigm_genotypes";
+
+  my $snpset_file     = "$raw_data_path/qc.csv";
+  my $reference_name  = 'Homo_sapiens (1000Genomes)';
+  my $snpset_name     = 'qc';
+  my $snpset_platform = 'fluidigm';
+
+  ok(system(join q{ }, "$PUBLISH_SNPSET",
+            "--dest $irods_tmp_coll",
+            "--reference-name '$reference_name'",
+            "--snpset-name $snpset_name",
+            "--snpset-platform $snpset_platform",
+            "--source $snpset_file") == 0, 'Published SNPSet');
 
   # Includes a directory with a missing CSV file to check that the
   # script exits successfully when ths happens.
@@ -72,8 +84,9 @@ sub test_publish_fluidigm_genotypes : Test(1) {
             "--days-ago 0",
             "--days 1000000",
             "--dest $irods_tmp_coll",
+            "--reference-path $irods_tmp_coll",
             "--source $raw_data_path",
-            "2>/dev/null"),
+            "2>/dev/null") == 0,
      'Published Fluidigm genotypes');
 }
 
