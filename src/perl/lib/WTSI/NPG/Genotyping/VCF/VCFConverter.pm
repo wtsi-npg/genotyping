@@ -260,7 +260,13 @@ sub _parse_calls_samples {
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
             my $sam_id = $ar->npg_sample_id();
-            my $snp_id = $ar->npg_snp_id();
+            unless ($sam_id) {
+                $self->logcroak("Missing sample ID for assay result");
+            }
+            my $snp_id = $ar->snp_assayed();
+            unless ($snp_id) {
+                $self->logcroak("Missing SNP ID for sample '$sam_id'");
+            }
             my $call = $ar->npg_call();
             my $previous_call = $calls{$snp_id}{$sam_id};
             if ($previous_call && $previous_call ne $call) {

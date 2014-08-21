@@ -120,10 +120,10 @@ sub npg_call {
   Arg [1]    : None
 
   Example    : $sample_identifier = $result->npg_sample_id()
-  Description: Method to return the sample ID. Name and behaviour of method
-               are intended to be consistent across all 'AssayResultSet'
-               classes (for Sequenom, Fluidigm, etc) in the WTSI::NPG
-               genotyping pipeline.
+  Description: Method to return the sample ID. Name and behaviour of method,
+               and format of output string, are intended to be consistent
+               across all 'AssayResultSet' classes (for Sequenom, Fluidigm,
+               etc) in the WTSI::NPG genotyping pipeline.
   Returntype : Str
 
 =cut
@@ -131,25 +131,6 @@ sub npg_call {
 sub npg_sample_id {
     my ($self) = @_;
     return $self->sample_name();
-}
-
-
-=head2 npg_snp_id
-
-  Arg [1]    : None
-
-  Example    : $snp_identifier = $result->npg_snp_id()
-  Description: Method to return the SNP (assay) ID. Name and behaviour of
-               method are intended to be consistent across all
-               'AssayResultSet' classes (for Sequenom, Fluidigm, etc)
-               in the WTSI::NPG genotyping pipeline.
-  Returntype : Str
-
-=cut
-
-sub npg_snp_id {
-    my ($self) = @_;
-    return $self->snp_assayed();
 }
 
 
