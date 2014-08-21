@@ -22,20 +22,21 @@ has 'well_position' => (is => 'ro', isa => 'Str', required => 1);
 has 'str'           => (is => 'ro', isa => 'Str', required => 1);
 
 
-=head2 normalized_call
+=head2 npg_call
 
   Arg [1]    : None
 
-  Example    : $call = $result->normalized_call()
+  Example    : $call = $result->npg_call()
   Description: Method to return the genotype call, in a string representation
                of the form AA, AC, CC, or NN. Name and behaviour of method are
                intended to be consistent across all 'AssayResultSet' classes
-               (for Sequenom, Fluidigm, etc).
+               (for Sequenom, Fluidigm, etc) in the WTSI::NPG genotyping
+               pipeline.
   Returntype : Str
 
 =cut
 
-sub normalized_call {
+sub npg_call {
     # require an input call of the form A, AC, C, or N
     my ($self) = @_;
     my $call = $self->genotype_id();
@@ -47,44 +48,46 @@ sub normalized_call {
         # heterozygote, do nothing
     } else {
         my $msg = "Illegal genotype call '$call' for sample ".
-            $self->normalized_sample_id().", SNP ".self->normalized_snp_id();
+            $self->npg_sample_id().", SNP ".self->npg_snp_id();
         $self->logcroak($msg);
     }
     return $call;
 }
 
 
-=head2 normalized_sample_id
+=head2 npg_sample_id
 
   Arg [1]    : None
 
-  Example    : $sample_identifier = $result->normalized_sample_id()
+  Example    : $sample_identifier = $result->npg_sample_id()
   Description: Method to return the sample ID. Name and behaviour of method
                are intended to be consistent across all 'AssayResultSet'
-               classes (for Sequenom, Fluidigm, etc).
+               classes (for Sequenom, Fluidigm, etc) in the WTSI::NPG
+               genotyping pipeline.
   Returntype : Str
 
 =cut
 
-sub normalized_sample_id {
+sub npg_sample_id {
     my ($self) = @_;
     return $self->sample_id();
 }
 
 
-=head2 normalized_snp_id
+=head2 npg_snp_id
 
   Arg [1]    : None
 
-  Example    : $snp_identifier = $result->normalized_snp_id()
+  Example    : $snp_identifier = $result->npg_snp_id()
   Description: Method to return the SNP (assay) ID. Name and behaviour of
                method are intended to be consistent across all 'AssayResultSet'
-               classes (for Sequenom, Fluidigm, etc).
+               classes (for Sequenom, Fluidigm, etc) in the WTSI::NPG
+               genotyping pipeline.
   Returntype : Str
 
 =cut
 
-sub normalized_snp_id {
+sub npg_snp_id {
     my ($self) = @_;
     # assume assay_id of the form [plex name]-[snp name]
     my @terms = split("\-", $self->assay_id());

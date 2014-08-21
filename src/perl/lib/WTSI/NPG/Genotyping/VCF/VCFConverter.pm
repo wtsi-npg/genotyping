@@ -125,7 +125,7 @@ sub convert {
 }
 
 sub _call_to_vcf {
-    # input a 'normalized' call from an AssayResult (Sequenom or Fluidigm)
+    # input a 'npg' call from an AssayResult (Sequenom or Fluidigm)
     # convert to VCF representation
     my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
@@ -251,7 +251,7 @@ sub _normalize_chromosome_name {
 
 sub _parse_calls_samples {
     # parse calls and sample IDs from reference to an array of ResultSets
-    #  use 'normalized' methods to get snp, sample, call in standard format
+    #  use 'npg' methods to get snp, sample, call in standard format
     # for either Fluidigm or Sequenom
     my ($self, $resultsRef) = @_;
     my @results = @{$resultsRef};
@@ -259,9 +259,9 @@ sub _parse_calls_samples {
     # generate a hash of calls by SNP and sample, and list of sample IDs
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
-            my $sam_id = $ar->normalized_sample_id();
-            my $snp_id = $ar->normalized_snp_id();
-            my $call = $ar->normalized_call();
+            my $sam_id = $ar->npg_sample_id();
+            my $snp_id = $ar->npg_snp_id();
+            my $call = $ar->npg_call();
             my $previous_call = $calls{$snp_id}{$sam_id};
             if ($previous_call && $previous_call ne $call) {
                 my $msg = 'Conflicting genotype calls for SNP '.$snp_id.
