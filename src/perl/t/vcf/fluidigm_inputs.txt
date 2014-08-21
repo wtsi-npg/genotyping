@@ -1,0 +1,4 @@
+./t/vcf/fluidigm_001.csv
+./t/vcf/fluidigm_002.csv
+./t/vcf/fluidigm_003.csv
+./t/vcf/fluidigm_004.csv
