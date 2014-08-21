@@ -125,12 +125,12 @@ sub find_in_metadata {
   my @meta = @{$self->metadata};
   my @exists;
 
-  if ($value && $units) {
+  if (defined $value && defined $units) {
     @exists = grep { $_->{attribute} eq $attribute &&
                      $_->{value}     eq $value &&
                      $_->{units}     eq $units } @meta;
   }
-  elsif ($value) {
+  elsif (defined $value) {
     @exists = grep { $_->{attribute} eq $attribute &&
                      $_->{value}     eq $value } @meta;
   }
