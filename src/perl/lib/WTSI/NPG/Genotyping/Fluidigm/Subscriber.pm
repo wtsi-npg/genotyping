@@ -145,7 +145,7 @@ sub get_assay_resultsets {
       WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new($obj);
   }
 
-  return @resultsets
+  return @resultsets;
 }
 
 =head2 get_assay_resultset
