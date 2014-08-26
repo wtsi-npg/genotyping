@@ -316,7 +316,6 @@ sub get_permissions {
 sub set_permissions {
   my ($self, $permission, @owners) = @_;
 
-
   my $perm_str = defined $permission ? $permission : 'null';
 
   my $path = $self->str;
@@ -343,6 +342,12 @@ sub update_group_permissions {
 
   $self->debug("Permissions before: [", join(", ", @groups_permissions), "]");
   $self->debug("Updated annotations: [", join(", ", @groups_annotated), "]");
+
+  if ($self->get_avu($self->sample_consent_attr, 0)) {
+    $self->info("Data is marked as CONSENT WITHDRAWN; ",
+                "all permissions will be withdrawn");
+    @groups_annotated = (); # Emptying this means all will be removed
+  }
 
   my $perms = Set::Scalar->new(@groups_permissions);
   my $annot = Set::Scalar->new(@groups_annotated);
