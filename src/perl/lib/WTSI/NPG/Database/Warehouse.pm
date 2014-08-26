@@ -172,7 +172,7 @@ sub find_sample_by_plate {
     $self->logconfess("$n samples were returned where 1 sample was expected");
   }
 
-  $self->debug("Found 1 sample in plate ID '$plate_id' ''$unpadded_map");
+  $self->debug("Found 1 sample in plate ID '$plate_id' '$unpadded_map'");
 
   return shift @samples;
 }

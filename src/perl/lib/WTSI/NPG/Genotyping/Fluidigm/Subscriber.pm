@@ -6,6 +6,8 @@ package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 use Moose;
 
 use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
+use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
@@ -34,6 +36,15 @@ has 'reference_path' =>
    required => 1,
    default  => sub { return '/' },
    writer   => '_set_reference_path');
+
+has 'snpsets_cache' =>
+  (is       => 'ro',
+   isa      => 'HashRef[WTSI::NPG::Genotyping::SNPSet]',
+   required => 1,
+   default  => sub { return {} },
+   init_arg => undef);
+
+our $NO_CALL_GENOTYPE = 'NN';
 
 sub BUILD {
   my ($self) = @_;
@@ -68,23 +79,34 @@ sub get_snpset {
    $reference_name or
      $self->logconfess('The reference_name argument was empty');
 
-   my @obj_paths = $self->irods->find_objects_by_meta
-     ($self->reference_path,
-      [$self->fluidigm_plex_name_attr    => $snpset_name],
-      [$self->reference_genome_name_attr => $reference_name]);
+   # ASCII 30 is the record separator
+   my $cache_key = $snpset_name . chr(30) . $reference_name;
+   if (exists $self->snpsets_cache->{$cache_key}) {
+     $self->debug("Found SNP set '$snpset_name' and reference ",
+                  "'$reference_name' in the cache");
+   }
+   else {
+     my @obj_paths = $self->irods->find_objects_by_meta
+       ($self->reference_path,
+        [$self->fluidigm_plex_name_attr    => $snpset_name],
+        [$self->reference_genome_name_attr => $reference_name]);
 
-   my $num_snpsets = scalar @obj_paths;
-   if ($num_snpsets > 1) {
-     $self->logconfess("The SNP set query for SNP set '$snpset_name' and ",
-                       "reference '$reference_name' was not specific enough; ",
-                       "$num_snpsets SNP sets were returned: [",
-                       join(', ',  @obj_paths), "]");
+     my $num_snpsets = scalar @obj_paths;
+     if ($num_snpsets > 1) {
+       $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
+                         "and reference '$reference_name' ",
+                         "was not specific enough; $num_snpsets SNP sets ",
+                         "were returned: [", join(', ',  @obj_paths), "]");
+     }
+
+     my $path = shift @obj_paths;
+     my $obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
+
+     $self->snpsets_cache->{$cache_key} =
+       WTSI::NPG::Genotyping::SNPSet->new($obj);
    }
 
-   my $path = shift @obj_paths;
-   my $obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
-
-   return WTSI::NPG::Genotyping::SNPSet->new($obj);
+   return $self->snpsets_cache->{$cache_key};
 }
 
 =head2 get_assay_resultsets
@@ -114,9 +136,6 @@ sub get_assay_resultsets {
     ($self->data_path,
      [$self->fluidigm_plex_name_attr => $snpset_name],
      [$self->dcterms_identifier_attr => $sample_identifier], @query_specs);
-
-  $self->debug("Found ", scalar @obj_paths, " Fluidigm '$snpset_name' plex ",
-               "resultsets for '$sample_identifier'");
 
   my @resultsets;
   foreach my $obj_path (@obj_paths) {
@@ -200,8 +219,16 @@ sub get_calls {
         }
 
         my $snp = shift @snps;
+        my $genotype;
+        if ($result->is_call) {
+          $genotype = $result->compact_call
+        }
+        else {
+          $genotype = $NO_CALL_GENOTYPE;
+        }
+
         my $call = WTSI::NPG::Genotyping::Call->new
-          (genotype => $result->converted_call,
+          (genotype => $genotype,
            snp      => $snp);
 
         push @calls, $call;
