@@ -1132,7 +1132,7 @@ sub set_object_permissions {
 
   Example    : $irods->get_object_groups($path)
   Description: Return a list of the data access groups in the object's ACL.
-               If a permission leve argument is supplied, only groups with
+               If a permission level argument is supplied, only groups with
                that level of access will be returned.
   Returntype : Array
 

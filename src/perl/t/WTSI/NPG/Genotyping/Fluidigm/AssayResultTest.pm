@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 9;
+use Test::More tests => 11;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -83,7 +83,7 @@ sub is_control : Test(4) {
       converted_call => 'G:T',
       x_intensity    => 0.1,
       y_intensity    => 0.1,
-      str            => '')->is_control, 'Not control');
+      str            => '')->is_control, 'Is not control');
 
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
      (assay          => 'S01-A0',
@@ -131,7 +131,25 @@ sub is_control : Test(4) {
       str            => '')->is_control, 'Is control 3');
 }
 
-sub is_call : Test(2) {
+sub is_call : Test(4) {
+  ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is call 1');
+
+  # This is the conclusion from looking at counts of calls per SNP in
+  # the Fluidigm PDF summary report i.e. 'No Call' in the auto column
+  # does not necessarily mean a no call.
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
      (assay          => 'S01-A0',
       snp_assayed    => 'rs0123456',
@@ -145,7 +163,7 @@ sub is_call : Test(2) {
       converted_call => 'G:T',
       x_intensity    => 0.1,
       y_intensity    => 0.1,
-      str            => '')->is_call, 'Is call');
+      str            => '')->is_call, 'Is call 2');
 
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
      (assay          => 'S01-A0',
@@ -154,13 +172,28 @@ sub is_call : Test(2) {
       y_allele       => 'T',
       sample_name    => 'ABC0123456789',
       type           => 'Unknown',
-      auto           => 'No Call',
+      auto           => 'XY',
       confidence     => 0.1,
       final          => 'No Call',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is not call 1');
+
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
       converted_call => 'No Call',
       x_intensity    => 0.1,
       y_intensity    => 0.1,
-      str            => '')->is_call, 'Is not call');
+      str            => '')->is_call, 'Is not call 2');
 }
 
 1;
