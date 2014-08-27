@@ -126,11 +126,11 @@ sub compact_call {
 sub npg_call {
     my ($self) = @_;
     my $call = $self->compact_call(); # removes the : from raw input call
-    if ($call eq $NO_CALL) { 
-        $call = 'NN'; 
+    if ($call eq $NO_CALL || $call eq 'N') {
+        $call = 'NN';
     } elsif ($call !~ /[ACGTN][ACGTN]/ ) {
         my $msg = "Illegal genotype call '$call' for sample ".
-            $self->npg_sample_id().", SNP ".self->npg_snp_id();
+            $self->npg_sample_id().", SNP ".$self->snp_assayed();
         $self->logcroak($msg);
     }
     return $call;

@@ -24,6 +24,7 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $DEFAULT_READ_DEPTH = 1;
 our $DEFAULT_QUALITY = 40;
+our $NULL_ALLELE = 'N';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
@@ -147,6 +148,7 @@ sub _call_to_vcf {
         if ($reverse) { $allele = $complement{$allele}; }
         if ($allele eq $ref) { push(@new_alleles, '0'); }
         elsif ($allele eq $alt) { push(@new_alleles, '1'); }
+        elsif ($allele eq $NULL_ALLELE) { push(@new_alleles, '.'); }
         elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
         else { $self->logcroak("Non-null call '$allele' does not match ",
                                "reference '$ref' or alternate '$alt'");  }
@@ -261,11 +263,13 @@ sub _parse_calls_samples {
         foreach my $ar (@{$resultSet->assay_results()}) {
             my $sam_id = $ar->npg_sample_id();
             unless ($sam_id) {
-                $self->logcroak("Missing sample ID for assay result");
+                $self->logwarn("Missing sample ID for assay result");
+                next;
             }
             my $snp_id = $ar->snp_assayed();
             unless ($snp_id) {
-                $self->logcroak("Missing SNP ID for sample '$sam_id'");
+                $self->logwarn("Missing SNP ID for sample '$sam_id'");
+                next;
             }
             my $call = $ar->npg_call();
             my $previous_call = $calls{$snp_id}{$sam_id};
