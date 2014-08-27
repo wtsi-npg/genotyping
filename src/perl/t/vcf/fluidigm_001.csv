@@ -19,6 +19,6 @@ Fluidigm_017	rs649058	G	A	sample001	Unknown	Unknown	99.99	Unknown	G:A	0.5	0.5
 Fluidigm_018	rs6557634	T	C	sample001	Unknown	Unknown	99.99	Unknown	T:C	0.5	0.5
 Fluidigm_019	rs6759892	T	G	sample001	Unknown	Unknown	99.99	Unknown	T:G	0.5	0.5
 Fluidigm_020	rs7298565	G	A	sample001	Unknown	Unknown	99.99	Unknown	G:A	0.5	0.5
-Fluidigm_021	rs753381	A	G	sample001	Unknown	Unknown	99.99	Unknown	A:G	0.5	0.5
-Fluidigm_022	rs7627615	G	A	sample001	Unknown	Unknown	99.99	Unknown	G:A	0.5	0.5
+Fluidigm_021	rs753381	A	G	sample001	Unknown	Unknown	99.99	Unknown	No Call	0.5	0.5
+Fluidigm_022	rs7627615	G	A	sample001	Unknown	Unknown	99.99	Unknown	No Call	0.5	0.5
 Fluidigm_023	rs8065080	T	C	sample001	Unknown	Unknown	99.99	Unknown	T:C	0.5	0.5

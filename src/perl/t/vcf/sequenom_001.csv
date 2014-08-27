@@ -57,5 +57,5 @@ C	snpset01-rs1805034	1234	customer1	experiment1	CT	10	1	plate1	project1	sample00
 T	snpset01-rs1805034	1234	customer1	experiment1	CT	10	1	plate1	project1	sample001	1	A01
 A	snpset01-rs2241714	1234	customer1	experiment1	AG	10	1	plate1	project1	sample001	1	A01
 G	snpset01-rs2241714	1234	customer1	experiment1	AG	10	1	plate1	project1	sample001	1	A01
-A	snpset01-rs753381	1234	customer1	experiment1	AG	10	1	plate1	project1	sample001	1	A01
-G	snpset01-rs753381	1234	customer1	experiment1	AG	10	1	plate1	project1	sample001	1	A01
+A	snpset01-rs753381	1234	customer1	experiment1	N	10	1	plate1	project1	sample001	1	A01
+G	snpset01-rs753381	1234	customer1	experiment1	N	10	1	plate1	project1	sample001	1	A01
