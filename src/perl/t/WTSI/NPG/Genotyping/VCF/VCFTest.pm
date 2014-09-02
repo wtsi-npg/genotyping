@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 31;
+use Test::More tests => 32;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -20,6 +20,8 @@ our @fluidigm_csv = qw/fluidigm_001.csv fluidigm_002.csv
                        fluidigm_003.csv fluidigm_004.csv/;
 our @sequenom_csv = qw/sequenom_001.csv sequenom_002.csv
                        sequenom_003.csv sequenom_004.csv/;
+
+our $chromosome_lengths;
 
 our $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 our $FLUIDIGM_TYPE = 'fluidigm';
@@ -33,6 +35,12 @@ use WTSI::NPG::Genotyping::VCF::VCFConverter;
 use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 
 my $data_path = './t/vcf';
+my $sequenom_snpset_name = 'W30467_snp_set_info_GRCh37.tsv';
+my $sequenom_snpset_path = $data_path.'/'.$sequenom_snpset_name;
+my $fluidigm_snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
+my $chromosome_json_name = 'chromosome_lengths_GRCh37.json';
+my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
+
 my $irods_tmp_coll;
 my $pid = $$;
 
@@ -42,6 +50,8 @@ sub setup: Test(setup) {
     $irods_tmp_coll = "VCFTest.$pid";
     $irods->add_collection($irods_tmp_coll);
     $irods_tmp_coll = $irods->absolute_path($irods_tmp_coll);
+    # read chromosome lengths
+    $chromosome_lengths = _read_json($chromosome_json_path);
 }
 
 sub teardown : Test(teardown) {
@@ -55,8 +65,7 @@ sub fluidigm_file_test : Test(6) {
     foreach my $name (@fluidigm_csv) {
         push(@csv, abs_path($data_path."/".$name));
     }
-    my $chromosome_json = $data_path."/chromosome_lengths_GRCh37.json";
-    my $snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my @inputs;
     foreach my $csvPath (@csv) {
         my $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
@@ -66,10 +75,10 @@ sub fluidigm_file_test : Test(6) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
         (resultsets => \@inputs,
          input_type => 'fluidigm',
-         snpset_path => $snpset_path,
-         chromosome_length_path => $chromosome_json);
+         snpset => $snpset,
+         chromosome_lengths => $chromosome_lengths);
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
-    ok($converter->convert($vcf), 
+    ok($converter->convert($vcf),
        "Converted Fluidigm results to VCF with input from file");
     _test_fluidigm_gtcheck($vcf);
 }
@@ -77,9 +86,12 @@ sub fluidigm_file_test : Test(6) {
 sub fluidigm_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
-        (resultsets => \@inputs, 
-         input_type => 'fluidigm', 
+        (resultsets => \@inputs,
+         input_type => 'fluidigm',
+         snpset => $snpset,
+         chromosome_lengths => $chromosome_lengths,
          'fluidigm_plex_coll' => $irods_tmp_coll);
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
     ok($converter->convert($vcf), 
@@ -93,8 +105,7 @@ sub sequenom_file_test : Test(6) {
     foreach my $name (@sequenom_csv) { 
         push(@csv, abs_path($data_path."/".$name));
     }
-    my $chromosome_json = $data_path."/chromosome_lengths_GRCh37.json";
-    my $snpset_path = $data_path."/W30467_snp_set_info_GRCh37.tsv";
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my @inputs;
     foreach my $csvPath (@csv) {
         my $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
@@ -104,10 +115,10 @@ sub sequenom_file_test : Test(6) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
         (resultsets => \@inputs,
          input_type => 'sequenom',
-         snpset_path => $snpset_path,
-         chromosome_length_path => $chromosome_json);
+         snpset => $snpset,
+         chromosome_lengths => $chromosome_lengths);
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
-    ok($converter->convert($vcf), 
+    ok($converter->convert($vcf),
        "Converted Sequenom results to VCF with input from file");
     _test_sequenom_gtcheck($vcf);
 }
@@ -116,9 +127,12 @@ sub sequenom_irods_test : Test(6) {
     # upload test data to temporary irods collection
     my (@inputs, $converter, $output);
     @inputs = _upload_sequenom();
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
         (resultsets => \@inputs,
          input_type => 'sequenom',
+         snpset => $snpset,
+         chromosome_lengths => $chromosome_lengths,
          'sequenom_plex_coll' => $irods_tmp_coll);
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
     ok($converter->convert($vcf),
@@ -126,11 +140,11 @@ sub sequenom_irods_test : Test(6) {
     _test_sequenom_gtcheck($vcf);
 }
 
-sub script_test : Test(5) {
+sub script_test : Test(6) {
     # simple test of command-line script
     my $script = 'bin/vcf_from_plex.pl';
-    # input list contains paths in temp collection, must write on the fly
-    my @inputs = _upload_sequenom();
+    my $irods = WTSI::NPG::iRODS->new;
+    my @inputs = _upload_sequenom(); # write list of iRODS inputs
     my $sequenomList = "$tmp/sequenom_inputs.txt";
     open my $out, ">", $sequenomList || 
         log->logcroak("Cannot open output $sequenomList");
@@ -138,8 +152,9 @@ sub script_test : Test(5) {
     close $out || log->logcroak("Cannot close output $sequenomList");
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
+    my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --plex_type sequenom ".
-        "--plex_coll $irods_tmp_coll --gtcheck --text $tmpText ".
+        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
         "--json $tmpJson --irods < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $tmpText, "text output written");
@@ -154,10 +169,28 @@ sub script_test : Test(5) {
     close $in || log->logcroak("Cannot close input $tmpJson");
     is_deeply($outJson, $refJson, "Output and expected data structures match");
     # as above, but with VCF output to STDOUT
-     $cmd = "$script --input - --plex_type sequenom ".
-         "--plex_coll $irods_tmp_coll --gtcheck --text $tmpText ".
-         "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
+    $cmd = "$script --input - --plex_type sequenom ".
+        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
+        "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
+    # as above, but with non-irods input
+    $sequenomList = $data_path."/sequenom_inputs.txt";
+    $cmd = "$script --input - --plex_type sequenom ".
+    "--snpset $sequenom_snpset_path --gtcheck --text $tmpText ".
+    "--chromosomes $chromosome_json_path ".
+    "--json $tmpJson --vcf - < $sequenomList > /dev/null";
+    is(system($cmd), 0, "$cmd exits successfully with non-iRODS input");
+
+}
+
+sub _read_json {
+    # read given path into a string and decode as JSON
+    my $input = shift;
+    open my $in, '<:encoding(utf8)', $input ||
+        log->logcroak("Cannot open input '$input'");
+    my $data = decode_json(join("", <$in>));
+    close $in || log->logcroak("Cannot close input '$input'");
+    return $data;
 }
 
 sub _test_fluidigm_gtcheck {
@@ -233,8 +266,6 @@ sub _upload_plex_files {
     my $manifest_value = shift;
     my $data_type = shift;
     my $manifest_key = $data_type.'_plex';
-    my $chromosome_json_name = "chromosome_lengths_GRCh37.json";
-    my $chromosome_json_path = "$data_path/$chromosome_json_name";
     my @inputs;
     foreach my $csv (@csv_files) {
         my $ipath = "$irods_tmp_coll/$csv";
