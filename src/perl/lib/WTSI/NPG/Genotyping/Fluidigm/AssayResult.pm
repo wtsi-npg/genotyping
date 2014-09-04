@@ -78,6 +78,9 @@ sub is_control {
                as calls, provided the value in the converted_call columsn is
                NOT 'No Call'
 
+               Note that 'Invalid Call' and 'No Call' are distinct and
+               represent different experimental outcomes.
+
   Returntype : Bool
 
 =cut
@@ -85,8 +88,32 @@ sub is_control {
 sub is_call {
   my ($self) = @_;
 
-  return ($self->final          ne $NO_CALL &&
+  return ($self->is_valid() &&
+          $self->final ne $NO_CALL &&
           $self->converted_call ne $NO_CALL);
+}
+
+=head2 is_valid
+
+  Arg [1]    : None
+
+  Example    : $result->is_valid
+  Description: Check whether the 'final' and/or 'converted call' fields
+               have a value designating them as invalid. Note that 'Invalid
+               Call' and 'No Call' are distinct and represent different
+               experimental outcomes.
+
+  Returntype : Bool
+
+=cut
+
+sub is_valid {
+
+ my ($self) = @_;
+
+ return ($self->final          ne $INVALID_NAME &&
+         $self->converted_call ne $INVALID_NAME);
+
 }
 
 =head2 compact_call

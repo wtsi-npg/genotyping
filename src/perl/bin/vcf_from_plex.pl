@@ -38,7 +38,7 @@ my $embedded_conf = "
 ";
 
 my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
-    $log, $logConfig, $verbose, $use_irods, $debug,
+    $log, $logConfig, $use_irods, $debug, $quiet,
     $snpset_path, $chromosome_json, $raw_chromosome, $normalize_chromosome);
 
 my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
@@ -58,7 +58,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
            'gtcheck'           => \$gtCheck,
-           'verbose'           => \$verbose,
+           'quiet'             => \$quiet,
            'raw_chromosome'    => \$raw_chromosome,
        );
 
@@ -66,8 +66,9 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
 if ($logConfig) { Log::Log4perl::init($logConfig); } 
 else { Log::Log4perl::init(\$embedded_conf); }
 $log = Log::Log4perl->get_logger('npg.vcf.plex');
-if ($verbose) { $log->level($INFO); }
+if ($quiet) { $log->level($WARN); }
 elsif ($debug) { $log->level($DEBUG); }
+else { $log->level($INFO); }
 
 ### process command-line options and make sanity checks ###
 if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
@@ -163,16 +164,18 @@ if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
         snpset => $snpset, chromosome_lengths => $chroms,
-        normalize_chromosome => $normalize_chromosome);
+        normalize_chromosome => $normalize_chromosome, logger => $log);
 } else {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
         snpset => $snpset, chromosome_lengths => $chroms,
-        normalize_chromosome => $normalize_chromosome);
+        normalize_chromosome => $normalize_chromosome, logger => $log);
 }
 my $vcf = $converter->convert($vcfPath);
 
 if ($gtCheck) {
+    my $verbose = 1;
+    if ($quiet) { $verbose = 0; }
     my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(verbose => $verbose);
     my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
     my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
@@ -266,7 +269,7 @@ Options:
                       the standard GRCh37 format (ie. 1,2,3,...,22,X,Y).
                       WARNING: If this option is in effect, chromosome names
                       in the VCF header and body may be inconsistent.
-  --verbose           Print additional status information to STDERR.
+  --quiet             Suppress printing of status information.
 
 
 =head1 DESCRIPTION
