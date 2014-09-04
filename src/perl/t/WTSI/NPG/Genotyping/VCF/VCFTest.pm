@@ -153,7 +153,7 @@ sub script_test : Test(6) {
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
-    my $cmd = "$script --input - --plex_type sequenom ".
+    my $cmd = "$script --input - --plex_type sequenom --quiet ".
         "--snpset $snpset_ipath --gtcheck --text $tmpText ".
         "--json $tmpJson --irods < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
@@ -169,13 +169,13 @@ sub script_test : Test(6) {
     close $in || log->logcroak("Cannot close input $tmpJson");
     is_deeply($outJson, $refJson, "Output and expected data structures match");
     # as above, but with VCF output to STDOUT
-    $cmd = "$script --input - --plex_type sequenom ".
+    $cmd = "$script --input - --plex_type sequenom --quiet ".
         "--snpset $snpset_ipath --gtcheck --text $tmpText ".
         "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
     is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
     # as above, but with non-irods input
     $sequenomList = $data_path."/sequenom_inputs.txt";
-    $cmd = "$script --input - --plex_type sequenom ".
+    $cmd = "$script --input - --plex_type sequenom --quiet ".
     "--snpset $sequenom_snpset_path --gtcheck --text $tmpText ".
     "--chromosomes $chromosome_json_path ".
     "--json $tmpJson --vcf - < $sequenomList > /dev/null";

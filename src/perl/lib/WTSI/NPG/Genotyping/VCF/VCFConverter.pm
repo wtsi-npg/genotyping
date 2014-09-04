@@ -81,8 +81,6 @@ sub BUILD {
   if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
       $self->logcroak("Unknown input data type: '$input_type'");
   }
-  my $total = scalar( $self->resultsets() );
-  $self->logger->info("Found $total assay results\n");
 }
 
 
@@ -210,7 +208,7 @@ sub _generate_vcf_header {
     my @header = ();
     push(@header, '##fileformat=VCFv4.0');
     push(@header, '##fileDate='.$dt->ymd(''));
-    push(@header, '##source=WTSI::NPG::Genotyping::Sequenom::VCFConverter');
+    push(@header, '##source=WTSI_NPG_genotyping_pipeline');
     # add contig tags with chromosome lengths to prevent bcftools warnings
     my @chromosomes = sort(keys(%lengths));
     foreach my $chr (@chromosomes) {
@@ -268,7 +266,8 @@ sub _parse_calls_samples {
             }
             my $snp_id = $ar->snp_assayed();
             unless ($snp_id) {
-                $self->logwarn("Missing SNP ID for sample '$sam_id'");
+                # missing SNP ID is normal for control position in well 96
+                $self->logger->info("Missing SNP ID for sample '$sam_id'");
                 next;
             }
             my $call = $ar->npg_call();
