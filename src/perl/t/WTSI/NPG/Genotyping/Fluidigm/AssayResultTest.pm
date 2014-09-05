@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 16;
+use Test::More tests => 18;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -280,6 +280,27 @@ sub is_valid : Test(4) {
       x_intensity    => 0.1,
       y_intensity    => 0.1,
       str            => '')->is_valid, 'Is not valid 2');
+}
+
+sub parse_assay : Test(2) {
+
+  my @expected = ('S01', 'A0');
+  my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+    (assay          => 'S01-A0',
+     snp_assayed    => 'rs0123456',
+     x_allele       => 'G',
+     y_allele       => 'T',
+     sample_name    => 'ABC0123456789',
+     type           => 'Unknown',
+     auto           => 'XY',
+     confidence     => 0.1,
+     final          => 'Invalid',
+     converted_call => 'Invalid',
+     x_intensity    => 0.1,
+     y_intensity    => 0.1,
+     str            => '');
+  is($result->sample_address(), 'S01', 'Parsed sample address OK');
+  is($result->assay_position(), 'A0', 'Parsed assay position OK');
 }
 
 1;

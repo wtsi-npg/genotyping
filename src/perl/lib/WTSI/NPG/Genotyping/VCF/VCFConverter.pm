@@ -159,8 +159,7 @@ sub _call_to_vcf {
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
-    my $resultsRef = $self->resultsets;
-    my ($callsRef, $samplesRef) = $self->_parse_calls_samples($resultsRef);
+    my ($callsRef, $samplesRef) = $self->_parse_calls_samples();
     my %calls = %{$callsRef};
     my $read_depth = $DEFAULT_READ_DEPTH; # placeholder
     my $qscore = $DEFAULT_QUALITY;        # placeholder genotype quality
@@ -253,21 +252,30 @@ sub _parse_calls_samples {
     # parse calls and sample IDs from reference to an array of ResultSets
     #  use 'npg' methods to get snp, sample, call in standard format
     # for either Fluidigm or Sequenom
-    my ($self, $resultsRef) = @_;
-    my @results = @{$resultsRef};
+    my ($self) = @_;
     my (%calls, %samples);
     # generate a hash of calls by SNP and sample, and list of sample IDs
+    my $controls = 0;
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
+            my $assay_pos = $ar->assay_position();
+            if ($ar->is_control()) {
+                $self->loginfo("Found control assay in position ".$assay_pos);
+                $controls++;
+                next;
+            }
             my $sam_id = $ar->npg_sample_id();
             unless ($sam_id) {
-                $self->logwarn("Missing sample ID for assay result");
+                $self->logwarn("Missing sample ID for assay ".$assay_pos);
                 next;
             }
             my $snp_id = $ar->snp_assayed();
             unless ($snp_id) {
-                # missing SNP ID is normal for control position in well 96
-                $self->logger->info("Missing SNP ID for sample '$sam_id'");
+                # missing SNP ID is normal for control position
+                my ($sample, $assay_num) = $ar->parse_assay();
+                my $msg = "Missing SNP ID for sample '$sam_id', ".
+                    "assay '$assay_pos'";
+                $self->logwarn($msg);
                 next;
             }
             my $call = $ar->npg_call();
@@ -281,6 +289,11 @@ sub _parse_calls_samples {
             }
             $samples{$sam_id} = 1;
         }
+    }
+    if ($controls > 0) { 
+        my $msg = "Found ".$controls." controls out of ".
+            scalar(@{$self->resultsets()})." samples.";
+        $self->loginfo($msg);
     }
     return (\%calls, \%samples);
 }

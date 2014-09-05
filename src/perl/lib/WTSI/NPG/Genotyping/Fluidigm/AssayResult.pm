@@ -181,6 +181,58 @@ sub npg_sample_id {
     return $self->sample_name();
 }
 
+=head2 assay_position
+
+  Arg [1]    : None
+
+  Example    : $assay_position = $result->parse_assay()
+  Description: Parse the 'assay' field and return an identifier for the
+               well position.
+  Returntype : Str
+
+=cut
+
+sub assay_position {
+    my ($self) = @_;
+    my ($sample_address, $assay_pos) = $self->_parse_assay();
+    return $assay_pos;
+}
+
+=head2 sample_address
+
+  Arg [1]    : None
+
+  Example    : $assay_id = $result->sample_address()
+  Description: Parse the 'assay' field and return the sample address.
+  Returntype : Str
+
+=cut
+
+sub sample_address {
+    my ($self) = @_;
+    my ($sample_address, $assay_num) = $self->_parse_assay();
+    return $sample_address;
+}
+
+
+sub _parse_assay {
+    # Parse the 'assay' field and return the assay identifier. Field
+    # should be of the form [sample address]-[assay identifier], eg. S01-A96
+    my ($self) = @_;
+    my @terms = split('-', $self->assay());
+    my ($sample_address, $assay_num) = ('','');
+    if (scalar(@terms) != 2) {
+        my $msg = "Failed to parse sample address and assay number from ".
+            "Fluidigm assay field '".$self->assay().
+            "', returning empty strings instead.";
+        $self->logwarn($msg);
+    } else {
+        ($sample_address, $assay_num) = @terms;
+    }
+    return ($sample_address, $assay_num);
+}
+
+
 
 __PACKAGE__->meta->make_immutable;
 
