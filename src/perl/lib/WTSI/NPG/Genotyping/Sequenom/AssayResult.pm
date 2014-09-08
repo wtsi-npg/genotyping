@@ -22,6 +22,23 @@ has 'well_position' => (is => 'ro', isa => 'Str', required => 1);
 has 'str'           => (is => 'ro', isa => 'Str', required => 1);
 
 
+=head2 assay_position
+
+  Arg [1]    : None
+
+  Example    : my $pos = $self->assay_position()
+  Description: Alias for the well_position accessor. Provided for
+               consistency with the function of the same name in
+               Genotyping::Fluidigm::AssayResult
+  Returntype : Str
+
+=cut
+
+sub assay_position {
+    my ($self) = @_;
+    return $self->well_position();
+}
+
 =head2 npg_call
 
   Arg [1]    : None
@@ -71,6 +88,21 @@ sub npg_call {
 sub npg_sample_id {
     my ($self) = @_;
     return $self->sample_id();
+}
+
+=head2 is_control
+
+  Arg [1]    : None
+
+  Example    : $result->is_control() == 0
+  Description: Placeholder. In the Fluidigm::AssayResult class, the function
+               of this name checks for a 'control' result.
+  Returntype : Str
+
+=cut
+
+sub is_control {
+    return 0;
 }
 
 sub snpset_name {
