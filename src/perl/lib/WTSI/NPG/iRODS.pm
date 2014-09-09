@@ -877,7 +877,7 @@ sub add_object {
   Arg [1]    : Name of file to add to iRODs
   Arg [2]    : iRODS data object name
 
-  Example    : $irods->add_object('lorem.txt', '/my/path/lorem.txt')
+  Example    : $irods->replace_object('lorem.txt', '/my/path/lorem.txt')
   Description: Replace a file in iRODS.
   Returntype : Str
 

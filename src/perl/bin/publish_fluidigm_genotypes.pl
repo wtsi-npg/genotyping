@@ -116,7 +116,7 @@ sub run {
   my $relative_depth = 2;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
-             " results finished between ",
+             "results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
   $log->info("Using reference path '$reference_path'");
 

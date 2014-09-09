@@ -168,9 +168,9 @@ sub transaction : Test(8) {
   my $infinium = $db->method->find({name => 'Infinium'});
   my $pass = $db->state->find({name => 'autocall_pass'});
 
-  my $gtc_path = '\\netapp1a\illumina_geno1\0123456789\0123456789.gtc';
-  my $red_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_red.idat';
-  my $grn_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_grn.idat';
+  my $gtc_path = '/nfs/new_illumina_geno01/0123456789/0123456789.gtc';
+  my $red_path = '/nfs/new_illumina_geno01/0123456789/0123456789_Red.idat';
+  my $grn_path = '/nfs/new_illumina_geno01/0123456789/0123456789_Grn.idat';
 
   $db->in_transaction(sub {
                         foreach my $i (1..1000) {
