@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 32;
+use Test::More tests => 41;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -40,6 +40,10 @@ my $sequenom_snpset_path = $data_path.'/'.$sequenom_snpset_name;
 my $fluidigm_snpset_path = $data_path."/qc_fluidigm_snp_info_GRCh37.tsv";
 my $chromosome_json_name = 'chromosome_lengths_GRCh37.json';
 my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
+my $discordance_fluidigm = $data_path."/pairwise_discordance_fluidigm.json";
+my $discordance_sequenom = $data_path."/pairwise_discordance_sequenom.json";
+my $vcf_fluidigm = $data_path."/fluidigm.vcf";
+my $vcf_sequenom = $data_path."/sequenom.vcf";
 
 my $irods_tmp_coll;
 my $pid = $$;
@@ -55,11 +59,11 @@ sub setup: Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-  my $irods = WTSI::NPG::iRODS->new;
-  $irods->remove_collection($irods_tmp_coll);
+    my $irods = WTSI::NPG::iRODS->new;
+    $irods->remove_collection($irods_tmp_coll);
 }
 
-sub fluidigm_file_test : Test(6) {
+sub fluidigm_file_test : Test(7) {
     # upload test data to temporary irods collection
     my (@csv, $converter);
     foreach my $name (@fluidigm_csv) {
@@ -80,10 +84,11 @@ sub fluidigm_file_test : Test(6) {
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
     ok($converter->convert($vcf),
        "Converted Fluidigm results to VCF with input from file");
+    _test_vcf_output($vcf_fluidigm, $vcf);
     _test_fluidigm_gtcheck($vcf);
 }
 
-sub fluidigm_irods_test : Test(6) {
+sub fluidigm_irods_test : Test(7) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
@@ -94,12 +99,13 @@ sub fluidigm_irods_test : Test(6) {
          chromosome_lengths => $chromosome_lengths,
          'fluidigm_plex_coll' => $irods_tmp_coll);
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
-    ok($converter->convert($vcf), 
+    ok($converter->convert($vcf),
        "Converted Fluidigm results to VCF with input from iRODS");
+    _test_vcf_output($vcf_fluidigm, $vcf);
     _test_fluidigm_gtcheck($vcf);
 }
 
-sub sequenom_file_test : Test(6) {
+sub sequenom_file_test : Test(7) {
     # sequenom test with input from local filesystem
     my (@csv, $converter);
     foreach my $name (@sequenom_csv) { 
@@ -120,10 +126,11 @@ sub sequenom_file_test : Test(6) {
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
     ok($converter->convert($vcf),
        "Converted Sequenom results to VCF with input from file");
+    _test_vcf_output($vcf_sequenom, $vcf);
     _test_sequenom_gtcheck($vcf);
 }
 
-sub sequenom_irods_test : Test(6) {
+sub sequenom_irods_test : Test(7) {
     # upload test data to temporary irods collection
     my (@inputs, $converter, $output);
     @inputs = _upload_sequenom();
@@ -137,11 +144,13 @@ sub sequenom_irods_test : Test(6) {
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
     ok($converter->convert($vcf),
        "Converted Sequenom results to VCF with input from iRODS");
+    _test_vcf_output($vcf_sequenom, $vcf);
     _test_sequenom_gtcheck($vcf);
 }
 
-sub script_test : Test(6) {
-    # simple test of command-line script
+sub script_conversion_test : Test(3) {
+    # simple test of command-line script for conversion to VCF
+    # input is in iRODS
     my $script = 'bin/vcf_from_plex.pl';
     my $irods = WTSI::NPG::iRODS->new;
     my @inputs = _upload_sequenom(); # write list of iRODS inputs
@@ -152,35 +161,65 @@ sub script_test : Test(6) {
     close $out || log->logcroak("Cannot close output $sequenomList");
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
+    my $vcfOutput = "$tmp/vcf.txt";
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
-    my $cmd = "$script --input - --plex_type sequenom --quiet ".
-        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
-        "--json $tmpJson --irods < $sequenomList";
+    my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
+        "--snpset $snpset_ipath --gtcheck --irods --plex_type $SEQUENOM_TYPE ".
+        "< $sequenomList";
+    is(system($cmd), 0, "$cmd exits successfully");
+    ok(-e $vcfOutput, "VCF output written");
+    # read VCF output (omitting date) and compare to reference file
+    my @buffer = ();
+    _test_vcf_output($vcf_sequenom, $vcfOutput);
+}
+
+sub script_gtcheck_test : Test(4) {
+    # simple test of command-line script for genotype consistency check
+    my $script = 'bin/vcf_consistency_check.pl';
+    my $vcf = "$data_path/sequenom.vcf";
+    my $tmpJson = "$tmp/sequenom.json";
+    my $tmpText = "$tmp/sequenom.txt";
+    my $cmd = "$script --input - --text - --json $tmpJson < $vcf > $tmpText";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $tmpText, "text output written");
     ok(-e $tmpJson, "JSON output written");
-    my $refJsonPath = "$data_path/pairwise_discordance_sequenom.json";
-    open my $in, "<", $refJsonPath || 
-        log->logcroak("Cannot open input $refJsonPath");
-    my $refJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $refJsonPath");
-    open $in, "<", $tmpJson || log->logcroak("Cannot open input $tmpJson");
-    my $outJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $tmpJson");
-    is_deeply($outJson, $refJson, "Output and expected data structures match");
-    # as above, but with VCF output to STDOUT
-    $cmd = "$script --input - --plex_type sequenom --quiet ".
-        "--snpset $snpset_ipath --gtcheck --text $tmpText ".
-        "--json $tmpJson --irods --vcf - < $sequenomList > /dev/null";
-    is(system($cmd), 0, "$cmd exits successfully with VCF printed to STDOUT");
-    # as above, but with non-irods input
-    $sequenomList = $data_path."/sequenom_inputs.txt";
-    $cmd = "$script --input - --plex_type sequenom --quiet ".
-    "--snpset $sequenom_snpset_path --gtcheck --text $tmpText ".
-    "--chromosomes $chromosome_json_path ".
-    "--json $tmpJson --vcf - < $sequenomList > /dev/null";
-    is(system($cmd), 0, "$cmd exits successfully with non-iRODS input");
+    _compare_json($discordance_sequenom, $tmpJson);
+}
 
+sub script_pipe_test : Test(4) {
+    # test with output of one VCF script piped into the other
+    # initial input is in local filesystem (not iRODS)
+    my $converter = 'bin/vcf_from_plex.pl';
+    my $checker = 'bin/vcf_consistency_check.pl';
+    my $sequenomList = "$data_path/sequenom_inputs.txt";
+    my $tmpJson = "$tmp/sequenom.json";
+    my $tmpText = "$tmp/sequenom.txt";
+    my @cmds = (
+        "cat $sequenomList",
+        "$converter --input - --vcf - --snpset $sequenom_snpset_path ".
+            "--chromosomes $chromosome_json_path --plex_type sequenom",
+        "$checker --input - --text $tmpText --json $tmpJson"
+    );
+    my $cmd = join(' | ', @cmds);
+    is(system($cmd), 0, "$cmd exits successfully");
+    ok(-e $tmpText, "text output written");
+    ok(-e $tmpJson, "JSON output written");
+    _compare_json($discordance_sequenom, $tmpJson);
+}
+
+sub _read_without_filedate {
+    # read a VCF file, omitting the fileDate line
+    my $inPath = shift;
+    my @buffer = ();
+    open my $in, "<", $inPath ||
+        log->logcroak("Cannot open input $inPath");
+    while (<$in>) {
+        if ( /^##fileDate/ ) { next; } # omit creation date for testing
+        else { push(@buffer, $_); }
+    }
+    close $in || log->logcroak("Cannot close input $inPath");
+    my $input = join("", @buffer);
+    return $input;
 }
 
 sub _read_json {
@@ -193,6 +232,21 @@ sub _read_json {
     return $data;
 }
 
+sub _compare_json {
+    # compare the contents of two JSON files
+    # use to test genotype consistency check results against a master file
+    my ($jsonPath0, $jsonPath1) = @_;
+    open my $in, "<", $jsonPath0 ||
+        log->logcroak("Cannot open input $jsonPath0");
+    my $data0 = from_json(join("", <$in>));
+    close $in || log->logcroak("Cannot close input $jsonPath0");
+    open $in, "<", $jsonPath1 ||
+        log->logcroak("Cannot open input $jsonPath1");
+    my $data1 = from_json(join("", <$in>));
+    close $in || log->logcroak("Cannot close input $jsonPath1");
+    is_deeply($data0, $data1, "JSON data structures match");
+}
+
 sub _test_fluidigm_gtcheck {
     my $vcf = shift;
     my $gtcheck = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new();
@@ -203,18 +257,9 @@ sub _test_fluidigm_gtcheck {
     my $outputText = $tmp."/pairwise_discordance.txt";
     ok($gtcheck->write_results_json($resultRef, $maxDiscord, $outputJson),
        "JSON output written");
-    ok($gtcheck->write_results_text($resultRef, $maxDiscord, $outputText), 
+    ok($gtcheck->write_results_text($resultRef, $maxDiscord, $outputText),
        "Text output written");
-    my $refJsonPath = "$data_path/pairwise_discordance_fluidigm.json";
-    open my $in, "<", $refJsonPath ||
-        log->logcroak("Cannot open input $refJsonPath");
-    my $refJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $refJsonPath");
-    open $in, "<", $outputJson ||
-        log->logcroak("Cannot open input $outputJson");
-    my $outJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $outputJson");
-    is_deeply($outJson, $refJson, "Output and expected data structures match");
+    _compare_json($discordance_fluidigm, $outputJson);
 }
 
 sub _test_sequenom_gtcheck {
@@ -229,16 +274,15 @@ sub _test_sequenom_gtcheck {
        "JSON output written");
     ok($gtcheck->write_results_text($resultRef, $maxDiscord, $outputText),
        "Text output written");
-    my $refJsonPath = "$data_path/pairwise_discordance_sequenom.json";
-    open my $in, "<", $refJsonPath ||
-        log->logcroak("Cannot open input $refJsonPath");
-    my $refJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $refJsonPath");
-    open $in, "<", $outputJson ||
-        log->logcroak("Cannot open input $outputJson");
-    my $outJson = from_json(join("", <$in>));
-    close $in || log->logcroak("Cannot close input $outputJson");
-    is_deeply($outJson, $refJson, "Output and expected data structures match");
+    _compare_json($discordance_sequenom, $outputJson)
+}
+
+sub _test_vcf_output {
+    my ($outPath, $refPath) = @_;
+    # read VCF output (omitting date) and compare to reference file
+    my $outVCF = _read_without_filedate($outPath);
+    my $refVCF = _read_without_filedate($refPath);
+    is($outVCF, $refVCF, "Reference and output VCF files match");
 }
 
 sub _upload_fluidigm {
