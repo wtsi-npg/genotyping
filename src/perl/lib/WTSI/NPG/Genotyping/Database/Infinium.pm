@@ -1019,6 +1019,7 @@ sub _fixup_paths_and_files {
         $path =~ s{\\}{/}gmsx;
         $path =~ s{//}{/}msx;
         $path =~ s{netapp\d[ab]/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
+        $path =~ s{evs-illumina/illumina_geno01}{nfs/new_illumina_geno03}msx;
         $if_sample->{$key} = $path;
       }
     }
