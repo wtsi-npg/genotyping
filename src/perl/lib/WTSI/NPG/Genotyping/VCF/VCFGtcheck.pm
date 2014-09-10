@@ -169,7 +169,7 @@ sub write_results_json {
 
   Arg [1]    : Hash of hashes of discordance, as returned by run()
   Arg [2]    : Maximum pairwise discordance, as returned by run()
-  Arg [3]    : Path for text output
+  Arg [3]    : Path for text output, or - for STDOUT
 
   Example    : write_results_text($results, $max, $my_text_path)
   Description: Write results of 'bcftools gtcheck' in tab-delimited text
@@ -186,8 +186,13 @@ sub write_results_text {
     my $maxDiscord = shift;
     my $outPath = shift;
     my @samples = sort(keys(%results));
-    open my $out, '>:encoding(utf8)', $outPath || 
-        $self->logcroak("Cannot open output $outPath");
+    my $out;
+    if ($outPath eq '-') {
+        $out = *STDOUT;
+    } else {
+        open $out, '>:encoding(utf8)', $outPath || 
+            $self->logcroak("Cannot open output $outPath");
+    }
     printf $out "# $MAX_DISCORDANCE_KEY: %.5f\n", $maxDiscord;
     print $out "# sample_i\tsample_j\tpairwise_discordance\n";
     foreach my $sample_i (@samples) {
@@ -199,7 +204,9 @@ sub write_results_text {
             printf $out "%s\t%s\t%.5f\n", @fields;
         }
     }
-    close $out || $self->logcroak("Cannot close output $outPath");
+    if ($outPath ne '-') {
+        close $out || $self->logcroak("Cannot close output $outPath");
+    }
     return 1;
 }
 

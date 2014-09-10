@@ -14,7 +14,6 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Genotyping::VCF::VCFConverter;
-use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 my $uid = `whoami`;
@@ -52,10 +51,8 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
                                                   -exitval => 0) },
            'input=s'           => \$input,
            'irods'             => \$use_irods,
-           'json=s'            => \$jsonOut,
            'logconf=s'         => \$logConfig,
            'plex_type=s'       => \$inputType,
-           'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
            'gtcheck'           => \$gtCheck,
            'quiet'             => \$quiet,
@@ -158,7 +155,7 @@ if ($use_irods) {
 }
 $log->info("Found $total assay results");
 
-### convert to VCF, and do genotype consistency check if requested ###
+### convert to VCF ###
 my $converter;
 if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
@@ -172,25 +169,6 @@ if ($use_irods) {
         normalize_chromosome => $normalize_chromosome, logger => $log);
 }
 my $vcf = $converter->convert($vcfPath);
-
-if ($gtCheck) {
-    my $verbose = 1;
-    if ($quiet) { $verbose = 0; }
-    my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(verbose => $verbose);
-    my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
-    my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
-    $log->info($msg);
-    if ($jsonOut) {
-        $log->info("Writing JSON output to $jsonOut");
-        $checker->write_results_json($resultRef, $maxDiscord, $jsonOut);
-    }
-    if ($textOut) {
-        $log->info("Writing text output to $textOut");
-        $checker->write_results_text($resultRef, $maxDiscord, $textOut);
-    }
-} elsif ($textOut || $jsonOut) {
-    $log->logwarn("Warning: Text/JSON output of concordance metrics will not be written unless the --gtcheck option is in effect. Run with --help for details.");
-}
 
 sub _chromosome_lengths_irods {
     # get reference to a hash of chromosome lengths
@@ -235,10 +213,6 @@ Options:
                       produce the VCF header. PATH must be on the local
                       filesystem (not iRODS). Optional for iRODS inputs,
                       required otherwise.
-  --gtcheck           Run the bcftools gtcheck function to find consistency
-                      of calls between samples; computes pairwise difference
-                      metrics. Metrics are written to file if --json and/or
-                      --text is specified.
   --help              Display this help and exit
   --input=PATH        List of input paths, one per line. The inputs may be
                       on a locally mounted filesystem, or locations of iRODS
@@ -260,10 +234,6 @@ Options:
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.
-  --json=PATH         Path for JSON output of gtcheck metrics.
-                      Optional; if not given, JSON is not written.
-  --text=PATH         Path for text output of gtcheck metrics.
-                      Optional; if not given, text is not written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
   --raw_chromosome    Do not normalize chromosome IDs in the VCF body to
                       the standard GRCh37 format (ie. 1,2,3,...,22,X,Y).

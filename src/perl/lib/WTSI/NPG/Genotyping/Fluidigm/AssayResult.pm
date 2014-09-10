@@ -216,8 +216,8 @@ sub sample_address {
 
 
 sub _parse_assay {
-    # Parse the 'assay' field, which should be of the form
-    # [sample address]-[assay identifier], eg. S01-A96
+    # Parse the 'assay' field and return the assay identifier. Field
+    # should be of the form [sample address]-[assay identifier], eg. S01-A96
     my ($self) = @_;
     my @terms = split('-', $self->assay());
     my ($sample_address, $assay_num) = ('','');
