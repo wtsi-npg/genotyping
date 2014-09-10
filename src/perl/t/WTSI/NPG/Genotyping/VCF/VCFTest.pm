@@ -197,7 +197,7 @@ sub script_pipe_test : Test(4) {
     my @cmds = (
         "cat $sequenomList",
         "$converter --input - --vcf - --snpset $sequenom_snpset_path ".
-            "--chromosomes $chromosome_json_path --plex_type sequenom",
+            "--quiet --chromosomes $chromosome_json_path --plex_type sequenom",
         "$checker --input - --text $tmpText --json $tmpJson"
     );
     my $cmd = join(' | ', @cmds);
