@@ -45,17 +45,17 @@ sub run {
   my $verbose;
   my $stdio;
 
-  GetOptions('config=s'   => \$config,
-             'days=i'     => \$days,
-             'days-ago=i' => \$days_ago,
-             'debug'      => \$debug,
-             'dest=s'     => \$publish_dest,
-             'force'      => \$force,
-             'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'logconf=s'  => \$log4perl_config,
-             'project=s'  => \$project,
-             'verbose'    => \$verbose,
-             ''           => \$stdio); # Permits a trailing '-' for STDIN
+  GetOptions('config=s'     => \$config,
+             'days=i'       => \$days,
+             'days-ago=i'   => \$days_ago,
+             'debug'        => \$debug,
+             'dest=s'       => \$publish_dest,
+             'force'        => \$force,
+             'help'         => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'    => \$log4perl_config,
+             'project=s'    => \$project,
+             'verbose'      => \$verbose,
+             ''             => \$stdio); # Permits a trailing '-' for STDIN
 
   if ($stdio && ($days || $days_ago)) {
     pod2usage(-msg => "The --days and --days-ago options are " .
@@ -171,20 +171,25 @@ sub run {
   return 0;
 }
 
+# Compare with data in iRODS. If a file exists with the same beadchip,
+# beadchip_section and md5, then that file is skipped. If the --force
+# flag is in place, re-publish everything.
 sub find_files_to_publish {
   my ($ifdb, $begin, $end, $project, $irods, $publish_dest, $force, $log) = @_;
 
   my @samples;
 
   if ($project) {
-    $log->debug("Finding scanned samples in project '$project' ...");
-    @samples = @{$ifdb->find_project_samples($project)};
+    $log->debug("Finding completed samples in project '$project' ...");
+    @samples = @{$ifdb->find_project_completed_samples($project)};
   }
   else {
     $log->debug("Finding samples scanned between ", $begin->iso8601,
                 " and ", $end->iso8601);
     @samples = @{$ifdb->find_scanned_samples_by_date($begin, $end)};
   }
+
+  $log->info(scalar @samples, " samples counted");
 
   my @to_publish;
 
@@ -193,58 +198,54 @@ sub find_files_to_publish {
     my $section = $if_sample->{beadchip_section};
     my $red     = $if_sample->{idat_red_path};
     my $grn     = $if_sample->{idat_grn_path};
-    # May be NULL if not called yet, or if a methylation chip
+    # May be undef if not called yet, or if a methylation chip
     my $gtc     = $if_sample->{gtc_path};
 
-    my @files;
+    my @candidate_files;
+    my @data_objects;
+
     foreach my $file (($red, $grn, $gtc)) {
       if ($file) {
-        push @files, _map_netapp_path($file);
+        push @candidate_files, $file;
+
+        # If a file with matching MD5 metadata is present in iRODS, we
+        # do not need to publish
+        my $md5 = $irods->md5sum($file);
+        my @matches = $irods->find_objects_by_meta
+          ($publish_dest,
+           ['beadchip'         => $chip],
+           ['beadchip_section' => $section],
+           ['md5'              => $md5]);
+
+        my $num_matches = scalar @matches;
+        if ($num_matches == 0) {
+          push @to_publish, $file;
+        }
+        elsif ($num_matches == 1) {
+          push @data_objects, @matches;
+          $log->info("Found a match for '$file' with MD5 '$md5'");
+        }
+        else {
+          $log->logconfess("Found $num_matches files with MD5 '$md5' when ",
+                           "checking for '$file'");
+        }
       }
     }
 
-    if ($force) {
-      push @to_publish, @files;
-    }
-    else {
-      my @data_objects = $irods->find_objects_by_meta
-        ($publish_dest,
-         ['beadchip', $chip],
-         ['beadchip_section', $section]);
+    my $num_files        = scalar @candidate_files;
+    my $num_data_objects = scalar @data_objects;
 
-      my $num_files        = scalar @files;
-      my $num_data_objects = scalar @data_objects;
+    $log->info("Beadchip '$chip' section '$section' data objects published ",
+               "previously: $num_data_objects/$num_files");
 
-      $log->info("Beadchip '$chip' section '$section' data objects published ",
-                 "previously: $num_data_objects/$num_files");
-
-      if ($num_data_objects < $num_files) {
-        push @to_publish, @files;
-      }
+    if ($num_data_objects < $num_files || $force) {
+      push @to_publish, @candidate_files;
     }
   }
 
   return @to_publish;
 }
 
-sub _map_netapp_path {
-  my ($netapp_path) = @_;
-
-  my $mapped_path = '';
-
-  if ($netapp_path) {
-    $mapped_path = $netapp_path;
-    $mapped_path =~ s{\\}{/}gmsx;
-    $mapped_path =~ s{//}{/}msx;
-    $mapped_path =~ s{netapp\d[ab]/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
-
-    $mapped_path =~ s{_r(\d+)c(\d+)_}{_R$1C$2_}msx;
-    $mapped_path =~ s{grn}{Grn}msx;
-    $mapped_path =~ s{red}{Red}msx;
-  }
-
-  return $mapped_path;
-}
 
 __END__
 
@@ -269,6 +270,8 @@ Options:
                 modified during this period will be considered
                 for publication. Optional, defaults to 7 days.
   --dest        The data destination root collection in iRODS.
+  --force       Force publication, even is a file exists in iRODS with the
+                same beadchip, chip section and MD5 metadata.
   --help        Display help.
   --logconf     A log4perl configuration file. Optional.
   --project     The name of a genotyping project in the Infinium LIMS.
@@ -281,6 +284,11 @@ Searches one or more a directories recursively for idat and GTC sample
 data files that have been modified within the n days prior to a
 specific time.  Any files identified are published to iRODS with
 metadata obtained from LIMS.
+
+By default, files are candidates for publishing only if no file for
+the beadchip section exists in iRODS with the same MD5 in their
+metadata. If such a file exists, this script will log it and skip
+it. Using the --force flag overrides this behaviour.
 
 This script also accepts lists of specific files on STDIN, as an
 alternative to searching for files by modification time. To do this,

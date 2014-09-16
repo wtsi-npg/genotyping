@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 11;
+use Test::More tests => 18;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -131,7 +131,7 @@ sub is_control : Test(4) {
       str            => '')->is_control, 'Is control 3');
 }
 
-sub is_call : Test(4) {
+sub is_call : Test(5) {
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
      (assay          => 'S01-A0',
       snp_assayed    => 'rs0123456',
@@ -194,6 +194,113 @@ sub is_call : Test(4) {
       x_intensity    => 0.1,
       y_intensity    => 0.1,
       str            => '')->is_call, 'Is not call 2');
+
+  # For 'Invalid' calls, is_call() should be false
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'Invalid',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is not call 3');
+}
+
+
+sub is_valid : Test(4) {
+
+  # Evaluate whether a result is valid. See is_call. 'No Call' and 'invalid'
+  # are distinct and represent different experimental outcomes.
+
+  ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_valid, 'Is valid 1');
+
+  # a 'no call' may still be valid
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'No Call',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_call, 'Is valid 2');
+
+  # invalid calls
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'Invalid',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_valid, 'Is not valid 1');
+
+  # invalid calls
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A0',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'Invalid',
+      converted_call => 'Invalid',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_valid, 'Is not valid 2');
+}
+
+sub parse_assay : Test(2) {
+
+  my @expected = ('S01', 'A0');
+  my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+    (assay          => 'S01-A0',
+     snp_assayed    => 'rs0123456',
+     x_allele       => 'G',
+     y_allele       => 'T',
+     sample_name    => 'ABC0123456789',
+     type           => 'Unknown',
+     auto           => 'XY',
+     confidence     => 0.1,
+     final          => 'Invalid',
+     converted_call => 'Invalid',
+     x_intensity    => 0.1,
+     y_intensity    => 0.1,
+     str            => '');
+  is($result->sample_address(), 'S01', 'Parsed sample address OK');
+  is($result->assay_position(), 'A0', 'Parsed assay position OK');
 }
 
 1;

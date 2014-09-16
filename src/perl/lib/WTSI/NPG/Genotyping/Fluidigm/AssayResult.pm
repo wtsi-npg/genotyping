@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
 
+with 'WTSI::NPG::Loggable';
+
 has 'assay'          => (is => 'ro', isa => 'Str', required => 1);
 has 'snp_assayed'    => (is => 'ro', isa => 'Str', required => 1);
 has 'x_allele'       => (is => 'ro', isa => 'Str', required => 1);
@@ -76,6 +78,9 @@ sub is_control {
                as calls, provided the value in the converted_call columsn is
                NOT 'No Call'
 
+               Note that 'Invalid Call' and 'No Call' are distinct and
+               represent different experimental outcomes.
+
   Returntype : Bool
 
 =cut
@@ -83,8 +88,32 @@ sub is_control {
 sub is_call {
   my ($self) = @_;
 
-  return ($self->final          ne $NO_CALL &&
+  return ($self->is_valid() &&
+          $self->final ne $NO_CALL &&
           $self->converted_call ne $NO_CALL);
+}
+
+=head2 is_valid
+
+  Arg [1]    : None
+
+  Example    : $result->is_valid
+  Description: Check whether the 'final' and/or 'converted call' fields
+               have a value designating them as invalid. Note that 'Invalid
+               Call' and 'No Call' are distinct and represent different
+               experimental outcomes.
+
+  Returntype : Bool
+
+=cut
+
+sub is_valid {
+
+ my ($self) = @_;
+
+ return ($self->final          ne $INVALID_NAME &&
+         $self->converted_call ne $INVALID_NAME);
+
 }
 
 =head2 compact_call
@@ -106,6 +135,104 @@ sub compact_call {
 
   return $compact;
 }
+
+=head2 npg_call
+
+  Arg [1]    : None
+
+  Example    : $call = $result->npg_call()
+  Description: Method to return the genotype call, in a string representation
+               of the form AA, AC, CC, or NN. Name and behaviour of method are
+               intended to be consistent across all 'AssayResultSet' classes
+               (for Sequenom, Fluidigm, etc) in the WTSI::NPG genotyping
+               pipeline.
+  Returntype : Str
+
+=cut
+
+sub npg_call {
+    my ($self) = @_;
+    my $call = $self->compact_call(); # removes the : from raw input call
+    if ($call eq $NO_CALL) {
+        $call = 'NN';
+    } elsif ($call !~ /[ACGTN][ACGTN]/ ) {
+        my $msg = "Illegal genotype call '$call' for sample ".
+            $self->npg_sample_id().", SNP ".$self->snp_assayed();
+        $self->logcroak($msg);
+    }
+    return $call;
+}
+
+=head2 npg_sample_id
+
+  Arg [1]    : None
+
+  Example    : $sample_identifier = $result->npg_sample_id()
+  Description: Method to return the sample ID. Name and behaviour of method,
+               and format of output string, are intended to be consistent
+               across all 'AssayResultSet' classes (for Sequenom, Fluidigm,
+               etc) in the WTSI::NPG genotyping pipeline.
+  Returntype : Str
+
+=cut
+
+sub npg_sample_id {
+    my ($self) = @_;
+    return $self->sample_name();
+}
+
+=head2 assay_position
+
+  Arg [1]    : None
+
+  Example    : $assay_position = $result->parse_assay()
+  Description: Parse the 'assay' field and return an identifier for the
+               well position.
+  Returntype : Str
+
+=cut
+
+sub assay_position {
+    my ($self) = @_;
+    my ($sample_address, $assay_pos) = $self->_parse_assay();
+    return $assay_pos;
+}
+
+=head2 sample_address
+
+  Arg [1]    : None
+
+  Example    : $assay_id = $result->sample_address()
+  Description: Parse the 'assay' field and return the sample address.
+  Returntype : Str
+
+=cut
+
+sub sample_address {
+    my ($self) = @_;
+    my ($sample_address, $assay_num) = $self->_parse_assay();
+    return $sample_address;
+}
+
+
+sub _parse_assay {
+    # Parse the 'assay' field and return the assay identifier. Field
+    # should be of the form [sample address]-[assay identifier], eg. S01-A96
+    my ($self) = @_;
+    my @terms = split('-', $self->assay());
+    my ($sample_address, $assay_num) = ('','');
+    if (scalar(@terms) != 2) {
+        my $msg = "Failed to parse sample address and assay number from ".
+            "Fluidigm assay field '".$self->assay().
+            "', returning empty strings instead.";
+        $self->logwarn($msg);
+    } else {
+        ($sample_address, $assay_num) = @terms;
+    }
+    return ($sample_address, $assay_num);
+}
+
+
 
 __PACKAGE__->meta->make_immutable;
 

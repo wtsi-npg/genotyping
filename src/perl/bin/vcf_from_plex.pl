@@ -8,12 +8,12 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
+use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Genotyping::VCF::VCFConverter;
-use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 my $uid = `whoami`;
@@ -37,74 +37,66 @@ my $embedded_conf = "
 ";
 
 my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
-    $log, $logConfig, $verbose, $use_irods, $debug, $manifest,
-    $chromosome_json);
+    $log, $logConfig, $use_irods, $debug, $quiet,
+    $snpset_path, $chromosome_json, $raw_chromosome, $normalize_chromosome);
 
 my $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 my $FLUIDIGM_TYPE = 'fluidigm';
+my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 
 GetOptions('chromosomes=s'     => \$chromosome_json,
+           'snpset=s'          => \$snpset_path,
            'debug'             => \$debug,
            'help'              => sub { pod2usage(-verbose => 2,
-                                                -exitval => 0) },
+                                                  -exitval => 0) },
            'input=s'           => \$input,
            'irods'             => \$use_irods,
-           'json=s'            => \$jsonOut,
            'logconf=s'         => \$logConfig,
-           'manifest=s'        => \$manifest,
-           'plex_coll=s'       => \$plexColl,
            'plex_type=s'       => \$inputType,
-           'text=s'            => \$textOut,
            'vcf=s'             => \$vcfPath,
            'gtcheck'           => \$gtCheck,
-           'verbose'           => \$verbose,
+           'quiet'             => \$quiet,
+           'raw_chromosome'    => \$raw_chromosome,
        );
 
 ### set up logging ###
-if ($logConfig) {
-    Log::Log4perl::init($logConfig);
-    $log = Log::Log4perl->get_logger('npg.vcf.plex');
-} else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.vcf.plex');
-}
-if ($verbose) {
-    $log->level($INFO);
-}
-elsif ($debug) {
-    $log->level($DEBUG);
-}
+if ($logConfig) { Log::Log4perl::init($logConfig); } 
+else { Log::Log4perl::init(\$embedded_conf); }
+$log = Log::Log4perl->get_logger('npg.vcf.plex');
+if ($quiet) { $log->level($WARN); }
+elsif ($debug) { $log->level($DEBUG); }
+else { $log->level($INFO); }
 
 ### process command-line options and make sanity checks ###
 if ($inputType ne $SEQUENOM_TYPE && $inputType ne $FLUIDIGM_TYPE) {
     $log->logcroak(
         "Must specify $SEQUENOM_TYPE or $FLUIDIGM_TYPE as plex type");
 }
-my $plexCollOpt;
+unless ($snpset_path) { 
+    $log->logcroak("Must specify a snpset path in iRODS or local filesystem");
+}
+my ($snpset, $chroms);
 if ($use_irods) {
-    if ($inputType eq $SEQUENOM_TYPE) {
-        $plexCollOpt = 'sequenom_plex_coll';
-        $plexColl ||= '/seq/sequenom/multiplexes';
-    } elsif ($inputType eq $FLUIDIGM_TYPE) {
-        $plexCollOpt = 'fluidigm_plex_coll';
-        $plexColl ||= '/seq/fluidigm/multiplexes';
+    my $irods = WTSI::NPG::iRODS->new();
+    $irods->logger($log);
+    my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
+        ($irods, $snpset_path);
+    $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
+    if ($chromosome_json) {
+        $chroms = _read_json($chromosome_json);
+    } else {
+        $chroms = _chromosome_lengths_irods($irods, $snpset_obj);
     }
 } else {
-    if ($plexColl) {
-        my $msg = "plex_coll option does not apply to non-iRODS input ".
-            "and will be ignored";
-        $log->warn($msg);
-    }
-    if (!$manifest) {
-        $log->logcroak("--manifest is required for non-iRODS input");
-    } elsif (!(-e $manifest)) {
-        $log->logcroak("Manifest path '$manifest' does not exist");
-    } elsif (!$chromosome_json) {
+    $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_path);
+    if (!$chromosome_json) {
         $log->logcroak("--chromosomes is required for non-iRODS input");
     } elsif (!(-e $chromosome_json)) {
         $log->logcroak("Chromosome path '$chromosome_json' does not exist");
     }
+    $chroms = _read_json($chromosome_json);
 }
+$normalize_chromosome = !($raw_chromosome);
 
 ### read inputs ###
 my $in;
@@ -163,33 +155,45 @@ if ($use_irods) {
 }
 $log->info("Found $total assay results");
 
-### convert to VCF, and do genotype consistency check if requested ###
+### convert to VCF ###
 my $converter;
 if ($use_irods) {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
         resultsets => \@results, input_type => $inputType,
-        $plexCollOpt => $plexColl);
+        snpset => $snpset, chromosome_lengths => $chroms,
+        normalize_chromosome => $normalize_chromosome, logger => $log);
 } else {
     $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
-        resultsets => \@results, input_type => $inputType);
+        resultsets => \@results, input_type => $inputType,
+        snpset => $snpset, chromosome_lengths => $chroms,
+        normalize_chromosome => $normalize_chromosome, logger => $log);
 }
 my $vcf = $converter->convert($vcfPath);
 
-if ($gtCheck) {
-    my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(verbose => $verbose);
-    my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
-    my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;
-    $log->info($msg);
-    if ($jsonOut) {
-        $log->info("Writing JSON output to $jsonOut");
-        $checker->write_results_json($resultRef, $maxDiscord, $jsonOut);
+sub _chromosome_lengths_irods {
+    # get reference to a hash of chromosome lengths
+    # read from JSON file, identified by snpset metadata in iRODS
+    my ($irods, $snpset_obj) = @_;
+    my @avus = $snpset_obj->find_in_metadata($CHROMOSOME_JSON_KEY);
+    if (scalar(@avus)!=1) {
+        $log->logcroak("Must have exactly one $CHROMOSOME_JSON_KEY value",
+                       " in iRODS metadata for SNP set file");
     }
-    if ($textOut) {
-        $log->info("Writing text output to $textOut");
-        $checker->write_results_text($resultRef, $maxDiscord, $textOut);
-    }
-} elsif ($textOut || $jsonOut) {
-    $log->logwarn("Warning: Text/JSON output of concordance metrics will not be written unless the --gtcheck option is in effect. Run with --help for details.");
+    my %avu = %{ shift(@avus) };
+    my $chromosome_json = $avu{'value'};
+    my $data_object = WTSI::NPG::iRODS::DataObject->new
+        ($irods, $chromosome_json);
+    return decode_json($data_object->slurp());
+}
+
+sub _read_json {
+    # read given path into a string and decode as JSON
+    my $input = shift;
+    open my $in, '<:encoding(utf8)', $input ||
+        log->logcroak("Cannot open input '$input'");
+    my $data = decode_json(join("", <$in>));
+    close $in || $log->logcroak("Cannot close input '$input'");
+    return $data;
 }
 
 
@@ -209,15 +213,11 @@ Options:
                       produce the VCF header. PATH must be on the local
                       filesystem (not iRODS). Optional for iRODS inputs,
                       required otherwise.
-  --gtcheck           Run the bcftools gtcheck function to find consistency
-                      of calls between samples; computes pairwise difference
-                      metrics. Metrics are written to file if --json and/or
-                      --text is specified.
   --help              Display this help and exit
   --input=PATH        List of input paths, one per line. The inputs may be
                       on a locally mounted filesystem, or locations of iRODS
                       data objects. In the former case, the --chromosomes
-                      and --manifest options must be specified;
+                      and --snpset options must be specified;
                       otherwise default values can be found from iRODS
                       metadata. The inputs are Sequenom or Fluidigm "CSV"
                       files. The input list is read from the given PATH, or
@@ -225,25 +225,21 @@ Options:
                       Fluidigm and Sequenom file formats may not be mixed.
   --irods             Indicates that inputs are in iRODS. If absent, inputs
                       are assumed to be in the local filesystem, and the
-                      --manifest and --chromosomes options are required.
-  --manifest=PATH     Path to the tab-separated manifest file giving SNP
-                      information for the QC plex. PATH must be on the local
-                      filesystem (not iRODS). Optional for iRODS inputs,
-                      required otherwise.
+                      --snpset and --chromosomes options are required.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
-  --plex_coll=PATH    Path of an iRODS data collection containing QC plex
-                      manifest files. Optional, defaults to
-                      /seq/$PLEX_NAME/multiplexes. Has no effect for
-                      non-iRODS inputs.
+  --snpset            Path to a tab-separated manifest file with information
+                      on the SNPs in the QC plex. Path must be in iRODS if the
+                      --irods option is in effect, or on the local filesystem
+                      otherwise.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.
-  --json=PATH         Path for JSON output of gtcheck metrics.
-                      Optional; if not given, JSON is not written.
-  --text=PATH         Path for text output of gtcheck metrics.
-                      Optional; if not given, text is not written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
-  --verbose           Print additional status information to STDERR.
+  --raw_chromosome    Do not normalize chromosome IDs in the VCF body to
+                      the standard GRCh37 format (ie. 1,2,3,...,22,X,Y).
+                      WARNING: If this option is in effect, chromosome names
+                      in the VCF header and body may be inconsistent.
+  --quiet             Suppress printing of status information.
 
 
 =head1 DESCRIPTION

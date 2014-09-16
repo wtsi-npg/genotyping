@@ -272,10 +272,11 @@ sub run {
            $ss_barcode = $untracked_plates{$if_barcode};
          }
 
-	 my $ss_supply = $ss_sample->{supplier_name};
-	 unless (defined($ss_supply)) { $ss_supply = ""; }
-	 my $ss_cohort = $ss_sample->{cohort};
-	 unless (defined($ss_cohort)) { $ss_cohort = ""; }
+         my $ss_supply = $ss_sample->{supplier_name};
+         $ss_supply ||= "";
+         my $ss_cohort = $ss_sample->{cohort};
+         $ss_cohort ||= "";
+
          my $ss_gender = $ss_sample->{gender};
          my $ss_consent_withdrawn = $ss_sample->{consent_withdrawn};
          my $gender = $pipedb->gender->find({name => $ss_gender}) || $gender_na;
@@ -286,7 +287,7 @@ sub run {
                                      beadchip         => $if_chip,
                                      include          => 0,
                                      supplier_name    => $ss_supply,
-				     cohort           => $ss_cohort,
+                                     cohort           => $ss_cohort,
                                      rowcol           => $if_rowcol});
 
          # If consent has been withdrawn, do not analyse and do not
