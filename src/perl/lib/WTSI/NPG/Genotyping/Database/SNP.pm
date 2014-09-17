@@ -138,11 +138,11 @@ sub find_sequenom_calls {
 
   my $query =
     qq(SELECT DISTINCT
-         well_assay.id_well AS assay_name,
+         well_assay.id_well       AS assay_name,
          snp_summary.default_name AS snp_name,
-         genotype.genotype AS genotype,
-         genotype.id_session AS id_session,
-         well_result.call_date AS call_date
+         genotype.genotype        AS genotype,
+         genotype.id_session      AS id_session,
+         well_result.call_date    AS call_date
        FROM
          individual,
          genotype,
@@ -151,23 +151,23 @@ sub find_sequenom_calls {
          snpassay_snp,
          snp_summary
        WHERE
-         individual.clonename = ?
-         AND genotype.id_result = well_result.id_result
-         AND genotype.id_assay = snpassay_snp.id_assay
-         AND genotype.id_ind = individual.id_ind
-         AND genotype.disregard = 0
+         individual.clonename      = ?
+         AND genotype.id_result    = well_result.id_result
+         AND genotype.id_assay     = snpassay_snp.id_assay
+         AND genotype.id_ind       = individual.id_ind
+         AND genotype.disregard    = 0
          AND genotype.confidence <> 'A'
-         AND well_assay.id_assay = snpassay_snp.id_assay
-         AND snpassay_snp.id_snp = snp_summary.id_snp
+         AND well_assay.id_assay   = snpassay_snp.id_assay
+         AND snpassay_snp.id_snp   = snp_summary.id_snp
          AND well_result.call_date =
              (SELECT
                 MAX(well_result.call_date)
               FROM
                 individual, genotype, well_result
               WHERE individual.clonename = ?
-              AND genotype.id_result = well_result.id_result
-              AND genotype.id_ind = individual.id_ind
-              AND genotype.disregard = 0
+              AND genotype.id_result     = well_result.id_result
+              AND genotype.id_ind        = individual.id_ind
+              AND genotype.disregard     = 0
               AND genotype.confidence <> 'A'));
 
   my $sth = $self->dbh->prepare($query);
