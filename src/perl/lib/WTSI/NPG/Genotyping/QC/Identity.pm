@@ -250,23 +250,21 @@ sub readPlexCalls {
     # read QC calls for each sample and SNP
     my $snpResultTotal = 0;
     my %results;
-    $db->in_transaction(sub {
-	foreach my $sample (@samples) {
-	    if ($sample->include == 0) { next; }
-	    my $sampleURI = $sample->uri;
-	    my @results = $sample->results->all;
-	    foreach my $result (@results) {
-		my @snpResults = $result->snp_results->all;
-		$snpResultTotal += @snpResults;
-		foreach my $snpResult (@snpResults) {
-		    my $snpName = $snpNames{$snpResult->id_snp};
-		    if (!$results{$sampleURI}{$snpName}) {
-			$results{$sampleURI}{$snpName} = $snpResult->value;
-		    }
-		}
-	    }
-	}
-			});
+    foreach my $sample (@samples) {
+        if ($sample->include == 0) { next; }
+        my $sampleURI = $sample->uri;
+        my @results = $sample->results->all;
+        foreach my $result (@results) {
+            my @snpResults = $result->snp_results->all;
+            $snpResultTotal += @snpResults;
+            foreach my $snpResult (@snpResults) {
+                my $snpName = $snpNames{$snpResult->id_snp};
+                if (!$results{$sampleURI}{$snpName}) {
+                    $results{$sampleURI}{$snpName} = $snpResult->value;
+                }
+            }
+        }
+    }
     $log->debug("Read $snpResultTotal QC SNP results from pipeline DB");
     return \%results;
 }
