@@ -844,6 +844,7 @@ sub find_scanned_samples_by_date {
     push @samples, $row;
   }
 
+  @samples = $self->_fixup_paths_and_files(\@samples);
   @samples = $self->_choose_from_scans(\@samples);
 
   $self->debug("Found ", scalar @samples,
