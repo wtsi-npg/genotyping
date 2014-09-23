@@ -493,6 +493,44 @@ sub move_collection {
   return $target;
 }
 
+=head2 get_collection
+
+  Arg [1]    : iRODS collection name
+  Arg [2]    : Local directory path
+
+  Example    : $irods->get_collection('/my/path/foo', '.')
+  Description: Fetch a collection and contents, recursively and return
+               the path of the local copy.
+  Returntype : Str
+
+=cut
+
+sub get_collection {
+  my ($self, $source, $target) = @_;
+
+  defined $source or
+    $self->logconfess('A defined source (collection) argument is required');
+  defined $target or
+    $self->logconfess('A defined target (directory) argument is required');
+
+  $source eq '' and
+    $self->logconfess('A non-empty source (collection) argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (directory) argument is required');
+
+  $source = File::Spec->canonpath($source);
+  $source = $self->_ensure_absolute_path($source);
+  $target = File::Spec->canonpath($target);
+  $self->debug("Getting from '$source' to '$target'");
+
+  my @args = ('-r', '-f', $source, $target);
+  WTSI::NPG::Runnable->new(executable  => $IGET,
+                           arguments   => \@args,
+                           environment => $self->environment,
+                           logger      => $self->logger)->run;
+  return $self;
+}
+
 =head2 remove_collection
 
   Arg [1]    : iRODS collection name
@@ -828,7 +866,7 @@ sub add_object {
   $self->debug("Adding '$file' as new object '$target'");
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
-                           arguments   => [$file, $target],
+                           arguments   => ['-K', $file, $target],
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
@@ -839,7 +877,7 @@ sub add_object {
   Arg [1]    : Name of file to add to iRODs
   Arg [2]    : iRODS data object name
 
-  Example    : $irods->add_object('lorem.txt', '/my/path/lorem.txt')
+  Example    : $irods->replace_object('lorem.txt', '/my/path/lorem.txt')
   Description: Replace a file in iRODS.
   Returntype : Str
 
@@ -862,7 +900,7 @@ sub replace_object {
   $self->debug("Replacing object '$target' with '$file'");
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
-                           arguments   => ['-f', '-k', $file, $target],
+                           arguments   => ['-f', '-K', $file, $target],
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
@@ -958,6 +996,39 @@ sub move_object {
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target
+}
+
+=head2 get_object
+
+  Arg [1]    : iRODS data object name
+  Arg [2]    : Local file path
+
+  Example    : $irods->get_object('/my/path/lorem.txt', 'lorem.txt')
+  Description: Fetch a data object and return the path of the local copy.
+  Returntype : Str
+
+=cut
+
+sub get_object {
+  my ($self, $source, $target) = @_;
+
+  defined $source or
+    $self->logconfess('A defined source (data object) argument is required');
+  defined $target or
+    $self->logconfess('A defined target (file) argument is required');
+
+  $source eq '' and
+    $self->logconfess('A non-empty source (data object) argument is required');
+  $target eq '' and
+    $self->logconfess('A non-empty target (file) argument is required');
+
+  my @args = ('-f', '-T', $source, $target);
+  my $runnable = WTSI::NPG::Runnable->new
+    (executable  => $IGET,
+     arguments   => \@args,
+     logger      => $self->logger)->run;
+
+  return $target;
 }
 
 =head2 remove_object
@@ -1061,7 +1132,7 @@ sub set_object_permissions {
 
   Example    : $irods->get_object_groups($path)
   Description: Return a list of the data access groups in the object's ACL.
-               If a permission leve argument is supplied, only groups with
+               If a permission level argument is supplied, only groups with
                that level of access will be returned.
   Returntype : Array
 
@@ -1533,6 +1604,10 @@ e.g. The query
 is translated to the iRODS imeta query
 
   x = a and y = b and x like c%
+
+Tokens having spaces within them or that would otherwise require
+escaping for the shell, e.g. the '>' and '<' operators, are not
+escaped by this module.
 
 =head1 AUTHOR
 

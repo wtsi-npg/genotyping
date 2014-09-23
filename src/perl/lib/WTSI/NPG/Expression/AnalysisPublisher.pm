@@ -5,7 +5,6 @@ package WTSI::NPG::Expression::AnalysisPublisher;
 use File::Spec;
 use Moose;
 
-use WTSI::NPG::Expression::ControlProfileHint;
 use WTSI::NPG::Expression::ProfileAnnotation;
 use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::Expression::SampleProbeProfile;

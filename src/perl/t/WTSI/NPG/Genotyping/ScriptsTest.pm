@@ -11,7 +11,7 @@ use Log::Log4perl;
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 27;
+use Test::More tests => 29;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -19,6 +19,7 @@ use WTSI::NPG::iRODS;
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 our $PUBLISH_SNPSET              = './bin/publish_snpset.pl';
+our $PUBLISH_FLUIDIGM_GENOTYPES  = './bin/publish_fluidigm_genotypes.pl';
 
 our $PUBLISH_INFINIUM_GENOTYPES  = './bin/publish_infinium_genotypes.pl';
 our $UPDATE_INFINIUM_METADATA    = './bin/update_infinium_metadata.pl';
@@ -62,6 +63,33 @@ sub test_publish_snpset : Test(1) {
             "--source $data_file") == 0, 'Published SNPSet');
 }
 
+sub test_publish_fluidigm_genotypes : Test(2) {
+  my $raw_data_path = "$data_path/publish_fluidigm_genotypes";
+
+  my $snpset_file     = "$raw_data_path/qc.csv";
+  my $reference_name  = 'Homo_sapiens (1000Genomes)';
+  my $snpset_name     = 'qc';
+  my $snpset_platform = 'fluidigm';
+
+  ok(system(join q{ }, "$PUBLISH_SNPSET",
+            "--dest $irods_tmp_coll",
+            "--reference-name '$reference_name'",
+            "--snpset-name $snpset_name",
+            "--snpset-platform $snpset_platform",
+            "--source $snpset_file") == 0, 'Published SNPSet');
+
+  # Includes a directory with a missing CSV file to check that the
+  # script exits successfully when ths happens.
+  ok(system(join q{ }, "$PUBLISH_FLUIDIGM_GENOTYPES",
+            "--days-ago 0",
+            "--days 1000000",
+            "--dest $irods_tmp_coll",
+            "--reference-path $irods_tmp_coll",
+            "--source $raw_data_path",
+            "2>/dev/null") == 0,
+     'Published Fluidigm genotypes');
+}
+
 sub test_publish_infinium_genotypes : Test(3) {
   my $gtc_path  = "$data_path/publish_infinium_genotypes/coreex_bbgahs/gtc";
   my $idat_path = "$data_path/publish_infinium_genotypes/coreex_bbgahs/idat";
@@ -81,7 +109,6 @@ sub test_publish_infinium_genotypes : Test(3) {
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $irods_tmp_coll",
-            "--verbose",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 }
@@ -137,20 +164,20 @@ sub test_publish_infinium_analysis : Test(7) {
             "--supplier $supplier",
             "--project '$project'") == 0, 'Ready infinium');
 
-  # Withdraw all samples
+  # Exclude all samples
   ok(system(join q{ }, "$READY_SAMPLES",
             "--dbfile $dbfile",
             "--select autocall_pass",
             "|",
             "$READY_SAMPLES",
             "--dbfile $dbfile",
-            "--add withdrawn") == 0, 'Withdrew all samples');
+            "--add excluded") == 0, 'Excluded all samples');
 
   # Restore only samples that have test data in iRODS
   ok(system(join q{ }, "$READY_SAMPLES",
             "--dbfile $dbfile",
             "--input $selected_samples_file",
-            "--remove withdrawn") == 0, 'Restored some samples');
+            "--remove excluded") == 0, 'Restored some samples');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_ANALYSIS",
             "--dbfile $dbfile",

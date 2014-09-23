@@ -1,0 +1,4 @@
+./t/vcf/sequenom_001.csv
+./t/vcf/sequenom_002.csv
+./t/vcf/sequenom_003.csv
+./t/vcf/sequenom_004.csv

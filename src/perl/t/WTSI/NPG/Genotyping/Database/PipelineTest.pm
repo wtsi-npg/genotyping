@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 66;
+use Test::More tests => 63;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -133,7 +133,6 @@ sub add_datasets : Test(6) {
   my $run = $db->piperun->find_or_create({name       => 'test',
                                           start_time => time()});
 
-  my @datasets;
   foreach my $i (1..3) {
     my $dataset = $run->add_to_datasets
       ({if_project   => sprintf("%s_%d", $project_base, $i),
@@ -141,7 +140,6 @@ sub add_datasets : Test(6) {
         snpset       => $snpset});
 
     ok($dataset, "dataset $i inserted");
-    push @datasets, $dataset;
   }
 
   ok($run->validate_datasets, 'A piperun validated');
@@ -170,9 +168,9 @@ sub transaction : Test(8) {
   my $infinium = $db->method->find({name => 'Infinium'});
   my $pass = $db->state->find({name => 'autocall_pass'});
 
-  my $gtc_path = '\\netapp1a\illumina_geno1\0123456789\0123456789.gtc';
-  my $red_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_red.idat';
-  my $grn_path = '\\netapp1a\illumina_geno1\0123456789\0123456789_grn.idat';
+  my $gtc_path = '/nfs/new_illumina_geno01/0123456789/0123456789.gtc';
+  my $red_path = '/nfs/new_illumina_geno01/0123456789/0123456789_Red.idat';
+  my $grn_path = '/nfs/new_illumina_geno01/0123456789/0123456789_Grn.idat';
 
   $db->in_transaction(sub {
                         foreach my $i (1..1000) {
@@ -226,114 +224,183 @@ sub transaction : Test(8) {
   cmp_ok(scalar $datasets[0]->samples, '==', 1000, 'Successful rollback');
 }
 
-sub state_changes : Test(20) {
+sub autocall_state : Test(6) {
   my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
                                                     namespace => 'wtsi'});
   my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
-  my $run = $db->piperun->find_or_create({name       => 'transaction_test',
+  my $run = $db->piperun->find_or_create({name       => 'autocall_pass_test',
                                           start_time => time()});
-
-  my @datasets;
-  foreach my $i (1..3) {
-    my $dataset = $run->add_to_datasets
-      ({if_project   => sprintf("%s_%d", $project_base, $i),
-        datasupplier => $supplier,
-        snpset       => $snpset});
-    push @datasets, $dataset;
-  }
+  my $dataset = $run->add_to_datasets
+    ({if_project   => 'state_test_project',
+      datasupplier => $supplier,
+      snpset       => $snpset});
 
   my $pass = $db->state->find({name => 'autocall_pass'});
   my $fail = $db->state->find({name => 'autocall_fail'});
-  my $pi_approved = $db->state->find({name => 'pi_approved'});
+
+  my $sample = $dataset->add_to_samples
+    ({name     => sprintf("%s_0", $sample_base),
+      beadchip => 'ABC123456',
+      include  => 0});
+
+  ok(!$sample->include, 'Default state excluded');
+
+  $db->in_transaction
+    (sub {
+       $sample->add_to_states($pass);
+       $sample->include_from_state;
+       ok($sample->include, 'autocall_pass is included');
+       $sample->update;
+     });
+
+  my $saved1 = $db->sample->find({id_sample => $sample->id_sample});
+  ok($saved1->include);
+
+  $db->in_transaction
+    (sub {
+       $sample->remove_from_states($pass);
+       $sample->add_to_states($fail);
+       $sample->include_from_state;
+       ok(!$sample->include, 'autocall_fail is excluded');
+       $sample->update;
+     });
+
+  my $saved2 = $db->sample->find({id_sample => $sample->id_sample});
+  ok(!$saved2->include);
+
+  dies_ok {
+    $sample->add_to_states($pass);
+    $sample->include_from_state;
+  } 'Sample cannot both pass and fail';
+}
+
+sub excluded_state : Test(4) {
+  my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
+                                                    namespace => 'wtsi'});
+  my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+  my $run = $db->piperun->find_or_create({name       => 'excluded_test',
+                                          start_time => time()});
+  my $dataset = $run->add_to_datasets
+    ({if_project   => 'state_test_project',
+      datasupplier => $supplier,
+      snpset       => $snpset});
+
+  my $pass     = $db->state->find({name => 'autocall_pass'});
+  my $excluded = $db->state->find({name => 'excluded'});
+
+  my $sample = $dataset->add_to_samples
+    ({name     => sprintf("%s_0", $sample_base),
+      beadchip => 'ABC123456',
+      include  => 0});
+
+  $db->in_transaction
+    (sub {
+       $sample->add_to_states($pass);
+       $sample->add_to_states($excluded);
+       $sample->include_from_state;
+       ok(!$sample->include, 'Addition of excluded state results in exclusion');
+       $sample->update;
+      });
+
+  my $saved1 = $db->sample->find({id_sample => $sample->id_sample});
+  ok(!$saved1->include);
+
+  $db->in_transaction
+    (sub {
+       $sample->remove_from_states($excluded);
+       $sample->include_from_state;
+       ok($sample->include, 'Removal of excluded state results in inclusion');
+       $sample->update;
+     });
+
+  my $saved2 = $db->sample->find({id_sample => $sample->id_sample});
+  ok($saved2->include);
+}
+
+sub pi_approved_state : Test(4) {
+  my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
+                                                    namespace => 'wtsi'});
+  my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+  my $run = $db->piperun->find_or_create({name       => 'excluded_test',
+                                          start_time => time()});
+  my $dataset = $run->add_to_datasets
+    ({if_project   => 'state_test_project',
+      datasupplier => $supplier,
+      snpset       => $snpset});
+
+  my $pass              = $db->state->find({name => 'autocall_pass'});
+  my $pi_approved       = $db->state->find({name => 'pi_approved'});
   my $consent_withdrawn = $db->state->find({name => 'consent_withdrawn'});
-  my $withdrawn = $db->state->find({name => 'withdrawn'});
+  my $excluded          = $db->state->find({name => 'excluded'});
 
-  $db->in_transaction(sub {
-                        foreach my $i (1..1000) {
-                          my $sample = $datasets[0]->add_to_samples
-                            ({name     => sprintf("%s_%d", $sample_base, $i),
-                              beadchip => 'ABC123456',
-                              include  => 1});
-                          $sample->add_to_states($pass);
-                        }
-                      });
+  my $sample = $dataset->add_to_samples
+    ({name     => sprintf("%s_0", $sample_base),
+      beadchip => 'ABC123456',
+      include  => 0});
 
-  my $passed_sample1 = ($datasets[0]->samples)[0];
-  my $sample_id1 = $passed_sample1->id_sample;
+  $db->in_transaction
+    (sub {
+       $sample->add_to_states($pass);
+       $sample->add_to_states($excluded);
+       $sample->add_to_states($pi_approved);
+       $sample->include_from_state;
+       ok($sample->include,
+          'Addition of pi_approved state results in inclusion');
+       $sample->update;
+     });
 
-  # Test removing and adding states
-  $passed_sample1->remove_from_states($pass);
-  cmp_ok(scalar $passed_sample1->states, '==', 0,
-         'autocall_pass state removed');
+  my $saved1 = $db->sample->find({id_sample => $sample->id_sample});
+  ok($saved1->include);
 
-  $passed_sample1->add_to_states($fail);
-  cmp_ok(scalar $passed_sample1->states, '==', 1,
-         'autocall_fail state added 1');
-  ok((grep { $_->name eq 'autocall_fail' } $passed_sample1->states),
-     'autocall_fail state added 2');
+  $db->in_transaction
+    (sub {
+       $sample->add_to_states($consent_withdrawn);
+       $sample->include_from_state;
+       ok(!$sample->include, 'Removal of consent results in exclusion');
+       $sample->update;
+     });
 
-  # Test that changing states allows inclusion policy to be updated
-  ok($passed_sample1->include, 'Passed sample included');
-  $passed_sample1->include_from_state;
-  $passed_sample1->update;
+  my $saved2 = $db->sample->find({id_sample => $sample->id_sample});
+  ok(!$saved2->include);
+}
 
-  my $failed_sample1 = $db->sample->find({id_sample => $sample_id1});
-  ok($failed_sample1, 'Found a failed sample');
-  ok(!$failed_sample1->include, 'Sample excluded after autocall_fail');
+sub pi_excluded_state : Test(3) {
+  my $supplier = $db->datasupplier->find_or_create({name      => $ENV{'USER'},
+                                                    namespace => 'wtsi'});
+  my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+  my $run = $db->piperun->find_or_create({name       => 'excluded_test',
+                                          start_time => time()});
+  my $dataset = $run->add_to_datasets
+    ({if_project   => 'state_test_project',
+      datasupplier => $supplier,
+      snpset       => $snpset});
 
-  # Test that pi_approved state overrides exclusion
-  $failed_sample1->add_to_states($pi_approved);
-  is(scalar $failed_sample1->states, 2, 'pi_approved state added 1');
-  ok((grep { $_->name eq 'pi_approved' } $failed_sample1->states),
-     'pi_approved state added 2');
-  $failed_sample1->include_from_state;
-  $failed_sample1->update;
+  my $pass        = $db->state->find({name => 'autocall_pass'});
+  my $pi_approved = $db->state->find({name => 'pi_approved'});
+  my $pi_excluded = $db->state->find({name => 'pi_excluded'});
 
-  $failed_sample1 = $db->sample->find({id_sample => $sample_id1});
-  ok($failed_sample1->include, 'Sample included after pi_approved');
+  my $sample = $dataset->add_to_samples
+    ({name     => sprintf("%s_0", $sample_base),
+      beadchip => 'ABC123456',
+      include  => 0});
 
-  # Test that consent_withdrawn overrides everything
-  $failed_sample1->add_to_states($consent_withdrawn);
-  cmp_ok(scalar $failed_sample1->states, '==', 3,
-         'consent-withdrawn state added 1');
-  ok((grep { $_->name eq 'consent_withdrawn' } $failed_sample1->states),
-     'consent_withdrawn state added 2');
-  $failed_sample1->include_from_state;
-  $failed_sample1->update;
+  $db->in_transaction
+    (sub {
+       $sample->add_to_states($pass);
+       $sample->add_to_states($pi_excluded);
+       $sample->include_from_state;
+       ok(!$sample->include,
+          'Addition of pi_excluded state results in exclusion');
+       $sample->update;
+     });
 
-  $failed_sample1 = $db->sample->find({id_sample => $sample_id1});
-  ok(!$failed_sample1->include, 'Sample excluded after consent_withdrawn');
+  my $saved = $db->sample->find({id_sample => $sample->id_sample});
+  ok(!$saved->include);
 
-  my $passed_sample2 = ($datasets[0]->samples)[1];
-  my $sample_id2 = $passed_sample2->id_sample;
-
-  $passed_sample2->add_to_states($withdrawn);
-  cmp_ok(scalar $passed_sample2->states, '==', 2,
-         'withdrawn state added 1');
-  ok((grep { $_->name eq 'withdrawn' } $passed_sample2->states),
-     'withdrawn state added 2');
-
-  # Test that withdrawn results in sample exclusion
-  ok($passed_sample2->include);
-  $passed_sample2->include_from_state;
-  $passed_sample2->update;
-
-  my $withdrawn_sample2 = $db->sample->find({id_sample => $sample_id2});
-  ok($withdrawn_sample2);
-  ok(!$withdrawn_sample2->include, 'Sample excluded after withdrawn');
-
-  # Test that pi_approved state overrides exclusion
-  $withdrawn_sample2->add_to_states($pi_approved);
-  cmp_ok(scalar $passed_sample2->states, '==', 3,
-         'pi_approved state added 1');
-  ok((grep { $_->name eq 'pi_approved' } $withdrawn_sample2->states),
-     'pi_approved state added 2');
-  $withdrawn_sample2->include_from_state;
-  $withdrawn_sample2->update;
-
-  $withdrawn_sample2 = $db->sample->find({id_sample => $sample_id2});
-  ok($withdrawn_sample2->include,
-     'withdrawn sample included after pi_approved');
+  dies_ok {
+    $sample->add_to_states($pi_approved);
+    $sample->include_from_state;
+  } 'Sample be both pi_approved and pi_excluded';
 }
 
 1;

@@ -59,12 +59,12 @@ sub run {
              'verbose'          => \$verbose);
 
   unless ($source) {
-    pod2usage(-msg => "A --source argument is required\n",
+    pod2usage(-msg     => "A --source argument is required\n",
               -exitval => 2);
   }
 
   unless ($publish_dest) {
-    pod2usage(-msg => "A --dest argument is required\n",
+    pod2usage(-msg     => "A --dest argument is required\n",
               -exitval => 2);
   }
 
@@ -92,7 +92,7 @@ sub run {
   }
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name   => 'sequencescape_warehouse',
+    (name    => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
@@ -101,40 +101,54 @@ sub run {
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch
-      (epoch => $now->epoch())->subtract(days => $days_ago);
+      (epoch => $now->epoch)->subtract(days => $days_ago);
   }
   else {
     $end = $now;
   }
 
   my $begin = DateTime->from_epoch
-    (epoch => $end->epoch())->subtract(days => $days);
+    (epoch => $end->epoch)->subtract(days => $days);
 
-  my $dir_test = modified_between($begin->epoch(), $end->epoch());
+  my $dir_test = modified_between($begin->epoch, $end->epoch);
   my $dir_regex = qr{^[0-9]{10}$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
-             " results finished between ",
+             "results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
   $log->info("Using reference path '$reference_path'");
 
-  foreach my $dir (collect_dirs($source_dir, $dir_test, $relative_depth,
-                                $dir_regex)) {
+  my @dirs = collect_dirs($source_dir, $dir_test, $relative_depth, $dir_regex);
+  my $total = scalar @dirs;
+  my $num_published = 0;
 
-    my $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
-      (directory => $dir);
+  $log->debug("Publishing $total Fluidigm data directories in '$source_dir'");
 
-    my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
-      (publication_time => $now,
-       resultset        => $resultset,
-       reference_path   => $reference_path,
-       ss_warehouse_db  => $ssdb,
-       logger           => $log);
-    $publisher->irods->logger($log);
+  foreach my $dir (@dirs) {
+    eval {
+      my $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
+        (directory => $dir);
 
-    $publisher->publish($publish_dest);
+      my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
+        (publication_time => $now,
+         resultset        => $resultset,
+         reference_path   => $reference_path,
+         ss_warehouse_db  => $ssdb,
+         logger           => $log);
+      $publisher->irods->logger($log);
+
+      $publisher->publish($publish_dest);
+      $num_published++;
+    };
+
+    if ($@) {
+      $log->error("Failed to publish '$dir': ", $@);
+    }
+    else {
+      $log->debug("Published '$dir': $num_published of $total");
+    }
   }
 }
 
