@@ -170,7 +170,7 @@ sub run {
 
 # Compare with data in iRODS. If any plate has less than the full
 # complement of files in iRODS (one per well) then re-publish the
-# plate.
+# plate. If the --force flag is in place, re-publish everything.
 sub find_plates_to_publish {
   my ($sqdb, $begin, $end, $irods, $publish_dest, $force, $log) = @_;
 

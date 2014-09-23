@@ -866,7 +866,7 @@ sub add_object {
   $self->debug("Adding '$file' as new object '$target'");
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
-                           arguments   => [$file, $target],
+                           arguments   => ['-K', $file, $target],
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
@@ -877,7 +877,7 @@ sub add_object {
   Arg [1]    : Name of file to add to iRODs
   Arg [2]    : iRODS data object name
 
-  Example    : $irods->add_object('lorem.txt', '/my/path/lorem.txt')
+  Example    : $irods->replace_object('lorem.txt', '/my/path/lorem.txt')
   Description: Replace a file in iRODS.
   Returntype : Str
 
@@ -900,7 +900,7 @@ sub replace_object {
   $self->debug("Replacing object '$target' with '$file'");
 
   WTSI::NPG::Runnable->new(executable  => $IPUT,
-                           arguments   => ['-f', '-k', $file, $target],
+                           arguments   => ['-f', '-K', $file, $target],
                            environment => $self->environment,
                            logger      => $self->logger)->run;
   return $target;
