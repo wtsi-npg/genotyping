@@ -124,6 +124,7 @@ my $total = 0;
 if ($use_irods) {
     my $irods = WTSI::NPG::iRODS->new;
     foreach my $input (@inputs) {
+        $log->debug("Reading ".$input." from iRODS for VCF conversion");
         my $resultSet;
         if ($inputType eq $SEQUENOM_TYPE) {
             my $d_obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
@@ -141,6 +142,7 @@ if ($use_irods) {
     }
 } else {
     foreach my $input (@inputs) {
+        $log->debug("Reading ".$input." from filesystem for VCF conversion");
         my $resultSet;
         if ($inputType eq $SEQUENOM_TYPE) {
             $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(

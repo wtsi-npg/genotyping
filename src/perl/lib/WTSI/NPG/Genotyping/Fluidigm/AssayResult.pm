@@ -155,6 +155,8 @@ sub npg_call {
     my $call = $self->compact_call(); # removes the : from raw input call
     if ($call eq $NO_CALL) {
         $call = 'NN';
+    } elsif ($call eq $INVALID_NAME) {
+        $call = ''; # empty call will be rendered as '.' in VCF output
     } elsif ($call !~ /[ACGTN][ACGTN]/ ) {
         my $msg = "Illegal genotype call '$call' for sample ".
             $self->npg_sample_id().", SNP ".$self->snp_assayed();

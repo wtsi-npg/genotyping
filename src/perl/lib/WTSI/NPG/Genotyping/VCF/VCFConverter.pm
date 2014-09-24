@@ -128,7 +128,7 @@ sub _call_to_vcf {
     # convert to VCF representation
     my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
-        return '';
+        return './.';
     }
     my %complement = ('A' => 'T',
                       'C' => 'G',
@@ -283,10 +283,10 @@ sub _parse_calls_samples {
             if ($previous_call && $previous_call ne $call) {
                 my $msg = 'Conflicting genotype calls for SNP '.$snp_id.
                     ' sample '.$sam_id.': '.$call.', '.$previous_call;
-                $self->logcroak($msg);
-            } else {
-                $calls{$snp_id}{$sam_id} = $call;
+                $self->logwarn($msg);
+                $call = '';
             }
+            $calls{$snp_id}{$sam_id} = $call;
             $samples{$sam_id} = 1;
         }
     }
