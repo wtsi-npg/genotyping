@@ -156,7 +156,6 @@ sub find_sequenom_calls {
          AND genotype.id_assay     = snpassay_snp.id_assay
          AND genotype.id_ind       = individual.id_ind
          AND genotype.disregard    = 0
-         AND genotype.confidence <> 'A'
          AND well_assay.id_assay   = snpassay_snp.id_assay
          AND snpassay_snp.id_snp   = snp_summary.id_snp
          AND well_result.call_date =
@@ -167,8 +166,7 @@ sub find_sequenom_calls {
               WHERE individual.clonename = ?
               AND genotype.id_result     = well_result.id_result
               AND genotype.id_ind        = individual.id_ind
-              AND genotype.disregard     = 0
-              AND genotype.confidence <> 'A'));
+              AND genotype.disregard     = 0));
 
   my $sth = $self->dbh->prepare($query);
 
