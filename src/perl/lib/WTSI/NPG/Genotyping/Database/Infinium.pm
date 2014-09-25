@@ -1010,7 +1010,7 @@ sub _fixup_paths_and_files {
 
   # Horrible, fragile munging because the Infinium LIMS doesn't store
   # the correct path case and the result is then exposed as an NFS
-  # mount.
+  # mount (which also gets changed over time).
 
   foreach my $if_sample (@samples) {
     # Correct the path to the NFS mount
@@ -1019,6 +1019,7 @@ sub _fixup_paths_and_files {
         my $path = $if_sample->{$key};
         $path =~ s{\\}{/}gmsx;
         $path =~ s{//}{/}msx;
+        $path =~ s{fastnfs/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
         $path =~ s{netapp\d[ab]/illumina_geno(\d)}{nfs/new_illumina_geno0$1}msx;
         $path =~ s{evs-illumina/illumina_geno01}{nfs/new_illumina_geno03}msx;
         $if_sample->{$key} = $path;
