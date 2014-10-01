@@ -488,7 +488,7 @@ sub find_project_samples {
                       "'$project_title'");
   }
 
-  @samples = $self->_fixup_paths_and_files(@samples);
+  @samples = $self->_fixup_paths_and_files(\@samples);
 
   return \@samples;
 }
@@ -596,7 +596,7 @@ sub find_project_completed_samples {
                       "'$project_title'");
   }
 
-  @samples = $self->_fixup_paths_and_files(@samples);
+  @samples = $self->_fixup_paths_and_files(\@samples);
 
   return \@samples;
 }
@@ -1006,13 +1006,13 @@ sub _choose_from_scans {
 }
 
 sub _fixup_paths_and_files {
-  my ($self, @samples) = @_;
+  my ($self, $samples) = @_;
 
   # Horrible, fragile munging because the Infinium LIMS doesn't store
   # the correct path case and the result is then exposed as an NFS
   # mount (which also gets changed over time).
 
-  foreach my $if_sample (@samples) {
+  foreach my $if_sample (@$samples) {
     # Correct the path to the NFS mount
     foreach my $key (qw(gtc_path idat_red_path idat_grn_path)) {
       if (defined $if_sample->{$key}) {
@@ -1053,7 +1053,7 @@ sub _fixup_paths_and_files {
     }
   }
 
-  return @samples;
+  return @$samples;
 }
 
 __PACKAGE__->meta->make_immutable;
