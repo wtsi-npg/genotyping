@@ -8,7 +8,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 7;
+use Test::More tests => 8;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -90,13 +90,48 @@ sub get_assay_resultset : Test(2) {
   } 'Fails on matching multiple results';
 }
 
-sub get_calls : Test(1) {
+sub get_calls : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
       (irods => $irods)->get_calls('Homo_sapiens (1000Genomes)', 'qc',
                                    'ABC0123456789')};
   cmp_ok(scalar @calls, '==', 26, 'Number of calls');
+
+  my @calls_expected = (['GS34251',    'TC'],
+                        ['GS34251',    'TC'],
+                        ['GS35220',    'CT'],
+                        ['GS35220',    'CT'],
+                        ['rs11096957', 'TG'],
+                        ['rs12828016', 'NN'], # 'No Call'
+                        ['rs156697',   'NN'], # 'Invalid' call
+                        ['rs1801262',  'TC'],
+                        ['rs1805034',  'CT'],
+                        ['rs1805087',  'AG'],
+                        ['rs2247870',  'GA'],
+                        ['rs2286963',  'TG'],
+                        ['rs3742207',  'TG'],
+                        ['rs3795677',  'GA'],
+                        ['rs4075254',  'GA'],
+                        ['rs4619',     'AG'],
+                        ['rs4843075',  'GA'],
+                        ['rs5215',     'CT'],
+                        ['rs6166',     'CT'],
+                        ['rs649058',   'GA'],
+                        ['rs6557634',  'TC'],
+                        ['rs6759892',  'TG'],
+                        ['rs7298565',  'GA'],
+                        ['rs753381',   'TC'],
+                        ['rs7627615',  'GA'],
+                        ['rs8065080',  'TC']);
+
+  my @calls_observed;
+  foreach my $call (@calls) {
+    push @calls_observed, [$call->snp->name, $call->genotype],
+  }
+
+  is_deeply(\@calls_observed, \@calls_expected) or
+    diag explain \@calls_observed;
 }
 
 1;
