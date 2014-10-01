@@ -26,6 +26,8 @@ our $NO_TEMPLATE_CONTROL = 'NTC';
 our $NO_CALL             = 'No Call';
 our $INVALID_NAME        = 'Invalid';
 
+our $NO_CALL_GENOTYPE    = 'NN';
+
 =head2 is_control
 
   Arg [1]    : None
@@ -88,8 +90,8 @@ sub is_control {
 sub is_call {
   my ($self) = @_;
 
-  return ($self->is_valid() &&
-          $self->final ne $NO_CALL &&
+  return ($self->is_valid                   &&
+          $self->final          ne $NO_CALL &&
           $self->converted_call ne $NO_CALL);
 }
 
@@ -108,7 +110,6 @@ sub is_call {
 =cut
 
 sub is_valid {
-
  my ($self) = @_;
 
  return ($self->final          ne $INVALID_NAME &&
@@ -151,16 +152,19 @@ sub compact_call {
 =cut
 
 sub npg_call {
-    my ($self) = @_;
-    my $call = $self->compact_call(); # removes the : from raw input call
-    if ($call eq $NO_CALL) {
-        $call = 'NN';
-    } elsif ($call !~ /[ACGTN][ACGTN]/ ) {
-        my $msg = "Illegal genotype call '$call' for sample ".
-            $self->npg_sample_id().", SNP ".$self->snp_assayed();
-        $self->logcroak($msg);
-    }
-    return $call;
+  my ($self) = @_;
+
+  my $call = $NO_CALL_GENOTYPE;
+  if ($self->is_call) {
+    $call = $self->compact_call; # removes the : from raw input call
+  }
+
+  if ($call !~ /[ACGTN][ACGTN]/) {
+    $self->logcroak("Illegal genotype call '$call' for sample ",
+                    $self->npg_sample_id, ", SNP ", $self->snp_assayed);
+  }
+
+  return $call;
 }
 
 =head2 npg_sample_id
@@ -178,7 +182,7 @@ sub npg_call {
 
 sub npg_sample_id {
     my ($self) = @_;
-    return $self->sample_name();
+    return $self->sample_name;
 }
 
 =head2 assay_position
@@ -194,7 +198,7 @@ sub npg_sample_id {
 
 sub assay_position {
     my ($self) = @_;
-    my ($sample_address, $assay_pos) = $self->_parse_assay();
+    my ($sample_address, $assay_pos) = $self->_parse_assay;
     return $assay_pos;
 }
 
@@ -210,29 +214,25 @@ sub assay_position {
 
 sub sample_address {
     my ($self) = @_;
-    my ($sample_address, $assay_num) = $self->_parse_assay();
+    my ($sample_address, $assay_num) = $self->_parse_assay;
     return $sample_address;
 }
 
-
 sub _parse_assay {
-    # Parse the 'assay' field and return the assay identifier. Field
-    # should be of the form [sample address]-[assay identifier], eg. S01-A96
-    my ($self) = @_;
-    my @terms = split('-', $self->assay());
-    my ($sample_address, $assay_num) = ('','');
-    if (scalar(@terms) != 2) {
-        my $msg = "Failed to parse sample address and assay number from ".
-            "Fluidigm assay field '".$self->assay().
-            "', returning empty strings instead.";
-        $self->logwarn($msg);
-    } else {
-        ($sample_address, $assay_num) = @terms;
-    }
-    return ($sample_address, $assay_num);
+  # Parse the 'assay' field and return the assay identifier. Field
+  # should be of the form [sample address]-[assay identifier], eg. S01-A96
+  my ($self) = @_;
+
+  my @terms = split '-', $self->assay;
+  if (scalar @terms != 2) {
+    $self->logconfess("Failed to parse sample address and assay number ",
+                      "from Fluidigm assay field '", $self->assay, "'");
+  }
+
+  my ($sample_address, $assay_num) = @terms;
+
+  return ($sample_address, $assay_num);
 }
-
-
 
 __PACKAGE__->meta->make_immutable;
 

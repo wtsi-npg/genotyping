@@ -122,7 +122,8 @@ sub find_sequenom_plate_id {
                samples, this corresponds to the identifier described above.
 
                In cases where the same individual.clonename has been assayed
-               multiple times, the most recent result is taken.
+               multiple times with the same plex, the most recent result is
+               taken.
 
   Returntype : HashRef
 
@@ -152,20 +153,23 @@ sub find_sequenom_calls {
          snp_summary
        WHERE
          individual.clonename      = ?
-         AND genotype.id_result    = well_result.id_result
-         AND genotype.id_assay     = snpassay_snp.id_assay
+         AND well_assay.id_well    = ?
          AND genotype.id_ind       = individual.id_ind
-         AND genotype.disregard    = 0
+         AND genotype.id_result    = well_result.id_result
+         AND genotype.id_assay     = well_assay.id_assay
          AND well_assay.id_assay   = snpassay_snp.id_assay
          AND snpassay_snp.id_snp   = snp_summary.id_snp
+         AND genotype.disregard    = 0
          AND well_result.call_date =
              (SELECT
                 MAX(well_result.call_date)
               FROM
-                individual, genotype, well_result
+                individual, genotype, well_result, well_assay
               WHERE individual.clonename = ?
-              AND genotype.id_result     = well_result.id_result
+              AND well_assay.id_well     = ?
               AND genotype.id_ind        = individual.id_ind
+              AND genotype.id_result     = well_result.id_result
+              AND genotype.id_assay      = well_assay.id_assay
               AND genotype.disregard     = 0));
 
   my $sth = $self->dbh->prepare($query);
@@ -173,21 +177,16 @@ sub find_sequenom_calls {
   my %result;
 
   foreach my $sample_name (@$sample_names) {
-    $self->trace("Executing: '$query' with args [$sample_name, $sample_name]");
-    $sth->execute($sample_name, $sample_name);
+    $self->trace("Executing: '$query' with args [",
+                 join(", ", $sample_name, $snpset->name,
+                      $sample_name, $snpset->name),
+                 "]");
+    $sth->execute($sample_name, $snpset->name,
+                  $sample_name, $snpset->name);
 
     my @calls;
     while (my ($assay_name, $snp_name, $genotype, $session, $call_date) =
            $sth->fetchrow_array) {
-      # Selecting WHERE well_assay.id_well = $assay_name in the query
-      # causes a performance problem; optimiser tries lots of nested
-      # loop joins
-      unless ($assay_name eq $snpset->name) {
-        $self->debug("Ignoring Sequenom result for sample '$sample_name' ",
-                     "SNP '$snp_name' because assay '$assay_name' is not ",
-                     "SNP set '", $snpset->name, "'");
-      }
-
       # Genotypes are stored as single characters when both alleles
       # are the same. Convert to a pair of characters.
       $genotype .= $genotype if length($genotype) == 1;

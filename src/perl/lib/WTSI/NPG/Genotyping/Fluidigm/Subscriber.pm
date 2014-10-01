@@ -44,8 +44,6 @@ has 'snpsets_cache' =>
    default  => sub { return {} },
    init_arg => undef);
 
-our $NO_CALL_GENOTYPE = 'NN';
-
 sub BUILD {
   my ($self) = @_;
 
@@ -219,13 +217,7 @@ sub get_calls {
         }
 
         my $snp = shift @snps;
-        my $genotype;
-        if ($result->is_call) {
-          $genotype = $result->compact_call
-        }
-        else {
-          $genotype = $NO_CALL_GENOTYPE;
-        }
+        my $genotype = $result->npg_call;
 
         my $call = WTSI::NPG::Genotyping::Call->new
           (genotype => $genotype,
