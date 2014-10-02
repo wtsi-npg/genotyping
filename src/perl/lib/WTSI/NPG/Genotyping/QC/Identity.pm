@@ -21,6 +21,8 @@
 
 # Module for identity QC check against Sequenom calls
 
+use utf8;
+
 package WTSI::NPG::Genotyping::QC::Identity;
 
 use warnings;
@@ -28,55 +30,117 @@ use strict;
 
 use Carp;
 use Cwd;
-use JSON; # for testing only
+use JSON;
 use List::Util qw(max);
 use Log::Log4perl;
 use Log::Log4perl::Level;
+use Moose;
 use POSIX qw(ceil);
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
-use WTSI::NPG::Genotyping::Database::SNP;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir getDatabaseObject);
-use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
 
+use WTSI::NPG::Genotyping::Database::SNP;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir
+                                               getDatabaseObject);
+use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
-use Exporter;
+with 'WTSI::NPG::Loggable';
 
-our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/run_identity_check getIntersectingSNPsManifest $PLEX_DIR $PLEX_FILE/;
+#our @EXPORT_OK = qw/run_identity_check getIntersectingSNPsManifest $PLEX_DIR $PLEX_FILE/;
 
-our %OUTPUT_NAMES = ('genotypes'  => 'identity_check_gt.txt',
-		     'results'    => 'identity_check_results.txt',
-		     'fail_pairs' => 'identity_check_failed_pairs.txt',
-		     'json'       => 'identity_check.json'
+
+has 'db_path' =>
+    (is       => 'rw',
+     isa      => 'Str',
+     required => 1,
     );
-our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
-our $PLEX_FILE = 'W30467_snp_set_info_1000Genomes.tsv'; # W30467 has same snp set for 1000Genomes and GRCh37
 
-Log::Log4perl::init(defaultConfigDir().'/log4perl.conf');
-our $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
-$log->level($WARN);
+has 'ini_path' =>
+    (is        => 'rw',
+     isa       => 'Str',
+     required  => 1,
+    );
 
-# Check identity of Plink calls with a QC plex.
-# QC plex method is currently Sequenom, may later extend to Fluidigm.
-#
-# Cross-references Plink with the QC plex to find number of available SNPs. If available SNPs are too few, omit the identity check.
-# TODO include convenience method to cross-reference .bpm.csv manifest with QCplex.
-# Compute match rate of (Plink calls, plex calls) for each sample. No-calls on any given sample are counted as mismatches.
-# Samples with low match rate fail the QC metric.
-# Compare calls on failed sample pairs to detect possible sample swaps.
-# Write JSON file with identity metric for each sample, and supplementary text files.
+has 'is_sequenom' =>
+    (is           => 'rw',
+     isa          => 'Bool',
+     required     => 1,
+    );
+
+has 'min_shared_snps' =>
+    (is               => 'rw',
+     isa              => 'Int',
+     default          => 8,
+ );
+
+has 'output_dir' =>
+    (is          => 'rw',
+     isa         => 'Str',
+     default     => '.'
+ );
+
+has 'output_names' =>
+    (is            => 'ro',
+     isa           => 'HashRef[Str]',
+     default       => sub {{'genotypes'  => 'identity_check_gt.txt',
+                            'results'    => 'identity_check_results.txt',
+                            'fail_pairs' => 'identity_check_failed_pairs.txt',
+                            'json'       => 'identity_check.json' }},
+ );
+
+has 'pass_threshold' => # minimum similarity for metric pass
+    (is              => 'rw',
+     isa             => 'Num',
+     default         => 0.9,
+ );
+
+has 'pipedb' =>
+    (is      => 'rw',
+     isa     => 'WTSI::NPG::Genotyping::Database::Pipeline',
+ );
+
+has 'plex_manifest' => # location of plex manifest in iRODS
+    (is             => 'rw',
+     isa            => 'Str',
+     required       => 1,
+ );
+
+has 'plink_path' =>
+    (is          => 'rw',
+     isa         => 'Str',
+     required    => 1,
+ );
+
+has 'plink' =>
+    (is     => 'rw',
+     isa    => 'plink_binary::plink_binary',
+ );
+
+has 'swap_threshold' => # minimum similarity to be flagged as possible swap
+    (is              => 'rw',
+     isa             => 'Num',
+     default         => 0.9,
+);
+
+
+sub BUILD {
+  my ($self,) = @_;
+  $self->plink = new plink_binary::plink_binary($self->plink_path);
+  $self->plink->{"missing_genotype"} = "N";
+  $self->pipedb = getDatabaseObject($self->db_path, $self->ini_path);
+}
 
 sub compareFailedPairs {
     # pairwise check of all failed samples; use output to detect swaps
     # Consider sample pair (i, j)
     # let s_ij = rate of matching calls between (Illumina_i, Sequenom_j)
     # we may have s_ij != s_ji, so define pairwise metric as max(s_ij, s_ji)
-    my %genotypes = %{ shift() };
-    my @failedSamples = @{ shift() };
-    my @snps = @{ shift() };
+    my ($self, $gtRef, $failRef, $snpRef) = @_;
+    my %genotypes = %{$gtRef};
+    my @failedSamples = @{$failRef};
+    my @snps = @{$snpRef};
     my @comparison = ();
     for (my $i = 0; $i < @failedSamples; $i++) {
         for (my $j = 0; $j < $i; $j++) {
@@ -101,7 +165,7 @@ sub compareFailedPairs {
 sub equivalent {
     # check if given genotypes are equivalent to within:
     # - swap (major/minor allele reversal) and/or a flip (reverse complement)
-    my ($gt0, $gt1) = @_;
+    my ($self, $gt0, $gt1) = @_;
     # basic sanity checking on input
     # allow no-call genotypes (represented by NN or 0)
     my $inputOK = 1;
@@ -110,7 +174,10 @@ sub equivalent {
 	    $inputOK = 0; 
 	}
     }
-    unless ($inputOK) { $log->logcroak("Incorrect arguments to equivalentGenotype: $gt0 $gt1"); }
+    unless ($inputOK) { 
+        $self->logger->logcroak("Incorrect arguments to equivalentGenotype:",
+                                $gt0, $gt1);
+    }
     my $gt1Swap = join('', reverse(split('', $gt1))); # swap alleles
     if ($gt0 eq $gt1 || $gt0 eq $gt1Swap || $gt0 eq revComp($gt1) || 
         $gt0 eq revComp($gt1Swap) ) {
@@ -123,10 +190,10 @@ sub equivalent {
 sub findIdentity {
     # find the identity metric for each sample
     # return: metric values, genotypes by SNP & sample, pass/fail status
-    my %plink = %{ shift() };
-    my %qcplex = %{ shift() };
-    my @snps = @{ shift() };
-    my $minIdent = shift;
+    my ($self, $plinkRef, $plexRef, $snpsRef) = @_;
+    my %plink = %{$plinkRef};
+    my %qcplex = %{$plexRef};
+    my @snps = @{$snpsRef};
     my (%identity, %genotypes, %failed, %missing);
     foreach my $sample (keys(%plink)) {
 	my $match = 0;
@@ -138,8 +205,8 @@ sub findIdentity {
 		my $sCall = $qcplex{$sample}{$snp};
 		if ($pCall && $sCall) {
 		    my $equiv = eval { equivalent($pCall, $sCall) };
-		    unless (defined($equiv)) {  
-			$log->logwarn("WARNING: ".$@); # error caught
+		    unless (defined($equiv)) {
+			$self->logger->logwarn("WARNING: ".$@); # error caught
 			$equiv = 0;
 		    }
 		    if ($equiv) { $match++; }
@@ -150,7 +217,7 @@ sub findIdentity {
 	    }
 	    my $id = $match / @snps;
 	    $identity{$sample} = $id;
-	    if ($id < $minIdent) { $failed{$sample} = 1; }
+	    if ($id < $self->pass_threshold) { $failed{$sample} = 1; }
 	} else {
 	    $missing{$sample} = 1;
 	    $identity{$sample} = 0;
@@ -162,56 +229,60 @@ sub findIdentity {
 sub getIntersectingSNPsPlink {
     # find SNPs in Plink data which are also in QC plex
     # TODO modify to get plex file from IRODS
-    my $pb = shift;
-    # find Plink SNP names and cross-reference with Sequenom
+    # find Plink SNP names and cross-reference with Sequenom/Fluidigm
+    my ($self,) = @_;
     my @plinkSNPs;
-    for my $i (0..$pb->{"snps"}->size() - 1) {
-	my $name = $pb->{"snps"}->get($i)->{"name"};
+    for my $i (0..$self->plink->{"snps"}->size() - 1) {
+	my $name = $self->plink->{"snps"}->get($i)->{"name"};
 	push @plinkSNPs, $name;
     }
-    return getPlexIntersection(@plinkSNPs);
+    return $self->getPlexIntersection(\@plinkSNPs);
 }
 
 sub getIntersectingSNPsManifest {
     # find SNPs in given .bpm.csv manifest which are also in QC plex
-    my $manifestPath = shift;
+    my ($self, $manifestPath) = @_;
     my @manifest;
-    open my $in, "<", $manifestPath || $log->logcroak("Cannot open '$manifestPath'");
+    open my $in, "<", $manifestPath ||
+        $self->logger->logcroak("Cannot open '$manifestPath'");
     while (<$in>) {
 	if (/^Index/) { next; } # skip header line
 	chomp;
 	my @words = split(/,/);
 	push(@manifest, $words[1]);
     }
-    close $in || $log->logcroak("Cannot close '$manifestPath'");
-    return getPlexIntersection(@manifest);
+    close $in || $self->logger->logcroak("Cannot close '$manifestPath'");
+    return $self->getPlexIntersection(\@manifest);
 }
 
 sub getPlexIntersection {
     # find intersection of given SNP list with QC plex
-    my @compare = @_;
-    my $plexPath = "$PLEX_DIR/$PLEX_FILE";
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new(file_name=>$plexPath, logger=>$log);
+    my ($self, $compareRef) = @_;
+    my @compare = @{$compareRef};
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new(
+        file_name => $self->plex_manifest);
     my %plexSNPs = ();
     foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; } 
     my @shared;
     foreach my $name (@compare) {
-	my $sqName = illuminaToSequenomSNP($name);
-	if ($plexSNPs{$sqName}) { push(@shared, $sqName); }
+        if ($self->is_sequenom) { # apply sequenom-specific name conversion
+            $name = illuminaToSequenomSNP($name);
+        }
+	if ($plexSNPs{$name}) { push(@shared, $name); }
     }
     return @shared;
 }
 
-sub getSampleNamesIDs {  
+sub getSampleNamesIDs {
     # extract sample IDs from a plink_binary object
     # first, try parsing sampleName in standard PLATE_WELL_ID format
     # if unsuccessful, set sample ID = sampleName
     # output hash of IDs indexed by name
     # also get list of names (use to ensure consistent name order)
-    my ($pb) = @_;  # $pb = plink_binary 
+    my ($self,) = @_;
     my (%samples, @sampleNames);
-    for my $i (0..$pb->{"individuals"}->size() - 1) {
-        my $longName = $pb->{"individuals"}->get($i)->{"name"};
+    for my $i (0..$self->plink->{"individuals"}->size() - 1) {
+        my $longName = $self->plink->{"individuals"}->get($i)->{"name"};
         my ($plate, $well, $id) = split /_/, $longName, 3;
         if ($id) {
             $samples{$longName} = $id;
@@ -226,9 +297,10 @@ sub getSampleNamesIDs {
 sub getSequenomSNPNames {
     # read definitive Sequenom plex from iRODS, using SNPSet module
     # 2014-03-07 iRODS is having issues, use filename instead
+    my ($self,) = @_;
     my $irods = WTSI::NPG::iRODS->new;
     my $data_object = WTSI::NPG::iRODS::DataObject->new
-    ($irods, "$PLEX_DIR/$PLEX_FILE");
+    ($irods, $self->plex_manifest);
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
     return $snpset->snp_names;
 }
@@ -236,13 +308,12 @@ sub getSequenomSNPNames {
 sub readPlexCalls {
     # read QC plex calls (Sequenom or Fluidigm) from pipeline SQLite database
     # return a hash of calls indexed by sample and SNP
-    my ($dbPath, $iniPath) = @_;
-    my $db = getDatabaseObject($dbPath, $iniPath);
+    my ($self, ) = @_;
     # read samples and SNP names
-    my @samples = $db->sample->all;
-    my @snps = $db->snp->all;
+    my @samples = $self->pipedb->sample->all;
+    my @snps = $self->pipedb->snp->all;
     my $snpTotal = @snps;
-    $log->debug("Read $snpTotal SNPs from pipeline DB");
+    $self->logger->debug("Read $snpTotal SNPs from pipeline DB");
     my %snpNames;
     foreach my $snp (@snps) {
 	$snpNames{$snp->id_snp} = $snp->name; 
@@ -265,7 +336,8 @@ sub readPlexCalls {
             }
         }
     }
-    $log->debug("Read $snpResultTotal QC SNP results from pipeline DB");
+    $self->logger->debug("Read", $snpResultTotal,
+                         "QC SNP results from pipeline DB");
     return \%results;
 }
 
@@ -274,7 +346,7 @@ sub readPlinkCalls {
     # requires list of sample names in same order as in plink file
     # assumes that "sample names" in the Plink dataset are URI's
     # return hash of calls by sample and SNP name
-    my ($pb, $sampleNamesRef, $snpsRef) = @_;
+    my ($self, $sampleNamesRef, $snpsRef) = @_;
     my @sampleNames = @$sampleNamesRef;
     my @snps = @$snpsRef;
     my %snps;
@@ -282,7 +354,7 @@ sub readPlinkCalls {
     my $snp = new plink_binary::snp;
     my $genotypes = new plink_binary::vectorstr;
     my %plinkCalls;
-    while ($pb->next_snp($snp, $genotypes)) {
+    while ($self->plink->next_snp($snp, $genotypes)) {
         # read calls from Plink binary object
         # try both "plink" and "sequenom" SNP name formats
         my $snp_id_illumina = $snp->{"name"};
@@ -301,7 +373,7 @@ sub readPlinkCalls {
 
 sub revComp {
     # reverse complement a DNA sequence
-    my $seq = shift;
+    my ($self, $seq) = @_;
     my @bases = reverse(split('', $seq));
     my @rev = ();
     foreach my $base (@bases) {
@@ -315,11 +387,12 @@ sub revComp {
 }
 
 sub writeFailedPairComparison {
+    my $self = shift;
     my @compareResults = @{ shift() };
     my $maxSimilarity = shift;
-    my $outDir = shift;
-    my $outPath = $outDir.'/'.$OUTPUT_NAMES{'fail_pairs'};
-    open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
+    my $outPath = $self->output_dir.'/'.$self->output_names->{'fail_pairs'};
+    open my $out, ">", $outPath || 
+        $self->logger->logcroak("Cannot open '$outPath'");
     my $header = join("\t", "#Sample_1", "Sample_2", "Similarity", "Swap_warning");
     print $out $header."\n";
     foreach my $resultRef (@compareResults) {
@@ -330,15 +403,16 @@ sub writeFailedPairComparison {
 	my $line = sprintf("%s\t%s\t%.4f\t%s\n", $sample1, $sample2, $metric, $status);
 	print $out $line;
     }
-    close $out || $log->logcroak("Cannot close '$outPath'");
+    close $out || $self->logger->logcroak("Cannot close '$outPath'");
 }
 
 sub writeGenotypes {
+    my $self = shift;
     my %genotypes = %{ shift() }; # hashes of calls by sample & snp
     my @snps = @{ shift() }; # list of SNPs to output
-    my $outDir = shift;
     my @samples = sort(keys(%genotypes));
-    open my $gt, ">", $outDir.'/'.$OUTPUT_NAMES{'genotypes'} or die $!;
+    my $outPath = $self->output_dir.'/'.$self->output_names->{'genotypes'};
+    open my $gt, ">", $outPath or die $!;
     my @heads = qw/SNP sample illumina_call qc_plex_call/;
     print $gt '#'.join("\t", @heads)."\n";
     foreach my $snp (@snps) {
@@ -355,14 +429,15 @@ sub writeGenotypes {
 sub writeIdentity {
     # evaluate identity pass/fail and write results
     # return list of failed sample names
+    my $self = shift;
     my %identity = %{ shift() }; # hash of identity by sample
     my %failed = %{ shift() };   # pass/fail status by sample
     my %missing = %{ shift() };  # missing samples from Sequenom query 
     my @samples = @{ shift() };  # list ensures consistent sample name order
     my $snpTotal = shift;
     my $minIdent = shift;
-    my $outDir = shift;
-    open my $results, ">",  $outDir.'/'.$OUTPUT_NAMES{'results'} or die $!;
+    my $outPath = $self->output_dir.'/'.$self->output_names->{'results'};
+    open my $results, ">", $outPath or die $!;
     my $header = join("\t", "#Identity comparison",
 		      "MIN_IDENTITY:$minIdent", 
                       "AVAILABLE_PLEX_SNPS:$snpTotal")."\n";
@@ -385,59 +460,104 @@ sub writeIdentity {
 sub writeJson {
     # get data structure for output to and write to JSON file
     # first argument is hash of values (if check was run) or list of samples (if check was not run)
-    my ($resultsRef, $idCheck, $minSnps, $commonSnps, $outDir) = @_;
+    my ($self, $resultsRef, $idCheck, $minSnps, $commonSnps) = @_;
     my $idRef;
     my %data = (results => $resultsRef,
 		identity_check_run => $idCheck,
 		min_snps => $minSnps,
 		common_snps => $commonSnps
 	);
-    my $outPath = $outDir.'/'.$OUTPUT_NAMES{'json'};
-    open my $out, ">", $outPath || $log->logcroak("Cannot open '$outPath'");
+    my $outPath = $self->output_dir.'/'.$self->output_names->{'json'};
+    open my $out, ">", $outPath || 
+        $self->logger->logcroak("Cannot open '$outPath'");
     print $out encode_json(\%data);
-    close $out || $log->logcroak("Cannot close '$outPath'");
+    close $out || $self->logger->logcroak("Cannot close '$outPath'");
 }
 
 sub run_identity_check {
     # 'main' method to run identity check
-    my ($plinkPrefix, $dbPath, $outDir, $minCheckedSNPs, $minIdent, $swap, $iniPath, $warn) = @_;
-    my $pb = new plink_binary::plink_binary($plinkPrefix);
-    $pb->{"missing_genotype"} = "N"; 
-
+    my ($self,) = @_;
     # 1) Read sample names and IDs from Plink
-    my ($samplesRef, $sampleNamesRef) = getSampleNamesIDs($pb);
-    $log->debug("Sample names read from PLINK binary.\n"); 
-    my @snps = getIntersectingSNPsPlink($pb); # definitive list of qc SNPs
+    my ($samplesRef, $sampleNamesRef) = $self->getSampleNamesIDs();
+    $self->logger->debug("Sample names read from PLINK binary.\n");
+    # definitive list of qc SNPs
+    my @snps = $self->getIntersectingSNPsPlink();
     my $snpTotal = @snps;
-    if ($snpTotal < $minCheckedSNPs) {
+    if ($snpTotal < $self->min_shared_snps) {
 	my %id;
 	foreach my $sample (@{$sampleNamesRef}) { $id{$sample} = 'NA'; }
-	writeJson(\%id, 0, $minCheckedSNPs, $snpTotal, $outDir);
-	my $msg = "Cannot do identity check; $minCheckedSNPs SNPs from QC ".
-	    "plex required, $snpTotal found";
-	if ($warn) { $log->logwarn($msg); }
+	$self->writeJson(\%id, 0, $self->min_shared_snps, $snpTotal);
+	$self->logger->logwarn("Cannot do identity check;",
+                               $self->min_shared_snps,
+                               "SNPs from QC plex required", $snpTotal,
+                               "found");
     } else {
 	# 2) Read Sequenom results from pipeline SQLite DB
-	my $plexCallsRef = readPlexCalls($dbPath, $iniPath);
+	my $plexCallsRef = $self->readPlexCalls();
 	# 3) Read PLINK genotypes for all samples; can take a while!
 	my $start = time();
-	my $plinkCallsRef = readPlinkCalls($pb, $sampleNamesRef, \@snps);
+	my $plinkCallsRef = $self->readPlinkCalls($sampleNamesRef, \@snps);
 	my $duration = time() - $start;
-	$log->debug("Calls read from PLINK binary: $duration seconds.\n");
+	$self->logger->debug("Calls read from PLINK binary:",
+                             $duration, "seconds.\n");
 	# 4) Find identity, genotypes, and pass/fail status; write output
-	my ($idRef, $gtRef, $failRef, $missingRef) = findIdentity($plinkCallsRef, $plexCallsRef, \@snps, $minIdent);
-	writeJson($idRef, 1, $minCheckedSNPs, $snpTotal, $outDir);
-	writeGenotypes($gtRef, \@snps, $outDir);
-	writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
-		      $snpTotal, $minIdent, $outDir);	
+	my ($idRef, $gtRef, $failRef, $missingRef) = $self->findIdentity($plinkCallsRef, $plexCallsRef, \@snps, $self->pass_threshold);
+	$self->writeJson($idRef, 1, $self->min_shared_snps, $snpTotal);
+	$self->writeGenotypes($gtRef, \@snps);
+	$self->writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
+                             $snpTotal, $self->pass_threshold);
 	# 5) Pairwise check on failed samples for possible swaps
 	my @failed = sort(keys(%{$failRef}));
-	my $compareRef = compareFailedPairs($gtRef, \@failed, \@snps, $swap);
-	writeFailedPairComparison($compareRef, $minIdent, $outDir);
-	
-	$log->debug("Finished identity check.\n");
+	my $compareRef = $self->compareFailedPairs($gtRef, \@failed,
+                                                   \@snps,
+                                                   $self->swap_threshold);
+	$self->writeFailedPairComparison($compareRef, $self->pass_threshold);
+	$self->logger->debug("Finished identity check.\n");
     }
     return 1;
 }
 
+no Moose;
+
 1;
+
+
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::Genotyping::QC::Identity
+
+=head1 DESCRIPTION
+
+Class to run the WTSI Genotyping pipeline identity check on a Plink dataset.
+Checks Plink calls against a QC plex (Sequenom or Fluidigm) by comparing
+calls on SNPs which occur in both the Infinium and QC plex manifests. If
+available SNPs are too few, omit the identity check. No-calls on any given
+sample are counted as mismatches. Samples with concordance below a given
+threshold fail the QC metric. Failed pairs of samples are compared in order
+to detect possible swaps.
+
+Output is a JSON file with identity metric for each sample, and supplementary
+text files.
+
+=head1 AUTHOR
+
+Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
