@@ -8,27 +8,37 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
+use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::QC::Identity qw /getIntersectingSNPsManifest $PLEX_FILE/;
+use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
+use WTSI::NPG::Genotyping::SNPSet;
 
-my ($manifestPath, $outPath, $quiet);
+my ($manifestPath, $plexPath, $outPath, $quiet, $is_sequenom);
 
-GetOptions('manifest=s' => \$manifestPath,
-	   'out=s'      => \$outPath,
-           'quiet'      => \$quiet,
-           'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },);
+GetOptions('manifest=s'   => \$manifestPath,
+           'plex=s'       => \$plexPath,
+           'is_sequenom'  => \$is_sequenom,
+	   'out=s'        => \$outPath,
+           'quiet'        => \$quiet,
+           'help'         => sub { pod2usage(-verbose => 2, -exitval => 0) },);
 
-# TODO Add an option to choose between Sequenom and Fluidigm QC plexes
+my $DEFAULT_PLEX_FILE = '/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv';
+
+$plexPath ||= $DEFAULT_PLEX_FILE;
+if (!(-e $manifestPath)) {
+    croak("QC plex path '$plexPath' does not exist");
+}
 
 if (!($manifestPath)) {
     croak("Must supply a --manifest argument");
 } elsif (!(-e $manifestPath)) {
     croak("Manifest path '$manifestPath' does not exist");
 }
-my @shared = getIntersectingSNPsManifest($manifestPath);
+
+my @shared = getIntersectingSNPsManifest($manifestPath, $plexPath);
 if (!($quiet)) {
-    print "Comparing manifest to QC plex $PLEX_FILE\n";
+    print "Comparing manifest to QC plex $DEFAULT_PLEX_FILE\n";
     my $total = @shared;
     print "$total shared SNPs found\n";
 }
@@ -37,6 +47,42 @@ if ($outPath) {
     foreach my $snp (@shared) { print $out "$snp\n"; }
     close $out || croak "Cannot close output '$outPath'";
 }
+
+
+sub getIntersectingSNPsManifest {
+    # find SNPs in given .bpm.csv manifest which are also in QC plex
+    my ($manifestPath, $plexPath) = @_;
+    my @manifest;
+    open my $in, "<", $manifestPath || croak("Cannot open '$manifestPath'");
+    while (<$in>) {
+	if (/^Index/) { next; } # skip header line
+	chomp;
+	my @words = split(/,/);
+	push(@manifest, $words[1]);
+    }
+    close $in || croak("Cannot close '$manifestPath'");
+    return getPlexIntersection($plexPath, \@manifest);
+}
+
+# duplication of code from Identity.pm
+# TODO replace with instantiation of a simplified base class
+
+sub getPlexIntersection {
+    my ($plexPath, $compareRef) = @_;
+    my @compare = @{$compareRef};
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plexPath);
+    $snpset->logger->level($WARN);
+    my %plexSNPs = ();
+    foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; } 
+    my @shared;
+    foreach my $name (@compare) {
+        $name = convertFromIlluminaExomeSNP($name);
+	if ($plexSNPs{$name}) { push(@shared, $name); }
+    }
+    return @shared;
+}
+
+
 
 __END__
 
