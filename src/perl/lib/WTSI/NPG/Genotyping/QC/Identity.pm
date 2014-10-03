@@ -61,12 +61,6 @@ has 'ini_path' =>
      required  => 1,
     );
 
-has 'is_sequenom' =>
-    (is           => 'rw',
-     isa          => 'Bool',
-     required     => 1,
-    );
-
 has 'min_shared_snps' =>
     (is               => 'rw',
      isa              => 'Int',

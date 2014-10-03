@@ -109,7 +109,6 @@ else { $warn = 1; }
 WTSI::NPG::Genotyping::QC::Identity->new(
     db_path => $dbPath,
     ini_path => $iniPath,
-    is_sequenom => 1,
     min_shared_snps => $minSNPs,
     output_dir => $outDir,
     pass_threshold => $minIdent,
