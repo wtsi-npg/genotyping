@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use Cwd;
 use Getopt::Long;
-use WTSI::NPG::Genotyping::QC::Identity qw(run_identity_check);
+use WTSI::NPG::Genotyping::QC::Identity;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -104,5 +104,21 @@ my $warn;
 if ($noWarning) { $warn = 0; } # option to suppress warning in pipeline tests
 else { $warn = 1; }
 
-run_identity_check($plink, $dbPath, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
+## TODO !!! get rid of hard-coded values
+
+WTSI::NPG::Genotyping::QC::Identity->new(
+    db_path => $dbPath,
+    ini_path => $iniPath,
+    is_sequenom => 1,
+    min_shared_snps => $minSNPs,
+    output_dir => $outDir,
+    pass_threshold => $minIdent,
+    plex_manifest => '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
+    plink_path => $plink,
+    swap_threshold => $swap
+)->run_identity_check();
+
+
+
+#run_identity_check($plink, $dbPath, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
 

@@ -21,12 +21,14 @@
 
 # Module for identity QC check against Sequenom calls
 
+
+use warnings;
+use strict;
 use utf8;
 
 package WTSI::NPG::Genotyping::QC::Identity;
 
-use warnings;
-use strict;
+use Moose;
 
 use Carp;
 use Cwd;
@@ -34,22 +36,18 @@ use JSON;
 use List::Util qw(max);
 use Log::Log4perl;
 use Log::Log4perl::Level;
-use Moose;
 use POSIX qw(ceil);
 use plink_binary; # in /software/varinf/gftools/lib ; front-end for C library
 
 use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir
                                                getDatabaseObject);
-use WTSI::NPG::Genotyping::QC::SnpID qw(illuminaToSequenomSNP);
+use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::NPG::Loggable';
-
-#our @EXPORT_OK = qw/run_identity_check getIntersectingSNPsManifest $PLEX_DIR $PLEX_FILE/;
-
 
 has 'db_path' =>
     (is       => 'rw',
@@ -127,9 +125,10 @@ has 'swap_threshold' => # minimum similarity to be flagged as possible swap
 
 sub BUILD {
   my ($self,) = @_;
-  $self->plink = new plink_binary::plink_binary($self->plink_path);
+  $self->plink(plink_binary::plink_binary->new($self->plink_path));
   $self->plink->{"missing_genotype"} = "N";
-  $self->pipedb = getDatabaseObject($self->db_path, $self->ini_path);
+  $self->pipedb(getDatabaseObject($self->db_path, $self->ini_path));
+  $self->logger->level($WARN);
 }
 
 sub compareFailedPairs {
@@ -150,8 +149,8 @@ sub compareFailedPairs {
 	    foreach my $snp (@snps) {
 		my ($plink_i, $plex_i) = @{$genotypes{$sample_i}{$snp}};
 		my ($plink_j, $plex_j) = @{$genotypes{$sample_j}{$snp}};
-		my $equiv_ij = eval { equivalent($plink_i, $plex_j) };
-		my $equiv_ji = eval { equivalent($plink_j, $plex_i) };
+		my $equiv_ij = eval { $self->equivalent($plink_i, $plex_j) };
+		my $equiv_ji = eval { $self->equivalent($plink_j, $plex_i) };
 		if ($equiv_ij) { $match[0]++; }
 		if ($equiv_ji) { $match[1]++; }
 	    }
@@ -179,8 +178,8 @@ sub equivalent {
                                 $gt0, $gt1);
     }
     my $gt1Swap = join('', reverse(split('', $gt1))); # swap alleles
-    if ($gt0 eq $gt1 || $gt0 eq $gt1Swap || $gt0 eq revComp($gt1) || 
-        $gt0 eq revComp($gt1Swap) ) {
+    if ($gt0 eq $gt1 || $gt0 eq $gt1Swap || $gt0 eq $self->revComp($gt1) ||
+        $gt0 eq $self->revComp($gt1Swap) ) {
         return 1; # match
     } else {
         return 0; # no match
@@ -204,7 +203,7 @@ sub findIdentity {
 		my $pCall = $plink{$sample}{$snp};
 		my $sCall = $qcplex{$sample}{$snp};
 		if ($pCall && $sCall) {
-		    my $equiv = eval { equivalent($pCall, $sCall) };
+		    my $equiv = eval { $self->equivalent($pCall, $sCall) };
 		    unless (defined($equiv)) {
 			$self->logger->logwarn("WARNING: ".$@); # error caught
 			$equiv = 0;
@@ -239,35 +238,20 @@ sub getIntersectingSNPsPlink {
     return $self->getPlexIntersection(\@plinkSNPs);
 }
 
-sub getIntersectingSNPsManifest {
-    # find SNPs in given .bpm.csv manifest which are also in QC plex
-    my ($self, $manifestPath) = @_;
-    my @manifest;
-    open my $in, "<", $manifestPath ||
-        $self->logger->logcroak("Cannot open '$manifestPath'");
-    while (<$in>) {
-	if (/^Index/) { next; } # skip header line
-	chomp;
-	my @words = split(/,/);
-	push(@manifest, $words[1]);
-    }
-    close $in || $self->logger->logcroak("Cannot close '$manifestPath'");
-    return $self->getPlexIntersection(\@manifest);
-}
-
 sub getPlexIntersection {
     # find intersection of given SNP list with QC plex
     my ($self, $compareRef) = @_;
     my @compare = @{$compareRef};
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new(
-        file_name => $self->plex_manifest);
+    my $irods = WTSI::NPG::iRODS->new;
+    my $data_object = WTSI::NPG::iRODS::DataObject->new
+        ($irods, $self->plex_manifest);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+    $snpset->logger->level($WARN);
     my %plexSNPs = ();
     foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; } 
     my @shared;
     foreach my $name (@compare) {
-        if ($self->is_sequenom) { # apply sequenom-specific name conversion
-            $name = illuminaToSequenomSNP($name);
-        }
+        $name = convertFromIlluminaExomeSNP($name);
 	if ($plexSNPs{$name}) { push(@shared, $name); }
     }
     return @shared;
@@ -302,6 +286,7 @@ sub getSequenomSNPNames {
     my $data_object = WTSI::NPG::iRODS::DataObject->new
     ($irods, $self->plex_manifest);
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+    $snpset->logger->level($WARN);
     return $snpset->snp_names;
 }
 
@@ -311,20 +296,29 @@ sub readPlexCalls {
     my ($self, ) = @_;
     # read samples and SNP names
     my @samples = $self->pipedb->sample->all;
+    $self->logger->debug("Read ", scalar(@samples),
+                         " samples from pipeline DB");
     my @snps = $self->pipedb->snp->all;
     my $snpTotal = @snps;
     $self->logger->debug("Read $snpTotal SNPs from pipeline DB");
     my %snpNames;
     foreach my $snp (@snps) {
-	$snpNames{$snp->id_snp} = $snp->name; 
+	$snpNames{$snp->id_snp} = $snp->name;
     }
     # read QC calls for each sample and SNP
     my $snpResultTotal = 0;
     my %results;
+    my $i = 0;
     foreach my $sample (@samples) {
         if ($sample->include == 0) { next; }
         my $sampleURI = $sample->uri;
         my @results = $sample->results->all;
+        $i++;
+        if ($i % 100 == 0) {
+            $self->logger->debug("Read ", scalar(@results),
+                                 " results for sample ", $i, " of ",
+                                 scalar(@samples));
+        }
         foreach my $result (@results) {
             my @snpResults = $result->snp_results->all;
             $snpResultTotal += @snpResults;
@@ -336,8 +330,8 @@ sub readPlexCalls {
             }
         }
     }
-    $self->logger->debug("Read", $snpResultTotal,
-                         "QC SNP results from pipeline DB");
+    $self->logger->debug("Read ", $snpResultTotal,
+                         " QC SNP results from pipeline DB");
     return \%results;
 }
 
@@ -358,7 +352,7 @@ sub readPlinkCalls {
         # read calls from Plink binary object
         # try both "plink" and "sequenom" SNP name formats
         my $snp_id_illumina = $snp->{"name"};
-        my $snp_id_sequenom = illuminaToSequenomSNP($snp_id_illumina);
+        my $snp_id_sequenom = convertFromIlluminaExomeSNP($snp_id_illumina);
         foreach my $snp_id ($snp_id_illumina, $snp_id_sequenom) {
             if (!$snps{$snp_id}) { next; }
             for my $i (0..$genotypes->size() - 1) {
@@ -487,19 +481,23 @@ sub run_identity_check {
 	my %id;
 	foreach my $sample (@{$sampleNamesRef}) { $id{$sample} = 'NA'; }
 	$self->writeJson(\%id, 0, $self->min_shared_snps, $snpTotal);
-	$self->logger->logwarn("Cannot do identity check;",
+	$self->logger->logwarn("Cannot do identity check; ",
                                $self->min_shared_snps,
-                               "SNPs from QC plex required", $snpTotal,
-                               "found");
+                               " SNPs from QC plex required ", $snpTotal,
+                               " found");
     } else {
 	# 2) Read Sequenom results from pipeline SQLite DB
-	my $plexCallsRef = $self->readPlexCalls();
-	# 3) Read PLINK genotypes for all samples; can take a while!
 	my $start = time();
-	my $plinkCallsRef = $self->readPlinkCalls($sampleNamesRef, \@snps);
+	my $plexCallsRef = $self->readPlexCalls();
 	my $duration = time() - $start;
-	$self->logger->debug("Calls read from PLINK binary:",
-                             $duration, "seconds.\n");
+	$self->logger->debug("Calls read from pipeline DB: ",
+                             $duration, " seconds.\n");
+	# 3) Read PLINK genotypes for all samples; can take a while!
+	$start = time();
+	my $plinkCallsRef = $self->readPlinkCalls($sampleNamesRef, \@snps);
+	$duration = time() - $start;
+	$self->logger->debug("Calls read from PLINK binary: ",
+                             $duration, " seconds.\n");
 	# 4) Find identity, genotypes, and pass/fail status; write output
 	my ($idRef, $gtRef, $failRef, $missingRef) = $self->findIdentity($plinkCallsRef, $plexCallsRef, \@snps, $self->pass_threshold);
 	$self->writeJson($idRef, 1, $self->min_shared_snps, $snpTotal);
