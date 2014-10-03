@@ -93,7 +93,7 @@ has 'pipedb' =>
      isa     => 'WTSI::NPG::Genotyping::Database::Pipeline',
  );
 
-has 'plex_manifest' => # location of plex manifest in iRODS
+has 'plex_manifest' => # location of plex manifest in local filesystem
     (is             => 'rw',
      isa            => 'Str',
      required       => 1,
@@ -236,10 +236,7 @@ sub getPlexIntersection {
     # find intersection of given SNP list with QC plex
     my ($self, $compareRef) = @_;
     my @compare = @{$compareRef};
-    my $irods = WTSI::NPG::iRODS->new;
-    my $data_object = WTSI::NPG::iRODS::DataObject->new
-        ($irods, $self->plex_manifest);
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->plex_manifest);
     $snpset->logger->level($WARN);
     my %plexSNPs = ();
     foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; } 
@@ -276,10 +273,7 @@ sub getSequenomSNPNames {
     # read definitive Sequenom plex from iRODS, using SNPSet module
     # 2014-03-07 iRODS is having issues, use filename instead
     my ($self,) = @_;
-    my $irods = WTSI::NPG::iRODS->new;
-    my $data_object = WTSI::NPG::iRODS::DataObject->new
-    ($irods, $self->plex_manifest);
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($self->plex_manifest);
     $snpset->logger->level($WARN);
     return $snpset->snp_names;
 }
