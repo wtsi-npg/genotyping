@@ -10,7 +10,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 
 use base qw(Test::Class);
-use Test::More tests => 29;
+use Test::More tests => 28;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC::Identity;
@@ -28,8 +28,13 @@ my $gtName = 'identity_check_gt.txt';
 my $failPairsName = 'identity_check_failed_pairs.txt';
 my $pipelineTestDir = '/nfs/gapi/data/genotype/pipeline_test';
 my $dataDir = $pipelineTestDir.'/identity_check';
-my $dbPath =  $dataDir.'/id_test_genotyping.db';
+#my $dbPath =  $dataDir.'/id_test_genotyping.db';
+# TODO temporary hack of dbpath for testing
+#my $dbPath = '/nfs/users/nfs_i/ib5/data/identity_test/id_test_genotyping.db';
+my $dbPath = '/tmp/gtpl_identity_test/id_test_genotyping.db';
+print STDERR "Pipeline DB: $dbPath\n";
 my $manifest = $pipelineTestDir.'/manifests/Human670-QuadCustom_v1_A.bpm.csv';
+my $qcPlex = "$dataDir/W30467_snp_set_info_1000Genomes.tsv";
 my $minSNPs = 8;
 my $manySNPs = 1000; # use to make methods fail
 my $minIdent = 0.90;
@@ -60,10 +65,9 @@ sub test_alternate_snp_names : Test(5) {
     WTSI::NPG::Genotyping::QC::Identity->new(
         db_path => $dbPath,
         ini_path => $iniPath,
-        is_sequenom => 1,
         output_dir => $workdir,
-        plex_manifest => '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
-        plink_path => '/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test_not_exome',
+        plex_manifest => $qcPlex,
+        plink_path => $dataDir.'/identity_test_not_exome',
     )->run_identity_check();
     validate_outputs();
 }
@@ -72,7 +76,7 @@ sub test_command_line : Test(6) {
     my $plink = $dataDir."/identity_test";
     my $config = defaultJsonConfig();
     my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
-	"--plink $plink --db $dbPath";
+	"--qcplex $qcPlex --plink $plink --db $dbPath";
     is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
     validate_outputs();
 }
@@ -95,11 +99,10 @@ sub test_insufficient_snps : Test(2) {
     WTSI::NPG::Genotyping::QC::Identity->new(
         db_path => $dbPath,
         ini_path => $iniPath,
-        is_sequenom => 1,
         min_shared_snps => $manySNPs,
         output_dir => $workdir,
-        plex_manifest => '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
-        plink_path => '/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test',
+        plex_manifest => $qcPlex,
+        plink_path => $dataDir.'/identity_test',
     )->run_identity_check();
     $log->level($WARN);
     ok(-e $jsonOutPath, "JSON output exists for insufficient SNPs");
@@ -126,10 +129,9 @@ sub test_standard : Test(7) {
     my $checker = WTSI::NPG::Genotyping::QC::Identity->new(
         db_path => $dbPath,
         ini_path => $iniPath,
-        is_sequenom => 1,
         output_dir => $workdir,
-        plex_manifest => '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
-        plink_path => '/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test',
+        plex_manifest => $qcPlex,
+        plink_path => $dataDir.'/identity_test',
     );
     ok($checker, "Identity check Moose object created");
     ok($checker->run_identity_check(), "Identity check completed");
