@@ -11,9 +11,9 @@ use Carp;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/illuminaToSequenomSNP sequenomToIlluminaSNP/;
+our @EXPORT_OK = qw/convertFromIlluminaExomeSNP convertToIlluminaExomeSNP/;
 
-sub illuminaToSequenomSNP {
+sub convertFromIlluminaExomeSNP {
     # strip off exm- prefix, if any
     my $id = shift;
     my $pattern = '^exm-';
@@ -27,7 +27,7 @@ sub illuminaToSequenomSNP {
     return $newID;
 }
 
-sub sequenomToIlluminaSNP {
+sub convertToIlluminaExomeSNP {
     # prepend exm- prefix, if not already present
     my $id = shift;
     my $prefix = 'exm-';
