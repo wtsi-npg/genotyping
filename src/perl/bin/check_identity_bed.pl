@@ -29,17 +29,20 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my ($outDir, $dbPath, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $noWarning, $help);
+my ($outDir, $dbPath, $configPath, $iniPath, $minSNPs, $minIdent, $swap, 
+    $qcPlex, $plink, $help);
+
+# TODO introduce 'quiet' mode to suppress warnings
 
 GetOptions("outdir=s"     => \$outDir,
 	   "db=s"         => \$dbPath,
            "config=s"     => \$configPath,
            "ini=s"        => \$iniPath,
+           "qcplex=s"     => \$qcPlex,
            "min_snps=i"   => \$minSNPs,
            "min_ident=f"  => \$minIdent,
 	   "swap=f"       => \$swap,
 	   "plink=s"      => \$plink,
-	   "no_warning"   => \$noWarning,
            "h|help"       => \$help);
 
 my $swapDefault = 0.95;
@@ -52,6 +55,9 @@ Options:
                     At least one of config or min_ident must be given.
 --ini=PATH          Path to .ini file with additional configuration. 
                     Defaults to: $DEFAULT_INI
+--qcplex=PATH       Path to .tsv file with SNP information for QC plex to be
+                    used in identity check. QC plex genotyping platforms
+                    include Sequenom and Fluidigm.
 --min_snps=NUMBER   Minimum number of SNPs for comparison
 --min_ident=NUMBER  Minimum threshold of SNP matches for identity; if given, overrides value in config file; 0 <= NUMBER <= 1
 --swap=NUMBER       Minimum threshold of SNP matches to flag a failed sample
@@ -62,7 +68,6 @@ Options:
 --plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
                     .bim, .fam extension. Required.
 --db=PATH           Path to an SQLite pipeline database containing the QC plex calls. Required.
---no_warning        Do not write a warning if insufficent SNPs are present
 --help              Print this help text and exit
 ";
     exit(0);
@@ -100,11 +105,8 @@ $swap ||= $swapDefault;
 
 $iniPath ||= $DEFAULT_INI;
 
-my $warn;
-if ($noWarning) { $warn = 0; } # option to suppress warning in pipeline tests
-else { $warn = 1; }
-
-## TODO !!! get rid of hard-coded values
+if (!$qcPlex) { croak "QC plex argument is required"; }
+elsif (not -e $qcPlex) { croak "Cannot read QC plex file $qcPlex"; }
 
 WTSI::NPG::Genotyping::QC::Identity->new(
     db_path => $dbPath,
@@ -112,12 +114,9 @@ WTSI::NPG::Genotyping::QC::Identity->new(
     min_shared_snps => $minSNPs,
     output_dir => $outDir,
     pass_threshold => $minIdent,
-    plex_manifest => '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
+    plex_manifest => $qcPlex,
     plink_path => $plink,
     swap_threshold => $swap
 )->run_identity_check();
 
-
-
-#run_identity_check($plink, $dbPath, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
-
+# default was '/seq/sequenom/multiplexes/W30467_snp_set_info_1000Genomes.tsv',
