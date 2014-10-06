@@ -31,6 +31,7 @@ my $inclusionMaster = "$Bin/qc_test_data/sample_inclusion.json";
 my $mafhet = "$Bin/qc_test_data/output_examples/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
 my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
+my $qcPlex = "$Bin/qc_test_data/W30467_snp_set_info_1000Genomes.tsv";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -57,7 +58,7 @@ if (-e $outDir) {
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --plink $plink --no_warning --db $dbfile");
+$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config --qcplex $qcPlex --plink $plink --db $dbfile");
 is($status, 0, "check_identity_bed.pl exit status");
 
 ## test call rate & heterozygosity computation
@@ -139,7 +140,7 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
-$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config"; 
+$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --qcplex=$qcPlex --inipath=$iniPath --mafhet --config=$config"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check (non-heatmap) outputs again
