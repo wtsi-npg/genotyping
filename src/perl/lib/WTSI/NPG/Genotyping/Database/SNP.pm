@@ -121,6 +121,10 @@ sub find_sequenom_plate_id {
                more generic term 'sample.name'. However, in the case of WTSI
                samples, this corresponds to the identifier described above.
 
+               In cases where the same individual.clonename has been assayed
+               multiple times with the same plex, the most recent result is
+               taken.
+
   Returntype : HashRef
 
 =cut
@@ -137,41 +141,52 @@ sub find_sequenom_calls {
     qq(SELECT DISTINCT
          well_assay.id_well       AS assay_name,
          snp_summary.default_name AS snp_name,
-         genotype.genotype        AS genotype
+         genotype.genotype        AS genotype,
+         genotype.id_session      AS id_session,
+         well_result.call_date    AS call_date
        FROM
          individual,
          genotype,
+         well_result,
          well_assay,
          snpassay_snp,
          snp_summary
        WHERE
-         individual.clonename = ?
-         AND genotype.id_assay   = snpassay_snp.id_assay
-         AND genotype.id_ind     = individual.id_ind
-         AND genotype.disregard  = 0
-         AND genotype.confidence <> 'A'
-         AND well_assay.id_assay = snpassay_snp.id_assay
-         AND snpassay_snp.id_snp = snp_summary.id_snp);
+         individual.clonename      = ?
+         AND well_assay.id_well    = ?
+         AND genotype.id_ind       = individual.id_ind
+         AND genotype.id_result    = well_result.id_result
+         AND genotype.id_assay     = well_assay.id_assay
+         AND well_assay.id_assay   = snpassay_snp.id_assay
+         AND snpassay_snp.id_snp   = snp_summary.id_snp
+         AND genotype.disregard    = 0
+         AND well_result.call_date =
+             (SELECT
+                MAX(well_result.call_date)
+              FROM
+                individual, genotype, well_result, well_assay
+              WHERE individual.clonename = ?
+              AND well_assay.id_well     = ?
+              AND genotype.id_ind        = individual.id_ind
+              AND genotype.id_result     = well_result.id_result
+              AND genotype.id_assay      = well_assay.id_assay
+              AND genotype.disregard     = 0));
 
   my $sth = $self->dbh->prepare($query);
 
   my %result;
 
   foreach my $sample_name (@$sample_names) {
-    $self->trace("Executing: '$query' with args [$sample_name]");
-    $sth->execute($sample_name);
+    $self->trace("Executing: '$query' with args [",
+                 join(", ", $sample_name, $snpset->name,
+                      $sample_name, $snpset->name),
+                 "]");
+    $sth->execute($sample_name, $snpset->name,
+                  $sample_name, $snpset->name);
 
     my @calls;
-    while (my ($assay_name, $snp_name, $genotype) = $sth->fetchrow_array) {
-      # Selecting WHERE well_assay.id_well = $assay_name in the query
-      # causes a performance problem; optimiser tries lots of nested
-      # loop joins
-      unless ($assay_name eq $snpset->name) {
-        $self->debug("Ignoring Sequenom result for sample '$sample_name' ",
-                     "SNP '$snp_name' because assay '$assay_name' is not ",
-                     "SNP set '", $snpset->name, "'");
-      }
-
+    while (my ($assay_name, $snp_name, $genotype, $session, $call_date) =
+           $sth->fetchrow_array) {
       # Genotypes are stored as single characters when both alleles
       # are the same. Convert to a pair of characters.
       $genotype .= $genotype if length($genotype) == 1;
