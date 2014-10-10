@@ -14,6 +14,7 @@ use File::Basename;
 use FindBin qw($Bin);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
 use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
+use WTSI::NPG::Genotyping::QC::Identity;
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
@@ -22,8 +23,8 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
-my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title, 
-    $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter, 
+my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title,
+    $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter,
     $illuminusFilter, $include);
 
 GetOptions("help"              => \$help,
@@ -50,12 +51,12 @@ Options:
 --output-dir=PATH   Directory for QC output
 --sim=PATH          Path to SIM file for intensity metrics. See note [1] below.
 --dbpath=PATH       Path to pipeline database .db file. Required.
---inipath=PATH      Path to .ini file containing general pipeline and database 
+--inipath=PATH      Path to .ini file containing general pipeline and database
                     configuration; local default is $DEFAULT_INI
---run=NAME          Name of run in pipeline database (needed for database 
+--run=NAME          Name of run in pipeline database (needed for database
                     update from gender check)
 --config=PATH       Path to JSON config file; default is taken from inipath
---mafhet            Find heterozygosity separately for SNP populations with 
+--mafhet            Find heterozygosity separately for SNP populations with
                     minor allele frequency greater than 1%, and less than 1%.
 --title             Title for this analysis; will appear in plots
 --zcall-filter      Apply default zcall filter; see note [2] below.
@@ -64,14 +65,14 @@ Options:
 --include           Do not exclude failed samples from the pipeline DB.
                     See note [2] below.
 
-[1] If --sim is not specified, but the intensity files magnitude.txt and 
-xydiff.txt are present in the pipeline output directory, intensity metrics 
-will be read from the files. This allows intensity metrics to be computed only 
+[1] If --sim is not specified, but the intensity files magnitude.txt and
+xydiff.txt are present in the pipeline output directory, intensity metrics
+will be read from the files. This allows intensity metrics to be computed only
 once when multiple callers are used on the same dataset.
 
 [2] The --zcall, --illuminus, and --filter options enable \"prefilter\" mode:
-    * Samples which fail the filter criteria are excluded in the pipeline 
-      SQLite DB. This ensures that failed samples are not input to subsequent 
+    * Samples which fail the filter criteria are excluded in the pipeline
+      SQLite DB. This ensures that failed samples are not input to subsequent
       analyses using the same DB.
     * Filter criteria are determined by one of three options:
       --illuminus     Default illuminus criteria
@@ -79,9 +80,9 @@ once when multiple callers are used on the same dataset.
       --filter=PATH   Custom criteria, given by the JSON file at PATH.
     * If more than one of the above options is specified, an error is raised.
       If none of them is specified, no filtering is carried out.
-    * Additional CSV and JSON summary files are written to describe the 
+    * Additional CSV and JSON summary files are written to describe the
       prefilter results.
-    * If the --include option is in effect, filter summary files will be 
+    * If the --include option is in effect, filter summary files will be
       written but samples will not be excluded from the SQLite DB.
 ";
     exit(0);
@@ -110,7 +111,8 @@ $include ||= 0;
 my $exclude = !($include);
 
 ### run QC
-run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude);
+run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
+$runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude);
 
 sub cleanup {
     # create a 'supplementary' subdirectory of the output directory
@@ -226,25 +228,25 @@ sub verifyAbsPath {
 }
 
 sub run {
-    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath, $runName, 
-        $outDir, $title, $texIntroPath, $mafHet, $filter, $exclude) = @_;
+    my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
+        $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
+        $exclude) = @_;
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
-    my @cmds = ("$Bin/check_identity_bed.pl --config $configPath --plink $plinkPrefix --outdir $outDir --no_warning --db $dbPath",
-		"$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
+    my @cmds = ("$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
 		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
-    if (!defined($runName)) { 
-	croak "Must supply pipeline run name for database gender update"; 
+    if (!defined($runName)) {
+	croak "Must supply pipeline run name for database gender update";
     }
     $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     push(@cmds, $genderCmd);
     if ($mafHet) {
 	my $mhout = $outDir.'/'.$fileNames{'het_by_maf'};
 	push(@cmds, "$MAF_HET_EXECUTABLE --in $plinkPrefix --out $mhout");
-    } 
+    }
     my $intensity = 0;
     my $magPath = $outDir.'/magnitude.txt';
     my $xydPath = $outDir.'/xydiff.txt';
@@ -258,12 +260,19 @@ sub run {
     }
     my $dbopt = "--dbpath=$dbPath "; 
     ### run QC data generation commands ###
-    foreach my $cmd (@cmds) { 
+    foreach my $cmd (@cmds) {
         my $result = system($cmd); 
-        if ($result!=0) { 
+        if ($result!=0) {
             croak "Command finished with non-zero exit status: \"$cmd\""; 
-        } 
+        }
     }
+    ### run identity check ###
+    WTSI::NPG::Genotyping::QC::Identity->new(
+        db_path => $dbPath,
+        ini_path => $iniPath,
+        output_dir => $outDir,
+        plink_path => $plinkPrefix,
+    )->run_identity_check();
     my $idJson = $outDir.'/'.$fileNames{'id_json'};
     if (!(-e $idJson)) { croak "Identity JSON file '$idJson' does not exist!"; }
     ### collate inputs, write JSON and CSV ###

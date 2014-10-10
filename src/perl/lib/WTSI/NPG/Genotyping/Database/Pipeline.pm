@@ -265,6 +265,41 @@ sub in_transaction {
   return wantarray ? @result : $result[0];
 }
 
+
+=head2 total_results_for_method
+
+Args [1]     : Name of genotying method (eg. Infinium, Sequenom, Fluidigm)
+               Must have an entry in the method table of the pipeline DB
+
+Count the number of results for the given genotyping method.
+
+=cut
+
+sub total_results_for_method {
+
+    my ($self, $method) = @_;
+
+    # check that method argument has an entry in the DB method table
+    my $method_entry = $self->method->find({name => $method});
+    unless ($method_entry) {
+        $self->logcroak("Method '", $method,
+                        "' is not defined in database methods table");
+    }
+    my $query =
+        qq(SELECT COUNT(*)
+           FROM
+             result,
+             method
+           WHERE
+             result.id_method = method.id_method
+             AND method.name = ?);
+    my $sth = $self->dbh->prepare($query);
+    $sth->execute($method) ||
+        $self->logcroak("Query execution failed for method '$method'");
+    my @results = $sth->fetchrow_array;
+    return $results[0];
+}
+
 =head2 address
 
 Returns a DBIx::Class::ResultSet for the registered source 'address'.

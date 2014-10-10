@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 63;
+use Test::More tests => 66;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -401,6 +401,44 @@ sub pi_excluded_state : Test(3) {
     $sample->add_to_states($pi_approved);
     $sample->include_from_state;
   } 'Sample be both pi_approved and pi_excluded';
+}
+
+sub total_results : Test(3) {
+
+    # load some results into the test database
+
+    my $supplier = $db->datasupplier->find_or_create({name  => $ENV{'USER'},
+                                                      namespace => 'wtsi'});
+    my $snpset = $db->snpset->find({name => 'HumanOmni25-8v1'});
+    my $run = $db->piperun->find_or_create({name       => 'total_result_test',
+                                            start_time => time()});
+    my $dataset = $run->add_to_datasets
+        ({if_project   => 'test_project',
+          datasupplier => $supplier,
+          snpset       => $snpset});
+    my $autocall = $db->method->find({name => 'Autocall'});
+
+    $db->in_transaction(sub {
+                        foreach my $i (1..1000) {
+                          my $sample = $dataset->add_to_samples
+                            ({name     => sprintf("%s_%d", $sample_base, $i),
+                              beadchip => 'ABC123456',
+                              include  => 1});
+                          $sample->add_to_results({method => $autocall});
+                        }
+                      });
+
+    # test the total_results_for_method function
+
+    is($db->total_results_for_method("Autocall"), 1000,
+       '1000 Autocall results found');
+
+    is($db->total_results_for_method("Fluidigm"), 0,
+       'Zero Fluidigm results found');
+
+    dies_ok { $db->total_results_for_method("Nonsense")}
+        'Result counter fails for unknown method';
+
 }
 
 1;
