@@ -28,8 +28,6 @@ package WTSI::NPG::Genotyping::QC::Identity;
 
 use Moose;
 
-#extends 'WTSI::NPG::Genotyping::QC::IdentityBase';
-
 use JSON;
 use List::Util qw(max);
 use Log::Log4perl;
