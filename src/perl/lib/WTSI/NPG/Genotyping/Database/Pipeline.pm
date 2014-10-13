@@ -285,19 +285,9 @@ sub total_results_for_method {
         $self->logcroak("Method '", $method,
                         "' is not defined in database methods table");
     }
-    my $query =
-        qq(SELECT COUNT(*)
-           FROM
-             result,
-             method
-           WHERE
-             result.id_method = method.id_method
-             AND method.name = ?);
-    my $sth = $self->dbh->prepare($query);
-    $sth->execute($method) ||
-        $self->logcroak("Query execution failed for method '$method'");
-    my @results = $sth->fetchrow_array;
-    return $results[0];
+    my $total = $self->schema->resultset('Result')->search(
+        {'method.name' => $method}, {join => 'method'})->count;
+    return $total;
 }
 
 =head2 address
