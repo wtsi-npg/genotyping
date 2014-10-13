@@ -154,8 +154,8 @@ sub compareFailedPairs {
 	    foreach my $snp (@snps) {
 		my ($plink_i, $plex_i) = @{$genotypes{$sample_i}{$snp}};
 		my ($plink_j, $plex_j) = @{$genotypes{$sample_j}{$snp}};
-		my $equiv_ij = eval { $self->equivalent($plink_i, $plex_j) };
-		my $equiv_ji = eval { $self->equivalent($plink_j, $plex_i) };
+		my $equiv_ij = $self->equivalent($plink_i, $plex_j);
+		my $equiv_ji = $self->equivalent($plink_j, $plex_i);
 		if ($equiv_ij) { $match[0]++; }
 		if ($equiv_ji) { $match[1]++; }
 	    }
@@ -175,12 +175,12 @@ sub equivalent {
     my $inputOK = 1;
     foreach my $gt ($gt0, $gt1) {
 	if ($gt && $gt ne 'NN' && (length($gt)!=2 || $gt =~ /[^ACGT]/)) { 
-	    $inputOK = 0; 
+	    $inputOK = 0;
 	}
     }
-    unless ($inputOK) { 
-        $self->logger->logcroak("Incorrect arguments to equivalentGenotype:",
-                                $gt0, $gt1);
+    unless ($inputOK) {
+        $self->warn("Invalid genotype arguments: '$gt0', '$gt1'");
+        return 0; # no match
     }
     my $gt1Swap = join('', reverse(split('', $gt1))); # swap alleles
     if ($gt0 eq $gt1 || $gt0 eq $gt1Swap || $gt0 eq $self->revComp($gt1) ||
@@ -208,7 +208,7 @@ sub findIdentity {
 		my $pCall = $plink{$sample}{$snp};
 		my $sCall = $qcplex{$sample}{$snp};
 		if ($pCall && $sCall) {
-		    my $equiv = eval { $self->equivalent($pCall, $sCall) };
+		    my $equiv = $self->equivalent($pCall, $sCall);
 		    unless (defined($equiv)) {
 			$self->logger->logwarn("WARNING: ".$@); # error caught
 			$equiv = 0;
@@ -463,10 +463,10 @@ sub run_identity_check {
 	my %id;
 	foreach my $sample (@{$sampleNamesRef}) { $id{$sample} = 'NA'; }
 	$self->writeJson(\%id, 0, $self->min_shared_snps, $snpTotal);
-	$self->logger->warn("Cannot do identity check; ",
-                            $self->min_shared_snps,
-                            " SNPs from QC plex required ", $snpTotal,
-                            " found");
+	$self->warn("Cannot do identity check; ",
+                    $self->min_shared_snps,
+                    " SNPs from QC plex required ", $snpTotal,
+                    " found");
     } else {
 	# 2) Read Sequenom results from pipeline SQLite DB
 	my $start = time();
