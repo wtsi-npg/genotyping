@@ -93,7 +93,8 @@ sub get_snpset {
      if ($num_snpsets > 1) {
        $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
                          "and reference '$reference_name' ",
-                         "was not specific enough; $num_snpsets SNP sets ",
+                         "under reference path '", $self->reference_path,
+                         "' was not specific enough; $num_snpsets SNP sets ",
                          "were returned: [", join(', ',  @obj_paths), "]");
      }
 
