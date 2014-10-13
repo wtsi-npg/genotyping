@@ -10,25 +10,31 @@ use Carp;
 use Getopt::Long;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::QC::Identity qw /getIntersectingSNPsManifest $PLEX_FILE/;
+use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
+use WTSI::NPG::Genotyping::SNPSet;
 
-my ($manifestPath, $outPath, $quiet);
+my ($manifestPath, $plexPath, $outPath, $verbose);
 
-GetOptions('manifest=s' => \$manifestPath,
-	   'out=s'      => \$outPath,
-           'quiet'      => \$quiet,
+GetOptions('manifest=s'        => \$manifestPath,
+           'plex=s'            => \$plexPath,
+	   'out=s'             => \$outPath,
+           'verbose'           => \$verbose,
            'help'       => sub { pod2usage(-verbose => 2, -exitval => 0) },);
 
-# TODO Add an option to choose between Sequenom and Fluidigm QC plexes
-
+if (!$plexPath) {
+    croak("Must specify a QC plex SNP set path");
+} elsif (!(-e $plexPath)) {
+    croak("QC plex path '$plexPath' does not exist");
+}
 if (!($manifestPath)) {
     croak("Must supply a --manifest argument");
 } elsif (!(-e $manifestPath)) {
     croak("Manifest path '$manifestPath' does not exist");
 }
-my @shared = getIntersectingSNPsManifest($manifestPath);
-if (!($quiet)) {
-    print "Comparing manifest to QC plex $PLEX_FILE\n";
+
+my @shared = getIntersectingSNPsManifest($manifestPath, $plexPath);
+if ($verbose) {
+    print "Comparing manifest to QC plex\n";
     my $total = @shared;
     print "$total shared SNPs found\n";
 }
@@ -38,6 +44,32 @@ if ($outPath) {
     close $out || croak "Cannot close output '$outPath'";
 }
 
+sub getIntersectingSNPsManifest {
+    # find SNPs in given .bpm.csv manifest which are also in QC plex
+    my ($manifestPath, $plexPath) = @_;
+    my @manifest;
+    open my $in, "<", $manifestPath || croak("Cannot open '$manifestPath'");
+    while (<$in>) {
+	if (/^Index/) { next; } # skip header line
+	chomp;
+	my @words = split(/,/);
+	push(@manifest, $words[1]);
+    }
+    close $in || croak("Cannot close '$manifestPath'");
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new( file_name => $plexPath,
+                                                     quiet => 1);
+    my %plexSNPs = ();
+    foreach my $name ($snpset->snp_names) { $plexSNPs{$name} = 1; }
+    my @shared;
+    foreach my $name (@manifest) {
+        $name = convertFromIlluminaExomeSNP($name);
+	if ($plexSNPs{$name}) { push(@shared, $name); }
+    }
+    return @shared;
+}
+
+
+
 __END__
 
 =head1 NAME
@@ -46,20 +78,23 @@ manifest_plex_intersection
 
 =head1 SYNOPSIS
 
-manifest_plex_intersection --manifest <path> [--out <path>] [--quiet] [--help]
+manifest_plex_intersection --manifest <path> --plex <path> [--out <path>]
+ [--quiet] [--help]
 
 Options:
 
   --manifest    Path to a .bpm.csv SNP manifest file. Required.
+  --plex        Path to a .tsv file containing the QC plex SNP manifest.
+                Requried.
   --out         Path to a text output file containing the names of all
                 intersecting SNPs. Optional.
-  --quiet       Do not print total number of intersecting SNPs to STDOUT.
+  --verbose     Print total number of intersecting SNPS to STDOUT. Optional.
   --help        Display this help and exit
 
 =head1 DESCRIPTION
 
 Convenience script to find the intersection of SNP sets between a .bpm.csv
-manifest and a QC plex, and print to standard output.
+manifest and a QC plex.
 
 =head1 METHODS
 

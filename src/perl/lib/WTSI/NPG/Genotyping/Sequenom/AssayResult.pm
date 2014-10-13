@@ -54,10 +54,12 @@ sub assay_position {
 =cut
 
 sub npg_call {
-    # require an input call of the form A, AC, C, or N
+    # require an input call of the form A, AC, C, or N (or an empty string)
     my ($self) = @_;
     my $call = $self->genotype_id();
-    if ($call =~ /[^ACGTN]/) {
+    if (!$call) {
+        $call = '';
+    } elsif ($call =~ /[^ACGTN]/) {
         $self->logcroak("Characters other than ACGTN in genotype '$call'");
     } elsif (length($call) == 1) {
         $call = $call.$call; # homozygote or no call
@@ -65,7 +67,7 @@ sub npg_call {
         # heterozygote, do nothing
     } else {
         my $msg = "Illegal genotype call '$call' for sample ".
-            $self->npg_sample_id().", SNP ".self->npg_snp_id();
+            $self->npg_sample_id().", SNP ".$self->assay_id();
         $self->logcroak($msg);
     }
     return $call;

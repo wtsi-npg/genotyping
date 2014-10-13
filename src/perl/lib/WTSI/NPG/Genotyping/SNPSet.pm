@@ -4,6 +4,7 @@ use utf8;
 package WTSI::NPG::Genotyping::SNPSet;
 
 use List::AllUtils qw(uniq);
+use Log::Log4perl::Level;
 use Moose;
 use Text::CSV;
 
@@ -32,6 +33,11 @@ has 'snps' =>
    builder  => '_build_snps',
    lazy     => 1);
 
+has 'quiet' => # reduced level of log output
+  (is       => 'ro',
+   isa      => 'Bool',
+   default  => 0);
+
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
@@ -52,6 +58,8 @@ around BUILDARGS => sub {
 # BUILD is defined in the Storable Role
 sub BUILD {
   my ($self) = @_;
+
+  if ($self->quiet) { $self->logger->level($ERROR); }
 
   $self->_build_snps;
 }

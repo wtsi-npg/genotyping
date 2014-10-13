@@ -94,11 +94,14 @@ sub run {
             $self->logcroak("Cannot parse sample names from output: $line");
         }
         my $discord_rate;
-        if ($sites == 0) { $discord_rate = 'NA'; }
-        else { $discord_rate = $discordance / $sites; }
+        if ($sites == 0) {
+            $discord_rate = 'NA';
+        } else {
+            $discord_rate = $discordance / $sites; 
+            if ($discord_rate > $max) { $max = $discord_rate; }
+        }
         $results{$sample_i}{$sample_j} = $discord_rate;
         $results{$sample_j}{$sample_i} = $discord_rate;
-        if ($discord_rate > $max) { $max = $discord_rate; }
     }
     return (\%results, $max);
 }
@@ -201,7 +204,11 @@ sub write_results_text {
             my @fields = ($sample_i,
                           $sample_j,
                           $results{$sample_i}{$sample_j});
-            printf $out "%s\t%s\t%.5f\n", @fields;
+            if ($fields[2] eq 'NA') {
+                printf $out "%s\t%s\t%s\n", @fields;
+            } else {
+                printf $out "%s\t%s\t%.5f\n", @fields;
+            }
         }
     }
     if ($outPath ne '-') {
