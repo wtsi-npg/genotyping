@@ -67,13 +67,18 @@ sub constructor : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
 
   new_ok('WTSI::NPG::Genotyping::Fluidigm::Subscriber',
-         [irods => $irods]);
+         [irods          => $irods,
+          data_path      => $irods_tmp_coll,
+          reference_path => $irods_tmp_coll]);
 }
 
 sub get_assay_resultsets : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
   my @resultsets = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-    (irods => $irods)->get_assay_resultsets('qc', $non_unique_identifier);
+    (irods          => $irods,
+     data_path      => $irods_tmp_coll,
+     reference_path => $irods_tmp_coll)->get_assay_resultsets
+       ('qc', $non_unique_identifier);
 
   cmp_ok(scalar @resultsets, '==', 2, 'Assay resultsets');
 }
@@ -81,12 +86,18 @@ sub get_assay_resultsets : Test(1) {
 sub get_assay_resultset : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
   my $resultset = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-    (irods => $irods)->get_assay_resultset('qc', 'ABC0123456789');
+    (irods          => $irods,
+     data_path      => $irods_tmp_coll,
+     reference_path => $irods_tmp_coll)->get_assay_resultset
+       ('qc', 'ABC0123456789');
 
   ok($resultset, 'Assay resultsets');
   dies_ok {
     WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-        (irods => $irods)->get_assay_resultset('qc', $non_unique_identifier);
+        (irods          => $irods,
+         data_path      => $irods_tmp_coll,
+         reference_path => $irods_tmp_coll)->get_assay_resultset
+           ('qc', $non_unique_identifier);
   } 'Fails on matching multiple results';
 }
 
@@ -94,8 +105,10 @@ sub get_calls : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-      (irods => $irods)->get_calls('Homo_sapiens (1000Genomes)', 'qc',
-                                   'ABC0123456789')};
+      (irods          => $irods,
+       data_path      => $irods_tmp_coll,
+       reference_path => $irods_tmp_coll)->get_calls
+         ('Homo_sapiens (1000Genomes)', 'qc', 'ABC0123456789')};
   cmp_ok(scalar @calls, '==', 26, 'Number of calls');
 
   my @calls_expected = (['GS34251',    'TC'],
