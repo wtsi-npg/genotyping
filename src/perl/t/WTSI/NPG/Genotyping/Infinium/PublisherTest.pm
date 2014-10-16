@@ -119,7 +119,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 173;
+use Test::More tests => 231;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -157,6 +157,11 @@ my @data_files = ("$data_path/gtc/0123456789/0123456789_R01C01.gtc",
                   "$data_path/idat/0123456799/0123456799_R01C02_Grn.idat",
                   "$data_path/idat/0123456799/0123456799_R01C02_Red.idat",
 
+                  # 11-digit barcode number
+                  "$data_path/gtc/01234567999/01234567999_R01C01.gtc",
+                  "$data_path/idat/01234567999/01234567999_R01C01_Grn.idat",
+                  "$data_path/idat/01234567999/01234567999_R01C01_Red.idat",
+
                   "$data_path/gtc/0123456799/0123456799_R01C03.gtc",
                   # Missing Grn idat file
                   # Missing Red idat file
@@ -175,7 +180,8 @@ my @methyl_files = ("$data_path/idat/0123456799/0123456799_R02C04_Grn.idat",
 my @repub_files =
   ("$data_path/repub/gtc/0123456789/0123456789_R01C01.gtc",
    "$data_path/repub/idat/0123456789/0123456789_R01C01_Grn.idat",
-   "$data_path/repub/idat/0123456789/0123456789_R01C01_Red.idat");
+   "$data_path/repub/idat/0123456789/0123456789_R01C01_Red.idat"
+);
 
 my $irods_tmp_coll;
 
@@ -226,7 +232,7 @@ sub resultsets : Test(2) {
      ss_warehouse_db  => $ssdb,
      publication_time => $publication_time);
 
-  cmp_ok(scalar @{$publisher->resultsets}, '==', 6,
+  cmp_ok(scalar @{$publisher->resultsets}, '==', 7,
          'Found only complete resultsets 1');
 
   my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
@@ -240,7 +246,7 @@ sub resultsets : Test(2) {
     ss_warehouse_db  => $ssdb,
     publication_time => $publication_time);
 
-  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 7,
+  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 8,
 	 'Found only complete resultsets 2');
 }
 sub dryrun : Test(4) {
@@ -303,6 +309,57 @@ sub publish : Test(58) {
                                                 [infinium_well  => 'A10'],
                                                 [type           => 'idat']);
   cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published');
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'infinium_plate',          value => 'plate1'},
+     {attribute => 'infinium_well',           value => 'A10'},
+     {attribute => 'md5',
+      value     => 'd41d8cd98f00b204e9800998ecf8427e'}, # MD5 of empty file
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  foreach my $data_path (@gtc_files, @idat_files) {
+    test_metadata($irods, $data_path, $expected_meta);
+  }
+}
+
+sub publish_longer_barcode : Test(58) {
+  # 11 digits instead of 10 in barcode
+  my $publication_time = DateTime->now;
+
+  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
+    (data_files       => [@data_files[15 .. 17]],
+     infinium_db      => $ifdb,
+     ss_warehouse_db  => $ssdb,
+     publication_time => $publication_time);
+
+  cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
+         'Number of resultsets prepared for 11-digit barcode');
+
+  cmp_ok($publisher->publish($irods_tmp_coll), '==', 3,
+         'Number of files published for 11-digit barcode');
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my @gtc_files = $irods->find_objects_by_meta($irods_tmp_coll,
+                                               [infinium_plate => 'plate1'],
+                                               [infinium_well  => 'A10'],
+                                               [type           => 'gtc']);
+  cmp_ok(scalar @gtc_files, '==', 1, 'Number of GTC files published for 11-digit barcode');
+
+  my @idat_files = $irods->find_objects_by_meta($irods_tmp_coll,
+                                                [infinium_plate => 'plate1'],
+                                                [infinium_well  => 'A10'],
+                                                [type           => 'idat']);
+  cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published for 11-digit barcode');
 
   my $expected_meta =
     [{attribute => 'dcterms:identifier',      value => '0123456789'},
