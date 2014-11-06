@@ -95,7 +95,7 @@ sub run {
              'logconf=s'        => \$log4perl_config,
              'maximum=i'        => \$maximum,
              'namespace=s'      => \$namespace,
-             'pl_config_dir=s'  => \$pl_config_dir,
+             'pl-config-dir=s'  => \$pl_config_dir,
              'project=s'        => \$project_title,
              'qc-platform=s'    => \$qc_platform,
 	     'qc-plex=s'        => \$qc_plex,
@@ -153,7 +153,7 @@ sub run {
 
   if ($qc_platform) {
       if ($qc_plex) {
-          die "Cannot specify both --qc_platform and --qc_plex options";
+          die "Cannot specify both --qc-platform and --qc-plex options";
       } else {
           $qc_platform = lc $qc_platform;
           unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
@@ -453,7 +453,7 @@ sub insert_fluidigm_calls {
   my $snpset = $pipedb->snpset->find({name => $qc_plex});
 
   $method or die "The genotyping method 'Fluidigm' is not configured for use\n";
-  $snpset or die "The Fluidigm SNP set 'qc' is unknown\n";
+  $snpset or die "The Fluidigm SNP set '$qc_plex' is unknown\n";
 
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
@@ -470,7 +470,7 @@ sub insert_fluidigm_calls {
     }
     else {
       warn("Failed to find any Fluidigm results for '",
-           $sample->sanger_sample_id, "'");
+           $sample->sanger_sample_id,  "', QC plex '", $qc_plex, "'");
     }
   }
 }
@@ -500,17 +500,13 @@ sub insert_sequenom_calls {
 
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
-    if (scalar(@$calls)==0) {
-      warn("No calls found for sample '", $sample->sanger_sample_id,
-	   "', QC plex '", $qc_plex, "'");
-    }
 
     if ($calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
     }
     else {
-      warn("Failed to find any Sequenom results for '",
-           $sample->sanger_sample_id, "'");
+      warn("Failed to find any Sequenom results for sample '",
+           $sample->sanger_sample_id, "', QC plex '", $qc_plex, "'");
     }
   }
 }
