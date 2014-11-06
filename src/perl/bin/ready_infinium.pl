@@ -586,7 +586,7 @@ Options:
   --maximum       Import samples up to a maximum number. Optional.
   --namespace     The namespace for the imported sample names. Optional,
                   defaults to 'wtsi'.
-  --pl_config_dir Directory containing additional pipeline .ini files.
+  --pl-config-dir Directory containing additional pipeline .ini files.
                   Optional.
   --project       The name of the Infinium LIMS project to import.
   --qc-platform   The QC genotyping platform. Fluidigm or Sequenom. Optional;
