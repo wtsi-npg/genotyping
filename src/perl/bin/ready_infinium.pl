@@ -399,7 +399,7 @@ sub run {
            unless ($qc_platform) {
                # script will die here if an unknown QC plex name is given
                die("Could not find QC platform for given QC plex '",
-                   $qc_plex, "' in ".$snpsets_ini_path;
+                   $qc_plex, "' in ", $snpsets_ini_path);
            }
        } else {
          $log->debug("Not inserting QC data; ",
