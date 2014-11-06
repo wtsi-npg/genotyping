@@ -6,6 +6,7 @@ package main;
 
 use warnings;
 use strict;
+use Config::IniFiles;
 use Getopt::Long;
 use List::AllUtils;
 use Log::Log4perl;
@@ -13,6 +14,7 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Database::SNP;
@@ -25,16 +27,25 @@ use WTSI::NPG::Utilities qw(user_session_log);
 our $AUTOCALL_PASS = 'Pass';
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
+our $SNPSETS_INI = 'snpsets.ini';
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
 
 our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
 
-our $SEQUENOM_QC_PLEX = '/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv';
+our $SEQUENOM_QC_DIR = '/nfs/srpipe_references/genotypes/';
+our %SEQUENOM_QC_PLEX = (
+     W30467 => $SEQUENOM_QC_DIR.'W30467_snp_set_info_1000Genomes.tsv',
+     W34340 => $SEQUENOM_QC_DIR.'W34340_snp_set_info_1000Genomes.tsv'
+);
+
+our %QC_PLEX_DEFAULT = (
+    $SEQUENOM => 'W30467',
+    $FLUIDIGM => 'qc'
+);
 
 our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
 our $DEFAULT_DATA_PATH      = '/seq/fluidigm';
-
 
 my $uid = `whoami`;
 chomp($uid);
@@ -66,8 +77,10 @@ sub run {
   my $log4perl_config;
   my $maximum;
   my $namespace;
+  my $pl_config_dir;
   my $project_title;
   my $qc_platform;
+  my $qc_plex;
   my $reference_path;
   my $run_name;
   my $supplier_name;
@@ -82,14 +95,17 @@ sub run {
              'logconf=s'        => \$log4perl_config,
              'maximum=i'        => \$maximum,
              'namespace=s'      => \$namespace,
+             'pl_config_dir=s'  => \$pl_config_dir,
              'project=s'        => \$project_title,
              'qc-platform=s'    => \$qc_platform,
+	     'qc-plex=s'        => \$qc_plex,
              'reference-path=s' => \$reference_path,
              'run=s'            => \$run_name,
              'supplier=s'       => \$supplier_name,
              'verbose'          => \$verbose);
 
   $config         ||= $DEFAULT_INI;
+  $pl_config_dir  ||= WTSI::NPG::Genotyping::config_dir();
   $namespace      ||= $WTSI_NAMESPACE;
   $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
@@ -131,26 +147,36 @@ sub run {
     }
   }
 
+  unless (-e $dbfile) {
+      die "SQLite database file '$dbfile' does not exist";
+  }
+
   if ($qc_platform) {
-    $qc_platform = lc $qc_platform;
-    unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
-      pod2usage(-msg => "Invalid qc-platform '$qc_platform' " .
-                "expected one of [$FLUIDIGM, $SEQUENOM]\n", -exitval => 2);
-    }
-  }
-  else {
-    $log->warn("No QC platform selected. Proceeding without fetching QC data");
+      if ($qc_plex) {
+          die "Cannot specify both --qc_platform and --qc_plex options";
+      } else {
+          $qc_platform = lc $qc_platform;
+          unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
+              pod2usage(-msg => "Invalid qc-platform '$qc_platform' " .
+                        "expected one of [$FLUIDIGM, $SEQUENOM]\n",
+                        -exitval => 2);
+          }
+          $log->info("Selected QC platform $qc_platform");
+      }
+  } elsif ($qc_plex) {
+      $log->info("Selected QC plex $qc_plex");
+  } else {
+      $log->warn("No QC platform or plex selected. ",
+                 "Proceeding without fetching QC data");
   }
 
-  if ($verbose) {
-    my $db = $dbfile;
-    $db ||= 'configured database';
-    $log->info("Updating $db using config from $config");
-  }
+  $log->info("Updating database '$dbfile' using config from $config");
 
-  my @initargs = (name    => 'pipeline',
-                  inifile => $config,
-                  dbfile  => $dbfile);
+
+  my @initargs = (name        => 'pipeline',
+                  inifile     => $config,
+                  dbfile      => $dbfile,
+                  config_dir  => $pl_config_dir);
 
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (@initargs)->connect
@@ -350,32 +376,55 @@ sub run {
          die "Failed to find any samples for project '$project_title'\n";
        }
 
+       # need to know both QC platform and QC plex name
        if ($qc_platform) {
-         $log->debug("Inserting QC data for platform '$qc_platform'");
-         if ($qc_platform eq $SEQUENOM) {
+           $qc_plex = $QC_PLEX_DEFAULT{$qc_platform};
+       } elsif ($qc_plex) {
+           # QC platform is section title in snpsets.ini
+           my $snpsets_ini_path = $pl_config_dir."/".$SNPSETS_INI;
+           unless (-e $snpsets_ini_path) {
+               die("Snpsets .ini path '", $snpsets_ini_path,
+                   "' does not exist.");
+           }
+           $log->debug("Reading snpsets from ", $snpsets_ini_path);
+           my $ini = Config::IniFiles->new(-file => $snpsets_ini_path);
+           foreach my $sect ($ini->Sections) {
+               foreach my $elt ($ini->val($sect, 'name')) {
+                   if ($elt eq $qc_plex) {
+                       $qc_platform = $sect;
+                       last;
+                   }
+               }
+           }
+           unless ($qc_platform) {
+               # script will die here if an unknown QC plex name is given
+               die("Could not find QC platform for given QC plex '",
+                   $qc_plex, "' in ".$snpsets_ini_path;
+           }
+       } else {
+         $log->debug("Not inserting QC data; ",
+                     "no QC platform or plex specified");
+       }
+
+       # retrieve QC calls for given platform and plex
+       if ($qc_platform eq $SEQUENOM) {
            $log->debug("Inserting Sequenom QC data from SNP");
 
            my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-             (name    => 'snp',
-              inifile => $config,
-              logger  => $log)->connect(RaiseError => 1);
+               (name    => 'snp',
+                inifile => $config,
+                logger  => $log)->connect(RaiseError => 1);
 
-           insert_sequenom_calls($pipedb, $snpdb, \@samples);
-         }
-         elsif ($qc_platform eq $FLUIDIGM) {
+           insert_sequenom_calls($pipedb, $snpdb, \@samples, $qc_plex);
+       } elsif ($qc_platform eq $FLUIDIGM) {
            $log->debug("Inserting Fluidigm QC data from iRODS");
-
            my $irods = WTSI::NPG::iRODS->new;
-           insert_fluidigm_calls($pipedb, $irods, \@samples, $reference_path,
-                                 $log);
-         }
-         else {
+           insert_fluidigm_calls($pipedb, $irods, \@samples, $qc_plex,
+                                 $reference_path, $log);
+       } else {
            die "Unexpected QC platform '$qc_platform'\n";
-         }
        }
-       else {
-         $log->debug("Not inserting QC data; no QC platform specified");
-       }
+
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
@@ -398,10 +447,10 @@ sub validate_snpset {
 }
 
 sub insert_fluidigm_calls {
-  my ($pipedb, $irods, $samples, $reference_path, $log) = @_;
+  my ($pipedb, $irods, $samples, $qc_plex, $reference_path, $log) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
-  my $snpset = $pipedb->snpset->find({name => 'qc'});
+  my $snpset = $pipedb->snpset->find({name => $qc_plex});
 
   $method or die "The genotyping method 'Fluidigm' is not configured for use\n";
   $snpset or die "The Fluidigm SNP set 'qc' is unknown\n";
@@ -413,7 +462,7 @@ sub insert_fluidigm_calls {
      logger         => $log);
 
   foreach my $sample (@$samples) {
-    my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', 'qc',
+    my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', $qc_plex,
                                        $sample->sanger_sample_id);
 
     if ($calls) {
@@ -427,17 +476,17 @@ sub insert_fluidigm_calls {
 }
 
 sub insert_sequenom_calls {
-  my ($pipedb, $snpdb, $samples) = @_;
+  my ($pipedb, $snpdb, $samples, $qc_plex) = @_;
 
   my $method = $pipedb->method->find({name => 'Sequenom'});
-  my $snpset = $pipedb->snpset->find({name => 'W30467'});
+  my $snpset = $pipedb->snpset->find({name => $qc_plex});
 
   $method or die "The genotyping method 'Sequenom' is not configured for use\n";
-  $snpset or die "The Sequenom SNP set 'W30467' is unknown\n";
+  $snpset or die "The Sequenom SNP set '$qc_plex' is unknown\n";
 
   my $sequenom_set = WTSI::NPG::Genotyping::SNPSet->new
-    (name      => 'W30467',
-     file_name => $SEQUENOM_QC_PLEX);
+    (name      => $qc_plex,
+     file_name => $SEQUENOM_QC_PLEX{$qc_plex});
 
   my @sample_names;
   foreach my $sample (@$samples) {
@@ -451,6 +500,10 @@ sub insert_sequenom_calls {
 
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
+    if (scalar(@$calls)==0) {
+      warn("No calls found for sample '", $sample->sanger_sample_id,
+	   "', QC plex '", $qc_plex, "'");
+    }
 
     if ($calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
@@ -529,20 +582,26 @@ ready_infinium [--config <database .ini file>] [--chip-design <name>] \
 
 Options:
 
-  --chip-design Explicitly state the chip design.
-  --config      Load database configuration from a user-defined .ini file.
-                Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile      The SQLite database file.
-  --help        Display help.
-  --maximum     Import samples up to a maximum number. Optional.
-  --namespace   The namespace for the imported sample names. Optional,
-                defaults to 'wtsi'.
-  --project     The name of the Infinium LIMS project to import.
-  --qc-platform The QC genotyping platform. Fluidigm or Sequenom. Optional.
-  --run         The pipeline run name in the database which will be created
-                or added to.
-  --supplier    The name of the sample supplier.
-  --verbose     Print messages while processing. Optional.
+  --chip-design   Explicitly state the chip design.
+  --config        Load database configuration from a user-defined .ini file.
+                  Optional, defaults to $HOME/.npg/genotyping.ini
+  --dbfile        The SQLite database file. Required.
+  --help          Display help.
+  --maximum       Import samples up to a maximum number. Optional.
+  --namespace     The namespace for the imported sample names. Optional,
+                  defaults to 'wtsi'.
+  --pl_config_dir Directory containing additional pipeline .ini files.
+                  Optional.
+  --project       The name of the Infinium LIMS project to import.
+  --qc-platform   The QC genotyping platform. Fluidigm or Sequenom. Optional;
+                  not compatible with --qc-plex.
+  --qc-plex       Name of snpset used by the QC genotyping platform. The
+                  snpset must be present in the SQLite database. Optional;
+                  not compatible with --qc-platform.
+  --run           The pipeline run name in the database which will be created
+                  or added to.
+  --supplier      The name of the sample supplier.
+  --verbose       Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
