@@ -465,7 +465,7 @@ sub insert_fluidigm_calls {
     my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', $qc_plex,
                                        $sample->sanger_sample_id);
 
-    if ($calls && scalar(@{$calls}>0)) {
+    if ($calls && @$calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
     }
     else {
@@ -501,7 +501,7 @@ sub insert_sequenom_calls {
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
 
-    if ($calls && scalar(@{$calls}>0)) {
+    if ($calls && @$calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
     }
     else {
