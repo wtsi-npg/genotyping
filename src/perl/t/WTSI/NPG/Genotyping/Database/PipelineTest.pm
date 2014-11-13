@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 66;
+use Test::More tests => 68;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -401,6 +401,61 @@ sub pi_excluded_state : Test(3) {
     $sample->add_to_states($pi_approved);
     $sample->include_from_state;
   } 'Sample be both pi_approved and pi_excluded';
+}
+
+
+sub snpset_names : Test(2) {
+
+    # load some Sequenom results into the test database
+    # first, create a supplier and snpset
+    my $supplier = $db->datasupplier->find_or_create({name  => $ENV{'USER'},
+                                                      namespace => 'wtsi'});
+    my $snpset_name_input = 'W30467';
+    my $snpset = $db->snpset->find({name => $snpset_name_input});
+
+    # create some dummy snps
+    my $chromosome = 1;
+    my @snps;
+    for (my $i=0;$i<5;$i++) {
+        my $name = 'dummy_snp_0000'.$i;
+        my $position = 100000 + $i;
+        my $snp = $db->snp->find_or_create
+            ({name       => $name,
+              chromosome => $chromosome,
+              position   => $position,
+              snpset     => $snpset});
+        push(@snps, $snp);
+    }
+
+    # now create a pipeline run and some results
+    my $run = $db->piperun->find_or_create({name       => 'snpset_name_test',
+                                            start_time => time()});
+    my $dataset = $run->add_to_datasets
+        ({if_project   => 'test_project',
+          datasupplier => $supplier,
+          snpset       => $snpset});
+    my $sequenom = $db->method->find({name => 'Sequenom'});
+    $db->in_transaction(sub {
+                        foreach my $i (1..1000) {
+                          my $sample = $dataset->add_to_samples
+                            ({name     => sprintf("%s_%d", $sample_base, $i),
+                              beadchip => 'ABC123456',
+                              include  => 1});
+                          my $result = $sample->add_to_results(
+                              {method => $sequenom});
+                          foreach my $snp (@snps) {
+                               $result->add_to_snp_results({snp   => $snp,
+                                                            value => 'AA',
+                                                        });
+                          }
+                        }
+                      });
+
+    # test the snpset_name_for_method function
+    my @names = @{$db->snpset_names_for_method("Sequenom")};
+    is (scalar(@names), 1, 'One snpset name found for Sequenom');
+    is ($names[0], $snpset_name_input, "Correct name for Sequenom snpset");
+
 }
 
 sub total_results : Test(3) {

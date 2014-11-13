@@ -108,12 +108,18 @@ has 'swap_threshold' => # minimum similarity to be flagged as possible swap
      default         => 0.9,
 );
 
-
-our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
 our $SEQUENOM = 'Sequenom';
 our $FLUIDIGM = 'Fluidigm';
-our $SEQUENOM_PLEX = $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv';
-our $FLUIDIGM_PLEX = $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv';
+our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
+our %PLEX_MANIFESTS = (
+    $FLUIDIGM => {
+        qc => $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv',
+    },
+    $SEQUENOM => {
+        W30467 => $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv',
+        W34340 => $PLEX_DIR.'/W34340_snp_set_info_1000Genomes.tsv',
+    },
+);
 
 sub BUILD {
   my ($self,) = @_;
@@ -122,18 +128,26 @@ sub BUILD {
   $self->pipedb(getDatabaseObject($self->db_path, $self->ini_path));
   my $sequenomTotal = $self->pipedb->total_results_for_method($SEQUENOM);
   my $fluidigmTotal = $self->pipedb->total_results_for_method($FLUIDIGM);
-
+  my $method;
   # if no valid QC plex found, plex_manifest attribute remains undefined
   if ($sequenomTotal==0 && $fluidigmTotal==0) {
       $self->logger->warn('No QC plex results in pipeline DB');
   } elsif ($sequenomTotal!=0 && $fluidigmTotal!=0) {
       $self->logger->warn('Results for more than one QC plex in pipeline DB');
   } elsif ($fluidigmTotal != 0) {
-      $self->plex_manifest($FLUIDIGM_PLEX);
+      $method = $FLUIDIGM;
   } else {
-      $self->plex_manifest($SEQUENOM_PLEX);
+      $method = $SEQUENOM;
   }
-
+  if ($method) {
+      my @names = @{$self->pipedb->snpset_names_for_method($method)};
+      if (scalar(@names)!=1) {
+          $self->logcroak("Must have exactly one snpset name ",
+                          "for identity check");
+      } else {
+          $self->plex_manifest($PLEX_MANIFESTS{$method}{$names[0]});
+      }
+  }
 }
 
 sub compareFailedPairs {
