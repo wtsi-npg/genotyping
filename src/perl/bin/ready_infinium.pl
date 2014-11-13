@@ -67,6 +67,8 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
+my $log;
+
 run() unless caller();
 
 sub run {
@@ -129,8 +131,6 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
 
-  my $log;
-
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
     $log = Log::Log4perl->get_logger('npg.irods.publish');
@@ -148,12 +148,13 @@ sub run {
   }
 
   unless (-e $dbfile) {
-      die "SQLite database file '$dbfile' does not exist";
+      $log->logcroak("SQLite database file '$dbfile' does not exist");
   }
 
   if ($qc_platform) {
       if ($qc_plex) {
-          die "Cannot specify both --qc-platform and --qc-plex options";
+          $log->logcroak("Cannot specify both --qc-platform ",
+                         "and --qc-plex options");
       } else {
           $qc_platform = lc $qc_platform;
           unless ($qc_platform eq $FLUIDIGM or $qc_platform eq $SEQUENOM) {
@@ -198,19 +199,22 @@ sub run {
 
   my @chip_designs = @{$ifdb->find_project_chip_design($project_title)};
   unless (@chip_designs) {
-    die "Invalid chip design '$chip_design'. Valid designs are: [" .
-      join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
+    $log->logcroak("Invalid chip design '",
+                   $chip_design, "'. Valid designs are: [" ,
+                   join(", ", map { $_->name } $pipedb->snpset->all), "]");
   }
   if ($chip_design) {
     unless (grep { /^$chip_design$/ } @chip_designs) {
-      die "Invalid chip design '$chip_design' design. Valid designs are: [ "
-        . join(", ", @chip_designs) . "]\n";
+        $log->logcroak("Invalid chip design '",
+                       $chip_design, "'. Valid designs are: [ ",
+                       join(", ", @chip_designs), "]");
     }
   }
   else {
     if (scalar @chip_designs > 1) {
-      die "Found >1 chip design. Use the --chip_design argument to specify " .
-        "which one to use: [" . join(", ", @chip_designs) . "]\n";
+        $log->logcroak("Found >1 chip design. Use the --chip_design ",
+                       "argument to specify which one to use: [",
+                       join(", ", @chip_designs), "]");
     }
     else {
       $chip_design = $chip_designs[0];
@@ -219,9 +223,9 @@ sub run {
 
   my $snpset = $pipedb->snpset->find({name => $chip_design});
   unless ($snpset) {
-    die "Chip design '$chip_design' is not configured for use. " .
-      "Configured are: [" .
-        join(", ", map { $_->name } $pipedb->snpset->all) . "]\n";
+    $log->logcroak("Chip design '$chip_design' is not configured for use. ",
+                   "Configured are: [",
+                   join(", ", map { $_->name } $pipedb->snpset->all), "]");
   }
 
   my $infinium = $pipedb->method->find({name => 'Infinium'});
@@ -235,7 +239,8 @@ sub run {
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_title})) {
-    die "Failed to load '$project_title'; it is present already.\n";
+    $log->logcroak("Failed to load '", $project_title, 
+                   "'; it is present already.");
   }
 
   # This is here because SequenceScape is missing (!) some tracking
@@ -245,6 +250,9 @@ sub run {
   my $num_consent_withdrawn_samples = 0;
   my $num_untracked_plates          = 0;
   my %untracked_plates;
+
+  # chosen QC plex may not have been run for all samples
+  my $samples_without_qc_calls = 0;
 
   $pipedb->in_transaction
     (sub {
@@ -372,8 +380,10 @@ sub run {
        }
        unless (@samples) {
          print_post_report($pipedb, $project_title, $num_untracked_plates,
-                           $num_consent_withdrawn_samples);
-         die "Failed to find any samples for project '$project_title'\n";
+                           $num_consent_withdrawn_samples,
+                           $samples_without_qc_calls );
+         $log->logcroak("Failed to find any samples for project '",
+                        $project_title, "'");
        }
 
        # need to know both QC platform and QC plex name
@@ -383,8 +393,8 @@ sub run {
            # QC platform is section title in snpsets.ini
            my $snpsets_ini_path = $pl_config_dir."/".$SNPSETS_INI;
            unless (-e $snpsets_ini_path) {
-               die("Snpsets .ini path '", $snpsets_ini_path,
-                   "' does not exist.");
+               $log->logcroak("Snpsets .ini path '", $snpsets_ini_path,
+                              "' does not exist.");
            }
            $log->debug("Reading snpsets from ", $snpsets_ini_path);
            my $ini = Config::IniFiles->new(-file => $snpsets_ini_path);
@@ -398,8 +408,8 @@ sub run {
            }
            unless ($qc_platform) {
                # script will die here if an unknown QC plex name is given
-               die("Could not find QC platform for given QC plex '",
-                   $qc_plex, "' in ", $snpsets_ini_path);
+               $log->logcroak("Could not find QC platform for given QC plex '",
+                              $qc_plex, "' in ", $snpsets_ini_path);
            }
        } else {
          $log->debug("Not inserting QC data; ",
@@ -407,6 +417,7 @@ sub run {
        }
 
        # retrieve QC calls for given platform and plex
+       my $inserted = 0;
        if ($qc_platform eq $SEQUENOM) {
            $log->debug("Inserting Sequenom QC data from SNP");
 
@@ -415,20 +426,24 @@ sub run {
                 inifile => $config,
                 logger  => $log)->connect(RaiseError => 1);
 
-           insert_sequenom_calls($pipedb, $snpdb, \@samples, $qc_plex);
+           $inserted = insert_sequenom_calls($pipedb, $snpdb,
+                                             \@samples, $qc_plex);
        } elsif ($qc_platform eq $FLUIDIGM) {
            $log->debug("Inserting Fluidigm QC data from iRODS");
            my $irods = WTSI::NPG::iRODS->new;
-           insert_fluidigm_calls($pipedb, $irods, \@samples, $qc_plex,
-                                 $reference_path, $log);
+           $inserted = insert_fluidigm_calls($pipedb, $irods,
+                                             \@samples, $qc_plex,
+                                             $reference_path, $log);
        } else {
-           die "Unexpected QC platform '$qc_platform'\n";
+           $log->logcroak("Unexpected QC platform '$qc_platform'");
        }
+       $samples_without_qc_calls = scalar(@samples) - $inserted;
 
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
-                    $num_consent_withdrawn_samples) if $verbose;
+                    $num_consent_withdrawn_samples,
+                    $samples_without_qc_calls ) if $verbose;
 
   return;
 }
@@ -437,9 +452,10 @@ sub validate_snpset {
   my ($run, $snpset) = @_;
 
   unless ($run->validate_snpset($snpset)) {
-    die "Cannot add this project to '", $run->name, "'; design mismatch: '",
-      $snpset->name, "' cannot be added to existing designs [",
-        join(", ", map { $_->snpset->name } $run->datasets), "]\n";
+    $log->logcroak("Cannot add this project to '", $run->name, 
+                   "'; design mismatch: '", $snpset->name, 
+                   "' cannot be added to existing designs [",
+                   join(", ", map { $_->snpset->name } $run->datasets), "]");
 
   }
 
@@ -447,13 +463,16 @@ sub validate_snpset {
 }
 
 sub insert_fluidigm_calls {
+  # returns the number of samples for which calls were inserted
   my ($pipedb, $irods, $samples, $qc_plex, $reference_path, $log) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   my $snpset = $pipedb->snpset->find({name => $qc_plex});
 
-  $method or die "The genotyping method 'Fluidigm' is not configured for use\n";
-  $snpset or die "The Fluidigm SNP set '$qc_plex' is unknown\n";
+  $method or $log->logcroak("The genotyping method 'Fluidigm' is ",
+                            "not configured for use");
+  $snpset or $log->logcroak("The Fluidigm SNP set '", $qc_plex,
+                            "' is unknown");
 
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
@@ -461,28 +480,33 @@ sub insert_fluidigm_calls {
      reference_path => $reference_path,
      logger         => $log);
 
+  my $inserted = 0;
   foreach my $sample (@$samples) {
     my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', $qc_plex,
                                        $sample->sanger_sample_id);
 
     if ($calls && @$calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+      $inserted++;
     }
     else {
-      warn("Failed to find any Fluidigm results for '",
-           $sample->sanger_sample_id,  "', QC plex '", $qc_plex, "'");
+      $log->warn("Failed to find any Fluidigm results for '",
+                 $sample->sanger_sample_id,  "', QC plex '", $qc_plex, "'");
     }
   }
+  return $inserted;
 }
 
 sub insert_sequenom_calls {
+  # returns the number of samples for which calls were inserted
   my ($pipedb, $snpdb, $samples, $qc_plex) = @_;
 
   my $method = $pipedb->method->find({name => 'Sequenom'});
   my $snpset = $pipedb->snpset->find({name => $qc_plex});
 
-  $method or die "The genotyping method 'Sequenom' is not configured for use\n";
-  $snpset or die "The Sequenom SNP set '$qc_plex' is unknown\n";
+  $method or $log->logcroak("The genotyping method 'Sequenom' ",
+                            "is not configured for use");
+  $snpset or $log->logcroak("The Sequenom SNP set '$qc_plex' is unknown");
 
   my $sequenom_set = WTSI::NPG::Genotyping::SNPSet->new
     (name      => $qc_plex,
@@ -498,17 +522,20 @@ sub insert_sequenom_calls {
   my $sequenom_results = $snpdb->find_sequenom_calls($sequenom_set,
                                                      \@sample_names);
 
+  my $inserted = 0;
   foreach my $sample (@$samples) {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
 
     if ($calls && @$calls) {
       insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+      $inserted++;
     }
     else {
-      warn("Failed to find any Sequenom results for sample '",
-           $sample->sanger_sample_id, "', QC plex '", $qc_plex, "'");
+      $log->warn("Failed to find any Sequenom results for sample '",
+                 $sample->sanger_sample_id, "', QC plex '", $qc_plex, "'");
     }
   }
+  return $inserted;
 }
 
 sub insert_qc_calls {
@@ -531,16 +558,17 @@ sub insert_qc_calls {
 
 sub print_pre_report {
   my ($supplier, $project_title, $namespace, $snpset) = @_;
-  print STDERR "Adding dataset for '$project_title':\n";
-  print STDERR "  From '", $supplier->name, "'\n";
-  print STDERR "  Into namespace '$namespace'\n";
-  print STDERR "  Using '", $snpset->name, "'\n";
-
+  my $report = "Adding dataset for '$project_title':\n".
+      "  From supplier '".$supplier->name."'\n".
+      "  Into namespace '".$namespace."'\n".
+      "  Using snpset '".$snpset->name;
+  $log->info($report);
   return;
 }
 
 sub print_post_report {
-  my ($pipedb, $project_title, $untracked, $unconsented) = @_;
+  my ($pipedb, $project_title, $untracked, $unconsented,
+      $samples_without_qc) = @_;
 
   my $ds = $pipedb->dataset->find({if_project => $project_title});
   my $proj = $ds->if_project;
@@ -554,10 +582,13 @@ sub print_post_report {
     ({'dataset.if_project' => $project_title},
      {join => {result => {sample => 'dataset'}}})->count;
 
-  print STDERR "Added dataset for '$proj':\n";
-  print STDERR "  $num_plates plates ($untracked missing from Warehouse)\n";
-  print STDERR "  $num_samples samples ($unconsented consent withdrawn)\n";
-  print STDERR "  $num_calls QC SNP calls\n";
+  my $report = "Added dataset for '$proj':\n".
+      "  $num_plates plates ($untracked missing from Warehouse)\n".
+      "  $num_samples samples ($unconsented consent withdrawn)\n".
+      "  $num_calls QC SNP calls\n".
+      "  $samples_without_qc samples without QC plex calls";
+
+  $log->info($report);
 
   return;
 }
