@@ -36,7 +36,8 @@ our $FLUIDIGM = 'fluidigm';
 our $SEQUENOM_QC_DIR = '/nfs/srpipe_references/genotypes/';
 our %SEQUENOM_QC_PLEX = (
      W30467 => $SEQUENOM_QC_DIR.'W30467_snp_set_info_1000Genomes.tsv',
-     W34340 => $SEQUENOM_QC_DIR.'W34340_snp_set_info_1000Genomes.tsv'
+     W34340 => $SEQUENOM_QC_DIR.'W34340_snp_set_info_1000Genomes.tsv',
+     W35540 => $SEQUENOM_QC_DIR.'W35540_snp_set_info_1000Genomes.tsv'
 );
 
 our %QC_PLEX_DEFAULT = (
@@ -417,28 +418,30 @@ sub run {
        }
 
        # retrieve QC calls for given platform and plex
+       # if $qc_platform is false, continue without inserting calls
        my $inserted = 0;
-       if ($qc_platform eq $SEQUENOM) {
-           $log->debug("Inserting Sequenom QC data from SNP");
+       if ($qc_platform) {
+           if ($qc_platform eq $SEQUENOM) {
+               $log->debug("Inserting Sequenom QC data from SNP");
 
-           my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
-               (name    => 'snp',
-                inifile => $config,
-                logger  => $log)->connect(RaiseError => 1);
+               my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
+                   (name    => 'snp',
+                    inifile => $config,
+                    logger  => $log)->connect(RaiseError => 1);
 
-           $inserted = insert_sequenom_calls($pipedb, $snpdb,
-                                             \@samples, $qc_plex);
-       } elsif ($qc_platform eq $FLUIDIGM) {
-           $log->debug("Inserting Fluidigm QC data from iRODS");
-           my $irods = WTSI::NPG::iRODS->new;
-           $inserted = insert_fluidigm_calls($pipedb, $irods,
-                                             \@samples, $qc_plex,
-                                             $reference_path, $log);
-       } else {
-           $log->logcroak("Unexpected QC platform '$qc_platform'");
+               $inserted = insert_sequenom_calls($pipedb, $snpdb,
+                                                 \@samples, $qc_plex);
+           } elsif ($qc_platform eq $FLUIDIGM) {
+               $log->debug("Inserting Fluidigm QC data from iRODS");
+               my $irods = WTSI::NPG::iRODS->new;
+               $inserted = insert_fluidigm_calls($pipedb, $irods,
+                                                 \@samples, $qc_plex,
+                                                 $reference_path, $log);
+           } else {
+               $log->logcroak("Unexpected QC platform '$qc_platform'");
+           }
        }
        $samples_without_qc_calls = scalar(@samples) - $inserted;
-
      });
 
   print_post_report($pipedb, $project_title, $num_untracked_plates,
