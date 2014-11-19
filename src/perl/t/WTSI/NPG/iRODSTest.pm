@@ -63,15 +63,19 @@ sub absolute_path : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
 
   is($irods->absolute_path('/path'), '/path');
-  like($irods->absolute_path('path'), qr{^/Sanger1.*path$});
+  like($irods->absolute_path('path'), qr{^/.*path$});
 }
 
 sub find_zone_name : Test(3) {
   my $irods = WTSI::NPG::iRODS->new;
 
-  like($irods->find_zone_name('/Sanger1'), qr{^Sanger1});
-  is($irods->find_zone_name('/no_such_zone'), 'no_such_zone');
-  ok($irods->find_zone_name('relative'),
+  my $wc = $irods->working_collection;
+  my ($zone) = $wc =~ m{^/([^/]+)};
+
+  is($irods->find_zone_name($wc), $zone, 'Works for absolute paths');
+  is($irods->find_zone_name('/no_such_zone'), 'no_such_zone',
+     'Works for non-existent paths');
+  is($irods->find_zone_name('relative'), $zone,
      'Falls back to current zone for relative paths');
 }
 
