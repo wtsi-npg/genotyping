@@ -203,9 +203,9 @@ sub find_sequenom_calls {
                                                       snp      => $snp);
       }
       else {
-        $self->warn("Ignoring Sequenom call on SNP '$snp_name' for sample ",
-                    "'$sample_name' because SNP is not a member of SNP set '",
-                    $snpset->name, "'");
+        $self->debug("Ignoring Sequenom call on SNP '$snp_name' for sample ",
+                     "'$sample_name' because SNP is not a member ",
+                     "of SNP set '", $snpset->name, "'");
       }
     }
 

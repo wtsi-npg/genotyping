@@ -19,7 +19,7 @@ has 'is_methylation'   => (is => 'ro', isa => 'Bool', required => 0);
 sub BUILD {
   my ($self) = @_;
 
-  unless ($self->beadchip =~ m{^\d{10}$}) {
+  unless ($self->beadchip =~ m{^\d{10,11}$}) {
     $self->logconfess("Invalid beadchip number '", $self->beadchip, "'");
   }
 
