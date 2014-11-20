@@ -118,6 +118,7 @@ our %PLEX_MANIFESTS = (
     $SEQUENOM => {
         W30467 => $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv',
         W34340 => $PLEX_DIR.'/W34340_snp_set_info_1000Genomes.tsv',
+        W35540 => $PLEX_DIR.'/W35540_snp_set_info_1000Genomes.tsv',
     },
 );
 
