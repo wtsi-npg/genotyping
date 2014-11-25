@@ -128,7 +128,7 @@ sub _call_to_vcf {
     # convert to VCF representation
     my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
-        return '';
+        return './.';
     }
     my %complement = ('A' => 'T',
                       'C' => 'G',
@@ -260,7 +260,7 @@ sub _parse_calls_samples {
         foreach my $ar (@{$resultSet->assay_results()}) {
             my $assay_pos = $ar->assay_position();
             if ($ar->is_control()) {
-                $self->loginfo("Found control assay in position ".$assay_pos);
+                $self->info("Found control assay in position ".$assay_pos);
                 $controls++;
                 next;
             }
@@ -283,17 +283,17 @@ sub _parse_calls_samples {
             if ($previous_call && $previous_call ne $call) {
                 my $msg = 'Conflicting genotype calls for SNP '.$snp_id.
                     ' sample '.$sam_id.': '.$call.', '.$previous_call;
-                $self->logcroak($msg);
-            } else {
-                $calls{$snp_id}{$sam_id} = $call;
+                $self->logwarn($msg);
+                $call = '';
             }
+            $calls{$snp_id}{$sam_id} = $call;
             $samples{$sam_id} = 1;
         }
     }
     if ($controls > 0) { 
         my $msg = "Found ".$controls." controls out of ".
             scalar(@{$self->resultsets()})." samples.";
-        $self->loginfo($msg);
+        $self->info($msg);
     }
     return (\%calls, \%samples);
 }

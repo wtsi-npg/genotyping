@@ -17,6 +17,7 @@ Pipeline:
  Percolate              https://github.com/wtsi-npg/Percolate
  Simtools               https://github.com/wtsi-npg/simtools
  Plinktools             https://github.com/wtsi-npg/plinktools
+ Bcftools               https://github.com/samtools/bcftools
 
 
 QC scripts:

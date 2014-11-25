@@ -411,7 +411,7 @@ sub _build_filesets {
 
     my ($beadchip, $section, $channel, $suffix) =
       $filename =~ m{^
-                     (\d{10})        # beadchip
+                     (\d{10,11})        # beadchip
                      _(R\d{2}C\d{2}) # beadchip section
                      _?(Red|Grn)?    # channel (idat only)
                      \.(\S+)         # suffix

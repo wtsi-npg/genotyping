@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use Cwd;
 use Getopt::Long;
-use WTSI::NPG::Genotyping::QC::Identity qw(run_identity_check);
+use WTSI::NPG::Genotyping::QC::Identity;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -29,7 +29,10 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 #   where FOO is the Sequenom SNP name
 # - Either of the above differences *may* occur, but is not guaranteed!
 
-my ($outDir, $dbPath, $configPath, $iniPath, $minSNPs, $minIdent, $swap, $plink, $noWarning, $help);
+my ($outDir, $dbPath, $configPath, $iniPath, $minSNPs, $minIdent, $swap,
+    $plink, $help);
+
+# TODO introduce 'quiet' mode to suppress warnings
 
 GetOptions("outdir=s"     => \$outDir,
 	   "db=s"         => \$dbPath,
@@ -39,7 +42,6 @@ GetOptions("outdir=s"     => \$outDir,
            "min_ident=f"  => \$minIdent,
 	   "swap=f"       => \$swap,
 	   "plink=s"      => \$plink,
-	   "no_warning"   => \$noWarning,
            "h|help"       => \$help);
 
 my $swapDefault = 0.95;
@@ -62,7 +64,6 @@ Options:
 --plink=PATH        Prefix for a Plink binary dataset, ie. path without .bed,
                     .bim, .fam extension. Required.
 --db=PATH           Path to an SQLite pipeline database containing the QC plex calls. Required.
---no_warning        Do not write a warning if insufficent SNPs are present
 --help              Print this help text and exit
 ";
     exit(0);
@@ -100,9 +101,12 @@ $swap ||= $swapDefault;
 
 $iniPath ||= $DEFAULT_INI;
 
-my $warn;
-if ($noWarning) { $warn = 0; } # option to suppress warning in pipeline tests
-else { $warn = 1; }
-
-run_identity_check($plink, $dbPath, $outDir, $minSNPs, $minIdent, $swap, $iniPath, $warn);
-
+WTSI::NPG::Genotyping::QC::Identity->new(
+    db_path => $dbPath,
+    ini_path => $iniPath,
+    min_shared_snps => $minSNPs,
+    output_dir => $outDir,
+    pass_threshold => $minIdent,
+    plink_path => $plink,
+    swap_threshold => $swap
+)->run_identity_check();

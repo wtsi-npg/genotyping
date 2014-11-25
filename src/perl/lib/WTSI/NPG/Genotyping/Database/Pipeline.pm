@@ -265,6 +265,65 @@ sub in_transaction {
   return wantarray ? @result : $result[0];
 }
 
+
+=head2 snpset_names_for_method
+
+Args [1]     : Name of genotying method (eg. Infinium, Sequenom, Fluidigm)
+               Must have an entry in the method table of the pipeline DB
+
+Description  : Return the snpset name(s), if any, which have snp_results
+               for the given genotyping method.
+Returntype   : Arrayref
+
+=cut
+
+sub snpset_names_for_method {
+    my ($self, $method) = @_;
+
+    # check that method argument has an entry in the DB method table
+    my $method_entry = $self->method->find({name => $method});
+    unless ($method_entry) {
+        $self->logcroak("Method '", $method,
+                        "' is not defined in database methods table");
+    }
+
+    # get snpsets for method
+    my @results = $self->schema->resultset('Snpset')->search(
+        { 'method.name' => $method },
+        { join => { snps => { snp_results => { result => 'method' }}},
+          distinct => 1,
+        }
+    );
+    my @names;
+    foreach my $result (@results) { push @names, $result->name(); }
+    return \@names;
+}
+
+
+=head2 total_results_for_method
+
+Args [1]     : Name of genotying method (eg. Infinium, Sequenom, Fluidigm)
+               Must have an entry in the method table of the pipeline DB
+
+Count the number of results for the given genotyping method.
+
+=cut
+
+sub total_results_for_method {
+
+    my ($self, $method) = @_;
+
+    # check that method argument has an entry in the DB method table
+    my $method_entry = $self->method->find({name => $method});
+    unless ($method_entry) {
+        $self->logcroak("Method '", $method,
+                        "' is not defined in database methods table");
+    }
+    my $total = $self->schema->resultset('Result')->search(
+        {'method.name' => $method}, {join => 'method'})->count;
+    return $total;
+}
+
 =head2 address
 
 Returns a DBIx::Class::ResultSet for the registered source 'address'.

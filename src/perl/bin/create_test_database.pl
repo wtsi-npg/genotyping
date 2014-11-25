@@ -105,7 +105,7 @@ my @gSupplied = @$gRefSupplied;
 print "Read ".@sampleNames." samples from file.\n";
 
 ## create & initialize database object
-my $db = WTSI::Genotyping::Database::Pipeline->new
+my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => "$etcDir/pipeline.ini",
      dbfile => $dbPath);
@@ -152,6 +152,7 @@ $db->in_transaction(sub {
               supplier_name => 'supplier_WeylandYutani'.sprintf("%05d",$i),
               rowcol => 'rowcol_number'.sprintf("%03d", $i % $plateSize),
               beadchip => 'beadchip_ABC123456',
+              cohort => 'xenomorph_cohort',
               include => $include});
         addSampleGender($db, $sample, $gInferred[$i], 1);
         addSampleGender($db, $sample, $gSupplied[$i], 0);
@@ -173,7 +174,7 @@ $db->disconnect();
 undef $db;
 
 ### now try to read data back in from database file
-$db = WTSI::Genotyping::Database::Pipeline->new
+$db = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name => 'pipeline',
      inifile => "$etcDir/pipeline.ini",
      dbfile => $dbPath);
