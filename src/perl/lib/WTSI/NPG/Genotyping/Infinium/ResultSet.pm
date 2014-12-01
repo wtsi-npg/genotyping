@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::Infinium::ResultSet;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'beadchip'         => (is => 'ro', isa => 'Str',  required => 1);
 has 'beadchip_section' => (is => 'ro', isa => 'Str',  required => 1);

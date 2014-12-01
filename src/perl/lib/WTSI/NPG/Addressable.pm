@@ -4,7 +4,7 @@ package WTSI::NPG::Addressable;
 
 use Moose::Role;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'size' =>
   (is       => 'ro',

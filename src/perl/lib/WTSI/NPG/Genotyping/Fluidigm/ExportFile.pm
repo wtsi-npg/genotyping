@@ -6,8 +6,6 @@ package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use Moose;
 use Text::CSV;
 
-with 'WTSI::NPG::Genotyping::Annotation';
-
 use WTSI::NPG::Utilities qw(trim);
 
 our $HEADER_BARCODE_ROW = 0;
@@ -16,7 +14,8 @@ our $HEADER_BARCODE_COL = 2;
 our $HEADER_CONF_THRESHOLD_ROW = 5;
 our $HEADER_CONF_THRESHOLD_COL = 1;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Addressable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Addressable',
+  'WTSI::NPG::Genotyping::Annotation';
 
 has 'file_name' =>
   (is       => 'ro',

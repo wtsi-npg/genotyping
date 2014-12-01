@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'assay'          => (is => 'ro', isa => 'Str', required => 1);
 has 'snp_assayed'    => (is => 'ro', isa => 'Str', required => 1);

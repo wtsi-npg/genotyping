@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::Fluidigm::ResultSet;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 our $DATA_DIRECTORY_NAME = 'Data';
 our $EXPECTED_TIF_TOTAL = 3;

@@ -8,7 +8,7 @@ use Text::CSV;
 
 use WTSI::NPG::Genotyping::Sequenom::AssayResult;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable',
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
   'WTSI::NPG::Genotyping::Annotation';
 
 our $HEADER = "ALLELE\tASSAY_ID\tCHIP\tCUSTOMER\tEXPERIMENT\tGENOTYPE_ID\tHEIGHT\tMASS\tPLATE\tPROJECT\tSAMPLE_ID\tSTATUS\tWELL_POSITION";

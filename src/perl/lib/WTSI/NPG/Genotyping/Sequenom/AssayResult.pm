@@ -4,7 +4,7 @@ package WTSI::NPG::Genotyping::Sequenom::AssayResult;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'allele'        => (is => 'ro', isa => 'Str', required => 1);
 has 'assay_id'      => (is => 'ro', isa => 'Str', required => 1);

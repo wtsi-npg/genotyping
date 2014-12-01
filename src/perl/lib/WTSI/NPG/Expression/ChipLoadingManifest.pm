@@ -4,7 +4,7 @@ package WTSI::NPG::Expression::ChipLoadingManifest;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'file_name' =>
   (is       => 'ro',

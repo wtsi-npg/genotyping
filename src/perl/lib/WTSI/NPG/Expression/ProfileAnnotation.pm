@@ -4,7 +4,7 @@ package WTSI::NPG::Expression::ProfileAnnotation;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Expression::Annotation',
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
   'WTSI::NPG::iRODS::Storable';
 
 around BUILDARGS => sub {

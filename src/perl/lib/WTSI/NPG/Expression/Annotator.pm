@@ -6,7 +6,7 @@ use List::AllUtils qw(any);
 use Moose::Role;
 use UUID;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Expression::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation';
 
 our @VALID_PROFILE_GROUPINGS = qw(group sample);
 our @VALID_SUMMARY_TYPES     = qw(gene probe annotation);

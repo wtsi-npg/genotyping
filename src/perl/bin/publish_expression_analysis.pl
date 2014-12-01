@@ -19,13 +19,13 @@ use Pod::Usage;
 use URI;
 use UUID;
 
+use WTSI::DNAP::Utilities::IO qw(maybe_stdin);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Expression::AnalysisPublisher;
 use WTSI::NPG::Expression::ChipLoadingManifestV1;
 use WTSI::NPG::Expression::ChipLoadingManifestV2;
 use WTSI::NPG::Expression::Publisher;
 use WTSI::NPG::Utilities qw(collect_files trim user_session_log);
-use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 my $uid = `whoami`;
 chomp($uid);

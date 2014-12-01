@@ -9,7 +9,7 @@ use Data::Dumper;
 
 extends 'WTSI::NPG::Database';
 
-with 'WTSI::NPG::Cacheable';
+with 'WTSI::DNAP::Utilities::Cacheable';
 
 has 'red_cache' =>
   (is       => 'ro',

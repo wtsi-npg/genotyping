@@ -9,8 +9,8 @@ use Moose;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
-  'WTSI::NPG::Genotyping::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/gen/infinium';
 

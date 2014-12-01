@@ -4,7 +4,7 @@ package WTSI::NPG::Expression::ResultSet;
 
 use Moose;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'sample_id'        => (is => 'ro', isa => 'Str', required => 1);
 has 'plate_id'         => (is => 'ro', isa => 'Str', required => 0);
