@@ -17,10 +17,7 @@ use Log::Log4perl qw(:easy);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
-
-use WTSI::NPG::Utilities::IO qw(maybe_stdin
-                                maybe_stdout);
-
+use WTSI::DNAP::Utilities::IO qw(maybe_stdin  maybe_stdout);
 use WTSI::NPG::Genotyping qw(read_sample_json);
 use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
                                         read_it_column_names

@@ -40,7 +40,7 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir
 use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
 use WTSI::NPG::Genotyping::SNPSet;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'db_path' =>
     (is       => 'rw',

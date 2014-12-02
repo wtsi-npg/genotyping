@@ -19,7 +19,8 @@ has 'disperse' =>
    required => 1,
    default  => 1);
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator';
 
 =head2 publish_file
 

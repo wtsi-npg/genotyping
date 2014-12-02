@@ -14,8 +14,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
-  'WTSI::NPG::Genotyping::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',

@@ -7,7 +7,7 @@ use File::Basename;
 
 use WTSI::NPG::Utilities qw(md5sum);
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
 
 our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
 

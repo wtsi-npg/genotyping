@@ -10,7 +10,7 @@ use Text::CSV;
 
 use WTSI::NPG::Genotyping::SNP;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 

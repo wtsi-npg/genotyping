@@ -9,7 +9,7 @@ use Text::CSV;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 has '+data_object' =>
   (isa      => 'WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');

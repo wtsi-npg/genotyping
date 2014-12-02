@@ -57,8 +57,7 @@ has 'dbh' =>
    isa      => 'Any',
    required => 0);
 
-with 'WTSI::NPG::Loggable';
-
+with 'WTSI::DNAP::Utilities::Loggable';
 
 sub BUILD {
   my ($self) = @_;

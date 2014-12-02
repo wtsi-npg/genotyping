@@ -10,7 +10,7 @@ use Getopt::Long;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
-use WTSI::NPG::Utilities::IO qw(maybe_stdin maybe_stdout);
+use WTSI::DNAP::Utilities::IO qw(maybe_stdin maybe_stdout);
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 

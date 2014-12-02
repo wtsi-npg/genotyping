@@ -12,7 +12,7 @@ use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Annotation',
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation',
   'WTSI::NPG::Genotyping::Annotation';
 
 has 'data_path' =>
