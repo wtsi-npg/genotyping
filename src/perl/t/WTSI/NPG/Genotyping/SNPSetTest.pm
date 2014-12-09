@@ -8,10 +8,11 @@ use warnings;
 
 use File::Compare;
 use File::Temp qw(tempdir);
+use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 12;
+use Test::More tests => 16;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -72,7 +73,7 @@ sub constructor : Test(5) {
   } 'Cannot construct from both file and data object';
 }
 
-sub snps : Test(1) {
+sub snps : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
   my $data_object = WTSI::NPG::iRODS::DataObject->new
     ($irods, "$irods_tmp_coll/snpset/$data_file");
@@ -81,6 +82,34 @@ sub snps : Test(1) {
 
   cmp_ok(scalar @{$snpset->snps}, '==', 26,
          'Contains expected number of SNPs');
+
+  ok((all { $_->snpset->contains_snp($_->name) } @{$snpset->snps}),
+     'All SNPs and contained by parent');
+}
+
+sub references : Test(3) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $data_object = WTSI::NPG::iRODS::DataObject->new
+    ($irods, "$irods_tmp_coll/snpset/$data_file");
+
+  $data_object->add_avu('reference_name', 'ref1');
+  $data_object->add_avu('reference_name', 'ref2');
+
+  # References obtained from metadata, added automatically
+  my $snpset1 = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+
+  cmp_ok(scalar @{$snpset1->references}, '==', 2,
+         'Has expected number of References');
+
+  my @expected_names = qw(ref1 ref2);
+  my @ref_names = map { $_->name } @{$snpset1->references};
+  is_deeply(\@ref_names, \@expected_names,
+            'Contains expected reference names') or diag explain \@ref_names;
+
+  # No metadata, no references added automatically
+  my $snpset2 = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
+  cmp_ok(scalar @{$snpset2->references}, '==', 0,
+         'Has no of References');
 }
 
 sub snp_names : Test(2) {

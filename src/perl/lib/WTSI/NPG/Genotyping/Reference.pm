@@ -1,23 +1,12 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::SNP;
+package WTSI::NPG::Genotyping::Reference;
 
 use Moose;
 
-has 'name'       => (is => 'ro', isa => 'Str', required => 1);
-has 'ref_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'alt_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'chromosome' => (is => 'ro', isa => 'Str', required => 0);
-has 'position'   => (is => 'ro', isa => 'Int', required => 0);
-has 'strand'     => (is => 'ro', isa => 'Str', required => 0);
-has 'str'        => (is => 'ro', isa => 'Str', required => 0);
-
-has 'snpset' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::SNPSet',
-   required => 1,
-   weak_ref => 1);
+has 'canonical_name' => (is => 'ro', isa => 'Str', required => 0);
+has 'name'           => (is => 'ro', isa => 'Str', required => 1);
 
 __PACKAGE__->meta->make_immutable;
 
@@ -29,16 +18,18 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::SNP - Information on a single SNP
+WTSI::NPG::Genotyping::Reference - A genome reference sequence.
 
 =head1 SYNOPSIS
 
-   my $snp = WTSI::NPG::Genotyping::SNP(name => 'rs12345');
+   my $ref = WTSI::NPG::Genotyping::Reference
+     (canonical_name => 'GRCh38',
+      name           => 'Homo_sapiens (GRCh38_15)');
 
 =head1 DESCRIPTION
 
-A instance of SNP represents a SNP on a specific reference (or
-references).
+A instance of Reference represents a specific genome reference
+sequence.
 
 =head1 AUTHOR
 

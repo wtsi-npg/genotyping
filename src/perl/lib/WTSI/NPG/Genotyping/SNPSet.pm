@@ -8,9 +8,11 @@ use Log::Log4perl::Level;
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::Genotyping::Reference;
 use WTSI::NPG::Genotyping::SNP;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
+  'WTSI::NPG::Annotation';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 
@@ -33,10 +35,12 @@ has 'snps' =>
    builder  => '_build_snps',
    lazy     => 1);
 
-has 'quiet' => # reduced level of log output
+has 'references' =>
   (is       => 'ro',
-   isa      => 'Bool',
-   default  => 0);
+   isa      => 'ArrayRef[WTSI::NPG::Genotyping::Reference]',
+   required => 1,
+   builder  => '_build_references',
+   lazy     => 1);
 
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
@@ -55,14 +59,11 @@ around BUILDARGS => sub {
   }
 };
 
-# BUILD is defined in the Storable Role
-sub BUILD {
-  my ($self) = @_;
+# sub BUILD {
+#   my ($self) = @_;
 
-  if ($self->quiet) { $self->logger->level($ERROR); }
-
-  $self->_build_snps;
-}
+#   $self->_build_snps;
+# }
 
 =head2 snp_names
 
@@ -142,6 +143,7 @@ sub write_snpset_data {
     or $self->logcroak("Failed to open SNP set file '$file_name' ",
                        "for writing: $!");
 
+  print $out '#';
   $csv->print($out, $self->column_names);
 
   foreach my $snp (@{$self->snps}) {
@@ -178,6 +180,23 @@ sub _build_snps {
   close $fh or $self->logwarn("Failed to close a string handle");
 
   return $records;
+}
+
+sub _build_references {
+  my ($self) = @_;
+
+  my @references;
+  if ($self->data_object) {
+    my @reference_name_avus = $self->data_object->find_in_metadata
+      ($self->reference_genome_name_attr);
+
+    foreach my $avu (@reference_name_avus) {
+      push @references, WTSI::NPG::Genotyping::Reference->new
+        (name => $avu->{value});
+    }
+  }
+
+  return \@references;
 }
 
 sub _parse_snps {
@@ -221,7 +240,8 @@ sub _parse_snps {
        chromosome => $record->[3],
        position   => $record->[4],
        strand     => $record->[5],
-       str        => $csv->string);
+       str        => $csv->string,
+       snpset     => $self);
   }
   $csv->eof or
     $self->logconfess("Parse error within '", $self->str, "': ",
