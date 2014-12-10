@@ -5,6 +5,9 @@ package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 
 use Moose;
 
+use List::Util qw (reduce);
+use List::MoreUtils qw (uniq);
+
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
@@ -44,6 +47,11 @@ has 'snpsets_cache' =>
    default  => sub { return {} },
    init_arg => undef);
 
+# TODO Remove duplication of $NO_CALL_GENOTYPE in AssayResult.pm
+our $NO_CALL_GENOTYPE = 'NN';
+
+our $RECORD_SEPARATOR = chr(30); # Use ASCII 30 as non-printing separator
+
 sub BUILD {
   my ($self) = @_;
 
@@ -77,8 +85,7 @@ sub get_snpset {
    $reference_name or
      $self->logconfess('The reference_name argument was empty');
 
-   # ASCII 30 is the record separator
-   my $cache_key = $snpset_name . chr(30) . $reference_name;
+   my $cache_key = $snpset_name . $RECORD_SEPARATOR . $reference_name;
    if (exists $self->snpsets_cache->{$cache_key}) {
      $self->debug("Found SNP set '$snpset_name' and reference ",
                   "'$reference_name' in the cache");
@@ -107,6 +114,33 @@ sub get_snpset {
 
    return $self->snpsets_cache->{$cache_key};
 }
+
+=head2 get_assay_resultset
+
+  Arg [1] : Str SNP set name e.g. 'qc'
+  Arg [2] : Str sample identifier (dcterms:identifier)
+  Arg [n] : Optional additional query specs as ArrayRefs.
+  Example : $sub->get_assay_resultset('qc', '0123456789',
+                                      [study => 12345]);
+  Description: Fetch an assay result by SNP set and sample. Raises an error
+               if the query finds >1 result set.
+  Returntype : WTSI::NPG::Genotyping::Fluidigm::AssayResultSet
+
+=cut
+
+sub get_assay_resultset {
+    my ($self, $snpset_name, $sample_identifier, @query_specs) = @_;
+    my @resultsets = $self->get_assay_resultsets
+        ($snpset_name, $sample_identifier, @query_specs);
+    my $num_resultsets = scalar @resultsets;
+    if ($num_resultsets > 1) {
+        $self->logconfess("The assay results query was not specific enough; ",
+                          "$num_resultsets result sets were returned: [",
+                          join(', ', map { $_->str } @resultsets), "]");
+    }
+    return shift @resultsets;
+}
+
 
 =head2 get_assay_resultsets
 
@@ -147,36 +181,6 @@ sub get_assay_resultsets {
   return @resultsets;
 }
 
-=head2 get_assay_resultset
-
-  Arg [1]    : Str SNP set name e.g. 'qc'
-  Arg [2]    : Str sample identifier (dcterms:identifier)
-  Arg [n]    : Optional additional query specs as ArrayRefs.
-
-  Example    : $sub->get_assay_resultset('qc', '0123456789',
-                                         [study => 12345]);
-  Description: Fetch an assay result by SNP set and sample. Raises an error
-               if the query finds >1 result set.
-  Returntype : WTSI::NPG::Genotyping::Fluidigm::AssayResultSet
-
-=cut
-
-sub get_assay_resultset {
-  my ($self, $snpset_name, $sample_identifier, @query_specs) = @_;
-
-  my @resultsets = $self->get_assay_resultsets
-    ($snpset_name, $sample_identifier, @query_specs);
-
-  my $num_resultsets = scalar @resultsets;
-  if ($num_resultsets > 1) {
-    $self->logconfess("The assay results query was not specific enough; ",
-                      "$num_resultsets result sets were returned: [",
-                      join(', ', map { $_->str } @resultsets), "]");
-  }
-
-  return shift @resultsets;
-}
-
 =head2 get_calls
 
   Arg [1]    : Str reference name e.g. 'Homo sapiens (1000 Genomes)'
@@ -195,47 +199,59 @@ sub get_assay_resultset {
 sub get_calls {
   my ($self, $reference_name, $snpset_name, $sample_identifier,
       @query_specs) = @_;
-
-  my @calls;
-
   $self->debug("Finding a Fluidigm resultset for sample '$sample_identifier' ",
                "using SNP set '$snpset_name' on reference '$reference_name'");
-
-  my $resultset = $self->get_assay_resultset
-    ($snpset_name, $sample_identifier, @query_specs);
-
-  if ($resultset) {
-    my $snpset = $self->get_snpset($snpset_name, $reference_name);
-
-    foreach my $result (@{$resultset->assay_results}) {
-      if (!$result->is_control) {
-        my @snps = $snpset->named_snp($result->snp_assayed);
-        unless (@snps) {
-          $self->logconfess("Failed to get '", $resultset->str, "' calls ",
-                            "for SNP '", $result->snp_assayed, "' ",
-                            "on reference '$reference_name': this SNP is not ",
-                            "present in SNP set '", $snpset->str, "'");
-        }
-
-        my $snp = shift @snps;
-        my $genotype = $result->npg_call;
-
-        my $call = WTSI::NPG::Genotyping::Call->new
-          (genotype => $genotype,
-           snp      => $snp);
-
-        push @calls, $call;
+  my @resultsets = $self->get_assay_resultsets
+      ($snpset_name, $sample_identifier, @query_specs);
+  my @calls;
+  if (scalar @resultsets == 0) {
+      $self->debug("Failed to find a Fluidigm resultset for sample ",
+                   "'$sample_identifier' using SNP set '$snpset_name' on ",
+                   "reference '$reference_name'");
+  } else {
+      # want to merge the calls for each SNP in the given snpset
+      my $snpset = $self->get_snpset($snpset_name, $reference_name);
+      my @snp_names = $snpset->snp_names();
+      my %calls_by_snp = ();
+      my %keys_by_name = (); # use to preserve ordering of SNP names
+      foreach my $resultset (@resultsets) {
+          foreach my $call (@{$resultset->get_calls($snpset)}) {
+              my @key_fields = ($call->snp->name,
+                                $call->snp->ref_allele,
+                                $call->snp->alt_allele,
+                                $call->snp->chromosome,
+                                $call->snp->position,
+                                $call->snp->strand
+                            );
+              my $snp_key = join($RECORD_SEPARATOR, @key_fields);
+              push @{$calls_by_snp{$snp_key}}, $call;
+              push @{$keys_by_name{$call->snp->name}}, $snp_key;
+          }
       }
-    }
+      foreach my $snp_name (@snp_names) {
+          # may have double-counted keys for gender markers
+          my @snp_keys = uniq @{$keys_by_name{$snp_name}};
+          foreach my $snp_key (@snp_keys) {
+              my $call;
+              eval {
+                  $call = reduce { $a->merge($b) } @{$calls_by_snp{$snp_key}}
+              };
+              if ($@) {
+                  my $snp = $calls_by_snp{$snp_key}[0]->snp;
+                  $self->logwarn("Cannot merge Fluidigm calls for SNP '",
+                                 $snp->name, "', defaulting to no-call: ", $@);
+                  $call = WTSI::NPG::Genotyping::Call->new
+                      (genotype   => $NO_CALL_GENOTYPE,
+                       snp        => $snp,
+                       is_call    => 0);
+              }
+              push @calls, $call;
+          }
+      }
   }
-  else {
-    $self->debug("Failed to find a Fluidigm resultset for sample ",
-                 "'$sample_identifier' using SNP set '$snpset_name' on ",
-                 "reference '$reference_name'");
-  }
-
   return \@calls;
 }
+
 
 __PACKAGE__->meta->make_immutable;
 
