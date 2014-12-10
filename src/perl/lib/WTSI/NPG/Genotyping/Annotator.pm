@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::Annotator;
 use Moose::Role;
 use UUID;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Genotyping::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation';
 
 =head2 make_infinium_metadata
 

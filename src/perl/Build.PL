@@ -8,7 +8,7 @@ use warnings;
 # directory is added because the Test::Class tests are there.
 use lib qw(. t);
 
-use Module::Build;
+use WTSI::DNAP::Utilities::Build;
 use Build;
 
 my $build = Build->new
@@ -16,15 +16,21 @@ my $build = Build->new
    dist_author     => ['Iain Bancarz <ib5@sanger.ac.uk>',
                        'Keith James <kdj@sanger.ac.uk>'],
    dist_abstract   => 'WTSI genotyping data management tools',
-   dist_version    => Build->git_tag,
+   dist_version    => Build->report_version,,
    license         => 'gpl',
-   requires => {'Carp'             => 0,
-                'TAP::Harness'     => 0,
-                'Test::Class'      => 0,
-                'Test::More'       => 0,
-                'Test::Exception'  => 0,
-                'DBIx::Class'      => 0,
-                'Config::IniFiles' => 0},
+   configure_requires => {
+                          'Module::Build'   => 0.42
+                         },
+   test_requires      => {
+                          'TAP::Harness'    => '>= 3.30',
+                          'Test::Class'     => '>= 0.41',
+                          'Test::More'      => '>= 0.98',
+                          'Test::Exception' => '>= 0.32',
+                         },
+   requires          => {
+                         'Carp'             => '>= 1.20',
+                         'WTSI::NPG::iRODS' => 0
+                        },
    ini_files => {'etc/genders.ini'   => 'etc/genders.ini',
                  'etc/methods.ini'   => 'etc/methods.ini',
                  'etc/pipeline.ini'  => 'etc/pipeline.ini',

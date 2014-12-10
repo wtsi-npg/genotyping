@@ -17,7 +17,7 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';

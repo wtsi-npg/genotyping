@@ -11,8 +11,8 @@ use JSON;
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::IO qw(maybe_stdout);
 use WTSI::NPG::Genotyping::Database::Pipeline;
-use WTSI::NPG::Utilities::IO qw(maybe_stdout);
 
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";

@@ -7,11 +7,11 @@ use warnings;
 use Carp;
 use List::AllUtils qw(pairs);
 
+use WTSI::DNAP::Utilities::IO qw(maybe_stdin);
 use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Utilities::DelimitedFiles qw(read_column_names
                                             find_column_indices
                                             filter_columns);
-use WTSI::NPG::Utilities::IO qw(maybe_stdin);
 
 use base 'Exporter';
 our @EXPORT_OK = qw(filter_gt_columns

@@ -13,8 +13,8 @@ use WTSI::NPG::SimplePublisher;
 use WTSI::NPG::Utilities qw(collect_files);
 use WTSI::NPG::iRODS;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
-  'WTSI::NPG::Expression::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
 our $FILE_TESTER = 'file';
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/exp/infinium';
@@ -264,7 +264,7 @@ sub publish_analysis_file {
 sub is_text_file {
   my ($self, $filename) = @_;
 
-  my $test_run = WTSI::NPG::Runnable->new
+  my $test_run = WTSI::DNAP::Utilities::Runnable->new
     (executable  => $FILE_TESTER,
      arguments   => ['-b', '-i', $filename])->run;
 
@@ -289,7 +289,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013-2014 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

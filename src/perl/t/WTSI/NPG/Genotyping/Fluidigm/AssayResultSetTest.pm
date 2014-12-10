@@ -71,6 +71,10 @@ sub constructor : Test(5) {
 
 sub assay_results : Test(1) {
   my $irods = WTSI::NPG::iRODS->new;
+  #$irods->obj_reader->max_size(1024 * 1024);
+  #$irods->obj_reader->parser()
+
+
   my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
     ($irods, "$irods_tmp_coll/1381735059/$data_file");
   my $resultset = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new

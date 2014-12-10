@@ -9,7 +9,7 @@ package WTSI::NPG::Genotyping::QC::Collation;
 use strict;
 use warnings;
 use Carp;
-use IO::Uncompress::Gunzip; # for duplicate_full.txt.gz
+use IO::Uncompress::Gunzip qw($GunzipError); # for duplicate_full.txt.gz
 use JSON;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getDatabaseObject
@@ -420,7 +420,7 @@ sub readDuplicates {
     # read pairwise similarities for duplicate check from gzipped file
     # also find maximum pairwise similarity for each sample
     my $inPath = shift;
-    my (%similarity, %max, $GunzipError);
+    my (%similarity, %max);
     my $z = new IO::Uncompress::Gunzip $inPath ||
     croak "gunzip failed: $GunzipError\n";
     my $firstLine = 1;
