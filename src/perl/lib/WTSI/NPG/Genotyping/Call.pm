@@ -42,14 +42,16 @@ sub merge {
         $self->logconfess("Attempted to merge calls for non-identical SNPs");
     }
     my $merged;
-    if ($self->genotype eq $other->genotype || !($other->is_call)) {
+    if ($self->is_call && !($other->is_call)) {
         $merged = $self;
-    } elsif (!($self->is_call)) {
+    } elsif (!($self->is_call) && $other->is_call) {
         $merged = $other;
+    } elsif ($self->genotype eq $other->genotype) {
+        $merged = $self;
     } else {
-        $self->logdie("Unable to merge differing non-null calls for SNP '",
-                      $self->snp->name, "': '", $self->genotype, "', '",
-                      $other->genotype, "'");
+        $self->logdie("Unable to merge differing non-null genotype calls ",
+                      "for SNP '", $self->snp->name, "': '",
+                      $self->genotype, "', '", $other->genotype, "'");
     }
     return $merged;
 }
