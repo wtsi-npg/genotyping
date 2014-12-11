@@ -13,6 +13,33 @@ has 'position'   => (is => 'ro', isa => 'Int', required => 0);
 has 'strand'     => (is => 'ro', isa => 'Str', required => 0);
 has 'str'        => (is => 'ro', isa => 'Str', required => 0);
 
+=head2 equals
+
+  Arg [1]    : WTSI::NPG::Genotyping::SNP
+
+  Description: Test whether this SNP is equal to another SNP. Two SNPs are
+               equal if all their attributes other than 'str' are equal.
+               (Equality of 'str' is not tested, as it represents raw
+               input from file.)
+
+  Returntype : Bool
+
+=cut
+
+sub equals {
+    my ($self, $other) = @_;
+    my $equal = ($self->name eq $other->name &&
+                 $self->ref_allele eq $other->ref_allele &&
+                 $self->alt_allele eq $other->alt_allele &&
+                 $self->chromosome eq $other->chromosome &&
+                 $self->position == $other->position &&
+                 $self->strand eq $other->strand
+             );
+    # do not compare the 'str' attribute, which represents raw input from file
+    return $equal;
+}
+
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;

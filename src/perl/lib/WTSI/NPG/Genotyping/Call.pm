@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Call;
 
 use Moose;
 
+with 'WTSI::DNAP::Utilities::Loggable';
+
 has 'snp' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::SNP',
@@ -14,6 +16,44 @@ has 'genotype' =>
   (is       => 'ro',
    isa      => 'Str',
    required => 1);
+
+has 'is_call' =>
+  (is       => 'ro',
+   isa      => 'Bool',
+   default  => 1); # used to represent 'no calls'
+
+=head2 merge
+
+  Arg [1]    : WTSI::NPG::Genotyping::Call
+
+  Example    : $new_call = $call->merge($other_call)
+  Description: Merge results of this call with another on the same SNP:
+               - If the genotypes are identical, return $self unchanged.
+               - If exactly one of the two calls is a 'no call', return the
+               non-null call.
+               - If two non-null genotypes are in conflict, return undef
+  Returntype : WTSI::NPG::Genotyping::Call or undef
+
+=cut
+
+sub merge {
+    my ($self, $other) = @_;
+    unless ($self->snp->equals($other->snp)) {
+        $self->logconfess("Attempted to merge calls for non-identical SNPs");
+    }
+    my $merged;
+    if ($self->genotype eq $other->genotype || !($other->is_call)) {
+        $merged = $self;
+    } elsif (!($self->is_call)) {
+        $merged = $other;
+    } else {
+        $self->logdie("Unable to merge differing non-null calls for SNP '",
+                      $self->snp->name, "': '", $self->genotype, "', '",
+                      $other->genotype, "'");
+    }
+    return $merged;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
