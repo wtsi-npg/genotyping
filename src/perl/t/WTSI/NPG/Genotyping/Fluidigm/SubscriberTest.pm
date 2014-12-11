@@ -8,7 +8,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 35;
+use Test::More tests => 37;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -104,25 +104,25 @@ sub get_assay_resultset : Test(2) {
   } 'Fails on matching multiple results';
 }
 
-sub get_calls : Test(29) {
+sub get_calls : Test(31) {
   my $irods = WTSI::NPG::iRODS->new;
 
-  # get_calls merges results for S01_1381735059.csv and S01_1381735060.csv
-  # S01_1381735060.csv differs by a no call for rs8065080
-  my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-      (irods          => $irods,
-       data_path      => $irods_tmp_coll,
-       reference_path => $irods_tmp_coll)->get_calls
-         ('Homo_sapiens (1000Genomes)', 'qc', 'ABC0123456789')};
-  cmp_ok(scalar @calls, '==', 26, 'Number of calls');
+  # check we can correctly read a single resultset
+  my $reference_name = 'Homo_sapiens (1000Genomes)';
+  my $snpset_name = 'qc';
+  my @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
+                                           $reference_name, $snpset_name,
+                                           'XYZ0123456789');
+  is(26, scalar @calls_observed,
+     "Correct number of calls in singular resultset");
 
   my @calls_expected = (['GS34251',    'TC'],
                         ['GS34251',    'TC'],
                         ['GS35220',    'CT'],
                         ['GS35220',    'CT'],
                         ['rs11096957', 'TG'],
-                        ['rs12828016', 'NN'], # 'No Call'
-                        ['rs156697',   'NN'], # 'Invalid' call
+                        ['rs12828016', 'GT'],
+                        ['rs156697',   'AG'],
                         ['rs1801262',  'TC'],
                         ['rs1805034',  'CT'],
                         ['rs1805087',  'AG'],
@@ -143,10 +143,46 @@ sub get_calls : Test(29) {
                         ['rs7627615',  'GA'],
                         ['rs8065080',  'TC']);
 
-  my @calls_observed;
-  foreach my $call (@calls) {
-    push @calls_observed, [$call->snp->name, $call->genotype],
-  }
+  is_deeply(\@calls_observed, \@calls_expected,
+            "All calls match in singular resultset") or
+                diag explain \@calls_observed;
+
+  # get merged results for S01_1381735059.csv and S01_1381735060.csv
+  # S01_1381735060.csv differs by a no call for rs8065080
+
+  @calls_expected = (['GS34251',    'TC'],
+                     ['GS34251',    'TC'],
+                     ['GS35220',    'CT'],
+                     ['GS35220',    'CT'],
+                     ['rs11096957', 'TG'],
+                     ['rs12828016', 'NN'], # 'No Call'
+                     ['rs156697',   'NN'], # 'Invalid' call
+                     ['rs1801262',  'TC'],
+                     ['rs1805034',  'CT'],
+                     ['rs1805087',  'AG'],
+                     ['rs2247870',  'GA'],
+                     ['rs2286963',  'TG'],
+                     ['rs3742207',  'TG'],
+                     ['rs3795677',  'GA'],
+                     ['rs4075254',  'GA'],
+                     ['rs4619',     'AG'],
+                     ['rs4843075',  'GA'],
+                     ['rs5215',     'CT'],
+                     ['rs6166',     'CT'],
+                     ['rs649058',   'GA'],
+                     ['rs6557634',  'TC'],
+                     ['rs6759892',  'TG'],
+                     ['rs7298565',  'GA'],
+                     ['rs753381',   'TC'],
+                     ['rs7627615',  'GA'],
+                     ['rs8065080',  'TC']);
+
+  @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
+                                        $reference_name, $snpset_name,
+                                        'ABC0123456789');
+
+  is(26, scalar @calls_observed,
+     "Correct number of calls in merged resultset");
 
   is_deeply(\@calls_observed, \@calls_expected,
             "All calls match in merged resultset") or
@@ -163,15 +199,9 @@ sub get_calls : Test(29) {
   $resultset_obj->add_avu('dcterms:identifier', $sample_identifiers[0]);
   $resultset_obj->add_avu('dcterms:identifier', $non_unique_identifier);
 
-  @calls =  @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-      (irods          => $irods,
-       data_path      => $irods_tmp_coll,
-       reference_path => $irods_tmp_coll)->get_calls
-           ('Homo_sapiens (1000Genomes)', 'qc', 'ABC0123456789')};
-  @calls_observed = ();
-  foreach my $call (@calls) {
-    push @calls_observed, [$call->snp->name, $call->genotype],
-  }
+  @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
+                                        $reference_name, $snpset_name,
+                                        'ABC0123456789');
 
   # Merging 3 un-mergable resultsets
   is (scalar @calls_expected, scalar @calls_observed,
@@ -188,6 +218,22 @@ sub get_calls : Test(29) {
   # calls differ at the 25th SNP, rs7627615
   isnt($calls_observed[$unmatched_pos][1], $calls_expected[$unmatched_pos][1],
        "Calls do not match for snp at position $unmatched_pos");
+}
+
+sub _get_observed_calls {
+  # get (snp_name, genotype) pair observed for each call
+  my ($irods, $irods_coll, $reference_name, $snpset_name, $sample_id) = @_;
+
+  my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+        (irods          => $irods,
+         data_path      => $irods_coll,
+         reference_path => $irods_coll)->get_calls
+             ($reference_name, $snpset_name, $sample_id)};
+  my @calls_observed = ();
+  foreach my $call (@calls) {
+      push @calls_observed, [$call->snp->name, $call->genotype],
+  }
+  return @calls_observed;
 }
 
 1;
