@@ -14,6 +14,7 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
+use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
@@ -161,42 +162,65 @@ sub _generate_vcf_complete {
     my ($self, @args) = @_;
     my ($callsRef, $samplesRef) = $self->_parse_calls_samples();
     my %calls = %{$callsRef};
-    my $read_depth = $DEFAULT_READ_DEPTH; # placeholder
-    my $qscore = $DEFAULT_QUALITY;        # placeholder genotype quality
+
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
     my ($chroms, $snpset);
     $snpset = $self->snpset;
     my $total = scalar(@{$snpset->snps()});
     push(@output, $self->_generate_vcf_header(\@samples));
+
     foreach my $snp (@{$snpset->snps}) {
-        my $ref = $snp->ref_allele();
-        my $alt = $snp->alt_allele();
-        my $chrom = $snp->chromosome();
-        if ($self->normalize_chromosome) {
-            $chrom = $self->_normalize_chromosome_name($chrom);
+        if (is_GenderMarker($snp)) {
+          push @output,
+            $self->_generate_vcf_records($snp->x_marker, \%calls, \@samples),
+            $self->_generate_vcf_records($snp->y_marker, \%calls, \@samples);
         }
-        my @fields = ( $chrom,                    # CHROM
-                       $snp->position(),          # POS
-                       $snp->name(),              # ID
-                       $ref,                      # REF
-                       $alt,                      # ALT
-                       '.', '.',                  # QUAL, FILTER
-                       'ORIGINAL_STRAND='.$snp->strand(),  # INFO
-                       'GT:GQ:DP',                # FORMAT
-                   );
-        foreach my $sample (@samples) {
-            my $call_raw = $calls{$snp->name}{$sample};
-            my $call = $self->_call_to_vcf($call_raw, $ref, $alt,
-                                           $snp->strand());
-            $call_raw ||= ".";
-            $call ||= ".";
-            my @sample_fields = ($call, $qscore, $read_depth);
-            push(@fields, join(':', @sample_fields));
+        else {
+            push @output,
+              $self->_generate_vcf_records($snp, \%calls, \@samples);
         }
-        push(@output, join("\t", @fields));
     }
+
     return @output;
+}
+
+sub _generate_vcf_records {
+    my ($self, $snp, $calls, $samples) = @_;
+
+    my $read_depth = $DEFAULT_READ_DEPTH; # placeholder
+    my $qscore = $DEFAULT_QUALITY;        # placeholder genotype quality
+
+    my $ref = $snp->ref_allele();
+    my $alt = $snp->alt_allele();
+    my $chrom = $snp->chromosome();
+    if ($self->normalize_chromosome) {
+        $chrom = $self->_normalize_chromosome_name($chrom);
+    }
+
+    my @fields = ( $chrom,                    # CHROM
+                   $snp->position(),          # POS
+                   $snp->name(),              # ID
+                   $ref,                      # REF
+                   $alt,                      # ALT
+                   '.', '.',                  # QUAL, FILTER
+                   'ORIGINAL_STRAND='.$snp->strand(),  # INFO
+                   'GT:GQ:DP',                # FORMAT
+                 );
+
+    my @records;
+    foreach my $sample (@$samples) {
+        my $call_raw = $calls->{$snp->name}{$sample};
+        my $call = $self->_call_to_vcf($call_raw, $ref, $alt, $snp->strand());
+        $call_raw ||= ".";
+        $call ||= ".";
+        my @sample_fields = ($call, $qscore, $read_depth);
+        push(@fields, join(':', @sample_fields));
+    }
+
+    push(@records, join("\t", @fields));
+
+    return @records;
 }
 
 sub _generate_vcf_header {

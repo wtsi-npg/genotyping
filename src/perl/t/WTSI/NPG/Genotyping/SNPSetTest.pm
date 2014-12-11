@@ -24,7 +24,7 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
 my $data_path = './t/snpset';
-my $data_file = 'qc.csv';
+my $data_file = 'qc.tsv';
 
 my $irods_tmp_coll;
 
@@ -80,7 +80,7 @@ sub snps : Test(2) {
 
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
 
-  cmp_ok(scalar @{$snpset->snps}, '==', 26,
+  cmp_ok(scalar @{$snpset->snps}, '==', 24,
          'Contains expected number of SNPs');
 
   ok((all { $_->snpset->contains_snp($_->name) } @{$snpset->snps}),

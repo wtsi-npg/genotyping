@@ -5,16 +5,14 @@ package WTSI::NPG::Genotyping::SNPSetPublisher;
 
 use File::Spec;
 use Moose;
-use Moose::Util::TypeConstraints;
 
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Genotyping::Types qw(Platform);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator';
-
-enum 'GenotypingPlatform', [qw(fluidigm sequenom)];
 
 has 'file_name' =>
   (is       => 'ro',
@@ -28,7 +26,7 @@ has 'snpset_name' =>
 
 has 'snpset_platform' =>
   (is       => 'ro',
-   isa      => 'GenotypingPlatform',
+   isa      => Platform,
    required => 1);
 
 has 'reference_names' =>

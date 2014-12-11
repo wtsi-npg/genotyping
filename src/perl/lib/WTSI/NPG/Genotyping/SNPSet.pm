@@ -8,8 +8,11 @@ use Log::Log4perl::Level;
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::Genotyping::GenderMarker;
 use WTSI::NPG::Genotyping::Reference;
 use WTSI::NPG::Genotyping::SNP;
+
+use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
   'WTSI::NPG::Annotation';
@@ -30,14 +33,14 @@ has 'column_names' =>
 
 has 'snps' =>
   (is       => 'ro',
-   isa      => 'ArrayRef[WTSI::NPG::Genotyping::SNP]',
+   isa      => ArrayRefOfVariant,
    required => 1,
    builder  => '_build_snps',
    lazy     => 1);
 
 has 'references' =>
   (is       => 'ro',
-   isa      => 'ArrayRef[WTSI::NPG::Genotyping::Reference]',
+   isa      => ArrayRefOfReference,
    required => 1,
    builder  => '_build_references',
    lazy     => 1);
@@ -58,12 +61,6 @@ around BUILDARGS => sub {
     return $class->$orig(@_);
   }
 };
-
-# sub BUILD {
-#   my ($self) = @_;
-
-#   $self->_build_snps;
-# }
 
 =head2 snp_names
 
@@ -86,12 +83,12 @@ sub snp_names {
   return sort { $a cmp $b } uniq @snp_names;
 }
 
-=head2 snp_names
+=head2 named_snp
 
   Arg [1]    : Str SNP name e.g. rs######
 
   Example    : $snp = $set->named_snp('rs0123456')
-  Description: Return specific, named SNP from the set.
+  Description: Return specific, named SNP(s) from the set.
   Returntype : WTSI::NPG::Genotyping::SNP
 
 =cut
@@ -147,11 +144,23 @@ sub write_snpset_data {
   $csv->print($out, $self->column_names);
 
   foreach my $snp (@{$self->snps}) {
-    $csv->print($out, [$snp->name, $snp->ref_allele, $snp->alt_allele,
-                       $snp->chromosome, $snp->position, $snp->strand])
-      or $self->logcroak("Failed to write record [", $snp->str,
-                         "] to '$file_name': ", $csv->error_diag);
-    ++$records_written;
+    if (is_GenderMarker($snp)) {
+      _write_snp_record($csv, $out, $snp->x_marker) or
+        $self->logcroak("Failed to write record [", $snp->x_marker->str,
+                        "] to '$file_name': ", $csv->error_diag);
+      ++$records_written;
+
+      _write_snp_record($csv, $out, $snp->y_marker) or
+        $self->logcroak("Failed to write record [", $snp->y_marker->str,
+                        "] to '$file_name': ", $csv->error_diag);
+      ++$records_written;
+    }
+    else {
+      _write_snp_record($csv, $out, $snp)
+        or $self->logcroak("Failed to write record [", $snp->str,
+                           "] to '$file_name': ", $csv->error_diag);
+      ++$records_written;
+    }
   }
 
   close $out;
@@ -219,7 +228,9 @@ sub _parse_snps {
 
   $self->_write_column_names($header);
 
-  my @records;
+  my @snps;
+  my %gender_markers;
+
   while (my $record = $csv->getline($fh)) {
     $csv->combine(@$record);
 
@@ -233,7 +244,7 @@ sub _parse_snps {
                         "expected 6 fields but found $num_fields");
     }
 
-    push @records, WTSI::NPG::Genotyping::SNP->new
+    my $snp = WTSI::NPG::Genotyping::SNP->new
       (name       => $record->[0],
        ref_allele => $record->[1],
        alt_allele => $record->[2],
@@ -242,13 +253,64 @@ sub _parse_snps {
        strand     => $record->[5],
        str        => $csv->string,
        snpset     => $self);
+
+    my $key = $snp->name;
+    if ($snp->is_gender_marker) {
+      $self->debug("SNP ", $snp->name, " is a gender marker");
+
+      if (exists $gender_markers{$key}) {
+        my $x_marker;
+        my $y_marker;
+
+        # FIXME -- check for conflicts
+        if ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?X$}) {
+          $x_marker = delete $gender_markers{$key};
+        }
+        elsif ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?Y$}) {
+          $y_marker = delete $gender_markers{$key};
+        }
+
+        # FIXME -- check for conflicts
+        # if ($snp->chromosome =~ m{(^[Cc]hr)?X$}) {
+        if (is_HsapiensX($snp->chromosome)) {
+          $x_marker = $snp;
+        }
+        elsif (is_HsapiensY($snp->chromosome)) {
+          $y_marker = $snp;
+        }
+
+        # FIXME -- check for X and Y SNPs
+
+        push @snps, WTSI::NPG::Genotyping::GenderMarker->new
+          (name     => $snp->name,
+           x_marker => $x_marker,
+           y_marker => $y_marker);
+      }
+      else {
+        $gender_markers{$key} = $snp;
+      }
+
+      # $self->warn($record->[0], " is a gender marker");
+    }
+    else {
+      $self->debug("SNP ", $snp->name, " is not a gender marker");
+      push @snps, $snp;
+    }
   }
   $csv->eof or
     $self->logconfess("Parse error within '", $self->str, "': ",
                       $csv->error_diag);
 
-  return \@records;
+  return \@snps;
 }
+
+sub _write_snp_record {
+  my ($csv, $fh, $snp) = @_;
+
+  return $csv->print($fh, [$snp->name, $snp->ref_allele, $snp->alt_allele,
+                           $snp->chromosome, $snp->position, $snp->strand]);
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

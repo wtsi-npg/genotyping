@@ -24,7 +24,7 @@ my $data_path = './t/fluidigm_subscriber';
 my @assay_resultset_files = qw(S01_1381735059.csv S02_1381735059.csv);
 my @sample_identifiers = qw(ABC0123456789 XYZ0123456789);
 my $non_unique_identifier = 'ABCDEFGHI';
-my $snpset_file = 'qc.csv';
+my $snpset_file = 'qc.tsv';
 
 my $irods_tmp_coll;
 

@@ -5,19 +5,54 @@ package WTSI::NPG::Genotyping::SNP;
 
 use Moose;
 
-has 'name'       => (is => 'ro', isa => 'Str', required => 1);
-has 'ref_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'alt_allele' => (is => 'ro', isa => 'Str', required => 0);
-has 'chromosome' => (is => 'ro', isa => 'Str', required => 0);
-has 'position'   => (is => 'ro', isa => 'Int', required => 0);
-has 'strand'     => (is => 'ro', isa => 'Str', required => 0);
-has 'str'        => (is => 'ro', isa => 'Str', required => 0);
+use WTSI::NPG::Genotyping::Types qw(:all);
+
+has 'name' =>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 1);
+
+has 'ref_allele' =>
+  (is       => 'ro',
+   isa      => DNABase,
+   required => 0);
+
+has 'alt_allele' =>
+  (is       => 'ro',
+   isa      => DNABase,
+   required => 0);
+
+has 'chromosome' =>
+  (is       => 'ro',
+   isa      => HsapiensChromosome,
+   required => 0);
+
+has 'position' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   required => 0);
+
+has 'strand' =>
+  (is       => 'ro',
+   isa      => DNAStrand,
+   required => 0);
+
+has 'str'=>
+  (is       => 'ro',
+   isa      => 'Str',
+   required => 0);
 
 has 'snpset' =>
   (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::SNPSet',
+   isa      => SNPSet,
    required => 1,
    weak_ref => 1);
+
+sub is_gender_marker {
+  my ($self) = @_;
+
+  return $self->name =~ m{^GS};
+}
 
 __PACKAGE__->meta->make_immutable;
 
