@@ -211,45 +211,37 @@ sub get_calls {
   } else {
       # want to merge the calls for each SNP in the given snpset
       my $snpset = $self->get_snpset($snpset_name, $reference_name);
-      my @snp_names = $snpset->snp_names();
-      my %calls_by_snp = ();
-      my %keys_by_name = (); # use to preserve ordering of SNP names
-      foreach my $resultset (@resultsets) {
-          foreach my $call (@{$resultset->get_calls($snpset)}) {
-              my @key_fields = ($call->snp->name,
-                                $call->snp->ref_allele,
-                                $call->snp->alt_allele,
-                                $call->snp->chromosome,
-                                $call->snp->position,
-                                $call->snp->strand
-                            );
-              my $snp_key = join($RECORD_SEPARATOR, @key_fields);
-              push @{$calls_by_snp{$snp_key}}, $call;
-              push @{$keys_by_name{$call->snp->name}}, $snp_key;
+      foreach my $snp (@{$snpset->snps}) {
+          my $snp_calls = $self->_get_snp_calls($snp, $snpset, \@resultsets);
+          my $call;
+          eval { $call = reduce { $a->merge($b) } @{$snp_calls} };
+          if ($@) {
+              $self->logwarn("Cannot merge Fluidigm calls for SNP '",
+                             $snp->name, "', defaulting to no-call: ", $@);
+              $call = WTSI::NPG::Genotyping::Call->new
+                  (genotype   => $NO_CALL_GENOTYPE,
+                   snp        => $snp,
+                   is_call    => 0);
           }
-      }
-      foreach my $snp_name (@snp_names) {
-          # may have double-counted keys for gender markers
-          my @snp_keys = uniq @{$keys_by_name{$snp_name}};
-          foreach my $snp_key (@snp_keys) {
-              my $call;
-              eval {
-                  $call = reduce { $a->merge($b) } @{$calls_by_snp{$snp_key}}
-              };
-              if ($@) {
-                  my $snp = $calls_by_snp{$snp_key}[0]->snp;
-                  $self->logwarn("Cannot merge Fluidigm calls for SNP '",
-                                 $snp->name, "', defaulting to no-call: ", $@);
-                  $call = WTSI::NPG::Genotyping::Call->new
-                      (genotype   => $NO_CALL_GENOTYPE,
-                       snp        => $snp,
-                       is_call    => 0);
-              }
-              push @calls, $call;
-          }
+          push @calls, $call;
       }
   }
   return \@calls;
+}
+
+sub _get_snp_calls {
+    # get calls for the given SNP and SNPSet, from one or more resultsets
+    # TODO make this more efficient instead of repeatedly looping over calls
+    my ($self, $snp, $snpset, $resultsets_ref) = @_;
+    my @calls;
+    foreach my $resultset (@{$resultsets_ref}) {
+        foreach my $call (@{$resultset->get_calls($snpset)}) {
+            if ($snp->equals($call->snp)) {
+                push (@calls, $call);
+            }
+        }
+    }
+    return \@calls;
 }
 
 
