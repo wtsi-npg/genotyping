@@ -6,7 +6,6 @@ package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 use Moose;
 
 use List::Util qw (reduce);
-use List::MoreUtils qw (uniq);
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
