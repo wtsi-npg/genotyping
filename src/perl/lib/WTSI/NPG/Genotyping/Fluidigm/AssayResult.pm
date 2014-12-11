@@ -26,6 +26,7 @@ our $NO_TEMPLATE_CONTROL = 'NTC';
 our $NO_CALL             = 'No Call';
 our $INVALID_NAME        = 'Invalid';
 
+# TODO Remove duplication of $NO_CALL_GENOTYPE in Subscriber.pm
 our $NO_CALL_GENOTYPE    = 'NN';
 
 =head2 is_control
