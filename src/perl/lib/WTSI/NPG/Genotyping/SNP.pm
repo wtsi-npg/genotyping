@@ -43,16 +43,53 @@ has 'str'=>
    required => 0);
 
 has 'snpset' =>
-  (is       => 'ro',
+  (is       => 'rw',
    isa      => SNPSet,
-   required => 1,
+   required => 0,
    weak_ref => 1);
+
+=head2 is_gender_marker
+
+  Arg [1]    : None
+
+  Description: Return true if this SNP is actually a gender marker.
+
+  Returntype : Bool
+
+=cut
 
 sub is_gender_marker {
   my ($self) = @_;
 
   return $self->name =~ m{^GS};
 }
+
+=head2 equals
+
+  Arg [1]    : WTSI::NPG::Genotyping::SNP
+
+  Description: Test whether this SNP is equal to another SNP. Two SNPs are
+               equal if all their attributes other than 'str' are equal.
+               (Equality of 'str' is not tested, as it represents raw
+               input from file.)
+
+  Returntype : Bool
+
+=cut
+
+sub equals {
+    my ($self, $other) = @_;
+    my $equal = ($self->name eq $other->name &&
+                 $self->ref_allele eq $other->ref_allele &&
+                 $self->alt_allele eq $other->alt_allele &&
+                 $self->chromosome eq $other->chromosome &&
+                 $self->position == $other->position &&
+                 $self->strand eq $other->strand
+             );
+    # do not compare the 'str' attribute, which represents raw input from file
+    return $equal;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

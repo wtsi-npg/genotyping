@@ -7,6 +7,7 @@ use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
@@ -122,6 +123,49 @@ sub filter_on_confidence {
 
   return \@filtered_results;
 }
+
+
+=head2 get_calls
+
+  Arg [1]    : WTSI::NPG::Genotyping::SNPSet
+
+  Example    : $sub->get_resultset_calls($self, $snpset);
+
+  Description: Extract genotype calls (if any) for the given snpset
+
+  Returntype : ArrayRef [WTSI::NPG::Genotyping::Call]
+
+=cut
+
+sub get_calls {
+    my ($self, $snpset) = @_;
+    my @calls;
+    foreach my $result (@{$self->assay_results}) {
+        if (!$result->is_control) {
+            my @snps = $snpset->named_snp($result->snp_assayed);
+            unless (@snps) {
+                $self->logconfess("Failed to get '", $self->str,
+                                  "' calls for SNP '", $result->snp_assayed,
+                                  "' ",
+                                  "': this SNP is not ",
+                                  "present in SNP set '", $snpset->str, "'");
+            }
+            # the SNP name may correspond to more than one genomic location,
+            # eg. for gender markers; create a separate call for each one
+            foreach my $snp (@snps) {
+                my $genotype = $result->npg_call;
+                my $call = WTSI::NPG::Genotyping::Call->new
+                    (genotype   => $result->npg_call,
+                     snp        => $snp,
+                     is_call    => $result->is_call);
+                push @calls, $call;
+            }
+        }
+    }
+    return \@calls;
+}
+
+
 
 sub _build_assay_results {
   my ($self) = @_;

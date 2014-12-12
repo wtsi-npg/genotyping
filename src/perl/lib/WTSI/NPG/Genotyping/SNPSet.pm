@@ -3,7 +3,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::SNPSet;
 
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(first_value);
 use Log::Log4perl::Level;
 use Moose;
 use Text::CSV;
@@ -62,6 +62,22 @@ around BUILDARGS => sub {
   }
 };
 
+sub BUILD {
+  my ($self) = @_;
+
+  my %names;
+  foreach my $snp (@{$self->snps}) {
+    if (exists $names{$snp->name}) {
+      $self->logconfess("Attempted to make a SNPSet containing a duplicate ",
+                        "of '", $snp->name, "'");
+    }
+    else {
+      $names{$snp->name} = 1;
+      $snp->snpset($self);
+    }
+  }
+}
+
 =head2 snp_names
 
   Arg [1]    : None
@@ -75,12 +91,9 @@ around BUILDARGS => sub {
 sub snp_names {
   my ($self) = @_;
 
-  my @snp_names;
-  foreach my $snp (@{$self->snps}) {
-    push @snp_names, $snp->name;
-  }
+  my @snp_names = map { $_->name } @{$self->snps};
 
-  return sort { $a cmp $b } uniq @snp_names;
+  return sort { $a cmp $b } @snp_names;
 }
 
 =head2 named_snp
@@ -101,7 +114,7 @@ sub named_snp {
   $snp_name or
     $self->logconfess("A non-empty snp_name argument is required");
 
-  return grep { $snp_name eq $_->name } @{$self->snps};
+  return first_value { $_->name eq $snp_name }  @{$self->snps};
 }
 
 sub contains_snp {
@@ -116,7 +129,8 @@ sub contains_snp {
 
   Example    : $set->write_snpset_data('snpset.txt')
   Description: Write the content of the set to a file in the TSV format
-               used by NPG.
+               used by NPG. Defaults to the file given by the
+               file_name attribute.
   Returntype : Int number of records written (may be > number of unique
                SNP names for cases such as gender markers that have
                multiple locations on the reference genome).
@@ -126,8 +140,7 @@ sub contains_snp {
 sub write_snpset_data {
   my ($self, $file_name) = @_;
 
-  defined $file_name or
-    $self->logconfess("A defined file_name argument is required");
+  $file_name ||= $self->file_name;
 
   my $records_written = 0;
   my $csv = Text::CSV->new({eol              => "\n",
@@ -171,22 +184,23 @@ sub write_snpset_data {
 sub _build_snps {
   my ($self) = @_;
 
-  my $fh;
+  # Default is to be empty
+  my $records = [];
 
   if ($self->data_object) {
     my $content = $self->data_object->slurp;
-    open $fh, '<', \$content
+    open my $fh, '<', \$content
       or $self->logconfess("Failed to open content string for reading: $!");
+    $records = $self->_parse_snps($fh);
+    close $fh or $self->logwarn("Failed to close a string handle");
   }
-  elsif ($self->file_name) {
-    open $fh, '<:encoding(utf8)', $self->file_name or
+  elsif ($self->file_name && -e $self->file_name) {
+    open my $fh, '<:encoding(utf8)', $self->file_name or
       $self->$self->logconfess("Failed to open file '", $self->file_name,
                                "' for reading: $!");
+    $records = $self->_parse_snps($fh);
+    close $fh;
   }
-
-  my $records = $self->_parse_snps($fh);
-
-  close $fh or $self->logwarn("Failed to close a string handle");
 
   return $records;
 }
@@ -216,87 +230,94 @@ sub _parse_snps {
                             allow_whitespace => undef,
                             quote_char       => undef});
 
-  my $header = $csv->getline($fh);
-  unless ($header and @$header) {
-    $self->logconfess("SNPSet data file '", $self->str, "' is empty");
-  }
-
-  unless ($header->[0] =~ m{SNP_NAME}) {
-    $self->logconfess("SNPSet data file '", $self->str,
-                      "' is missing its header");
-  }
-
-  $self->_write_column_names($header);
-
   my @snps;
-  my %gender_markers;
 
-  while (my $record = $csv->getline($fh)) {
-    $csv->combine(@$record);
+  my $header = $csv->getline($fh);
 
-    my $str = $csv->string;
-    chomp $str;
-    $self->debug("Building a new SNP set record from '$str'");
-
-    my $num_fields = scalar @$record;
-    unless ($num_fields == 6) {
-      $self->logconfess("Invalid SNP set record '$str': ",
-                        "expected 6 fields but found $num_fields");
+  if ($header and @$header) {
+    unless ($header->[0] =~ m{SNP_NAME}) {
+      $self->logconfess("SNPSet data file '", $self->str,
+                        "' is missing its header");
     }
 
-    my $snp = WTSI::NPG::Genotyping::SNP->new
-      (name       => $record->[0],
-       ref_allele => $record->[1],
-       alt_allele => $record->[2],
-       chromosome => $record->[3],
-       position   => $record->[4],
-       strand     => $record->[5],
-       str        => $csv->string,
-       snpset     => $self);
+    # Remove comment character from header
+    $header->[0] =~ s/^#(.*)/$1/;
 
-    my $key = $snp->name;
-    if ($snp->is_gender_marker) {
-      $self->debug("SNP ", $snp->name, " is a gender marker");
+    $self->_write_column_names($header);
 
-      if (exists $gender_markers{$key}) {
-        my $x_marker;
-        my $y_marker;
+    my %gender_markers;
 
-        # FIXME -- check for conflicts
-        if ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?X$}) {
-          $x_marker = delete $gender_markers{$key};
+    while (my $record = $csv->getline($fh)) {
+      $csv->combine(@$record);
+
+      my $str = $csv->string;
+      chomp $str;
+      $self->debug("Building a new SNP set record from '$str'");
+
+      my $num_fields = scalar @$record;
+      unless ($num_fields == 6) {
+        $self->logconfess("Invalid SNP set record '$str': ",
+                          "expected 6 fields but found $num_fields");
+      }
+
+      my $snp = WTSI::NPG::Genotyping::SNP->new
+        (name       => $record->[0],
+         ref_allele => $record->[1],
+         alt_allele => $record->[2],
+         chromosome => $record->[3],
+         position   => $record->[4],
+         strand     => $record->[5],
+         str        => $csv->string,
+         snpset     => $self);
+
+      my $key = $snp->name;
+      if ($snp->is_gender_marker) {
+        $self->debug("SNP ", $snp->name, " is a gender marker");
+
+        if (exists $gender_markers{$key}) {
+          my $x_marker;
+          my $y_marker;
+
+          # FIXME -- check for conflicts
+          if ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?X$}) {
+            $x_marker = delete $gender_markers{$key};
+          }
+          elsif ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?Y$}) {
+            $y_marker = delete $gender_markers{$key};
+          }
+
+          # FIXME -- check for conflicts
+          # if ($snp->chromosome =~ m{(^[Cc]hr)?X$}) {
+          if (is_HsapiensX($snp->chromosome)) {
+            $x_marker = $snp;
+          }
+          elsif (is_HsapiensY($snp->chromosome)) {
+            $y_marker = $snp;
+          }
+
+          # FIXME -- check for X and Y SNPs
+
+          push @snps, WTSI::NPG::Genotyping::GenderMarker->new
+            (name     => $snp->name,
+             x_marker => $x_marker,
+             y_marker => $y_marker);
         }
-        elsif ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?Y$}) {
-          $y_marker = delete $gender_markers{$key};
+        else {
+          $gender_markers{$key} = $snp;
         }
 
-        # FIXME -- check for conflicts
-        # if ($snp->chromosome =~ m{(^[Cc]hr)?X$}) {
-        if (is_HsapiensX($snp->chromosome)) {
-          $x_marker = $snp;
-        }
-        elsif (is_HsapiensY($snp->chromosome)) {
-          $y_marker = $snp;
-        }
-
-        # FIXME -- check for X and Y SNPs
-
-        push @snps, WTSI::NPG::Genotyping::GenderMarker->new
-          (name     => $snp->name,
-           x_marker => $x_marker,
-           y_marker => $y_marker);
+        # $self->warn($record->[0], " is a gender marker");
       }
       else {
-        $gender_markers{$key} = $snp;
+        $self->debug("SNP ", $snp->name, " is not a gender marker");
+        push @snps, $snp;
       }
-
-      # $self->warn($record->[0], " is a gender marker");
-    }
-    else {
-      $self->debug("SNP ", $snp->name, " is not a gender marker");
-      push @snps, $snp;
     }
   }
+  else {
+    $self->debug("SNPSet data file '", $self->str, "' is empty");
+  }
+
   $csv->eof or
     $self->logconfess("Parse error within '", $self->str, "': ",
                       $csv->error_diag);
@@ -339,6 +360,13 @@ in genotyping analyses
 A wrapper for the CSV data files used to contain sets of SNP
 information. It performs an eager parse of the file and provides
 methods to access and manipulate the data.
+
+If backed by an iRODS data object, instances expect to read data and
+possibly metadata from that object. Writing data back to iRODS is not
+supported. However, writing data back to regular files is supported,
+so one may create a SNPSet, passing SNPs and the name of a
+non-existent file to the constructor and then write, at which point
+a new file will be created.
 
 =head1 AUTHOR
 

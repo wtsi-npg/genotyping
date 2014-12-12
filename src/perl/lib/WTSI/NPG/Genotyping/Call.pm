@@ -19,19 +19,18 @@ has 'genotype' =>
    isa      => SNPGenotype,
    required => 1);
 
-has 'is_valid' =>
+has 'is_call' =>
   (is       => 'rw',
    isa      => 'Bool',
-   required => 1,
-   default  => 1);
+   default  => 1); # used to represent 'no calls'
 
 sub BUILD {
   my ($self) = @_;
   if ($self->genotype eq 'NN') {
-    $self->is_valid(0);
+    $self->is_call(0);
   }
 
-  if ($self->is_valid) {
+  if ($self->is_call) {
     my $gt  = $self->genotype;
     my $snp = $self->snp;
     my $r = $snp->ref_allele;
@@ -128,7 +127,41 @@ sub complement {
   return WTSI::NPG::Genotyping::Call->new
     (snp      => $self->snp,
      genotype => _complement($self->genotype),
-     is_valid => $self->is_valid);
+     is_call  => $self->is_call);
+}
+
+=head2 merge
+
+  Arg [1]    : WTSI::NPG::Genotyping::Call
+
+  Example    : $new_call = $call->merge($other_call)
+  Description: Merge results of this call with another on the same SNP:
+               - If the genotypes are identical, return $self unchanged.
+               - If exactly one of the two calls is a 'no call', return the
+               non-null call.
+               - If two non-null genotypes are in conflict, die with error
+  Returntype : WTSI::NPG::Genotyping::Call
+
+=cut
+
+sub merge {
+    my ($self, $other) = @_;
+    unless ($self->snp->equals($other->snp)) {
+        $self->logconfess("Attempted to merge calls for non-identical SNPs");
+    }
+    my $merged;
+    if ($self->is_call && !($other->is_call)) {
+        $merged = $self;
+    } elsif (!($self->is_call) && $other->is_call) {
+        $merged = $other;
+    } elsif ($self->genotype eq $other->genotype) {
+        $merged = $self;
+    } else {
+        $self->logdie("Unable to merge differing non-null genotype calls ",
+                      "for SNP '", $self->snp->name, "': '",
+                      $self->genotype, "', '", $other->genotype, "'");
+    }
+    return $merged;
 }
 
 sub _complement {
@@ -148,6 +181,7 @@ __END__
 
 =head1 AUTHOR
 
+Iain Bancarz <ib5@sanger.ac.uk>
 Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER

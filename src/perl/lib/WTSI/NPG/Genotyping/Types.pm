@@ -25,6 +25,8 @@ use MooseX::Types -declare =>
       SNPGenotype
       SNPSet
       Variant
+      XMarker
+      YMarker
     )
   ];
 
@@ -73,6 +75,18 @@ class_type SNPSet,       { class => 'WTSI::NPG::Genotyping::SNPSet' };
 
 subtype Variant,
   as GenderMarker | SNP;
+
+subtype XMarker,
+  as SNP,
+  where { is_HsapiensX($_->chromosome) },
+  message { $_->name . ' on ' . $_->chromosome .
+              ' is not a valid X chromosome marker' };
+
+subtype YMarker,
+  as SNP,
+  where { is_HsapiensY($_->chromosome) },
+  message { $_->name . ' on ' . $_->chromosome .
+              ' is not a valid Y chromosome marker' };
 
 subtype ArrayRefOfReference,
   as ArrayRef[Reference];

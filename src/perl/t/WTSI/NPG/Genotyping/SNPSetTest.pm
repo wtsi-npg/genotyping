@@ -7,12 +7,12 @@ use strict;
 use warnings;
 
 use File::Compare;
-use File::Temp qw(tempdir);
+use File::Temp qw(tempdir tempfile);
 use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 16;
+use Test::More tests => 20;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -49,10 +49,16 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::SNPSet');
 }
 
-sub constructor : Test(5) {
+sub constructor : Test(6) {
   my $irods = WTSI::NPG::iRODS->new;
   my $data_object = WTSI::NPG::iRODS::DataObject->new
     ($irods, "$irods_tmp_coll/snpset/$data_file");
+
+  # Empty file (WTSI::NPG::iRODS::Storable requires that the file exists)
+  my $fh = File::Temp->new;
+  new_ok('WTSI::NPG::Genotyping::SNPSet',
+         [file_name => $fh->filename]);
+  close $fh;
 
   # From file
   new_ok('WTSI::NPG::Genotyping::SNPSet',
@@ -71,6 +77,28 @@ sub constructor : Test(5) {
         (file_name   => "$data_path/$data_file",
          data_object => $data_object);
   } 'Cannot construct from both file and data object';
+}
+
+sub de_novo : Test(3) {
+  my $from_file = WTSI::NPG::Genotyping::SNPSet->new
+    (file_name => "$data_path/$data_file");
+
+  # Empty file (WTSI::NPG::iRODS::Storable requires that the file exists)
+  my $fh = File::Temp->new;
+  my $file_name = $fh->filename;
+  my $de_novo = WTSI::NPG::Genotyping::SNPSet->new
+    (file_name => $file_name,
+     snps      => $from_file->snps); # Set in some SNPS
+
+  ok((all { $_->snpset->contains_snp($_->name) } @{$de_novo->snps}),
+     'All SNPs and contained by parent');
+
+  ok($de_novo->write_snpset_data, 'De novo SNPSet written');
+  close $fh;
+
+  my $expected_file = "$data_path/$data_file";
+  ok(compare($file_name, $expected_file) == 0,
+     "$file_name is identical to $expected_file");
 }
 
 sub snps : Test(2) {
@@ -161,6 +189,8 @@ sub write_snpset_file : Test(2) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $test_file = "$tmpdir/$data_file";
 
+  # 26, not 24 records because there are 2 records for each gender
+  # marker
   cmp_ok($multiplex->write_snpset_data($test_file), '==', 26,
          "Number of records written to $test_file");
 

@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::GenderMarker;
 
 use Moose;
 
-use WTSI::NPG::Genotyping::Types qw(SNP);
+use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -13,12 +13,12 @@ has 'name' => (is => 'ro', isa => 'Str', required => 1);
 
 has 'x_marker' =>
   (is       => 'ro',
-   isa      => SNP,
+   isa      => XMarker,
    required => 1);
 
 has 'y_marker' =>
   (is       => 'ro',
-   isa      => SNP,
+   isa      => YMarker,
    required => 1);
 
 sub BUILD {
@@ -27,13 +27,16 @@ sub BUILD {
   my $x_snpset = $self->x_marker->snpset;
   my $y_snpset = $self->y_marker->snpset;
 
-  # These have been checked by Moose to be defined references to SNPSets
-  unless ($x_snpset == $y_snpset) {
-    $self->logconfess("Cannot construct a GenderMarker from SNPs from ",
-                      "different SNPSets: X SNP ",
-                      $self->x_marker->str, " from ", $x_snpset->str,
+  unless ((defined $x_snpset && defined $y_snpset) &&
+          ($x_snpset == $y_snpset)) {
+    my $x_snpset_str = defined $x_snpset ? $x_snpset->str : 'undef';
+    my $y_snpset_str = defined $y_snpset ? $y_snpset->str : 'undef';
+
+    $self->logconfess("A GenderMarker may be constructed only from SNPs from ",
+                      "the same SNPSet: X SNP ",
+                      $self->x_marker->str, " from ", $x_snpset_str,
                       ", Y SNP ",
-                      $self->y_marker->str, " from ", $y_snpset->str);
+                      $self->y_marker->str, " from ", $y_snpset_str);
   }
 }
 
@@ -71,6 +74,14 @@ sub snpset {
   my ($self) = @_;
 
   return $self->x_marker->snpset;
+}
+
+sub equals {
+  my ($self, $other) = @_;
+
+  return ($other->isa(__PACKAGE__)                  &&
+          $self->x_marker->equals($other->x_marker) &&
+          $self->y_marker->equals($other->y_marker));
 }
 
 __PACKAGE__->meta->make_immutable;
