@@ -54,9 +54,11 @@ sub getBinCounts {
 	if ($y > $ymax) { $y = $ymax; }
 	elsif ($y < $ymin) { $y = $ymin; }
 	# find bin coordinates and increment count
-	my $xbin = int(($x-$xmin)/$xwidth);
-	my $ybin = int(($y-$ymin)/$ywidth);
-	if ($y == $ymax) { $ybin -= 1; }
+        my ($xbin, $ybin);
+        if ($xwidth==0) { $xbin = 0; }
+        else { $xbin = int(($x-$xmin)/$xwidth); }
+        if ($ywidth==0) { $ybin = 0; }
+        else { $ybin = int(($y-$ymin)/$ywidth); }
 	$counts[$xbin][$ybin] += 1;
     }
     return @counts;
