@@ -11,6 +11,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use FindBin qw($Bin);
+use POSIX qw(floor);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 my ($RScriptPath, $outDir, $title, $help);
@@ -42,23 +43,25 @@ sub getBinCounts {
     my $ywidth = ($ymax - $ymin) / $ysteps;
     my @data = @$dataRef;
     my @counts = ();
-    for (my $i=0;$i<$xsteps;$i++) { 
+    for (my $i=0;$i<$xsteps;$i++) {
 	my @row = (0) x $ysteps;
 	$counts[$i] = \@row;
     }
     foreach my $ref (@data) {
 	my ($x, $y) = @$ref;
 	# truncate x,y values outside given range (if any)
-	if ($x > $xmax) { $x = $xmax; } 
+	if ($x > $xmax) { $x = $xmax; }
 	elsif ($x < $xmin) { $x = $xmin; }
 	if ($y > $ymax) { $y = $ymax; }
 	elsif ($y < $ymin) { $y = $ymin; }
 	# find bin coordinates and increment count
         my ($xbin, $ybin);
         if ($xwidth==0) { $xbin = 0; }
-        else { $xbin = int(($x-$xmin)/$xwidth); }
+        elsif ($x==$xmax) { $xbin = $xsteps - 1; }
+        else { $xbin = floor(($x-$xmin)/$xwidth); }
         if ($ywidth==0) { $ybin = 0; }
-        else { $ybin = int(($y-$ymin)/$ywidth); }
+        elsif ($y==$ymax) { $ybin = $ysteps - 1; }
+        else { $ybin = floor(($y-$ymin)/$ywidth); }
 	$counts[$xbin][$ybin] += 1;
     }
     return @counts;
