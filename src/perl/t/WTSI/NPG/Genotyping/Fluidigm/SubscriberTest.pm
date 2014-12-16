@@ -27,7 +27,7 @@ my @sample_identifiers = qw(ABC0123456789 ABC0123456789 XYZ0123456789);
 my @sample_plates = qw(1381735059 1381735060 1381735059);
 my @sample_wells = qw(S01 S01 S02);
 my $non_unique_identifier = 'ABCDEFGHI';
-my $snpset_file = 'qc.csv';
+my $snpset_file = 'qc.tsv';
 
 my $irods_tmp_coll;
 
@@ -225,14 +225,16 @@ sub _get_observed_calls {
   my ($irods, $irods_coll, $reference_name, $snpset_name, $sample_id) = @_;
 
   my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-        (irods          => $irods,
-         data_path      => $irods_coll,
-         reference_path => $irods_coll)->get_calls
-             ($reference_name, $snpset_name, $sample_id)};
-  my @calls_observed = ();
+      (irods          => $irods,
+       data_path      => $irods_coll,
+       reference_path => $irods_coll)->get_calls
+         ($reference_name, $snpset_name, $sample_id)};
+
+  my @calls_observed;
   foreach my $call (@calls) {
-      push @calls_observed, [$call->snp->name, $call->genotype],
+    push @calls_observed, [$call->snp->name, $call->genotype],
   }
+
   return @calls_observed;
 }
 

@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 10;
+use Test::More tests => 11;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -21,6 +21,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 my $data_path = './t/sequenom_assay_data_object';
 my $data_file = 'plate1_A01.csv';
 my $irods_tmp_coll;
+
+my $resultset;
 
 my $pid = $$;
 
@@ -39,9 +41,16 @@ sub make_fixture : Test(setup) {
   $irods->add_object_avu($irods_path, 'study_id',             '10');
   $irods->add_object_avu($irods_path, 'sample_consent',       '1');
   $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
+
+  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/$data_file");
+  $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
+    ($data_object);
 }
 
 sub teardown : Test(teardown) {
+  undef $resultset;
+
   my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
 }
@@ -74,24 +83,17 @@ sub constructor : Test(5) {
   } 'Cannot construct from both file and data object';
 }
 
-sub assay_results : Test(1) {
-  my $irods = WTSI::NPG::iRODS->new;
-  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
-    ($irods, "$irods_tmp_coll/$data_file");
-  my $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
-    ($data_object);
+sub size : Test(1) {
+  cmp_ok($resultset->size, '==', 1, 'Expected size');
+}
 
+sub assay_results : Test(1) {
   cmp_ok(scalar @{$resultset->assay_results}, '==', 1,
          'Contains expected number of assay results');
 }
 
 sub snpset_name : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
-  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
-    ($irods, "$irods_tmp_coll/$data_file");
-  my $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
-    ($data_object);
-
   is($resultset->snpset_name, 'qc', 'Correct SNP set name');
 
   $irods->add_object_avu($resultset->data_object->str,

@@ -278,7 +278,7 @@ sub _build_snpsets {
 sub _find_resultset_snpset {
   my ($self, $resultset) = @_;
 
-  my @result_snp_names = $resultset->snp_names;
+  my @result_snp_names = @{$resultset->snp_names};
   my $expected_num_snps = scalar @result_snp_names;
 
   $self->debug("Finding set of $expected_num_snps SNPs ",

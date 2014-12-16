@@ -5,7 +5,8 @@ package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 
 use Moose;
 
-use List::Util qw (reduce);
+use List::AllUtils qw(all reduce);
+use Try::Tiny;
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
@@ -201,48 +202,96 @@ sub get_calls {
   $self->debug("Finding a Fluidigm resultset for sample '$sample_identifier' ",
                "using SNP set '$snpset_name' on reference '$reference_name'");
   my @resultsets = $self->get_assay_resultsets
-      ($snpset_name, $sample_identifier, @query_specs);
+    ($snpset_name, $sample_identifier, @query_specs);
+
+  my $num_resultsets = scalar @resultsets;
+
   my @calls;
-  if (scalar @resultsets == 0) {
-      $self->debug("Failed to find a Fluidigm resultset for sample ",
-                   "'$sample_identifier' using SNP set '$snpset_name' on ",
-                   "reference '$reference_name'");
-  } else {
-      # want to merge the calls for each SNP in the given snpset
-      my $snpset = $self->get_snpset($snpset_name, $reference_name);
-      foreach my $snp (@{$snpset->snps}) {
-          my $snp_calls = $self->_get_snp_calls($snp, $snpset, \@resultsets);
-          my $call;
-          eval { $call = reduce { $a->merge($b) } @{$snp_calls} };
-          if ($@) {
-              $self->logwarn("Cannot merge Fluidigm calls for SNP '",
-                             $snp->name, "', defaulting to no-call: ", $@);
-              $call = WTSI::NPG::Genotyping::Call->new
-                  (genotype   => $NO_CALL_GENOTYPE,
-                   snp        => $snp,
-                   is_call    => 0);
-          }
-          push @calls, $call;
-      }
+  if ($num_resultsets == 0) {
+    $self->debug("Failed to find a Fluidigm resultset for sample ",
+                 "'$sample_identifier' using SNP set '$snpset_name' on ",
+                 "reference '$reference_name'");
   }
+  else {
+    $self->info("Found $num_resultsets Fluidigm resultsets for sample ",
+                "'$sample_identifier' using SNP set '$snpset_name' on ",
+                "reference '$reference_name'");
+
+    # Want to merge the calls for each result, by assay. i.e. The
+    # S01-A01 assay is merged only with another experiment's S01-A01
+    # assay, even if other assays are measuring the same SNP as
+    # S01-A01.
+    my $snpset = $self->get_snpset($snpset_name, $reference_name);
+
+    my @sizes = map { $_->size } @resultsets;
+    unless (all { $_ == $sizes[0] } @sizes) {
+      $self->logconfess("Failed to merge $num_resultsets Fluidigm resultsets ",
+                        "for sample '$sample_identifier' using SNP set ",
+                        "'$snpset_name' because they are different sizes: [",
+                        join(', ', @sizes), "]");
+    }
+
+    my @repeated_calls;
+    foreach my $assay_address (@{$resultsets[0]->assay_addresses}) {
+      push @repeated_calls,
+        $self->_build_calls_at($assay_address, $snpset, \@resultsets);
+    }
+
+    foreach my $calls (@repeated_calls) {
+      if (@$calls) {
+        my $call;
+        try {
+          $call = reduce { $a->merge($b) } @$calls;
+        } catch {
+          my $snp = $calls->[0]->snp;
+          my @genotypes = map { $_->genotype } @$calls;
+
+          $self->logwarn("Cannot merge Fluidigm calls [",
+                         join(', ', @genotypes), "] for sample ",
+                         "'$sample_identifier', SNP '", $snp->name,
+                         "', defaulting to no-call: ", $_);
+          $call = WTSI::NPG::Genotyping::Call->new
+            (genotype => $NO_CALL_GENOTYPE,
+             snp      => $snp,
+             is_call  => 0);
+        };
+
+        push @calls, $call;
+      }
+    }
+  }
+
   return \@calls;
 }
 
-sub _get_snp_calls {
-    # get calls for the given SNP and SNPSet, from one or more resultsets
-    # TODO make this more efficient instead of repeatedly looping over calls
-    my ($self, $snp, $snpset, $resultsets_ref) = @_;
-    my @calls;
-    foreach my $resultset (@{$resultsets_ref}) {
-        foreach my $call (@{$resultset->get_calls($snpset)}) {
-            if ($snp->equals($call->snp)) {
-                push (@calls, $call);
-            }
-        }
-    }
-    return \@calls;
-}
+sub _build_calls_at {
+  my ($self, $assay_address, $snpset, $resultsets) = @_;
 
+  $self->debug("Collecting ", scalar @$resultsets, " Fluidigm results ",
+               "at address '$assay_address'");
+
+  my @calls;
+  foreach my $resultset (@$resultsets) {
+    my $result = $resultset->result_at($assay_address);
+    if ($result->is_control) {
+      $self->trace("Skipping Fluidigm control at '$assay_address'");
+    }
+    else {
+      $self->trace("Adding fluidigm result at '$assay_address'");
+
+      my $snp = $snpset->named_snp($result->snp_assayed);
+      push @calls,
+        WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                         genotype => $result->canonical_call,
+                                         is_call  => $result->is_call);
+    }
+  }
+
+  $self->debug("Found ", scalar @calls,
+               " Fluidigm calls at address '$assay_address'");
+
+  return \@calls;
+}
 
 __PACKAGE__->meta->make_immutable;
 
