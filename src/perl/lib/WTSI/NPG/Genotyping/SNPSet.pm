@@ -125,6 +125,9 @@ sub named_snp {
 sub contains_snp {
   my ($self, $snp_name) = @_;
 
+  defined $snp_name or
+    $self->logconfess("A defined snp_name argument is required");
+
   return defined first_value { $_->name eq $snp_name } @{$self->snps};
 }
 
@@ -283,24 +286,20 @@ sub _parse_snps {
           my $x_marker;
           my $y_marker;
 
-          # FIXME -- check for conflicts
-          if ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?X$}) {
+          # Remove from working hash on finding a pair
+          if (is_HsapiensX($gender_markers{$key}->chromosome)) {
             $x_marker = delete $gender_markers{$key};
           }
-          elsif ($gender_markers{$key}->chromosome =~ m{(^[Cc]hr)?Y$}) {
+          elsif (is_HsapiensY($gender_markers{$key}->chromosome)) {
             $y_marker = delete $gender_markers{$key};
           }
 
-          # FIXME -- check for conflicts
-          # if ($snp->chromosome =~ m{(^[Cc]hr)?X$}) {
           if (is_HsapiensX($snp->chromosome)) {
             $x_marker = $snp;
           }
           elsif (is_HsapiensY($snp->chromosome)) {
             $y_marker = $snp;
           }
-
-          # FIXME -- check for X and Y SNPs
 
           push @snps, WTSI::NPG::Genotyping::GenderMarker->new
             (name     => $snp->name,
@@ -310,13 +309,19 @@ sub _parse_snps {
         else {
           $gender_markers{$key} = $snp;
         }
-
-        # $self->warn($record->[0], " is a gender marker");
       }
       else {
         $self->debug("SNP ", $snp->name, " is not a gender marker");
         push @snps, $snp;
       }
+    }
+
+    # Any unpaired markers are orphans; they must always appear in
+    # pairs
+    if (%gender_markers) {
+      $self->logconfess("Orphan gender marker records for [",
+                        join(', ', sort keys %gender_markers), "] in ",
+                        $self->str);
     }
   }
   else {
