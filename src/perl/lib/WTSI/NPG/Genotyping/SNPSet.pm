@@ -101,7 +101,8 @@ sub snp_names {
   Arg [1]    : Str SNP name e.g. rs######
 
   Example    : $snp = $set->named_snp('rs0123456')
-  Description: Return specific, named SNP(s) from the set.
+  Description: Return specific, named SNP(s) from the set. Raise an
+               error if the SNP is not in the set.
   Returntype : WTSI::NPG::Genotyping::SNP
 
 =cut
@@ -114,13 +115,17 @@ sub named_snp {
   $snp_name or
     $self->logconfess("A non-empty snp_name argument is required");
 
-  return first_value { $_->name eq $snp_name }  @{$self->snps};
+  my $snp = first_value { $_->name eq $snp_name } @{$self->snps};
+
+  $snp or $self->logconfess("SNP set '", $self->name, "' does not contain ",
+                            "SNP '$snp_name'");
+  return $snp;
 }
 
 sub contains_snp {
   my ($self, $snp_name) = @_;
 
-  return defined $self->named_snp($snp_name);
+  return defined first_value { $_->name eq $snp_name } @{$self->snps};
 }
 
 =head2 write_snpset_data

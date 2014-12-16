@@ -26,6 +26,7 @@ has 'is_call' =>
 
 sub BUILD {
   my ($self) = @_;
+
   if ($self->genotype eq 'NN') {
     $self->is_call(0);
   }
@@ -54,6 +55,17 @@ sub BUILD {
   }
 }
 
+=head2 is_homozygous
+
+  Arg [1]    : None
+
+  Example    : $call->is_homozygous
+  Description: Return true if the call is homozygous i.e. both alleles
+               are identical to either the reference or alt alleles.
+  Returntype : Bool
+
+=cut
+
 sub is_homozygous {
   my ($self) = @_;
 
@@ -66,6 +78,18 @@ sub is_homozygous {
 
   return $gt eq $rr || $gt eq $aa;
 }
+
+=head2 is_heterozygous
+
+  Arg [1]    : None
+
+  Example    : $call->is_heterozygous
+  Description: Return true if the call is heterozygous i.e. one allele
+               is identical to the reference and the other identical to the
+               alt allele.
+  Returntype : Bool
+
+=cut
 
 sub is_heterozygous {
   my ($self) = @_;
@@ -80,6 +104,18 @@ sub is_heterozygous {
   return $gt eq $ra || $gt eq $ar;
 }
 
+=head2 is_homozygous_complement
+
+  Arg [1]    : None
+
+  Example    : $call->is_homozygous_complement
+  Description: Return true if the call is homozygous i.e. both alleles
+               are identical to the complement of either the reference or
+               alt alleles.
+  Returntype : Bool
+
+=cut
+
 sub is_homozygous_complement {
   my ($self) = @_;
 
@@ -93,6 +129,18 @@ sub is_homozygous_complement {
   return $cgt eq $rr || $cgt eq $aa;
 }
 
+=head2 is_heterozygous_complement
+
+  Arg [1]    : None
+
+  Example    : $call->is_heterozygous_complement
+  Description: Return true if the call is heterozygous i.e. one allele
+               is identical to the complement of the reference and the
+               other identical to the complement of the alt allele.
+  Returntype : Bool
+
+=cut
+
 sub is_heterozygous_complement {
   my ($self) = @_;
 
@@ -105,6 +153,17 @@ sub is_heterozygous_complement {
 
   return $cgt eq $ra || $cgt eq $ar;
 }
+
+=head2 is_complement
+
+  Arg [1]    : None
+
+  Example    : $call->is_complement
+  Description: Return true if the call is homozygous or heterozygous when
+               compared to the complement of the reference and alt alleles.
+  Returntype : Bool
+
+=cut
 
 sub is_complement {
   my ($self) = @_;
@@ -120,6 +179,17 @@ sub is_complement {
 
   return $cgt eq $rr || $cgt eq $aa || $cgt eq $ra || $cgt eq $ar;
 }
+
+=head2 complement
+
+  Arg [1]    : None
+
+  Example    : my $new_call = $call->complement
+  Description: Return a new call object whose genotype is complemented
+               with respect to the original.
+  Returntype : WTSI::NPG::Genotyping::Call
+
+=cut
 
 sub complement {
   my ($self) = @_;
@@ -145,23 +215,29 @@ sub complement {
 =cut
 
 sub merge {
-    my ($self, $other) = @_;
-    unless ($self->snp->equals($other->snp)) {
-        $self->logconfess("Attempted to merge calls for non-identical SNPs");
-    }
-    my $merged;
-    if ($self->is_call && !($other->is_call)) {
-        $merged = $self;
-    } elsif (!($self->is_call) && $other->is_call) {
-        $merged = $other;
-    } elsif ($self->genotype eq $other->genotype) {
-        $merged = $self;
-    } else {
-        $self->logdie("Unable to merge differing non-null genotype calls ",
-                      "for SNP '", $self->snp->name, "': '",
-                      $self->genotype, "', '", $other->genotype, "'");
-    }
-    return $merged;
+  my ($self, $other) = @_;
+
+  defined $other or
+    $self->logconfess("The other argument was undefined");
+
+  $self->snp->equals($other->snp) or
+    $self->logconfess("Attempted to merge calls for non-identical SNPs: ",
+                      $self->snp->name, " and ", $other->snp->name);
+
+  my $merged;
+  if ($self->is_call && !($other->is_call)) {
+    $merged = $self;
+  } elsif (!($self->is_call) && $other->is_call) {
+    $merged = $other;
+  } elsif ($self->genotype eq $other->genotype) {
+    $merged = $self;
+  } else {
+    $self->logdie("Unable to merge differing non-null genotype calls ",
+                  "for SNP '", $self->snp->name, "': '",
+                  $self->genotype, "', '", $other->genotype, "'");
+  }
+
+  return $merged;
 }
 
 sub _complement {

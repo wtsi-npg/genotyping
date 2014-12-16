@@ -125,7 +125,7 @@ sub convert {
 }
 
 sub _call_to_vcf {
-    # input a 'npg' call from an AssayResult (Sequenom or Fluidigm)
+    # input a 'canonical' call from an AssayResult (Sequenom or Fluidigm)
     # convert to VCF representation
     my ($self, $call, $ref, $alt, $strand) = @_;
     if (!defined($call) || !$call) {
@@ -282,15 +282,15 @@ sub _parse_calls_samples {
     my $controls = 0;
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
-            my $assay_pos = $ar->assay_position();
+            my $assay_adr = $ar->assay_address();
             if ($ar->is_control()) {
-                $self->info("Found control assay in position ".$assay_pos);
+                $self->info("Found control assay in position ".$assay_adr);
                 $controls++;
                 next;
             }
-            my $sam_id = $ar->npg_sample_id();
+            my $sam_id = $ar->canonical_sample_id();
             unless ($sam_id) {
-                $self->logwarn("Missing sample ID for assay ".$assay_pos);
+                $self->logwarn("Missing sample ID for assay ".$assay_adr);
                 next;
             }
             my $snp_id = $ar->snp_assayed();
@@ -298,11 +298,11 @@ sub _parse_calls_samples {
                 # missing SNP ID is normal for control position
                 my ($sample, $assay_num) = $ar->parse_assay();
                 my $msg = "Missing SNP ID for sample '$sam_id', ".
-                    "assay '$assay_pos'";
+                    "assay '$assay_adr'";
                 $self->logwarn($msg);
                 next;
             }
-            my $call = $ar->npg_call();
+            my $call = $ar->canonical_call();
             my $previous_call = $calls{$snp_id}{$sam_id};
             if ($previous_call && $previous_call ne $call) {
                 my $msg = 'Conflicting genotype calls for SNP '.$snp_id.

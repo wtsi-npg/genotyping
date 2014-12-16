@@ -225,14 +225,16 @@ sub _get_observed_calls {
   my ($irods, $irods_coll, $reference_name, $snpset_name, $sample_id) = @_;
 
   my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-        (irods          => $irods,
-         data_path      => $irods_coll,
-         reference_path => $irods_coll)->get_calls
-             ($reference_name, $snpset_name, $sample_id)};
-  my @calls_observed = ();
+      (irods          => $irods,
+       data_path      => $irods_coll,
+       reference_path => $irods_coll)->get_calls
+         ($reference_name, $snpset_name, $sample_id)};
+
+  my @calls_observed;
   foreach my $call (@calls) {
-      push @calls_observed, [$call->snp->name, $call->genotype],
+    push @calls_observed, [$call->snp->name, $call->genotype],
   }
+
   return @calls_observed;
 }
 

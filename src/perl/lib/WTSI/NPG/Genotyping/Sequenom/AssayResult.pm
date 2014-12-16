@@ -3,6 +3,7 @@ use utf8;
 package WTSI::NPG::Genotyping::Sequenom::AssayResult;
 
 use Moose;
+use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -21,12 +22,11 @@ has 'status'        => (is => 'ro', isa => 'Str', required => 1);
 has 'well_position' => (is => 'ro', isa => 'Str', required => 1);
 has 'str'           => (is => 'ro', isa => 'Str', required => 1);
 
-
-=head2 assay_position
+=head2 assay_address
 
   Arg [1]    : None
 
-  Example    : my $pos = $self->assay_position()
+  Example    : my $pos = $self->assay_address
   Description: Alias for the well_position accessor. Provided for
                consistency with the function of the same name in
                Genotyping::Fluidigm::AssayResult
@@ -34,16 +34,17 @@ has 'str'           => (is => 'ro', isa => 'Str', required => 1);
 
 =cut
 
-sub assay_position {
-    my ($self) = @_;
-    return $self->well_position();
+sub assay_address {
+  my ($self) = @_;
+
+  return $self->well_position;
 }
 
-=head2 npg_call
+=head2 canonical_call
 
   Arg [1]    : None
 
-  Example    : $call = $result->npg_call()
+  Example    : $call = $result->canonical_call
   Description: Method to return the genotype call, in a string representation
                of the form AA, AC, CC, or NN.  Name and behaviour of method,
                and format of output string, are intended to be consistent
@@ -53,32 +54,29 @@ sub assay_position {
 
 =cut
 
-sub npg_call {
-    # require an input call of the form A, AC, C, or N (or an empty string)
-    my ($self) = @_;
-    my $call = $self->genotype_id();
-    if (!$call) {
-        $call = '';
-    } elsif ($call =~ /[^ACGTN]/) {
-        $self->logcroak("Characters other than ACGTN in genotype '$call'");
-    } elsif (length($call) == 1) {
-        $call = $call.$call; # homozygote or no call
-    } elsif (length($call) == 2) {
-        # heterozygote, do nothing
-    } else {
-        my $msg = "Illegal genotype call '$call' for sample ".
-            $self->npg_sample_id().", SNP ".$self->assay_id();
-        $self->logcroak($msg);
-    }
-    return $call;
+sub canonical_call {
+  my ($self) = @_;
+
+  my $call = $self->genotype_id;
+  if (!$call) {
+    $call = ''; # FIXME -- check that this empty string should be permitted
+  } elsif (length($call) == 1) {
+    $call = $call . $call; # homozygote or no call
+  }
+
+  if (!is_SNPGenotype($call)) {
+    $self->logcroak("Illegal genotype call '$call' for sample ",
+                    $self->canonical_sample_id, ", SNP ", $self->assay_id);
+  }
+
+  return $call;
 }
 
-
-=head2 npg_sample_id
+=head2 canonical_sample_id
 
   Arg [1]    : None
 
-  Example    : $sample_identifier = $result->npg_sample_id()
+  Example    : $sample_identifier = $result->canonical_sample_id
   Description: Method to return the sample ID. Name and behaviour of method,
                and format of output string, are intended to be consistent
                across all 'AssayResultSet' classes (for Sequenom, Fluidigm,
@@ -87,16 +85,16 @@ sub npg_call {
 
 =cut
 
-sub npg_sample_id {
+sub canonical_sample_id {
     my ($self) = @_;
-    return $self->sample_id();
+    return $self->sample_id;
 }
 
 =head2 is_control
 
   Arg [1]    : None
 
-  Example    : $result->is_control() == 0
+  Example    : $result->is_control == 0
   Description: Placeholder. In the Fluidigm::AssayResult class, the function
                of this name checks for a 'control' result.
   Returntype : Str
@@ -113,12 +111,11 @@ sub snpset_name {
   return $self->_split_assay_id->[0];
 }
 
-
 =head2 snp_assayed
 
   Arg [1]    : None
 
-  Example    : $sample_identifier = $result->snp_assayed()
+  Example    : $sample_identifier = $result->snp_assayed
   Description: Return the name of the SNP being assayed. Name and
                behaviour of method are intended to be consistent
                across all 'AssayResultSet' classes (for Sequenom, Fluidigm,
@@ -136,7 +133,7 @@ sub snp_assayed {
 sub _split_assay_id {
   my ($self) = @_;
 
-  my ($snpset_name, $snp_name) = split /-/, $self->assay_id();
+  my ($snpset_name, $snp_name) = split /-/, $self->assay_id;
   $snpset_name ||= '';
   $snp_name    ||= '';
 

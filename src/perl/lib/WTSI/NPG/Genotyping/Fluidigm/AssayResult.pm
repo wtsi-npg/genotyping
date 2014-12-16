@@ -4,6 +4,7 @@ use utf8;
 package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
+use WTSI::NPG::Genotyping::Types qw(SNPGenotype);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -29,6 +30,24 @@ our $INVALID_NAME        = 'Invalid';
 # TODO Remove duplication of $NO_CALL_GENOTYPE in Subscriber.pm
 our $NO_CALL_GENOTYPE    = 'NN';
 
+=head2 is_empty
+
+  Arg [1]    : None
+
+  Example    : $result->is_empty
+  Description: Return whether the result is for a well marked as empty
+               (defined as having no sample i.e. the sample_name column
+                contains the token '[ Empty ]')
+  Returntype : Bool
+
+=cut
+
+sub is_empty {
+  my ($self) = @_;
+
+  return $self->sample_name eq $EMPTY_NAME;
+}
+
 =head2 is_control
 
   Arg [1]    : None
@@ -53,7 +72,6 @@ our $NO_CALL_GENOTYPE    = 'NN';
 
 sub is_control {
   my ($self) = @_;
-
 
   return ($self->snp_assayed eq ''          ||
           $self->sample_name eq $EMPTY_NAME ||
@@ -115,7 +133,6 @@ sub is_valid {
 
  return ($self->final          ne $INVALID_NAME &&
          $self->converted_call ne $INVALID_NAME);
-
 }
 
 =head2 compact_call
@@ -138,11 +155,11 @@ sub compact_call {
   return $compact;
 }
 
-=head2 npg_call
+=head2 canonical_call
 
   Arg [1]    : None
 
-  Example    : $call = $result->npg_call()
+  Example    : $call = $result->canonical_call()
   Description: Method to return the genotype call, in a string representation
                of the form AA, AC, CC, or NN. Name and behaviour of method are
                intended to be consistent across all 'AssayResultSet' classes
@@ -152,7 +169,7 @@ sub compact_call {
 
 =cut
 
-sub npg_call {
+sub canonical_call {
   my ($self) = @_;
 
   my $call = $NO_CALL_GENOTYPE;
@@ -160,19 +177,18 @@ sub npg_call {
     $call = $self->compact_call; # removes the : from raw input call
   }
 
-  if ($call !~ /[ACGTN][ACGTN]/) {
+  is_SNPGenotype($call) or
     $self->logcroak("Illegal genotype call '$call' for sample ",
-                    $self->npg_sample_id, ", SNP ", $self->snp_assayed);
-  }
+                    $self->canonical_sample_id, ", SNP ", $self->snp_assayed);
 
   return $call;
 }
 
-=head2 npg_sample_id
+=head2 canonical_sample_id
 
   Arg [1]    : None
 
-  Example    : $sample_identifier = $result->npg_sample_id()
+  Example    : $sample_identifier = $result->canonical_sample_id()
   Description: Method to return the sample ID. Name and behaviour of method,
                and format of output string, are intended to be consistent
                across all 'AssayResultSet' classes (for Sequenom, Fluidigm,
@@ -181,42 +197,45 @@ sub npg_call {
 
 =cut
 
-sub npg_sample_id {
-    my ($self) = @_;
-    return $self->sample_name;
+sub canonical_sample_id {
+  my ($self) = @_;
+
+  return $self->sample_name;
 }
 
-=head2 assay_position
+=head2 assay_address
 
   Arg [1]    : None
 
-  Example    : $assay_position = $result->parse_assay()
+  Example    : $assay_address = $result->assay_address
   Description: Parse the 'assay' field and return an identifier for the
-               well position.
+               assay address.
   Returntype : Str
 
 =cut
 
-sub assay_position {
-    my ($self) = @_;
-    my ($sample_address, $assay_pos) = $self->_parse_assay;
-    return $assay_pos;
+sub assay_address {
+  my ($self) = @_;
+  my ($sample_address, $assay_address) = $self->_parse_assay;
+
+  return $assay_address;
 }
 
 =head2 sample_address
 
   Arg [1]    : None
 
-  Example    : $assay_id = $result->sample_address()
+  Example    : $assay_id = $result->sample_address
   Description: Parse the 'assay' field and return the sample address.
   Returntype : Str
 
 =cut
 
 sub sample_address {
-    my ($self) = @_;
-    my ($sample_address, $assay_num) = $self->_parse_assay;
-    return $sample_address;
+  my ($self) = @_;
+
+  my ($sample_address, $assay_num) = $self->_parse_assay;
+  return $sample_address;
 }
 
 sub _parse_assay {
@@ -224,15 +243,13 @@ sub _parse_assay {
   # should be of the form [sample address]-[assay identifier], eg. S01-A96
   my ($self) = @_;
 
-  my @terms = split '-', $self->assay;
-  if (scalar @terms != 2) {
-    $self->logconfess("Failed to parse sample address and assay number ",
+  my ($sample_address, $assay_address) = split '-', $self->assay;
+  unless ($sample_address && $assay_address) {
+    $self->logconfess("Failed to parse sample address and assay address ",
                       "from Fluidigm assay field '", $self->assay, "'");
   }
 
-  my ($sample_address, $assay_num) = @terms;
-
-  return ($sample_address, $assay_num);
+  return ($sample_address, $assay_address);
 }
 
 __PACKAGE__->meta->make_immutable;

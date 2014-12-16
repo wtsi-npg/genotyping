@@ -21,7 +21,8 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 
 my $ini_path = './etc';
 
-my $tmpdir = tempdir(CLEANUP => 1);
+my $tmpdir = tempdir("tmp_pipeline_database_test_XXXX",
+                     CLEANUP => 1, DIR => './t');
 my $dbfile = "$tmpdir/pipeline.db";
 my $db;
 

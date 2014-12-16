@@ -88,7 +88,7 @@ sub de_novo : Test(3) {
   my $file_name = $fh->filename;
   my $de_novo = WTSI::NPG::Genotyping::SNPSet->new
     (file_name => $file_name,
-     snps      => $from_file->snps); # Set in some SNPS
+     snps      => $from_file->snps); # Set some SNPS to write
 
   ok((all { $_->snpset->contains_snp($_->name) } @{$de_novo->snps}),
      'All SNPs and contained by parent');
