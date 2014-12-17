@@ -22,7 +22,7 @@ use WTSI::NPG::Genotyping::SNPSetPublisher;
 use WTSI::NPG::iRODS;
 
 my $data_path = './t/snpset';
-my $data_file = 'qc.csv';
+my $data_file = 'qc.tsv';
 
 my $irods_tmp_coll;
 
@@ -100,10 +100,10 @@ sub publish : Test(4) {
      {attribute => $snpset_platform . "_plex",
       value => $snpset_name},
      {attribute => 'md5',
-      value => 'f45f7168e729d39d5c5131cd1dce1026'},
+      value => '66935a3f9084e3c695e3f39a65882968'},
      {attribute => 'reference_name',    value => $reference_name1},
      {attribute => 'reference_name',    value => $reference_name2},
-     {attribute => 'type',              value => 'csv'}];
+     {attribute => 'type',              value => 'tsv'}];
 
   my $irods = WTSI::NPG::iRODS->new;
   my $snpset_obj =

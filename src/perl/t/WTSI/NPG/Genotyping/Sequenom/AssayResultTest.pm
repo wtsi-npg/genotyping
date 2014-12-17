@@ -9,7 +9,7 @@ use warnings;
 use base qw(Test::Class);
 use File::Spec;
 use Log::Log4perl;
-use Test::More tests => 5;
+use Test::More tests => 6;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -83,5 +83,12 @@ sub snp_assayed : Test(1) {
   is($result->snp_assayed, 'rs012345678', 'SNP assayed');
 }
 
+sub canonical_call : Test(1) {
+  
+
+  foreach my $call ('AA', 'NN', '') {
+    
+  }
+}
 
 1;

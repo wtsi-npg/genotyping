@@ -5,16 +5,14 @@ package WTSI::NPG::Genotyping::SNPSetPublisher;
 
 use File::Spec;
 use Moose;
-use Moose::Util::TypeConstraints;
 
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Genotyping::Types qw(Platform);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator';
-
-enum 'GenotypingPlatform', [qw(fluidigm sequenom)];
 
 has 'file_name' =>
   (is       => 'ro',
@@ -28,7 +26,7 @@ has 'snpset_name' =>
 
 has 'snpset_platform' =>
   (is       => 'ro',
-   isa      => 'GenotypingPlatform',
+   isa      => Platform,
    required => 1);
 
 has 'reference_names' =>
@@ -71,9 +69,15 @@ sub publish {
 
   my $snpset_name = $self->snpset_platform . '_plex';
 
-  my @meta = ([$snpset_name   => $self->snpset_name]);
+  my @references;
   foreach my $reference_name (@{$self->reference_names}) {
-    push @meta, [$self->reference_genome_name_attr => $reference_name]
+    push @references, WTSI::NPG::Genotyping::Reference->new
+      (name => $reference_name);
+  }
+
+  my @meta = ([$snpset_name => $self->snpset_name]);
+  foreach my $reference (@references) {
+    push @meta, [$self->reference_genome_name_attr => $reference->name]
   }
 
   my $rods_path = $publisher->publish_file($self->file_name, \@meta,
@@ -81,7 +85,10 @@ sub publish {
                                            $self->publication_time);
 
   my $data_object = WTSI::NPG::iRODS::DataObject->new($self->irods, $rods_path);
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new
+    (data_object => $data_object,
+     references  => \@references);
 
   $self->info("Published SNPSet CSV data file '", $self->file_name, "' of ",
               scalar @{$snpset->snps}, " SNPs to ", $data_object->str);

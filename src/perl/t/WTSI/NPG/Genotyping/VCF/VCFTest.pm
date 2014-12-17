@@ -50,6 +50,7 @@ my $pid = $$;
 
 sub setup: Test(setup) {
     $tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
+
     my $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = "VCFTest.$pid";
     $irods->add_collection($irods_tmp_coll);

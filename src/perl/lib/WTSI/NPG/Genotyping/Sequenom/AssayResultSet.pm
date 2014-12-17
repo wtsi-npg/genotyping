@@ -40,6 +40,12 @@ around BUILDARGS => sub {
   }
 };
 
+sub size {
+  my ($self) = @_;
+
+  return scalar @{$self->assay_results};
+}
+
 sub snpset_name {
   my ($self) = @_;
 
@@ -69,7 +75,7 @@ sub snpset_name {
   Example    : $result->snp_names
   Description: Return a sorted array of the names of the SNPs assayed in
                this result set.
-  Returntype : Array
+  Returntype : ArrayRef[Str]
 
 =cut
 
@@ -81,7 +87,9 @@ sub snp_names {
     push @snp_names, $result->snp_assayed;
   }
 
-  return sort { $a cmp $b } uniq @snp_names;
+  @snp_names = sort { $a cmp $b } uniq @snp_names;
+
+  return \@snp_names;
 }
 
 sub _build_assay_results {

@@ -7,11 +7,12 @@ use strict;
 use warnings;
 
 use File::Compare;
-use File::Temp qw(tempdir);
+use File::Temp qw(tempdir tempfile);
+use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 12;
+use Test::More tests => 22;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -23,7 +24,7 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
 my $data_path = './t/snpset';
-my $data_file = 'qc.csv';
+my $data_file = 'qc.tsv';
 
 my $irods_tmp_coll;
 
@@ -48,10 +49,16 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::SNPSet');
 }
 
-sub constructor : Test(5) {
+sub constructor : Test(7) {
   my $irods = WTSI::NPG::iRODS->new;
   my $data_object = WTSI::NPG::iRODS::DataObject->new
     ($irods, "$irods_tmp_coll/snpset/$data_file");
+
+  # Empty file (WTSI::NPG::iRODS::Storable requires that the file exists)
+  my $fh = File::Temp->new;
+  new_ok('WTSI::NPG::Genotyping::SNPSet',
+         [file_name => $fh->filename]);
+  close $fh;
 
   # From file
   new_ok('WTSI::NPG::Genotyping::SNPSet',
@@ -70,17 +77,85 @@ sub constructor : Test(5) {
         (file_name   => "$data_path/$data_file",
          data_object => $data_object);
   } 'Cannot construct from both file and data object';
+
+  my $orphan_file = 'qc_orphan_marker.tsv';
+
+  dies_ok {
+    WTSI::NPG::Genotyping::SNPSet->new
+        (file_name   => "$data_path/$orphan_file");
+  } 'Cannot construct from file containing orphan marker records';
 }
 
-sub snps : Test(1) {
+sub de_novo : Test(3) {
+  my $from_file = WTSI::NPG::Genotyping::SNPSet->new
+    (file_name => "$data_path/$data_file");
+
+  # Empty file (WTSI::NPG::iRODS::Storable requires that the file exists)
+  my $fh = File::Temp->new;
+  my $file_name = $fh->filename;
+  my $de_novo = WTSI::NPG::Genotyping::SNPSet->new
+    (file_name => $file_name,
+     snps      => $from_file->snps); # Set some SNPS to write
+
+  ok((all { $_->snpset->contains_snp($_->name) } @{$de_novo->snps}),
+     'All SNPs and contained by parent');
+
+  ok($de_novo->write_snpset_data, 'De novo SNPSet written');
+  close $fh;
+
+  my $expected_file = "$data_path/$data_file";
+  ok(compare($file_name, $expected_file) == 0,
+     "$file_name is identical to $expected_file");
+}
+
+sub snps : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
   my $data_object = WTSI::NPG::iRODS::DataObject->new
     ($irods, "$irods_tmp_coll/snpset/$data_file");
 
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
 
-  cmp_ok(scalar @{$snpset->snps}, '==', 26,
+  cmp_ok(scalar @{$snpset->snps}, '==', 24,
          'Contains expected number of SNPs');
+
+  ok((all { $_->snpset->contains_snp($_->name) } @{$snpset->snps}),
+     'All SNPs and contained by parent');
+}
+
+sub named_snp : Test(1) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $data_object = WTSI::NPG::iRODS::DataObject->new
+    ($irods, "$irods_tmp_coll/snpset/$data_file");
+
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+
+  ok((all { $snpset->named_snp($_->name)->name eq $_->name } @{$snpset->snps}),
+     'All named SNPs');
+}
+
+sub references : Test(3) {
+  my $irods = WTSI::NPG::iRODS->new;
+  my $data_object = WTSI::NPG::iRODS::DataObject->new
+    ($irods, "$irods_tmp_coll/snpset/$data_file");
+
+  $data_object->add_avu('reference_name', 'ref1');
+  $data_object->add_avu('reference_name', 'ref2');
+
+  # References obtained from metadata, added automatically
+  my $snpset1 = WTSI::NPG::Genotyping::SNPSet->new($data_object);
+
+  cmp_ok(scalar @{$snpset1->references}, '==', 2,
+         'Has expected number of References');
+
+  my @expected_names = qw(ref1 ref2);
+  my @ref_names = map { $_->name } @{$snpset1->references};
+  is_deeply(\@ref_names, \@expected_names,
+            'Contains expected reference names') or diag explain \@ref_names;
+
+  # No metadata, no references added automatically
+  my $snpset2 = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
+  cmp_ok(scalar @{$snpset2->references}, '==', 0,
+         'Has no of References');
 }
 
 sub snp_names : Test(2) {
@@ -132,6 +207,8 @@ sub write_snpset_file : Test(2) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $test_file = "$tmpdir/$data_file";
 
+  # 26, not 24 records because there are 2 records for each gender
+  # marker
   cmp_ok($multiplex->write_snpset_data($test_file), '==', 26,
          "Number of records written to $test_file");
 
