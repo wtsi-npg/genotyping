@@ -35,6 +35,7 @@ bin/ready_samples.pl
 bin/run_qc.pl
 bin/sample_intensities.pl
 bin/set_irods_group_access.pl
+bin/update_expression_metadata.pl
 bin/update_fluidigm_metadata.pl
 bin/update_infinium_metadata.pl
 bin/update_plink_annotation.pl
@@ -96,6 +97,7 @@ lib/WTSI/NPG/Genotyping/Fluidigm/ExportFile.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/Publisher.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/ResultSet.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/Subscriber.pm
+lib/WTSI/NPG/Genotyping/GenderMarker.pm
 lib/WTSI/NPG/Genotyping/GenoSNP.pm
 lib/WTSI/NPG/Genotyping/Illuminus.pm
 lib/WTSI/NPG/Genotyping/Infinium/AnalysisPublisher.pm
@@ -113,6 +115,7 @@ lib/WTSI/NPG/Genotyping/QC/QCPlotShared.pm
 lib/WTSI/NPG/Genotyping/QC/QCPlotTests.pm
 lib/WTSI/NPG/Genotyping/QC/Reports.pm
 lib/WTSI/NPG/Genotyping/QC/SnpID.pm
+lib/WTSI/NPG/Genotyping/Reference.pm
 lib/WTSI/NPG/Genotyping/Schema.pm
 lib/WTSI/NPG/Genotyping/Schema/Result/Address.pm
 lib/WTSI/NPG/Genotyping/Schema/Result/Dataset.pm
@@ -140,6 +143,7 @@ lib/WTSI/NPG/Genotyping/Sequenom/Publisher.pm
 lib/WTSI/NPG/Genotyping/SNP.pm
 lib/WTSI/NPG/Genotyping/SNPSet.pm
 lib/WTSI/NPG/Genotyping/SNPSetPublisher.pm
+lib/WTSI/NPG/Genotyping/Types.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFConverter.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFGtcheck.pm
 lib/WTSI/NPG/Genotyping/Version.pm
@@ -150,6 +154,7 @@ lib/WTSI/NPG/Utilities.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 MANIFEST			This list of files
 README
+t/call.t
 t/collation.t
 t/critic.ignore
 t/database_infinium.t
@@ -201,6 +206,7 @@ t/filter_illuminus_output/illuminus_genotypes_1.txt
 t/filter_illuminus_output/illuminus_probabilities_1.txt
 t/fluidigm_assay_data_object.t
 t/fluidigm_assay_data_object/1381735059/S01_1381735059.csv
+t/fluidigm_assay_data_object/qc.tsv
 t/fluidigm_assay_result.t
 t/fluidigm_assay_resultset.t
 t/fluidigm_export_file.t
@@ -308,7 +314,7 @@ t/fluidigm_publisher/0123456789/0123456789.csv
 t/fluidigm_publisher/0123456789/Data/aramis.tif
 t/fluidigm_publisher/0123456789/Data/athos.tif
 t/fluidigm_publisher/0123456789/Data/porthos.tif
-t/fluidigm_publisher/qc.csv
+t/fluidigm_publisher/qc.tsv
 t/fluidigm_publisher/repub/0123456789/0123456789.csv
 t/fluidigm_publisher/repub/0123456789/Data/aramis.tif
 t/fluidigm_publisher/repub/0123456789/Data/athos.tif
@@ -326,8 +332,10 @@ t/fluidigm_resultset/missing_tif/0123456789/0123456789.csv
 t/fluidigm_resultset/missing_tif/0123456789/Data/athos.tif
 t/fluidigm_resultset/missing_tif/0123456789/Data/porthos.tif
 t/fluidigm_subscriber.t
-t/fluidigm_subscriber/qc.csv
+t/fluidigm_subscriber/qc.tsv
 t/fluidigm_subscriber/S01_1381735059.csv
+t/fluidigm_subscriber/S01_1381735060.csv
+t/fluidigm_subscriber/S01_1381735061.csv
 t/fluidigm_subscriber/S02_1381735059.csv
 t/gender.t
 t/gender/alpha.bed
@@ -338,6 +346,7 @@ t/gender/benchmark_gender_large.json
 t/gender/input_xhet.json
 t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
+t/gender_marker.t
 t/gender_standalone.t
 t/genotyping_yml.t
 t/genotyping_yml/config.yml
@@ -404,11 +413,11 @@ t/publisher.t
 t/publisher/lorem.txt
 t/publisher/update/lorem.txt
 t/qc/.gitattributes
+t/qc/alpha/pipeline_summary.lof
 t/qc_small.t
 t/qc_test_data/config_test.json
 t/qc_test_data/config_test_nomaf.json
 t/qc_test_data/output_examples/duplicate_full.txt.gz
-t/qc_test_data/output_examples/duplicate_subsets.json
 t/qc_test_data/output_examples/identity_check.json
 t/qc_test_data/output_examples/magnitude.txt
 t/qc_test_data/output_examples/qc_exclusions.json
@@ -481,7 +490,7 @@ t/scripts/publish_fluidigm_genotypes/0123456789/Data/porthos.tif
 t/scripts/publish_fluidigm_genotypes/9999999999/Data/aramis.tif
 t/scripts/publish_fluidigm_genotypes/9999999999/Data/athos.tif
 t/scripts/publish_fluidigm_genotypes/9999999999/Data/porthos.tif
-t/scripts/publish_fluidigm_genotypes/qc.csv
+t/scripts/publish_fluidigm_genotypes/qc.tsv
 t/scripts/publish_infinium_analysis/analysis/analysis.txt
 t/scripts/publish_infinium_analysis/coreex_bbgahs.txt
 t/scripts/publish_infinium_analysis/coreex_bbgahs/gtc/1/9298751015_R02C01.gtc
@@ -528,7 +537,7 @@ t/scripts/publish_infinium_genotypes/coreex_bbgahs/idat/1/9298751015_R05C01_Grn.
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/idat/1/9298751015_R05C01_Red.idat
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/idat/1/9298751015_R06C01_Grn.idat
 t/scripts/publish_infinium_genotypes/coreex_bbgahs/idat/1/9298751015_R06C01_Red.idat
-t/scripts/publish_snpset/qc.csv
+t/scripts/publish_snpset/qc.tsv
 t/sequenom_assay_data_object.t
 t/sequenom_assay_data_object/plate1_A01.csv
 t/sequenom_assay_result.t
@@ -537,9 +546,11 @@ t/sequenom_publisher.t
 t/simple_publisher.t
 t/simple_publisher/lorem.txt
 t/simple_publisher/update/lorem.txt
+t/snp.t
 t/snp_meta.t
 t/snpset.t
-t/snpset/qc.csv
+t/snpset/qc.tsv
+t/snpset/qc_orphan_marker.tsv
 t/snpset_publisher.t
 t/update_illuminus_input.t
 t/update_illuminus_input/columns.json
@@ -590,6 +601,7 @@ t/WTSI/NPG/Expression/ProfileAnnotationTest.pm
 t/WTSI/NPG/Expression/PublisherTest.pm
 t/WTSI/NPG/Expression/ResultSetTest.pm
 t/WTSI/NPG/Expression/SampleProbeProfileTest.pm
+t/WTSI/NPG/Genotyping/CallTest.pm
 t/WTSI/NPG/Genotyping/Database/InfiniumTest.pm
 t/WTSI/NPG/Genotyping/Database/PipelineTest.pm
 t/WTSI/NPG/Genotyping/Database/SequenomTest.pm
@@ -601,6 +613,7 @@ t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/SubscriberTest.pm
+t/WTSI/NPG/Genotyping/GenderMarkerTest.pm
 t/WTSI/NPG/Genotyping/IlluminusTest.pm
 t/WTSI/NPG/Genotyping/Infinium/AnalysisPublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/InfiniumDataObjectTest.pm
@@ -614,6 +627,7 @@ t/WTSI/NPG/Genotyping/Sequenom/AssayResultTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/PublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
+t/WTSI/NPG/Genotyping/SNPTest.pm
 t/WTSI/NPG/Genotyping/UpdatePlinkAnnotationTest.pm
 t/WTSI/NPG/Genotyping/VCF/VCFTest.pm
 t/WTSI/NPG/Genotyping/YMLTest.pm
@@ -621,4 +635,3 @@ t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
-
