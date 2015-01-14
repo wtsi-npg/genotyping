@@ -11,10 +11,29 @@ extends 'WTSI::NPG::iRODS::DataObject';
 sub update_secondary_metadata {
   my ($self, $snpdb, $ssdb) = @_;
 
+  my $plate_name;
+  my $well;
+
   my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
-  my $plate_name = $sequenom_plate_avu->{value};
+  if ($sequenom_plate_avu) {
+    $plate_name = $sequenom_plate_avu->{value};
+  }
+
   my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
-  my $well = $well_avu->{value};
+  if ($well_avu) {
+    $well = $well_avu->{value};
+  }
+
+  unless ($plate_name) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find Sequenom a plate name in the existing ",
+                   "metadata");
+  }
+  unless ($well) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find a Sequenom well address in the existing ",
+                   "metadata");
+  }
 
   $self->debug("Found plate well '$plate_name': '$well' in ",
                "current metadata of '", $self->str, "'");
@@ -132,7 +151,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
