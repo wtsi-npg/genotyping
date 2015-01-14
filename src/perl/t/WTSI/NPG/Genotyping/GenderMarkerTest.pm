@@ -25,7 +25,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::GenderMarker');
 }
 
-sub constructor : Test(4) {
+sub constructor : Test(6) {
   my $fh = File::Temp->new;
   close $fh;
   my $file_name = $fh->filename;
