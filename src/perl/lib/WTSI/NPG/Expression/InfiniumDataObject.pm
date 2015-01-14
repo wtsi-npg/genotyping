@@ -10,26 +10,32 @@ with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 extends 'WTSI::NPG::iRODS::DataObject';
 
 sub update_secondary_metadata {
-  my ($self, $ssdb, $sample_id, $plate_barcode, $well) = @_;
+  my ($self, $ssdb) = @_;
+
+  my $plate;
+  my $well;
+  my $sample_id;
+
+  my $plate_avu = $self->get_avu($self->expression_plate_name_attr);
+  if ($plate_avu) {
+    $plate = $plate_avu->{value};
+  }
+
+  my $well_avu = $self->get_avu($self->expression_plate_well_attr);
+  if ($well_avu) {
+    $well = $well_avu->{value};
+  }
+
+  my $sample_id_avu = $self->get_avu($self->dcterms_identifier_attr);
+  if ($sample_id_avu) {
+    $sample_id = $sample_id_avu->{value};
+  }
 
   my $ss_sample;
 
-  if ($plate_barcode && $well) {
+  if ($plate && $well) {
     # Using a V2 manifest, which has plate tracking information
-    $ss_sample = $ssdb->find_infinium_gex_sample($plate_barcode, $well);
-    my $expected_sanger_id = $ss_sample->{sanger_sample_id};
-
-    unless ($expected_sanger_id) {
-      $self->logcroak("Sample in plate '$plate_barcode' well '$well' ",
-                      "with sample ID '$sample_id' was not found in the ",
-                      "warehouse.");
-    }
-
-    unless ($sample_id eq $expected_sanger_id) {
-      $self->logcroak("Sample in plate '$plate_barcode' well '$well' ",
-                      "has an incorrect Sanger sample ID '$sample_id' ",
-                      "(expected '$expected_sanger_id'");
-    }
+    $ss_sample = $ssdb->find_infinium_gex_sample($plate, $well);
   }
   else {
     # Using a V1 manifest, which does not have plate tracking information
@@ -42,13 +48,13 @@ sub update_secondary_metadata {
     $self->info("Updating metadata for '", $self->str, "' from plate '",
                 $ss_sample->{barcode}, "' well '", $ss_sample->{map}, "'");
 
+    # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
-      $self->add_avu(@$avu);
+      $self->supersede_avus(@$avu);
     }
 
-    my @groups = $self->expected_groups;
-    $self->set_permissions('read', @groups);
+    $self->update_group_permissions;
   }
   else {
     $self->logcroak("Failed to update metadata for '", $self->str,
@@ -73,7 +79,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
