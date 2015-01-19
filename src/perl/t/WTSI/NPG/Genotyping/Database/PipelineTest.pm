@@ -10,6 +10,7 @@ use base qw(Test::Class);
 use Test::More tests => 68;
 use Test::Exception;
 
+use File::Temp qw(tempdir);
 use Log::Log4perl;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -19,7 +20,10 @@ BEGIN { use_ok('WTSI::NPG::Genotyping::Database::Pipeline'); }
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
 my $ini_path = './etc';
-my $dbfile = 't/pipeline.' . $$ . '.db';
+
+my $tmpdir = tempdir("tmp_pipeline_database_test_XXXX",
+                     CLEANUP => 1, DIR => './t');
+my $dbfile = "$tmpdir/pipeline.db";
 my $db;
 
 my $project_base = 'test_project';

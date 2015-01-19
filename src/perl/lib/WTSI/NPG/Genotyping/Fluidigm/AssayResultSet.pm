@@ -7,9 +7,11 @@ use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 has '+data_object' =>
   (isa      => 'WTSI::NPG::Genotyping::Fluidigm::AssayDataObject');
@@ -20,6 +22,11 @@ has 'assay_results' =>
    required => 1,
    builder  => '_build_assay_results',
    lazy     => 1);
+
+# TODO: add snpset attribute with auto-loading from iRODS (much like
+# the reference(s) of a SNPSet are built.
+#
+# This would removev the need for a SNPSet to be passed to get_calls.
 
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
@@ -37,6 +44,39 @@ around BUILDARGS => sub {
     return $class->$orig(@_);
   }
 };
+
+sub size {
+  my ($self) = @_;
+
+  return scalar @{$self->assay_results};
+}
+
+=head2 sample_name
+
+  Arg [1]    : None
+
+  Example    : $result->sample_name
+  Description: Return the name of the sample analysed. Since Fluidigm
+               results are split into files per sample, there should be
+               only sample name perl file. This method raises an error
+               if it encounters multiple sample names.
+  Returntype : Str
+
+=cut
+
+sub sample_name {
+  my ($self) = @_;
+
+  my @names = uniq map { $_->sample_name }
+    grep { ! $_->is_empty } @{$self->assay_results};
+
+  if (scalar @names > 1) {
+    $self->logconfess("Assay result set '", $self->str, "' contains data for ",
+                      ">1 sample: [", join(', ', @names), "]");
+  }
+
+  return shift @names;
+}
 
 =head2 snpset_name
 
@@ -78,7 +118,7 @@ sub snpset_name {
   Example    : $result->snp_names
   Description: Return a sorted array of the names of the SNPs assayed in
                this result set.
-  Returntype : Array
+  Returntype : ArrayRef[Str]
 
 =cut
 
@@ -93,7 +133,62 @@ sub snp_names {
     }
   }
 
-  return sort { $a cmp $b } uniq @snp_names;
+  @snp_names = sort { $a cmp $b } uniq @snp_names;
+
+  return \@snp_names;
+}
+
+=head2 assay_addresses
+
+  Arg [1]    : None
+
+  Example    : $result->assay_addresses
+  Description: Return an array reference to assay addresses, in the order
+               they appear in the assay results.
+  Returntype : ArrayRef[Str]
+
+=cut
+
+sub assay_addresses {
+  my ($self) = @_;
+
+  my @addresses = map { $_->assay_address } @{$self->assay_results};
+
+  return \@addresses;
+}
+
+
+=head2 result_at
+
+  Arg [1]    : Str Assay address
+
+  Example    : $result->result_at
+  Description: Return the result for the specified assay address. Raise
+               an error if the result is missing or duplicated.
+  Returntype : WTSI::NPG::Genotyping::Fluidigm::AssayResult
+
+=cut
+
+sub result_at {
+  my ($self, $assay_address) = @_;
+
+  defined $assay_address or
+    $self->logconfess('The assay_address argument was not defined');
+  $assay_address or
+    $self->logconfess('The assay_address argument was empty');
+
+  my @found = grep { $_->assay_address eq $assay_address }
+    @{$self->assay_results};
+  my $num_found = scalar @found;
+
+  $num_found == 0 and
+    $self->logconfess("The resultset '", $self->str, "' does not contain an ",
+                      "assay at address '$assay_address'");
+  $num_found > 1 and
+    $self->logconfess("The resultset '", $self->str, "' contains ",
+                      "$num_found assays at address '$assay_address'.");
+
+  return shift @found;
 }
 
 =head2 filter_on_confidence

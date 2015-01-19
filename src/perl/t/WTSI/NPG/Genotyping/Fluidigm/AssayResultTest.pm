@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 18;
+use Test::More tests => 402;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -51,7 +51,7 @@ sub constructor : Test(1) {
     ($irods, "$irods_tmp_coll/1381735059/$data_file");
 
   new_ok('WTSI::NPG::Genotyping::Fluidigm::AssayResult',
-         [assay          => 'S01-A0',
+         [assay          => 'S01-A01',
           snp_assayed    => 'rs0123456',
           x_allele       => 'G',
           y_allele       => 'T',
@@ -69,9 +69,9 @@ sub constructor : Test(1) {
          ]);
 }
 
-sub is_control : Test(4) {
+sub is_empty : Test(2) {
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -83,7 +83,7 @@ sub is_control : Test(4) {
       converted_call => 'G:T',
       x_intensity    => 0.1,
       y_intensity    => 0.1,
-      str            => '')->is_control, 'Is not control');
+      str            => '')->is_empty, 'Is not empty');
 
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
      (assay          => 'S01-A0',
@@ -98,10 +98,42 @@ sub is_control : Test(4) {
       converted_call => 'G:T',
       x_intensity    => 0.1,
       y_intensity    => 0.1,
+      str            => '')->is_empty, 'Is empty');
+}
+
+sub is_control : Test(4) {
+  ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'No Call',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_control, 'Is not control');
+
+  ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => '[ Empty ]',
+      type           => 'Unknown',
+      auto           => 'No Call',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
       str            => '')->is_control, 'Is control 1');
 
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -133,7 +165,7 @@ sub is_control : Test(4) {
 
 sub is_call : Test(5) {
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -151,7 +183,7 @@ sub is_call : Test(5) {
   # the Fluidigm PDF summary report i.e. 'No Call' in the auto column
   # does not necessarily mean a no call.
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -166,7 +198,7 @@ sub is_call : Test(5) {
       str            => '')->is_call, 'Is call 2');
 
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -181,7 +213,7 @@ sub is_call : Test(5) {
       str            => '')->is_call, 'Is not call 1');
 
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -197,7 +229,7 @@ sub is_call : Test(5) {
 
   # For 'Invalid' calls, is_call() should be false
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -212,14 +244,12 @@ sub is_call : Test(5) {
       str            => '')->is_call, 'Is not call 3');
 }
 
-
 sub is_valid : Test(4) {
-
   # Evaluate whether a result is valid. See is_call. 'No Call' and 'invalid'
   # are distinct and represent different experimental outcomes.
 
   ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -235,7 +265,7 @@ sub is_valid : Test(4) {
 
   # a 'no call' may still be valid
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -251,7 +281,7 @@ sub is_valid : Test(4) {
 
   # invalid calls
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -267,7 +297,7 @@ sub is_valid : Test(4) {
 
   # invalid calls
   ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-     (assay          => 'S01-A0',
+     (assay          => 'S01-A01',
       snp_assayed    => 'rs0123456',
       x_allele       => 'G',
       y_allele       => 'T',
@@ -282,25 +312,54 @@ sub is_valid : Test(4) {
       str            => '')->is_valid, 'Is not valid 2');
 }
 
-sub parse_assay : Test(2) {
+sub sample_address : Test(192) {
+  foreach my $s (1 .. 96) {
+    foreach my $assay_part ('01', '96') {
+      my $sample_part = sprintf("%02d", $s);
 
-  my @expected = ('S01', 'A0');
-  my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
-    (assay          => 'S01-A0',
-     snp_assayed    => 'rs0123456',
-     x_allele       => 'G',
-     y_allele       => 'T',
-     sample_name    => 'ABC0123456789',
-     type           => 'Unknown',
-     auto           => 'XY',
-     confidence     => 0.1,
-     final          => 'Invalid',
-     converted_call => 'Invalid',
-     x_intensity    => 0.1,
-     y_intensity    => 0.1,
-     str            => '');
-  is($result->sample_address(), 'S01', 'Parsed sample address OK');
-  is($result->assay_position(), 'A0', 'Parsed assay position OK');
+      my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+        (assay          => $sample_part . q{-} . $assay_part,
+         snp_assayed    => 'rs0123456',
+         x_allele       => 'G',
+         y_allele       => 'T',
+         sample_name    => 'ABC0123456789',
+         type           => 'Unknown',
+         auto           => 'XY',
+         confidence     => 0.1,
+         final          => 'Invalid',
+         converted_call => 'Invalid',
+         x_intensity    => 0.1,
+         y_intensity    => 0.1,
+         str            => '');
+
+      is($result->sample_address, $sample_part, "Sample address $s");
+    }
+  }
+}
+
+sub assay_address : Test(192) {
+  foreach my $sample_part ('01', '96') {
+    foreach my $a (1..96) {
+      my $assay_part = sprintf("%02d", $a);
+
+      my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+        (assay          => $sample_part . q{-} . $assay_part,
+         snp_assayed    => 'rs0123456',
+         x_allele       => 'G',
+         y_allele       => 'T',
+         sample_name    => 'ABC0123456789',
+         type           => 'Unknown',
+         auto           => 'XY',
+         confidence     => 0.1,
+         final          => 'Invalid',
+         converted_call => 'Invalid',
+         x_intensity    => 0.1,
+         y_intensity    => 0.1,
+         str            => '');
+
+      is($result->assay_address, $assay_part, "Assay position $a");
+    }
+  }
 }
 
 1;

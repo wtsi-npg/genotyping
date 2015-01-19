@@ -49,7 +49,7 @@ sub teardown : Test(teardown) {
 }
 
 sub test_publish_snpset : Test(1) {
-  my $data_file = "$data_path/publish_snpset/qc.csv";
+  my $data_file = "$data_path/publish_snpset/qc.tsv";
 
   my $reference_name  = 'Homo_sapiens (1000Genomes)';
   my $snpset_name     = 'qc';
@@ -66,7 +66,7 @@ sub test_publish_snpset : Test(1) {
 sub test_publish_fluidigm_genotypes : Test(2) {
   my $raw_data_path = "$data_path/publish_fluidigm_genotypes";
 
-  my $snpset_file     = "$raw_data_path/qc.csv";
+  my $snpset_file     = "$raw_data_path/qc.tsv";
   my $reference_name  = 'Homo_sapiens (1000Genomes)';
   my $snpset_name     = 'qc';
   my $snpset_platform = 'fluidigm';

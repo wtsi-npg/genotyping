@@ -12,7 +12,7 @@ use WTSI::NPG::Genotyping::SNPSet;
 
 extends 'WTSI::NPG::Database';
 
-with 'WTSI::NPG::Cacheable';
+with 'WTSI::DNAP::Utilities::Cacheable';
 
 # Method names for MOP operations
 our $FIND_SEQUENOM_PLATE_ID  = 'find_sequenom_plate_id';
@@ -194,9 +194,7 @@ sub find_sequenom_calls {
       $self->debug("Got Sequenom call for sample '$sample_name' in SNP set '",
                    $snpset->name, "': '$genotype' for SNP '$snp_name'");
 
-      # May get >1 item for a name for gender markers. Just use the first.
-      my @named = $snpset->named_snp($snp_name);
-      my $snp = shift @named;
+      my $snp = $snpset->named_snp($snp_name);
 
       if ($snp) {
         push @calls, WTSI::NPG::Genotyping::Call->new(genotype => $genotype,

@@ -10,56 +10,7 @@ use File::Copy;
 use File::Path qw(make_path);
 use File::Spec;
 
-use base 'Module::Build';
-
-# Git version code courtesy of Marina Gourtovaia <mg8@sanger.ac.uk>
-sub git_tag {
-  my $version;
-  my $default = '0.0.0';
-
-  unless (`which git`) {
-    warn "git command not found; cannot generate version string, defaulting to $default";
-    $version = $default;
-  }
-
-  if (!$version) {
-    $version = `git describe --dirty --always`;
-    chomp $version;
-  }
-
-  unless ($version =~ /^\d+\.\d+\.\d+$/) {
-    warn "git version string $version not in canonical format, defaulting to $default";
-    $version = $default;
-  }
-
-  return $version;
-}
-
-sub ACTION_code {
-  my ($self) = @_;
-
-  $self->SUPER::ACTION_code;
-
-  my $version_file = 'blib/lib/WTSI/NPG/Genotyping/Version.pm';
-  my $gitver = $self->git_tag;
-
-  if (-e $version_file) {
-    warn "Changing version of WTSI::NPG::Genotyping::Version to $gitver\n";
-
-    my $backup  = '.original';
-    local $^I   = $backup;
-    local @ARGV = ($version_file);
-
-    while (<>) {
-      s/(\$VERSION\s*=\s*)('?\S+'?)\s*;/${1}'$gitver';/;
-      print;
-    }
-
-    unlink "$version_file$backup";
-  } else {
-    warn "File $version_file not found\n";
-  }
-}
+use base 'WTSI::DNAP::Utilities::Build';
 
 #
 # Prepare configuration for tests
@@ -115,15 +66,18 @@ sub process_alternate_manifest {
         my @words = split;
         my $src = shift @words;
         my $dest = shift @words;
-        if ($dest) { $manifest{$src} = $dest; }
-        else { $manifest{$src} = $src; }
+        if ($dest) {
+          $manifest{$src} = $dest;
+        }
+        else {
+          $manifest{$src} = $src;
+        }
     }
     close $in || croak "Cannot close manifest $manifest_path: $!";
     my $dest_base = $self->install_base;
     my @installed;
     foreach my $src_file (keys %manifest) {
-        my $dest_file = File::Spec->catfile($dest_base,
-                                            $manifest{$src_file});
+        my $dest_file = File::Spec->catfile($dest_base, $manifest{$src_file});
         my $file = $self->copy_if_modified(from => $src_file, to => $dest_file);
         if ($file) {
             push(@installed, $file);

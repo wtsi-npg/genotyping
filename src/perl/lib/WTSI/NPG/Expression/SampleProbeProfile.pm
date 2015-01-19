@@ -6,7 +6,7 @@ use Moose;
 
 use WTSI::NPG::Utilities qw(trim);
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Expression::Annotation',
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
   'WTSI::NPG::iRODS::Storable';
 
 our $PLATFORM = 'Illumina Inc. GenomeStudio version 1.9.0';

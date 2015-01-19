@@ -6,9 +6,9 @@ package WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 use JSON;
 use Log::Log4perl::Level;
 use Moose;
-use WTSI::NPG::Runnable;
+use WTSI::DNAP::Utilities::Runnable;
 
-with 'WTSI::NPG::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 # front-end for bcftools gtcheck function
 # use to cross-check sample results in a single VCF file for consistency
@@ -61,7 +61,7 @@ sub run {
             $self->logcroak("VCF input string for STDIN is not valid");
         }
         @args = ('gtcheck', '-', '-G', 1);
-        @raw_results = WTSI::NPG::Runnable->new
+        @raw_results = WTSI::DNAP::Utilities::Runnable->new
             (executable  => $bcftools,
              arguments   => \@args,
              environment => $self->environment,
@@ -69,7 +69,7 @@ sub run {
              stdin       => \$input)->run->split_stdout;
     } else {
         @args = ('gtcheck', $input, '-G', 1);
-        @raw_results = WTSI::NPG::Runnable->new
+        @raw_results = WTSI::DNAP::Utilities::Runnable->new
             (executable  => $bcftools,
              arguments   => \@args,
              environment => $self->environment,
@@ -220,7 +220,7 @@ sub write_results_text {
 sub _find_bcftools {
     # check existence and version of the bcftools executable
     my $self = shift;
-    my @raw_results = WTSI::NPG::Runnable->new
+    my @raw_results = WTSI::DNAP::Utilities::Runnable->new
         (executable  => 'which',
          arguments   => ['bcftools',],
          environment => $self->environment,
@@ -228,7 +228,7 @@ sub _find_bcftools {
     my $bcftools = shift @raw_results;
     chomp $bcftools;
     if (!$bcftools) { $self->logcroak("Cannot find bcftools executable"); }
-    @raw_results = WTSI::NPG::Runnable->new
+    @raw_results = WTSI::DNAP::Utilities::Runnable->new
         (executable  => 'bcftools',
          arguments   => ['--version',],
          environment => $self->environment,

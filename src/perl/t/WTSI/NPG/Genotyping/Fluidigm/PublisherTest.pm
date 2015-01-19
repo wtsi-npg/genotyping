@@ -57,7 +57,7 @@ use WTSI::NPG::iRODS;
 my $data_path = './t/fluidigm_publisher';
 my $fluidigm_directory = "$data_path/0123456789";
 my $fluidigm_repub_directory = "$data_path/repub/0123456789";
-my $snpset_file = 'qc.csv';
+my $snpset_file = 'qc.tsv';
 
 my $resultset;
 my $reference_path;

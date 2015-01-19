@@ -11,8 +11,8 @@ use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
-  'WTSI::NPG::Expression::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
 has 'irods' =>
   (is       => 'ro',

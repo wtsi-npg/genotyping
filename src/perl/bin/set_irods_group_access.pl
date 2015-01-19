@@ -11,7 +11,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Utilities::IO qw(maybe_stdin);
+use WTSI::DNAP::Utilities::IO qw(maybe_stdin);
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
 use WTSI::NPG::iRODS qw(find_collections_by_meta
                         find_objects_by_meta

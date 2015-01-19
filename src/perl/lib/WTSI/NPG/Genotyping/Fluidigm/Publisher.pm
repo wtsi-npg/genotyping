@@ -16,8 +16,8 @@ use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-with 'WTSI::NPG::Loggable', 'WTSI::NPG::Accountable', 'WTSI::NPG::Annotator',
-  'WTSI::NPG::Genotyping::Annotator';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+ 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -278,7 +278,7 @@ sub _build_snpsets {
 sub _find_resultset_snpset {
   my ($self, $resultset) = @_;
 
-  my @result_snp_names = $resultset->snp_names;
+  my @result_snp_names = @{$resultset->snp_names};
   my $expected_num_snps = scalar @result_snp_names;
 
   $self->debug("Finding set of $expected_num_snps SNPs ",
