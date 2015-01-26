@@ -11,7 +11,7 @@ use Log::Log4perl;
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 31;
+use Test::More tests => 33;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
