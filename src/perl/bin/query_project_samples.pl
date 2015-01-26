@@ -77,7 +77,8 @@ sub run {
     $config         ||= $DEFAULT_INI;
     unless ($project) {
         pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
-    } if (defined($limit) && $limit < 0) {
+    }
+    if (defined($limit) && $limit < 0) {
         pod2usage(-msg => "--limit argument must be >= 0\n", -exitval => 2);
     }
     if ($log4perl_config) {
@@ -112,9 +113,9 @@ sub run {
     if ($root !~ '^/') { $root = '/'.$root; }
 
     my $sample_query = WTSI::NPG::Genotyping::Infinium::SampleQuery->new
-        (infinium_database      => $ifdb,
-         sequencescape_database => $ssdb,
-         logger                 => $log);
+        (infinium_db      => $ifdb,
+         sequencescape_db => $ssdb,
+         logger           => $log);
 
     $sample_query->run($project, $root, $outpath, $header, $limit);
 }

@@ -22,7 +22,8 @@ our @DATA_SOURCE_NAMES = qw(LIMS_ IRODS SS_WH);
 our @HEADER_FIELDS = qw(data_source plate well sample infinium_beadchip
                         infinium_beadchip_section sequencescape_barcode);
 
-has 'infinium_database'  =>
+
+has 'infinium_db'  =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::Database::Infinium',
    required => 1);
@@ -35,7 +36,8 @@ has 'irods' =>
      return WTSI::NPG::iRODS->new;
    });
 
-has 'sequencescape_database'  =>
+
+has 'sequencescape_db'  =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Database::Warehouse',
    required => 1);
@@ -120,7 +122,7 @@ sub _find_infinium_data {
     # query Infinium LIMS DB to get samples
     # extract relevant fields and store in array of arrays
     my ($self, $project) = @_;
-    my @if_samples = @{$self->infinium_database->find_project_samples
+    my @if_samples = @{$self->infinium_db->find_project_samples
                            ($project)};
     my @data;
     foreach my $if_sample (@if_samples) {
@@ -186,7 +188,7 @@ sub _find_warehouse_data {
     foreach my $input (@{$inputs_ref}) {
         my ($plate, $well, $sample) = @{$input};
         my $wh_result =
-            $self->sequencescape_database->find_infinium_sample_by_plate
+            $self->sequencescape_db->find_infinium_sample_by_plate
                 ($plate, $well);
         my @result;
         if ($wh_result) {
