@@ -26,6 +26,7 @@ our $UPDATE_INFINIUM_METADATA    = './bin/update_infinium_metadata.pl';
 our $PUBLISH_INFINIUM_ANALYSIS   = './bin/publish_infinium_analysis.pl';
 
 our $PUBLISH_EXPRESSION_ANALYSIS = './bin/publish_expression_analysis.pl';
+our $UPDATE_EXPRESSION_METADATA  = './bin/update_expression_metadata.pl';
 
 our $QUERY_PROJECT_SAMPLES = './bin/query_project_samples.pl';
 
@@ -317,7 +318,6 @@ sub test_ready_samples : Test(3) {
 }
 
 sub test_publish_expression_analysis : Test(1) {
-
   my $idat_path = "$data_path/publish_expression_analysis/infinium";
   my $analysis_path = "$data_path/publish_expression_analysis/results";
   my $manifest_path = "$data_path/publish_expression_analysis/manifest";
@@ -332,6 +332,26 @@ sub test_publish_expression_analysis : Test(1) {
             "--sample-dest $archive_coll",
             "--manifest $manifest_path/hipsci_12samples_2014-02-12.txt",
             "2>/dev/null") == 0, 'Published expression analysis');
+}
+
+sub test_update_expression_metadata : Test(2) {
+  my $idat_path = "$data_path/publish_expression_analysis/infinium";
+  my $analysis_path = "$data_path/publish_expression_analysis/results";
+  my $manifest_path = "$data_path/publish_expression_analysis/manifest";
+
+  my $archive_coll = "$irods_tmp_coll/infinium";
+  my $analysis_coll = "$irods_tmp_coll/analysis";
+
+  ok(system(join q{ }, "$PUBLISH_EXPRESSION_ANALYSIS",
+            "--analysis-source $analysis_path",
+            "--sample-source $idat_path",
+            "--analysis-dest $analysis_coll",
+            "--sample-dest $archive_coll",
+            "--manifest $manifest_path/hipsci_12samples_2014-02-12.txt",
+            "2>/dev/null") == 0, 'Published expression analysis');
+
+  ok(system(join q{ }, "$UPDATE_EXPRESSION_METADATA",
+            "--dest $irods_tmp_coll") == 0, 'Updated expression metadata');
 }
 
 1;

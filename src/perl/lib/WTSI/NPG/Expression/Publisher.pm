@@ -5,6 +5,7 @@ package WTSI::NPG::Expression::Publisher;
 
 use File::Spec;
 use Moose;
+use Try::Tiny;
 
 use WTSI::NPG::Expression::InfiniumDataObject;
 use WTSI::NPG::Expression::ResultSet;
@@ -95,17 +96,40 @@ sub _publish_files {
   push @meta, $self->make_infinium_metadata($resultset);
   my @fingerprint = $self->infinium_fingerprint(@meta);
 
-  foreach my $file ($resultset->idat_file, $resultset->xml_file) {
-    eval {
-      $self->_publish_file($file, $resultset, \@fingerprint, $publish_dest);
-      ++$num_published;
-    };
+  # At the time of publication, check that the sample ID in the
+  # manifest being used to publish the data corresponds to the one in
+  # the warehouse. Later they may differ for short periods if the one
+  # in the warehouse is changed (e.g. to correct a tracking error).
 
-    if ($@) {
-      $self->error("Failed to publish '$file' to '$publish_dest': ", $@);
-    }
-    else {
-      $self->info("Published '$file' to '$publish_dest'");
+  my $plate     = $resultset->plate_id;
+  my $well      = $resultset->well_id;
+  my $sample_id = $resultset->sample_id;
+
+  my $ssdb = $self->sequencescape_db;
+  my $ss_sample = $ssdb->find_infinium_gex_sample_by_sanger_id($sample_id);
+  my $expected_sanger_id = $ss_sample->{sanger_sample_id};
+
+  unless ($expected_sanger_id) {
+    $self->error("Sample in plate '$plate' well '$well' ",
+                 "with sample ID '$sample_id' was not found in the ",
+                 "warehouse.");
+  }
+
+  unless ($sample_id eq $expected_sanger_id) {
+    $self->error("Sample in plate '$plate' well '$well' ",
+                 "has an incorrect Sanger sample ID '$sample_id' ",
+                 "(expected '$expected_sanger_id'");
+  }
+
+  if ($expected_sanger_id && ($sample_id eq $expected_sanger_id)) {
+    foreach my $file ($resultset->idat_file, $resultset->xml_file) {
+      try {
+        $self->_publish_file($file, $resultset, \@fingerprint, $publish_dest);
+        ++$num_published;
+        $self->info("Published '$file' to '$publish_dest'");
+      } catch {
+        $self->error("Failed to publish '$file' to '$publish_dest': ", $_);
+      };
     }
   }
 
@@ -127,10 +151,8 @@ sub _publish_file {
 
   my $obj = WTSI::NPG::Expression::InfiniumDataObject->new($self->irods,
                                                            $obj_path);
-  $obj->update_secondary_metadata($self->sequencescape_db,
-                                  $resultset->sample_id,
-                                  $resultset->plate_id,
-                                  $resultset->well_id);
+  $obj->update_secondary_metadata($self->sequencescape_db);
+
   return $obj;
 }
 
@@ -242,7 +264,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
