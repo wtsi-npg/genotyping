@@ -155,15 +155,15 @@ sub require : Test(1) {
 
 sub construct : Test(1) {
     new_ok('WTSI::NPG::Genotyping::Infinium::SampleQuery',
-           ['ifdb' => $ifdb,
-            'ssdb' => $ssdb]);
+           ['infinium_database' => $ifdb,
+            'sequencescape_database' => $ssdb]);
 }
 
 sub test_infinium : Test(1) {
     # test of _get_infinium_data
     my $sample_query = WTSI::NPG::Genotyping::Infinium::SampleQuery->new(
-        'ifdb' => $ifdb,
-        'ssdb' => $ssdb
+        'infinium_database' => $ifdb,
+        'sequencescape_database' => $ssdb
     );
     my @data = $sample_query->_find_infinium_data($project);
     is_deeply(\@data, \@expected_infinium_data, 'Infinium data OK');
@@ -186,8 +186,8 @@ sub test_irods : Test(1) {
     }
     # now run query on the test iRODS
     my $sample_query = WTSI::NPG::Genotyping::Infinium::SampleQuery->new(
-        'ifdb' => $ifdb,
-        'ssdb' => $ssdb
+        'infinium_database' => $ifdb,
+        'sequencescape_database' => $ssdb
     );
     my @irods_metadata = $sample_query->_find_irods_metadata
         (\@expected_infinium_data, $irods_tmp_coll);
@@ -197,8 +197,8 @@ sub test_irods : Test(1) {
 sub test_warehouse : Test(1) {
     # test of _get_warehouse_data
     my $sample_query = WTSI::NPG::Genotyping::Infinium::SampleQuery->new(
-        'ifdb' => $ifdb,
-        'ssdb' => $ssdb
+        'infinium_database' => $ifdb,
+        'sequencescape_database' => $ssdb
     );
     my @wh_data = $sample_query->_find_warehouse_data(\@expected_infinium_data);
     my @expected_wh_data = (['plate1',

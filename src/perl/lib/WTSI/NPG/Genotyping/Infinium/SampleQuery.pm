@@ -13,7 +13,6 @@ use Pod::Usage;
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::MetaSearcher;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 with 'WTSI::DNAP::Utilities::Loggable';
@@ -23,7 +22,7 @@ our @DATA_SOURCE_NAMES = qw(LIMS_ IRODS SS_WH);
 our @HEADER_FIELDS = qw(data_source plate well sample infinium_beadchip
                         infinium_beadchip_section sequencescape_barcode);
 
-has 'ifdb'  =>
+has 'infinium_database'  =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Genotyping::Database::Infinium',
    required => 1);
@@ -36,7 +35,7 @@ has 'irods' =>
      return WTSI::NPG::iRODS->new;
    });
 
-has 'ssdb'  =>
+has 'sequencescape_database'  =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::Database::Warehouse',
    required => 1);
@@ -77,8 +76,10 @@ sub run {
     my @infinium_data = $self->_find_infinium_data($project);
     my $if_total = scalar @infinium_data;
     $self->info("Found ", $if_total, " Infinium samples.");
-    if ($limit) {
-        if ($limit >= $if_total) {
+    if (defined($limit)) {
+        if ($limit < 0) {
+            $self->logcroak("limit argument must be >= 0");
+        } elsif ($limit >= $if_total) {
             $self->info("Sample limit of ", $limit, " is not less than ",
                         "number found; continuing with all samples.");
         } else {
@@ -119,7 +120,8 @@ sub _find_infinium_data {
     # query Infinium LIMS DB to get samples
     # extract relevant fields and store in array of arrays
     my ($self, $project) = @_;
-    my @if_samples = @{$self->ifdb->find_project_samples($project)};
+    my @if_samples = @{$self->infinium_database->find_project_samples
+                           ($project)};
     my @data;
     foreach my $if_sample (@if_samples) {
         push @data, [$if_sample->{'plate'},
@@ -183,8 +185,9 @@ sub _find_warehouse_data {
     my @data;
     foreach my $input (@{$inputs_ref}) {
         my ($plate, $well, $sample) = @{$input};
-        my $wh_result = $self->ssdb->find_infinium_sample_by_plate($plate,
-                                                                   $well);
+        my $wh_result =
+            $self->sequencescape_database->find_infinium_sample_by_plate
+                ($plate, $well);
         my @result;
         if ($wh_result) {
             @result = ($plate, $well, $wh_result->{'name'},

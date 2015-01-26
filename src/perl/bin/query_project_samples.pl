@@ -15,7 +15,6 @@ use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Infinium::SampleQuery;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::MetaSearcher;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -79,8 +78,8 @@ sub run {
     unless ($project) {
         pod2usage(-msg => "A --project argument is required\n", -exitval => 2);
     }
-    if ($limit <= 0) {
-        pod2usage(-msg => "--limit argument must be > 0\n", -exitval => 2);
+    if ($limit < 0) {
+        pod2usage(-msg => "--limit argument must be >= 0\n", -exitval => 2);
     }
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
@@ -114,9 +113,9 @@ sub run {
     if ($root !~ '^/') { $root = '/'.$root; }
 
     my $sample_query = WTSI::NPG::Genotyping::Infinium::SampleQuery->new
-        (ifdb   => $ifdb,
-         ssdb   => $ssdb,
-         logger => $log);
+        (infinium_database      => $ifdb,
+         sequencescape_database => $ssdb,
+         logger                 => $log);
 
     $sample_query->run($project, $root, $outpath, $header, $limit);
 }
