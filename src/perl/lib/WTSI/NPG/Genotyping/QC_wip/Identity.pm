@@ -24,7 +24,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::QC::Identity;
+package WTSI::NPG::Genotyping::QC_wip::Identity;
 
 use Moose;
 
@@ -207,42 +207,51 @@ sub equivalent {
 }
 
 sub findIdentity {
-    # find the identity metric for each sample
-    # return: metric values, genotypes by SNP & sample, pass/fail status
+    # return hashref with identity results. For each sample:
+    # - metric value
+    # - hash of genotypes by SNP
+    # - missing status
+    # - pass/fail status
     my ($self, $plinkRef, $plexRef, $snpsRef) = @_;
     my %plink = %{$plinkRef};
     my %qcplex = %{$plexRef};
     my @snps = @{$snpsRef};
-    my (%identity, %genotypes, %failed, %missing);
+    my %identity_results;
     foreach my $sample (keys(%plink)) {
+	# compare genotypes; if missing, pass/fail status is undefined
+        my %genotypes = ();
+        my ($identity, $missing, $failed);
 	my $match = 0;
-	# compare genotypes
-	# mark samples as missing OR pass/fail (but not both)
 	if ($qcplex{$sample}) {
+            $missing = 0;
 	    foreach my $snp (@snps) {
-		my $pCall = $plink{$sample}{$snp};
-		my $sCall = $qcplex{$sample}{$snp};
-		if ($pCall && $sCall) {
-		    my $equiv = $self->equivalent($pCall, $sCall);
+		my $plCall = $plink{$sample}{$snp};
+		my $qcCall = $qcplex{$sample}{$snp};
+		if ($plCall && $qcCall) {
+		    my $equiv = $self->equivalent($plCall, $qcCall);
 		    unless (defined($equiv)) {
 			$self->logger->logwarn("WARNING: ".$@); # error caught
 			$equiv = 0;
 		    }
 		    if ($equiv) { $match++; }
 		}
-		$pCall ||= 0;
-		$sCall ||= 0;
-		$genotypes{$sample}{$snp} = [$pCall, $sCall];
+		$plCall ||= 0;
+		$qcCall ||= 0;
+		$genotypes{$snp} = [$plCall, $qcCall];
 	    }
-	    my $id = $match / @snps;
-	    $identity{$sample} = $id;
-	    if ($id < $self->pass_threshold) { $failed{$sample} = 1; }
+	    $identity = $match / @snps;
+	    if ($identity < $self->pass_threshold) { $failed = 1; }
+            else { $failed = 0; }
 	} else {
-	    $missing{$sample} = 1;
-	    $identity{$sample} = 0;
+            # $identity, $failed undefined; %genotypes empty
+	    $missing = 1;
 	}
+        $identity_results{$sample} = {'identity'  => $identity,
+                                      'failed'    => $failed,
+                                      'missing'   => $missing,
+                                      'genotypes' => \%genotypes };
     }
-    return (\%identity, \%genotypes, \%failed, \%missing);
+    return \%identity_results;
 }
 
 sub getIntersectingSNPsPlink {
@@ -423,7 +432,7 @@ sub writeIdentity {
     my $self = shift;
     my %identity = %{ shift() }; # hash of identity by sample
     my %failed = %{ shift() };   # pass/fail status by sample
-    my %missing = %{ shift() };  # missing samples from Sequenom query 
+    my %missing = %{ shift() };  # missing samples from Sequenom query
     my @samples = @{ shift() };  # list ensures consistent sample name order
     my $snpTotal = shift;
     my $minIdent = shift;
@@ -451,12 +460,12 @@ sub writeIdentity {
 sub writeJson {
     # get data structure for output to and write to JSON file
     # first argument is hash of values (if check was run) or list of samples (if check was not run)
-    my ($self, $resultsRef, $idCheck, $minSnps, $commonSnps) = @_;
+    my ($self, $resultsRef, $idCheck, $commonSnps) = @_;
     my $idRef;
     my %data = (results => $resultsRef,
 		identity_check_run => $idCheck,
-		min_snps => $minSnps,
-		common_snps => $commonSnps
+		common_snps => $commonSnps,
+		min_snps => $self->min_shared_snps
 	);
     my $outPath = $self->output_dir.'/'.$self->output_names->{'json'};
     open my $out, ">", $outPath || 
@@ -475,9 +484,9 @@ sub run_identity_check {
     my @snps = $self->getIntersectingSNPsPlink();
     my $snpTotal = @snps;
     if ($snpTotal < $self->min_shared_snps) {
-	my %id;
-	foreach my $sample (@{$sampleNamesRef}) { $id{$sample} = 'NA'; }
-	$self->writeJson(\%id, 0, $self->min_shared_snps, $snpTotal);
+	my %idResult = ();
+        my %failedPairComparison = ();
+	$self->writeJson(\%idResult, 0, $snpTotal);
 	$self->warn("Cannot do identity check; ",
                     $self->min_shared_snps,
                     " SNPs from QC plex required ", $snpTotal,
@@ -496,18 +505,32 @@ sub run_identity_check {
 	$self->logger->debug("Calls read from PLINK binary: ",
                              $duration, " seconds.\n");
 	# 4) Find identity, genotypes, and pass/fail status; write output
-	my ($idRef, $gtRef, $failRef, $missingRef) = $self->findIdentity($plinkCallsRef, $plexCallsRef, \@snps, $self->pass_threshold);
-	$self->writeJson($idRef, 1, $self->min_shared_snps, $snpTotal);
-	$self->writeGenotypes($gtRef, \@snps);
-	$self->writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
-                             $snpTotal, $self->pass_threshold);
+	my $idResult = $self->findIdentity($plinkCallsRef,
+                                           $plexCallsRef,
+                                           \@snps);
+	$self->writeJson($idResult, 1, $snpTotal);
+
+	#$self->writeGenotypes($gtRef, \@snps);
+	#$self->writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
+        #                     $snpTotal, $self->pass_threshold);
+
 	# 5) Pairwise check on failed samples for possible swaps
-	my @failed = sort(keys(%{$failRef}));
-	my $compareRef = $self->compareFailedPairs($gtRef, \@failed,
-                                                   \@snps,
-                                                   $self->swap_threshold);
-	$self->writeFailedPairComparison($compareRef, $self->pass_threshold);
-	$self->logger->debug("Finished identity check.\n");
+
+        # TODO re-implement and test step (5), the swap check
+
+        # TODO develop identity_qc_extra.pl to generate legacy text files
+        # on demand
+
+        #my @failed;
+        #foreach my $sample (keys(%{$idResult})) {
+        #    if ($idResult{$sample}{'failed'}) { push @failed, $sample; }
+        #}
+
+	#my $compareRef = $self->compareFailedPairs($gtRef,
+        #                                           \@snps,
+        #                                           $self->swap_threshold);
+	#$self->writeFailedPairComparison($compareRef, $self->pass_threshold);
+	#$self->logger->debug("Finished identity check.\n");
     }
     return 1;
 }
@@ -543,7 +566,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014-15 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

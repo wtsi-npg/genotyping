@@ -5,7 +5,7 @@ use utf8;
 use strict;
 use warnings;
 
-use WTSI::NPG::Genotyping::QC::IdentityTest;
+use WTSI::NPG::Genotyping::QC_wip::IdentityTest;
 
 # Created a cut-down PLINK dataset (20 SNPs, 5 samples)
 # see gapi/genotype_identity_test.git on http://git.internal.sanger.ac.uk
