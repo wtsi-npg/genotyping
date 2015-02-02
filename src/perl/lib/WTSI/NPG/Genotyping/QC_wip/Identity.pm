@@ -301,9 +301,9 @@ sub readPlexCalls {
     # return a hash of calls indexed by sample and SNP
     my ($self, ) = @_;
     # read samples and SNP names
-    my @samples = $self->pipedb->sample->all;
+    my @samples = $self->pipedb->sample->search({include => 1});
     $self->logger->debug("Read ", scalar(@samples),
-                         " samples from pipeline DB");
+                         " samples marked for inclusion from pipeline DB");
     my @snps = $self->pipedb->snp->all;
     my $snpTotal = @snps;
     $self->logger->debug("Read $snpTotal SNPs from pipeline DB");
@@ -315,10 +315,13 @@ sub readPlexCalls {
     my $snpResultTotal = 0;
     my %results;
     my $i = 0;
+
     foreach my $sample (@samples) {
-        if ($sample->include == 0) { next; }
         my $sampleURI = $sample->uri;
-        my @results = $sample->results->all;
+        # FIXME - Add an attribute to allow method.name(s) to be specified
+        my @results = $sample->results->search
+          ({'method.name' => ['Fluidigm', 'Sequenom']},
+           {join          => 'method'});
         $i++;
         if ($i % 100 == 0) {
             $self->logger->debug("Read ", scalar(@results),
@@ -326,7 +329,7 @@ sub readPlexCalls {
                                  scalar(@samples));
         }
         foreach my $result (@results) {
-            my @snpResults = $result->snp_results->all;
+            my @snpResults = $result->snp_results;
             $snpResultTotal += @snpResults;
             foreach my $snpResult (@snpResults) {
                 my $snpName = $snpNames{$snpResult->id_snp};
