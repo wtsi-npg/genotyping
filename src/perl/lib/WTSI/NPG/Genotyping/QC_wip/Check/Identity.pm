@@ -57,9 +57,9 @@ sub get_sample_names {
 sub get_shared_snp_names {
   my ($self) = @_;
 
-  my %plex_snp_table;
+  my %plex_snp_index;
   foreach my $name ($self->snpset->snp_names) {
-    $plex_snp_table{$name}++;
+    $plex_snp_index{$name}++;
   }
 
   my @shared_names;
@@ -68,7 +68,7 @@ sub get_shared_snp_names {
     my $name = $self->plink->{'snps'}->get($i)->{'name'};
     my $converted = _from_illumina_snp_name($name);
 
-    if (exists $plex_snp_table{$converted}) {
+    if (exists $plex_snp_index{$converted}) {
       push @shared_names, $converted;
     }
   }
@@ -76,40 +76,66 @@ sub get_shared_snp_names {
   return \@shared_names;
 }
 
+=head2 get_plink_calls
+
+  Arg [1]    : None
+
+  Example    : my $all_calls = $check->get_plink_calls;
+               my @sample_calls = @{$all_calls->{$sample_name}};
+  Description: Return the Plink calls for all samples, indexed by sample
+               name. The calls retain the order of the Plink dataset.
+
+  Returntype : HashRef[Str] of sample names, where values are
+               ArrayRef[WTSI::NPG::Genotyping::Call]
+
+=cut
+
 sub get_plink_calls {
   my ($self) = @_;
 
   my $genotypes = new plink_binary::vectorstr;
   my $snp = new plink_binary::snp;
 
-  my %shared_snp_names;
+  my %shared_snp_index;
   foreach my $name (@{$self->get_shared_snp_names}) {
-    $shared_snp_names{$name}++;
+    $shared_snp_index{$name}++;
   }
 
-  my @calls;
+  my $sample_names = $self->get_sample_names;
+
+  my %sample_calls_index;
   while ($self->plink->next_snp($snp, $genotypes)) {
     my $illumina_name = $snp->{'name'};
-    my $real_name     = _from_illumina_snp_name($illumina_name);
+    my $snp_name      = _from_illumina_snp_name($illumina_name);
+    if ($snp_name ne $illumina_name) {
+      $self->debug("Converted Illumina SNP name '$illumina_name' to ",
+                   "'$snp_name'");
+    }
 
-    foreach my $name ($illumina_name, $real_name) {
-      $self->debug("Checking for SNP '$name' in [",
-                   join(', ', keys %shared_snp_names), "]");
+    $self->debug("Checking for SNP '$snp_name' in [",
+                 join(', ', keys %shared_snp_index), "]");
 
-      for (my $i = 0; $i < $genotypes->size; $i++) {
-        if (exists $shared_snp_names{$name}) {
-          my $call = WTSI::NPG::Genotyping::Call->new
-            (snp      => $self->snpset->named_snp($name),
-             genotype => $genotypes->get($i));
+    for (my $i = 0; $i < $genotypes->size; $i++) {
+      if (exists $shared_snp_index{$snp_name}) {
+        my $call = WTSI::NPG::Genotyping::Call->new
+          (snp      => $self->snpset->named_snp($snp_name),
+           genotype => $genotypes->get($i));
 
-          $self->debug("Plink call: ", $call->str);
-          push @calls, $call;
+        my $sample_name = $sample_names->[$i];
+        unless (exists $sample_calls_index{$sample_name}) {
+          $sample_calls_index{$sample_name} = [];
         }
+
+        $self->debug("Plink call: ", $call->str);
+        push @{$sample_calls_index{$sample_name}}, $call;
+      }
+      else {
+        $self->debug("Skipping ", $snp_name);
       }
     }
   }
 
-  return \@calls;
+  return \%sample_calls_index;
 }
 
 
