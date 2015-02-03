@@ -240,6 +240,15 @@ sub merge {
   return $merged;
 }
 
+sub str {
+  my ($self) = @_;
+
+  return sprintf("%s call:%s SNP: %s",
+                 $self->genotype,
+                 $self->is_call ? 'yes' : 'no',
+                 $self->snp->str);
+}
+
 sub _complement {
   my ($genotype) = @_;
 
