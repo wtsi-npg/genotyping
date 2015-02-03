@@ -15,16 +15,16 @@ use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
-my $snpset = WTSI::NPG::Genotyping::SNPSet->new
-  ('/nfs/gapi/data/genotype/pipeline_test/identity_check/W30467_snp_set_info_1000Genomes.tsv');
+my $data_path = './t/qc/check/identity';
+my $plink_path = "$data_path/identity_test";
+my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Check::Identity');
 }
 
 sub get_num_samples : Test(1) {
-  my $plink_path = "/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test";
-
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink  => plink_binary::plink_binary->new($plink_path),
      snpset => $snpset);
@@ -33,8 +33,7 @@ sub get_num_samples : Test(1) {
 }
 
 sub get_sample_names : Test(1) {
-  my $plink_path = "/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test";
-
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink  => plink_binary::plink_binary->new($plink_path),
      snpset => $snpset);
@@ -51,8 +50,7 @@ sub get_sample_names : Test(1) {
 }
 
 sub get_shared_snp_names : Test(1) {
-  my $plink_path = "/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test";
-
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink  => plink_binary::plink_binary->new($plink_path),
      snpset => $snpset);
@@ -83,8 +81,7 @@ sub get_shared_snp_names : Test(1) {
 }
 
 sub get_plink_calls : Test(1) {
-  my $plink_path = "/nfs/gapi/data/genotype/pipeline_test/identity_check/identity_test";
-
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink  => plink_binary::plink_binary->new($plink_path),
      snpset => $snpset);
