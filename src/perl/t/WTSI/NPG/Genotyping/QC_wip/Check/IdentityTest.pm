@@ -6,7 +6,7 @@ use warnings;
 use File::Temp qw(tempdir);
 
 use base qw(Test::Class);
-use Test::More tests => 5;
+use Test::More tests => 22;
 use Test::Exception;
 
 use plink_binary;
@@ -80,11 +80,49 @@ sub get_shared_snp_names : Test(1) {
   is_deeply($shared, \@expected) or diag explain $shared;
 }
 
-sub get_plink_calls : Test(1) {
+sub get_plink_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink  => plink_binary::plink_binary->new($plink_path),
      snpset => $snpset);
 
-  $check->get_plink_calls;
+  my $calls = $check->get_plink_calls;
+
+  # Map of sample name to Plink genotypes
+  my $expected_genotypes =
+    {'urn:wtsi:000000_A00_DUMMY-SAMPLE' => [('NN') x 20],
+
+     'urn:wtsi:249441_F11_HELIC5102138' =>
+     ['AA', 'AG', 'TT', 'TT', 'AC', 'AG', 'CT', 'AA', 'GA', 'AA',
+      'CC', 'TT', 'AG', 'GG', 'CC', 'GG', 'AA', 'GG', 'GA', 'CT'],
+
+     'urn:wtsi:249442_C09_HELIC5102247' =>
+     ['GG', 'GG', 'CC', 'NN', 'CC', 'AA', 'CT', 'GG', 'GA', 'AA',
+      'CT', 'TT', 'AG', 'GA', 'TT', 'GG', 'GA', 'AG', 'AA', 'CT'],
+
+     'urn:wtsi:249461_G12_HELIC5215300' =>
+     [('NN') x 13, 'GA', 'TC', 'TG', 'AA', 'GG', 'GA', 'TT'],
+
+     'urn:wtsi:249469_H06_HELIC5274668' =>
+     ['AA', 'AG', 'TT', 'TT', 'AC', 'GG', 'TT', 'AA', 'AA', 'CC',
+      'TT', 'CT', 'AG', 'GA', 'TC', 'TG', 'AA', 'GG', 'AA', 'TT'],
+
+     'urn:wtsi:249470_F02_HELIC5274730' =>
+     ['GA', 'GG', 'TT', 'TT', 'AC', 'GG', 'TT', 'GG', 'AA', 'CA',
+      'CT', 'CT', 'AG', 'AA', 'CC', 'TT', 'GA', 'AA', 'AA', 'CT']};
+
+  my @expected_snp_names = @{$check->get_shared_snp_names};
+
+  foreach my $sample_name (@{$check->get_sample_names}) {
+    my @calls = @{$calls->{$sample_name}};
+
+    cmp_ok(scalar @calls, '==', 20, "Number of $sample_name calls");
+
+    my @snp_names = map { $_->snp->name } @calls;
+    is_deeply(\@snp_names, \@expected_snp_names) or diag explain \@snp_names;
+
+    my @genotypes = map { $_->genotype } @calls;
+    is_deeply(\@genotypes, $expected_genotypes->{$sample_name})
+      or diag explain \@genotypes;
+  }
 }
