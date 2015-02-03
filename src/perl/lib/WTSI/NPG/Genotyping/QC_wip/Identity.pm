@@ -152,31 +152,46 @@ sub BUILD {
 }
 
 sub compareFailedPairs {
+    # input: data structure output by findIdentity
     # pairwise check of all failed samples; use output to detect swaps
     # Consider sample pair (i, j)
     # let s_ij = rate of matching calls between (Illumina_i, Sequenom_j)
     # we may have s_ij != s_ji, so define pairwise metric as max(s_ij, s_ji)
-    my ($self, $gtRef, $failRef, $snpRef) = @_;
-    my %genotypes = %{$gtRef};
-    my @failedSamples = @{$failRef};
-    my @snps = @{$snpRef};
+    my ($self, $resultRef, $snpTotal) = @_;
+    my %results = %{$resultRef};
+    my @failedSamples;
+    foreach my $sample (keys(%results)) {
+        if ($results{$sample}{'failed'}) { push @failedSamples, $sample; }
+    }
     my @comparison = ();
+    my $total_warnings = 0;
     for (my $i = 0; $i < @failedSamples; $i++) {
         for (my $j = 0; $j < $i; $j++) {
             my $sample_i = $failedSamples[$i];
             my $sample_j = $failedSamples[$j];
+            my %gt_i = %{$results{$sample_i}{'genotypes'}};
+            my %gt_j = %{$results{$sample_j}{'genotypes'}};
 	    my @match = (0,0);
-	    foreach my $snp (@snps) {
-		my ($plink_i, $plex_i) = @{$genotypes{$sample_i}{$snp}};
-		my ($plink_j, $plex_j) = @{$genotypes{$sample_j}{$snp}};
+            foreach my $snp (keys(%gt_i)) {
+                my ($plink_i, $plex_i) = @{$gt_i{$snp}};
+		my ($plink_j, $plex_j) = @{$gt_j{$snp}};
 		my $equiv_ij = $self->equivalent($plink_i, $plex_j);
 		my $equiv_ji = $self->equivalent($plink_j, $plex_i);
 		if ($equiv_ij) { $match[0]++; }
 		if ($equiv_ji) { $match[1]++; }
-	    }
-	    my $similarity = max(@match)/@snps;
-	    push(@comparison, [$sample_i, $sample_j, $similarity]);
-	}
+            }
+            my $similarity = max(@match)/$snpTotal;
+            my $warning = 0;
+            if ($similarity > $self->swap_threshold) {
+                $warning = 1;
+                $total_warnings++;
+            }
+            push(@comparison, [$sample_i, $sample_j, $similarity, $warning]);
+        }
+    }
+    if ($total_warnings > 0) {
+        $self->warn("Warning of possible sample swap for ",
+                    "$total_warnings pairs of failed samples.");
     }
     return \@comparison;
 }
@@ -217,6 +232,7 @@ sub findIdentity {
     my %qcplex = %{$plexRef};
     my @snps = @{$snpsRef};
     my %identity_results;
+    my $totalMissing = 0;
     foreach my $sample (keys(%plink)) {
 	# compare genotypes; if missing, pass/fail status is undefined
         my %genotypes = ();
@@ -245,11 +261,19 @@ sub findIdentity {
 	} else {
             # $identity, $failed undefined; %genotypes empty
 	    $missing = 1;
+            $totalMissing++;
 	}
         $identity_results{$sample} = {'identity'  => $identity,
                                       'failed'    => $failed,
                                       'missing'   => $missing,
                                       'genotypes' => \%genotypes };
+    }
+    my $totalSamples = scalar(keys(%plink));
+    if ($totalMissing == 0) {
+        $self->info("Found identity for $totalSamples samples.");
+    } else {
+        $self->warn("Finished finding identity; QC plex information ",
+                    "missing for $totalMissing of $totalSamples samples.");
     }
     return \%identity_results;
 }
@@ -301,9 +325,9 @@ sub readPlexCalls {
     # return a hash of calls indexed by sample and SNP
     my ($self, ) = @_;
     # read samples and SNP names
-    my @samples = $self->pipedb->sample->search({include => 1});
+    my @samples = $self->pipedb->sample->all;
     $self->logger->debug("Read ", scalar(@samples),
-                         " samples marked for inclusion from pipeline DB");
+                         " samples from pipeline DB");
     my @snps = $self->pipedb->snp->all;
     my $snpTotal = @snps;
     $self->logger->debug("Read $snpTotal SNPs from pipeline DB");
@@ -315,13 +339,10 @@ sub readPlexCalls {
     my $snpResultTotal = 0;
     my %results;
     my $i = 0;
-
     foreach my $sample (@samples) {
+        if ($sample->include == 0) { next; }
         my $sampleURI = $sample->uri;
-        # FIXME - Add an attribute to allow method.name(s) to be specified
-        my @results = $sample->results->search
-          ({'method.name' => ['Fluidigm', 'Sequenom']},
-           {join          => 'method'});
+        my @results = $sample->results->all;
         $i++;
         if ($i % 100 == 0) {
             $self->logger->debug("Read ", scalar(@results),
@@ -329,7 +350,7 @@ sub readPlexCalls {
                                  scalar(@samples));
         }
         foreach my $result (@results) {
-            my @snpResults = $result->snp_results;
+            my @snpResults = $result->snp_results->all;
             $snpResultTotal += @snpResults;
             foreach my $snpResult (@snpResults) {
                 my $snpName = $snpNames{$snpResult->id_snp};
@@ -389,83 +410,13 @@ sub revComp {
     return join('', @rev);
 }
 
-sub writeFailedPairComparison {
-    my $self = shift;
-    my @compareResults = @{ shift() };
-    my $maxSimilarity = shift;
-    my $outPath = $self->output_dir.'/'.$self->output_names->{'fail_pairs'};
-    open my $out, ">", $outPath || 
-        $self->logger->logcroak("Cannot open '$outPath'");
-    my $header = join("\t", "#Sample_1", "Sample_2", "Similarity", "Swap_warning");
-    print $out $header."\n";
-    foreach my $resultRef (@compareResults) {
-	my ($sample1, $sample2, $metric) = @$resultRef;
-	my $status;
-	if ($metric > $maxSimilarity) { $status = 'TRUE'; }
-	else { $status = 'FALSE'; }
-	my $line = sprintf("%s\t%s\t%.4f\t%s\n", $sample1, $sample2, $metric, $status);
-	print $out $line;
-    }
-    close $out || $self->logger->logcroak("Cannot close '$outPath'");
-}
-
-sub writeGenotypes {
-    my $self = shift;
-    my %genotypes = %{ shift() }; # hashes of calls by sample & snp
-    my @snps = @{ shift() }; # list of SNPs to output
-    my @samples = sort(keys(%genotypes));
-    my $outPath = $self->output_dir.'/'.$self->output_names->{'genotypes'};
-    open my $gt, ">", $outPath or die $!;
-    my @heads = qw/SNP sample illumina_call qc_plex_call/;
-    print $gt '#'.join("\t", @heads)."\n";
-    foreach my $snp (@snps) {
-	foreach my $sample (sort(keys(%genotypes))) {
-	    my ($pCall, $sCall) = @{ $genotypes{$sample}{$snp} };
-	    $pCall ||= '-';
-	    $sCall ||= '-';
-	    print $gt join("\t", $snp, $sample, $pCall, $sCall), "\n";
-	}
-    }
-    close $gt or die $!;
-}
-
-sub writeIdentity {
-    # evaluate identity pass/fail and write results
-    # return list of failed sample names
-    my $self = shift;
-    my %identity = %{ shift() }; # hash of identity by sample
-    my %failed = %{ shift() };   # pass/fail status by sample
-    my %missing = %{ shift() };  # missing samples from Sequenom query
-    my @samples = @{ shift() };  # list ensures consistent sample name order
-    my $snpTotal = shift;
-    my $minIdent = shift;
-    my $outPath = $self->output_dir.'/'.$self->output_names->{'results'};
-    open my $results, ">", $outPath or die $!;
-    my $header = join("\t", "#Identity comparison",
-		      "MIN_IDENTITY:$minIdent", 
-                      "AVAILABLE_PLEX_SNPS:$snpTotal")."\n";
-    $header .= join("\t", "#sample", "concordance", "result")."\n";
-    print $results $header;
-    foreach my $sample (@samples) {
-	my $line;
-	if (!($missing{$sample})) {
-	    $line = sprintf("%s\t%.4f\t", $sample, $identity{$sample});
-	    if ($failed{$sample}) { $line .= "Fail\n"; }
-	    else { $line .= "Pass\n"; }
-	} else {
-	    $line = join("\t", $sample, "-", "Unavailable")."\n";
-	}
-	print $results $line;
-    }
-    close $results;
-}
-
 sub writeJson {
     # get data structure for output to and write to JSON file
     # first argument is hash of values (if check was run) or list of samples (if check was not run)
-    my ($self, $resultsRef, $idCheck, $commonSnps) = @_;
+    my ($self, $resultsRef, $idCheck, $commonSnps, $swapWarnings) = @_;
     my $idRef;
     my %data = (results => $resultsRef,
+                swap_warnings => $swapWarnings,
 		identity_check_run => $idCheck,
 		common_snps => $commonSnps,
 		min_snps => $self->min_shared_snps
@@ -488,8 +439,8 @@ sub run_identity_check {
     my $snpTotal = @snps;
     if ($snpTotal < $self->min_shared_snps) {
 	my %idResult = ();
-        my %failedPairComparison = ();
-	$self->writeJson(\%idResult, 0, $snpTotal);
+        my %failComparison = ();
+	$self->writeJson(\%idResult, 0, $snpTotal, \%failComparison);
 	$self->warn("Cannot do identity check; ",
                     $self->min_shared_snps,
                     " SNPs from QC plex required ", $snpTotal,
@@ -508,32 +459,12 @@ sub run_identity_check {
 	$self->logger->debug("Calls read from PLINK binary: ",
                              $duration, " seconds.\n");
 	# 4) Find identity, genotypes, and pass/fail status; write output
-	my $idResult = $self->findIdentity($plinkCallsRef,
-                                           $plexCallsRef,
-                                           \@snps);
-	$self->writeJson($idResult, 1, $snpTotal);
-
-	#$self->writeGenotypes($gtRef, \@snps);
-	#$self->writeIdentity($idRef, $failRef, $missingRef, $sampleNamesRef,
-        #                     $snpTotal, $self->pass_threshold);
-
-	# 5) Pairwise check on failed samples for possible swaps
-
-        # TODO re-implement and test step (5), the swap check
-
-        # TODO develop identity_qc_extra.pl to generate legacy text files
-        # on demand
-
-        #my @failed;
-        #foreach my $sample (keys(%{$idResult})) {
-        #    if ($idResult{$sample}{'failed'}) { push @failed, $sample; }
-        #}
-
-	#my $compareRef = $self->compareFailedPairs($gtRef,
-        #                                           \@snps,
-        #                                           $self->swap_threshold);
-	#$self->writeFailedPairComparison($compareRef, $self->pass_threshold);
-	#$self->logger->debug("Finished identity check.\n");
+	my $idResultRef = $self->findIdentity($plinkCallsRef,
+                                              $plexCallsRef,
+                                              \@snps);
+        my $failComparisonRef = $self->compareFailedPairs($idResultRef,
+                                                          scalar(@snps));
+	$self->writeJson($idResultRef, 1, $snpTotal, $failComparisonRef);
     }
     return 1;
 }
