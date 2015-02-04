@@ -37,11 +37,34 @@ has 'pass_threshold' => # minimum similarity for metric pass
    isa     => 'Num',
    default => 0.9);
 
+=head2 get_num_samples
+
+  Arg [1]    : None
+
+  Example    : my $n = $check->get_num_samples;
+  Description: Return number of samples in the Plink data.
+
+  Returntype : Int
+
+=cut
+
 sub get_num_samples {
   my ($self) = @_;
 
   return $self->plink->{"individuals"}->size;
 }
+
+=head2 get_sample_names
+
+  Arg [1]    : None
+
+  Example    : my @names = @{$check->get_num_samples};
+  Description: Return the names of the samples in the Plink data, in
+               their original order.
+
+  Returntype : ArrayRef[Str]
+
+=cut
 
 sub get_sample_names {
   my ($self) = @_;
@@ -53,6 +76,22 @@ sub get_sample_names {
 
   return \@names;
 }
+
+=head2 get_shared_snp_names
+
+  Arg [1]    : None
+
+  Example    : my @names = @{$check->get_shared_snp_names};
+  Description: Return the names of SNPs common to both the Plink data
+               and the quality control SNPset, in their original order
+               in the Plink data.
+
+               This method ignores the "exm-" prefix added by Illumina
+               to the real (dbSNP) SNP names.
+
+  Returntype : ArrayRef[Str]
+
+=cut
 
 sub get_shared_snp_names {
   my ($self) = @_;
@@ -76,11 +115,11 @@ sub get_shared_snp_names {
   return \@shared_names;
 }
 
-=head2 get_plink_calls
+=head2 get_all_calls
 
   Arg [1]    : None
 
-  Example    : my $all_calls = $check->get_plink_calls;
+  Example    : my $all_calls = $check->get_all_calls;
                my @sample_calls = @{$all_calls->{$sample_name}};
   Description: Return the Plink calls for all samples, indexed by sample
                name. The calls retain the order of the Plink dataset.
@@ -90,7 +129,7 @@ sub get_shared_snp_names {
 
 =cut
 
-sub get_plink_calls {
+sub get_all_calls {
   my ($self) = @_;
 
   my $genotypes = new plink_binary::vectorstr;
@@ -138,6 +177,77 @@ sub get_plink_calls {
   return \%sample_calls_index;
 }
 
+=head2 get_sample_calls
+
+  Arg [1]    : None
+
+  Example    : my @sample_calls = @{$check->get_sample_calls($sample_name)};
+  Description: Return the Plink calls for a samples.
+
+  Returntype : ArrayRef[WTSI::NPG::Genotyping::Call]
+
+=cut
+
+sub get_sample_calls {
+  my ($self, $sample_name) = @_;
+
+  defined $sample_name or $self->logconfess('sample_name argument was undef');
+  $sample_name or $self->logconfess('sample_name argument was empty');
+
+  return $self->get_all_calls->{$sample_name};
+}
+
+=head2 compare_calls
+
+  Arg [1]    : None
+
+  Example    : my @comparisons = @{$check->compare_calls($sample_name,
+                                                         $qc_calls)};
+  Description: Compare the array of QC calls with the sample calls for a
+               named sample. Return a HashRef for each QC call whose keys
+               and values are:
+
+                {qc         => <WTSI::NPG::Genotyping::Call>,
+                 sample     => <WTSI::NPG::Genotyping::Call>,
+                 equivalent => <Bool>}
+
+               The comparison results are in the same order as the QC calls
+               supplied as an argument.
+
+  Returntype : ArrayRef[HashRef]
+
+=cut
+
+sub compare_calls {
+  my ($self, $sample_name, $qc_calls) = @_;
+
+  my $sample_calls = $self->get_sample_calls($sample_name);
+  unless (defined $sample_calls) {
+    $self->logconfess("No sample calls are present for '$sample_name'");
+  }
+
+  my @comparisons;
+  foreach my $qc_call (@$qc_calls) {
+    unless ($self->snpset->contains_snp($qc_call->snp->name)) {
+      $self->logconfess("Invalid QC call for comparison; its SNP '",
+                        $qc_call->snp->name, "' is not in the SNP set ",
+                        "being compared");
+    }
+
+    foreach my $sample_call (@$sample_calls) {
+      if ($qc_call->snp->name eq $sample_call->snp->name) {
+        $self->debug("Comparing [", $qc_call->str, "] with [",
+                     $sample_call->str, "]");
+
+        push @comparisons, {qc         => $qc_call,
+                            sample     => $sample_call,
+                            equivalent => $qc_call->equivalent($sample_call)};
+      }
+    }
+  }
+
+  return \@comparisons;
+}
 
 sub _from_illumina_snp_name {
   my ($name) = @_;
