@@ -69,8 +69,8 @@ has 'output_dir' =>
 has 'output_names' =>
     (is            => 'ro',
      isa           => 'HashRef[Str]',
-     default       => sub {{'genotypes'  => 'identity_check_gt.txt',
-                            'results'    => 'identity_check_results.txt',
+     default       => sub {{'gt_output'  => 'identity_check_gt.txt',
+                            'summary'    => 'identity_check_results.txt',
                             'fail_pairs' => 'identity_check_failed_pairs.txt',
                             'json'       => 'identity_check.json' }},
  );
@@ -107,6 +107,12 @@ has 'swap_threshold' => # minimum similarity to be flagged as possible swap
      isa             => 'Num',
      default         => 0.9,
 );
+
+# keys for results hashes
+our $GENOTYPES_KEY = 'genotypes';
+our $FAILED_KEY = 'failed';
+our $MISSING_KEY = 'missing';
+our $IDENTITY_KEY = 'identity';
 
 our $SEQUENOM = 'Sequenom';
 our $FLUIDIGM = 'Fluidigm';
@@ -263,10 +269,10 @@ sub findIdentity {
 	    $missing = 1;
             $totalMissing++;
 	}
-        $identity_results{$sample} = {'identity'  => $identity,
-                                      'failed'    => $failed,
-                                      'missing'   => $missing,
-                                      'genotypes' => \%genotypes };
+        $identity_results{$sample} = {$IDENTITY_KEY  => $identity,
+                                      $FAILED_KEY    => $failed,
+                                      $MISSING_KEY   => $missing,
+                                      $GENOTYPES_KEY => \%genotypes };
     }
     my $totalSamples = scalar(keys(%plink));
     if ($totalMissing == 0) {
@@ -412,13 +418,51 @@ sub revComp {
     return join('', @rev);
 }
 
+sub writeFailedPairComparison {
+    # write pairwise comparison of failed sample used for swap check
+    my ($self, $outFile, $comparisonRef) = @_;
+    my @comparison = @{$comparisonRef};
+    my $header = join("\t", "#Sample_1", "Sample_2", "Similarity",
+                      "Swap_warning");
+    print $outFile $header."\n";
+    foreach my $resultRef (@comparison) {
+	my ($sample1, $sample2, $metric, $warning) = @{$resultRef};
+	my $line = sprintf("%s\t%s\t%.4f\t", $sample1, $sample2, $metric);
+        if ($warning) { $line .= 'TRUE'; }
+        else { $line .= 'FALSE'; }
+        print $outFile $line."\n";
+    }
+    return 1;
+}
+
+sub writeGenotypes {
+    # write genotypes used for identity check, in tab-delimited text format
+    my ($self, $outFile, $resultsRef, $snpsRef, $samplesRef) = @_;
+    my @headers = ('#SNP', 'sample', 'illumina_call', 'qc_plex_call');
+    my %results = %{$resultsRef};
+    print $outFile join("\t", @headers)."\n";
+    foreach my $snp (@{$snpsRef}) {
+        foreach my $sample (@{$samplesRef}) {
+            #print Dumper $results{$sample};
+            my $pCall = '-';
+            my $sCall = '-';
+            if (!$results{$sample}{$MISSING_KEY}) {
+                ($pCall, $sCall) =
+                    @{$results{$sample}{$GENOTYPES_KEY}{$snp}};
+            }
+            print $outFile join("\t", $snp, $sample, $pCall, $sCall), "\n";
+        }
+    }
+    return 1;
+}
+
 sub writeJson {
     # get data structure for output to and write to JSON file
     # first argument is hash of values (if check was run) or list of samples (if check was not run)
-    my ($self, $resultsRef, $idCheck, $commonSnps, $swapWarnings) = @_;
+    my ($self, $resultsRef, $idCheck, $commonSnps, $failComparison) = @_;
     my $idRef;
     my %data = (results => $resultsRef,
-                swap_warnings => $swapWarnings,
+                fail_comparison => $failComparison,
 		identity_check_run => $idCheck,
 		common_snps => $commonSnps,
 		min_snps => $self->min_shared_snps
@@ -428,6 +472,61 @@ sub writeJson {
         $self->logger->logcroak("Cannot open '$outPath'");
     print $out encode_json(\%data);
     close $out || $self->logger->logcroak("Cannot close '$outPath'");
+}
+
+sub writeSummary {
+    # write tab-delimited text summary file
+    my ($self, $outFile, $resultsRef, $samplesRef, $snpTotal) = @_;
+    my %results = %{$resultsRef};
+    my $header = join("\t", "#Identity comparison",
+		      "MIN_IDENTITY:".$self->pass_threshold,
+                      "AVAILABLE_PLEX_SNPS:".$snpTotal)."\n";
+    $header .= join("\t", "#sample", "concordance", "result")."\n";
+    print $outFile $header;
+    foreach my $sample (@{$samplesRef}) {
+        my $line;
+        if ($results{$sample}{$MISSING_KEY}) {
+            $line = join("\t", $sample, "-", "Unavailable")."\n";
+        } else {
+            $line = sprintf("%s\t%.4f\t", $sample,
+                            $results{$sample}{$IDENTITY_KEY});
+            if ($results{$sample}{$FAILED_KEY}) { $line .= "Fail\n"; }
+            else { $line .= "Pass\n"; }
+        }
+        print $outFile $line;
+    }
+    return 1;
+}
+
+sub writeText {
+    # write old-style output files in tab-delimited text format
+    # only written after a successful identity check
+    # useful as human-readable data for troubleshooting
+    # text files are:
+    # - identity_check_failed_pairs.txt : comparison of failed sample pairs
+    # - identity_check_gt.txt : all genotypes used in identity check
+    # - identity_check_results.txt : high-level summary of identity metric
+    my ($self, $resultsRef, $failComparison, $samplesRef, $snpsRef,
+        $snpTotal) = @_;
+    my @keys = qw/gt_output summary fail_pairs/;
+    my %outFiles = ();
+    foreach my $key (@keys) {
+        my $outPath = $self->output_dir.'/'.$self->output_names->{$key};
+        open my $out, ">", $outPath || $self->logcroak("Cannot open output '",
+                                                       $outPath, "': $!");
+        $outFiles{$key} = $out;
+    }
+    $self->writeGenotypes($outFiles{'gt_output'}, $resultsRef,
+                          $snpsRef, $samplesRef);
+    $self->writeSummary($outFiles{'summary'}, $resultsRef, $samplesRef,
+                        $snpTotal);
+    $self->writeFailedPairComparison($outFiles{'fail_pairs'},
+                                     $failComparison);
+    foreach my $key (@keys) {
+        close $outFiles{$key} || $self->logcroak("Cannot close output for ",
+                                                 $key, ": $!");
+    }
+    return 1;
 }
 
 sub run_identity_check {
@@ -467,6 +566,9 @@ sub run_identity_check {
         my $failComparisonRef = $self->compareFailedPairs($idResultRef,
                                                           scalar(@snps));
 	$self->writeJson($idResultRef, 1, $snpTotal, $failComparisonRef);
+        # only write text after a successful identity check
+	$self->writeText($idResultRef, $failComparisonRef,
+                         $sampleNamesRef, \@snps, $snpTotal);
     }
     return 1;
 }
