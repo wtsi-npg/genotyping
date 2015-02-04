@@ -28,8 +28,6 @@ package WTSI::NPG::Genotyping::QC_wip::Identity;
 
 use Moose;
 
-use Data::Dumper; # TODO remove after testing
-
 use JSON;
 use List::Util qw(max);
 use Log::Log4perl;
