@@ -5,12 +5,13 @@ package WTSI::NPG::Genotyping::QC_wip::IdentityTest;
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use File::Slurp qw(read_file);
 use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 
 use base qw(Test::Class);
-use Test::More tests => 28;
+use Test::More tests => 37;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC_wip::Identity;
@@ -57,7 +58,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Identity');
 }
 
-sub test_alternate_snp_names : Test(5) {
+sub test_alternate_snp_names : Test(8) {
     WTSI::NPG::Genotyping::QC_wip::Identity->new(
         db_path => $dbPath,
         ini_path => $iniPath,
@@ -68,7 +69,7 @@ sub test_alternate_snp_names : Test(5) {
     validate_outputs();
 }
 
-sub test_command_line : Test(6) {
+sub test_command_line : Test(9) {
     my $plink = $dataDir."/identity_test";
     my $config = defaultJsonConfig();
     my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
@@ -119,7 +120,7 @@ sub test_name_conversion : Test(4) {
        'Sequenom to Illumina action');
 }
 
-sub test_standard : Test(7) {
+sub test_standard : Test(10) {
     my $checker = WTSI::NPG::Genotyping::QC_wip::Identity->new(
         db_path => $dbPath,
         ini_path => $iniPath,
@@ -138,9 +139,13 @@ sub validate_outputs {
     ok(-e $jsonOutPath, "JSON output exists");
     my $jsonOut = decode_json(readFileToString($jsonOutPath));
     is_deeply($jsonOut, $jsonRef, "JSON output is equivalent to reference");
-    ok(-e $workdir.'/'.$textName, "Text summary exists");
-    ok(-e $workdir.'/'.$failPairsName, "Failed pairs comparison exists");
-    ok(-e $workdir.'/'.$gtName, "Detailed genotype file exists");
+    my @names = ($textName, $failPairsName, $gtName);
+    foreach my $name (@names) {
+        ok(-e $workdir.'/'.$name, "$name exists");
+        my $testContents = read_file($workdir.'/'.$name);
+        my $refContents  = read_file($dataDir.'/'.$name);
+        is($testContents, $refContents, "$name output matches reference");
+    }
 }
 
 return 1;
