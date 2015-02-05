@@ -210,6 +210,35 @@ sub get_sample_calls {
   return $all_calls->{$sample_name};
 }
 
+=head2 pair_all_calls
+
+  Arg [1]    : ArrayRef[HashRef]
+
+  Example    : my @pairs = @{$check->pair_calls($sample_name, $qc_calls)};
+  Description: Find the calls for given samples that correspond to the
+               supplied QC calls (i.e. are for the same SNP).
+
+               Each HashRef in the argument must have the following keys
+               and values:
+
+                {sample => <Str>,
+                 calls  => <ArrayRef[WTSI::NPG::Genotyping::Call]>}
+
+               (These are the arguments used by pair_sample_calls).
+
+               Return an array of HashRefs whose keys and values are:
+
+                {sample => <Str>,
+                 pairs  => <ArrayRef[HashRef]>}
+
+               (The values under the key 'pairs' correspond to the return
+                values of pair_sample_calls).
+
+  Returntype : ArrayRef[HashRef]
+
+=cut
+
+
 sub pair_all_calls {
   my ($self, $qc_call_sets) = @_;
 
@@ -240,7 +269,8 @@ sub pair_all_calls {
 
 =head2 pair_sample_calls
 
-  Arg [1]    : None
+  Arg [1]    : Str sample name (in Plink data)
+  Arg [2]    : ArrayRef[WTSI::NPG::Genotyping::Call] QC calls
 
   Example    : my @pairs = @{$check->pair_calls($sample_name, $qc_calls)};
   Description: Find the calls for a given sample that correspond to the
