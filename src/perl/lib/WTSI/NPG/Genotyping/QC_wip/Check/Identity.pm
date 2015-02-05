@@ -12,9 +12,9 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-has 'plink' =>
+has 'plink_path' =>
   (is      => 'ro',
-   isa     => 'plink_binary::plink_binary',
+   isa     => 'Str',
    required => 1);
 
 has 'snpset'  =>
@@ -51,7 +51,9 @@ has 'pass_threshold' => # minimum similarity for metric pass
 sub get_num_samples {
   my ($self) = @_;
 
-  return $self->plink->{"individuals"}->size;
+  my $plink = plink_binary::plink_binary->new($self->plink_path);
+
+  return $plink->{"individuals"}->size;
 }
 
 =head2 get_sample_names
@@ -69,9 +71,11 @@ sub get_num_samples {
 sub get_sample_names {
   my ($self) = @_;
 
+  my $plink = plink_binary::plink_binary->new($self->plink_path);
+
   my @names;
   for (my $i = 0; $i < $self->get_num_samples; $i++) {
-    push @names, $self->plink->{'individuals'}->get($i)->{'name'};
+    push @names, $plink->{'individuals'}->get($i)->{'name'};
   }
 
   return \@names;
@@ -101,10 +105,12 @@ sub get_shared_snp_names {
     $plex_snp_index{$name}++;
   }
 
+  my $plink = plink_binary::plink_binary->new($self->plink_path);
+
   my @shared_names;
-  my $num_plink_snps = $self->plink->{'snps'}->size;
+  my $num_plink_snps = $plink->{'snps'}->size;
   for (my $i = 0; $i < $num_plink_snps; $i++) {
-    my $name = $self->plink->{'snps'}->get($i)->{'name'};
+    my $name = $plink->{'snps'}->get($i)->{'name'};
     my $converted = _from_illumina_snp_name($name);
 
     if (exists $plex_snp_index{$converted}) {
@@ -132,6 +138,7 @@ sub get_shared_snp_names {
 sub get_all_calls {
   my ($self) = @_;
 
+  my $plink = plink_binary::plink_binary->new($self->plink_path);
   my $genotypes = new plink_binary::vectorstr;
   my $snp = new plink_binary::snp;
 
@@ -143,7 +150,7 @@ sub get_all_calls {
   my $sample_names = $self->get_sample_names;
 
   my %sample_calls_index;
-  while ($self->plink->next_snp($snp, $genotypes)) {
+  while ($plink->next_snp($snp, $genotypes)) {
     my $illumina_name = $snp->{'name'};
     my $snp_name      = _from_illumina_snp_name($illumina_name);
     if ($snp_name ne $illumina_name) {
@@ -191,42 +198,83 @@ sub get_all_calls {
 sub get_sample_calls {
   my ($self, $sample_name) = @_;
 
-  defined $sample_name or $self->logconfess('sample_name argument was undef');
-  $sample_name or $self->logconfess('sample_name argument was empty');
+  defined $sample_name or
+    $self->logconfess('A defined sample_name argument is required');
+  $sample_name or
+    $self->logconfess('A non-empty sample_name argument is required');
 
-  return $self->get_all_calls->{$sample_name};
+  my $all_calls = $self->get_all_calls;
+  exists $all_calls->{$sample_name} or
+    $self->logconfess("There is no data for a sample named '$sample_name'");
+
+  return $all_calls->{$sample_name};
 }
 
-=head2 compare_calls
+sub pair_all_calls {
+  my ($self, $qc_call_sets) = @_;
+
+  defined $qc_call_sets or
+    $self->logconfess('A defined qc_call_sets argument is required');
+
+  $self->debug("Pairing calls for ", scalar @$qc_call_sets, " samples");
+
+  my @paired;
+  foreach my $qc_call_set (@$qc_call_sets) {
+    exists $qc_call_set->{calls} or
+      $self->logconfess("A 'calls' key is required");
+    exists $qc_call_set->{sample} or
+      $self->logconfess("A 'sample' key is required");
+
+    my $qc_calls    = $qc_call_set->{calls};
+    my $sample_name = $qc_call_set->{sample};
+
+    push @paired,
+      {pairs  => $self->pair_sample_calls($sample_name, $qc_calls),
+       sample => $sample_name};
+  }
+
+  $self->debug("Paired calls for ", scalar @paired, " samples");
+
+  return \@paired;
+}
+
+=head2 pair_sample_calls
 
   Arg [1]    : None
 
-  Example    : my @comparisons = @{$check->compare_calls($sample_name,
-                                                         $qc_calls)};
-  Description: Compare the array of QC calls with the sample calls for a
-               named sample. Return a HashRef for each QC call whose keys
-               and values are:
+  Example    : my @pairs = @{$check->pair_calls($sample_name, $qc_calls)};
+  Description: Find the calls for a given sample that correspond to the
+               supplied QC calls (i.e. are for the same SNP). Return an array
+               pairs calls. Each pair is a HashRef whose keys and values are:
 
-                {qc         => <WTSI::NPG::Genotyping::Call>,
-                 sample     => <WTSI::NPG::Genotyping::Call>,
-                 equivalent => <Bool>}
+                {qc     => <WTSI::NPG::Genotyping::Call>,
+                 sample => <WTSI::NPG::Genotyping::Call>}
 
-               The comparison results are in the same order as the QC calls
-               supplied as an argument.
+               The results are in the same order as the supplied QC calls.
 
   Returntype : ArrayRef[HashRef]
 
 =cut
 
-sub compare_calls {
+sub pair_sample_calls {
   my ($self, $sample_name, $qc_calls) = @_;
+
+  defined $sample_name or
+    $self->logconfess('A defined sample_name argument is required');
+  $sample_name or
+    $self->logconfess('A non-empty sample_name argument is required');
+
+  defined $qc_calls or
+    $self->logconfess('A defined qc_calls argument is required');
 
   my $sample_calls = $self->get_sample_calls($sample_name);
   unless (defined $sample_calls) {
     $self->logconfess("No sample calls are present for '$sample_name'");
   }
 
-  my @comparisons;
+  $self->debug("Pairing calls for '$sample_name'");
+
+  my @pairs;
   foreach my $qc_call (@$qc_calls) {
     unless ($self->snpset->contains_snp($qc_call->snp->name)) {
       $self->logconfess("Invalid QC call for comparison; its SNP '",
@@ -239,14 +287,15 @@ sub compare_calls {
         $self->debug("Comparing [", $qc_call->str, "] with [",
                      $sample_call->str, "]");
 
-        push @comparisons, {qc         => $qc_call,
-                            sample     => $sample_call,
-                            equivalent => $qc_call->equivalent($sample_call)};
+        push @pairs, {qc     => $qc_call,
+                      sample => $sample_call};
       }
     }
   }
 
-  return \@comparisons;
+  $self->debug("Paired ", scalar @pairs, " calls for '$sample_name'");
+
+  return \@pairs;
 }
 
 sub _from_illumina_snp_name {

@@ -4,9 +4,10 @@ package WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest;
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 30;
+use Test::More tests => 66;
 use Test::Exception;
 
 use plink_binary;
@@ -27,8 +28,8 @@ sub require : Test(1) {
 sub get_num_samples : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
   cmp_ok($check->get_num_samples, '==', 6, 'Number of samples')
 }
@@ -36,8 +37,8 @@ sub get_num_samples : Test(1) {
 sub get_sample_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
   my @expected = ('urn:wtsi:000000_A00_DUMMY-SAMPLE',
                   'urn:wtsi:249441_F11_HELIC5102138',
@@ -53,8 +54,8 @@ sub get_sample_names : Test(1) {
 sub get_shared_snp_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
   my @expected = ('rs1805087',
                   'rs2241714',
@@ -84,8 +85,8 @@ sub get_shared_snp_names : Test(1) {
 sub get_all_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
   my $calls = $check->get_all_calls;
 
@@ -128,20 +129,31 @@ sub get_all_calls : Test(18) {
   }
 }
 
-sub get_sample_calls : Test(3) {
+sub get_sample_calls : Test(14) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
-  my $sample_name  = 'urn:wtsi:249461_G12_HELIC5215300';
-  my @calls = @{$check->get_sample_calls($sample_name)};
+  my @sample_names = ('urn:wtsi:000000_A00_DUMMY-SAMPLE',
+                      'urn:wtsi:249441_F11_HELIC5102138',
+                      'urn:wtsi:249442_C09_HELIC5102247',
+                      'urn:wtsi:249461_G12_HELIC5215300',
+                      'urn:wtsi:249469_H06_HELIC5274668',
+                      'urn:wtsi:249470_F02_HELIC5274730');
 
-  cmp_ok(scalar @calls, '==', 20, "Number of $sample_name calls");
+  foreach my $name (@sample_names) {
+    my $calls = $check->get_sample_calls($name);
+    ok($calls, "$name calls");
+    cmp_ok(scalar @$calls, '==', 20, "Number of $name calls");
+  }
 
   my @expected_snp_names = @{$check->get_shared_snp_names};
   my $expected_genotypes =
     [('NN') x 13, 'GA', 'TC', 'TG', 'AA', 'GG', 'GA', 'TT'],;
+
+  my $sample_name  = 'urn:wtsi:249461_G12_HELIC5215300';
+  my @calls = @{$check->get_sample_calls($sample_name)};
 
   my @snp_names = map { $_->snp->name } @calls;
   is_deeply(\@snp_names, \@expected_snp_names) or diag explain \@snp_names;
@@ -150,11 +162,11 @@ sub get_sample_calls : Test(3) {
   is_deeply(\@genotypes, $expected_genotypes) or diag explain \@genotypes;
 }
 
-sub compare_calls : Test(3) {
+sub pair_sample_calls : Test(5) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink  => plink_binary::plink_binary->new($plink_path),
-     snpset => $snpset);
+    (plink_path => $plink_path,
+     snpset     => $snpset);
 
   my $sample_name  = 'urn:wtsi:249442_C09_HELIC5102247';
 
@@ -199,12 +211,12 @@ sub compare_calls : Test(3) {
         (snp      => $snpset->named_snp($snp),
          genotype => $genotype) } @qc_data;
 
-  my @comparisons = @{$check->compare_calls($sample_name, \@qc_calls)};
-  my @matches    = grep {  $_->{equivalent} } @comparisons;
-  my @mismatches = grep { !$_->{equivalent} } @comparisons;
-  cmp_ok(scalar @comparisons, '==', 20, 'Number of comparisons');
-  cmp_ok(scalar @matches,     '==', 14, 'Number of matches');
-  cmp_ok(scalar @mismatches,  '==', 6,  'Number of mismatches');
+  my @pairs = @{$check->pair_sample_calls($sample_name, \@qc_calls)};
+  my @matches    = grep {  $_->{qc}->equivalent($_->{sample}) } @pairs;
+  my @mismatches = grep { !$_->{qc}->equivalent($_->{sample}) } @pairs;
+  cmp_ok(scalar @pairs,      '==', 20, 'Number of pairs');
+  cmp_ok(scalar @matches,    '==', 14, 'Number of matches');
+  cmp_ok(scalar @mismatches, '==', 6,  'Number of mismatches');
 
   # Expected match SNP list (retains QC order)
   my @expected_matches = ('rs649058',
@@ -235,4 +247,47 @@ sub compare_calls : Test(3) {
   my @mismatched_snps = map { $_->{qc}->snp->name } @mismatches;
   is_deeply(\@mismatched_snps, \@expected_mismatches)
     or diag explain \@mismatched_snps;
+}
+
+sub pair_all_calls : Test(1) {
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    (plink_path => $plink_path,
+     snpset     => $snpset);
+
+  my @sample_names = ('urn:wtsi:000000_A00_DUMMY-SAMPLE',
+                      'urn:wtsi:249441_F11_HELIC5102138',
+                      'urn:wtsi:249442_C09_HELIC5102247',
+                      'urn:wtsi:249461_G12_HELIC5215300',
+                      'urn:wtsi:249469_H06_HELIC5274668',
+                      'urn:wtsi:249470_F02_HELIC5274730');
+  # Extract pairs for just 2 SNPS from every sample
+  my @qc_data = (['rs1805087',  'AA'],
+                 ['rs3795677',  'TT']);
+
+  my @all_qc_calls;
+  foreach my $sample_name (@sample_names) {
+    my @qc_calls = map {
+      my ($snp, $genotype) = @$_;
+
+      WTSI::NPG::Genotyping::Call->new
+          (snp      => $snpset->named_snp($snp),
+           genotype => $genotype) } @qc_data;
+
+    push @all_qc_calls, {sample => $sample_name,
+                         calls  => \@qc_calls};
+  }
+
+  my @paired = @{$check->pair_all_calls(\@all_qc_calls)};
+  cmp_ok(scalar @paired, '==', 6, 'Number of paired sets');
+
+  my $ea = each_array(@sample_names, @paired);
+  while (my ($sample_name, $pairs) = $ea->()) {
+    is($pairs->{sample}, $sample_name, "Name for $sample_name");
+
+    my @pairs = @{$pairs->{pairs}};
+    cmp_ok(scalar @pairs, '==', 2, "Pairs for $sample_name");
+    is($pairs[0]->{qc}->snp->name, 'rs1805087', "SNP 0 for $sample_name");
+    is($pairs[1]->{qc}->snp->name, 'rs3795677', "SNP 1 for $sample_name");
+  }
 }
