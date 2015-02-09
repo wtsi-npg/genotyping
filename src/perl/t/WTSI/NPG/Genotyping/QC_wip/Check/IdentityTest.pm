@@ -4,10 +4,11 @@ package WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest;
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 90;
+use Test::More tests => 72;
 use Test::Exception;
 
 use plink_binary;
@@ -251,7 +252,62 @@ sub pair_sample_calls : Test(5) {
     or diag explain \@mismatched_snps;
 }
 
-sub pair_all_calls : Test(25) {
+sub count_sample_matches : Test(6) {
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    (plink_path => $plink_path,
+     snpset     => $snpset);
+
+  my @qc_data = (['rs649058',   'GA'],
+                 ['rs1805087',  'AG'],
+                 ['rs3795677',  'AG'],
+                 ['rs6166',     'GA'],
+                 ['rs2286963',  'GT'],
+                 ['rs6759892',  'GT'],
+                 ['rs7627615',  'GA'],
+                 ['rs2247870',  'GA'],
+                 ['rs4619',     'AG'],
+                 ['rs532841',   'CC']);
+
+  my @qc_calls = map {
+    my ($snp, $genotype) = @$_;
+
+    WTSI::NPG::Genotyping::Call->new
+        (snp      => $snpset->named_snp($snp),
+         genotype => $genotype) } @qc_data;
+
+  my $matches = $check->count_sample_matches
+    ('urn:wtsi:249441_F11_HELIC5102138', \@qc_calls);
+
+  my @expected_matched_snps = ('rs649058',
+                               'rs1805087',
+                               'rs3795677',
+                               'rs6166',
+                               'rs2286963',
+                               'rs6759892',
+                               'rs7627615',
+                               'rs2247870',
+                               'rs4619');
+  ok(!$matches->{failed}, 'Sample not failed');
+  cmp_ok($matches->{identity} * 10, '==', 9, 'Fraction identical');
+
+  cmp_ok((scalar @{$matches->{match}}), '==', 9,
+         'Number of calls matched');
+
+  my @matched_snps = map { $_->{qc}->snp->name } @{$matches->{match}};
+  is_deeply(\@matched_snps, \@expected_matched_snps,
+            'Expected matched SNPS') or diag explain \@matched_snps;
+
+  my @expected_mismatched_snps = ('rs532841');
+  cmp_ok((scalar @{$matches->{mismatch}}), '==', 1,
+         'Number of calls mismatched');
+
+  my @mismatched_snps = map { $_->{qc}->snp->name } @{$matches->{mismatch}};
+  is_deeply(\@mismatched_snps, \@expected_mismatched_snps,
+            'Expected mismatched SNPS') or diag explain \@matched_snps;
+}
+
+sub report_all_matches : Test(25) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
@@ -264,7 +320,7 @@ sub pair_all_calls : Test(25) {
                       'urn:wtsi:249469_H06_HELIC5274668',
                       'urn:wtsi:249470_F02_HELIC5274730');
   # Extract pairs for just 2 SNPS from every sample
-  my @qc_data = (['rs1805087',  'AA'],
+  my @qc_data = (['rs1805087',  'AG'],
                  ['rs3795677',  'TT']);
 
   my @all_qc_calls;
@@ -280,16 +336,58 @@ sub pair_all_calls : Test(25) {
                          calls  => \@qc_calls};
   }
 
-  my @paired = @{$check->pair_all_calls(\@all_qc_calls)};
-  cmp_ok(scalar @paired, '==', 6, 'Number of paired sets');
+  my $expected =
+    {'urn:wtsi:000000_A00_DUMMY-SAMPLE' =>
+      {'failed'    => 1,
+       'genotypes' => {'rs1805087' => ['AG', 'NN'],
+                       'rs3795677' => ['TT', 'NN']},
+       'identity'  => 0,
+       'missing'   => 0},
 
-  my $ea = each_array(@sample_names, @paired);
-  while (my ($sample_name, $pairs) = $ea->()) {
-    is($pairs->{sample}, $sample_name, "Name for $sample_name");
+     'urn:wtsi:249441_F11_HELIC5102138' =>
+      {'failed'    => 1,
+       'genotypes' => {'rs1805087' => ['AG', 'AG'],
+                       'rs3795677' => ['TT', 'AG']},
+       'identity'  => 0.5,
+       'missing'   => 0
+      },
 
-    my @pairs = @{$pairs->{pairs}};
-    cmp_ok(scalar @pairs, '==', 2, "Pairs for $sample_name");
-    is($pairs[0]->{qc}->snp->name, 'rs1805087', "SNP 0 for $sample_name");
-    is($pairs[1]->{qc}->snp->name, 'rs3795677', "SNP 1 for $sample_name");
-  }
+     'urn:wtsi:249442_C09_HELIC5102247' =>
+     {'failed'    => 1,
+      'genotypes' => {'rs1805087' => ['AG', 'AG'],
+                      'rs3795677' => ['TT', 'AG']},
+      'identity'  => 0.5,
+      'missing'   => 0
+     },
+
+     'urn:wtsi:249461_G12_HELIC5215300' =>
+     {'failed'    => 1,
+      'genotypes' => {'rs1805087' => ['AG', 'NN'],
+                      'rs3795677' => ['TT', 'NN']},
+      'identity'  => 0,
+      'missing'   => 0
+     },
+     'urn:wtsi:249469_H06_HELIC5274668' =>
+     {
+      'failed'    => 1,
+      'genotypes' => {'rs1805087' => ['AG', 'AG'],
+                      'rs3795677' => ['TT', 'AG']},
+      'identity' => 0.5,
+      'missing'  => 0
+     },
+
+     'urn:wtsi:249470_F02_HELIC5274730' =>
+     {
+      'failed'    => 1,
+      'genotypes' => {'rs1805087' => ['AG', 'AG'],
+                      'rs3795677' => ['TT', 'AG']},
+      'identity'  => 0.5,
+      'missing'   => 0
+     }
+    };
+
+  my $json = $check->report_all_matches(\@all_qc_calls);
+  my $result = decode_json($json);
+
+  is_deeply($result, $expected) or diag explain $result;
 }
