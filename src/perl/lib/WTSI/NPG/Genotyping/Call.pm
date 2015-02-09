@@ -204,7 +204,7 @@ sub complement {
 
   Arg [1]    : WTSI::NPG::Genotyping::Call
 
-  Example    : $new_call = $call->merge($other_call)
+  Example    : my $new_call = $call->merge($other_call)
   Description: Merge results of this call with another on the same SNP:
                - If the genotypes are identical, return $self unchanged.
                - If exactly one of the two calls is a 'no call', return the
@@ -238,6 +238,80 @@ sub merge {
   }
 
   return $merged;
+}
+
+=head2 equivalent
+
+  Arg [1]    : WTSI::NPG::Genotyping::Call
+
+  Example    : my $equiv = $call->equivalent($other_call)
+  Description: Compare two calls on the same SNP and return true if they are
+               equivalent. Calls with the ref and alt alleles swapped and/or
+               complemented are considered equivalent. If one or both calls
+               are a no-calls, they are considered non-equivalent.
+  Returntype : Bool
+
+=cut
+
+sub equivalent {
+  my ($self, $other) = @_;
+
+  defined $other or
+    $self->logconfess("The other argument was undefined");
+
+  $self->snp->equals($other->snp) or
+    $self->logconfess("Attempted to compare calls for non-identical SNPs: ",
+                      $self->snp->name, " and ", $other->snp->name);
+
+  my $equivalent = 0;
+
+  if ($self->is_call && $other->is_call) {
+    if ($self->genotype eq $other->genotype) {
+      $self->debug($self->genotype, " is equivalent to ", $other->genotype);
+      $equivalent = 1;
+    }
+    elsif ((scalar reverse $self->genotype) eq $other->genotype) {
+      $self->debug("Reverse of ", $self->genotype, " is equivalent to ",
+                   $other->genotype);
+      $equivalent = 1;
+    }
+    else {
+      my $complement = $self->complement;
+
+      if ($complement->genotype eq $other->genotype) {
+        $self->debug("Complement of ", $self->genotype,
+                     " is equivalent to ", $other->genotype);
+        $equivalent = 1;
+      }
+      elsif ((scalar reverse $complement->genotype) eq $other->genotype) {
+        $self->debug("Reverse complement of ", $self->genotype,
+                     " is equivalent to ", $other->genotype);
+        $equivalent = 1;
+      }
+      else {
+        $self->debug($self->genotype, " is not equivalent to ",
+                     $other->genotype);
+      }
+    }
+  }
+  else  {
+    my $sc = $self->is_call  ? 'call' : 'no call';
+    my $oc = $other->is_call ? 'call' : 'no call';
+
+    $self->debug($self->genotype, " ($sc) is not equivalent to ",
+                 $other->genotype, " ($oc)");
+  }
+
+  return $equivalent;
+}
+
+sub str {
+  my ($self) = @_;
+
+  return sprintf("%s call:%s SNP: %s",
+                 $self->genotype,
+                 $self->is_call ? 'yes' : 'no',
+                 $self->snp->str);
 }
 
 sub _complement {
