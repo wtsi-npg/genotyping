@@ -90,7 +90,6 @@ sub equals {
     return $equal;
 }
 
-
 __PACKAGE__->meta->make_immutable;
 
 no Moose;

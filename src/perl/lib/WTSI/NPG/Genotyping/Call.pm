@@ -218,7 +218,7 @@ sub merge {
   my ($self, $other) = @_;
 
   defined $other or
-    $self->logconfess("The other argument was undefined");
+    $self->logconfess("A defined other argument is required");
 
   $self->snp->equals($other->snp) or
     $self->logconfess("Attempted to merge calls for non-identical SNPs: ",
@@ -257,7 +257,7 @@ sub equivalent {
   my ($self, $other) = @_;
 
   defined $other or
-    $self->logconfess("The other argument was undefined");
+    $self->logconfess("A defined other argument is required");
 
   $self->snp->equals($other->snp) or
     $self->logconfess("Attempted to compare calls for non-identical SNPs: ",
