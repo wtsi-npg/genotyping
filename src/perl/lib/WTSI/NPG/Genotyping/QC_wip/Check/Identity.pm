@@ -1,6 +1,7 @@
 
 package WTSI::NPG::Genotyping::QC_wip::Check::Identity;
 
+use JSON;
 use Moose;
 
 use plink_binary;
@@ -43,7 +44,6 @@ has 'pass_threshold' => # minimum similarity for metric pass
 
   Example    : my $n = $check->get_num_samples;
   Description: Return number of samples in the Plink data.
-
   Returntype : Int
 
 =cut
@@ -63,7 +63,6 @@ sub get_num_samples {
   Example    : my @names = @{$check->get_num_samples};
   Description: Return the names of the samples in the Plink data, in
                their original order.
-
   Returntype : ArrayRef[Str]
 
 =cut
@@ -92,7 +91,6 @@ sub get_sample_names {
 
                This method ignores the "exm-" prefix added by Illumina
                to the real (dbSNP) SNP names.
-
   Returntype : ArrayRef[Str]
 
 =cut
@@ -129,7 +127,6 @@ sub get_shared_snp_names {
                my @sample_calls = @{$all_calls->{$sample_name}};
   Description: Return the Plink calls for all samples, indexed by sample
                name. The calls retain the order of the Plink dataset.
-
   Returntype : HashRef[Str] of sample names, where values are
                ArrayRef[WTSI::NPG::Genotyping::Call]
 
@@ -190,7 +187,6 @@ sub get_all_calls {
 
   Example    : my @sample_calls = @{$check->get_sample_calls($sample_name)};
   Description: Return the Plink calls for a samples.
-
   Returntype : ArrayRef[WTSI::NPG::Genotyping::Call]
 
 =cut
@@ -210,63 +206,6 @@ sub get_sample_calls {
   return $all_calls->{$sample_name};
 }
 
-=head2 pair_all_calls
-
-  Arg [1]    : ArrayRef[HashRef]
-
-  Example    : my @pairs = @{$check->pair_calls($sample_name, $qc_calls)};
-  Description: Find the calls for given samples that correspond to the
-               supplied QC calls (i.e. are for the same SNP).
-
-               Each HashRef in the argument must have the following keys
-               and values:
-
-                {sample => <Str>,
-                 calls  => <ArrayRef[WTSI::NPG::Genotyping::Call]>}
-
-               (These are the arguments used by pair_sample_calls).
-
-               Return an array of HashRefs whose keys and values are:
-
-                {sample => <Str>,
-                 pairs  => <ArrayRef[HashRef]>}
-
-               (The values under the key 'pairs' correspond to the return
-                values of pair_sample_calls).
-
-  Returntype : ArrayRef[HashRef]
-
-=cut
-
-
-sub pair_all_calls {
-  my ($self, $qc_call_sets) = @_;
-
-  defined $qc_call_sets or
-    $self->logconfess('A defined qc_call_sets argument is required');
-
-  $self->debug("Pairing calls for ", scalar @$qc_call_sets, " samples");
-
-  my @paired;
-  foreach my $qc_call_set (@$qc_call_sets) {
-    exists $qc_call_set->{calls} or
-      $self->logconfess("A 'calls' key is required");
-    exists $qc_call_set->{sample} or
-      $self->logconfess("A 'sample' key is required");
-
-    my $qc_calls    = $qc_call_set->{calls};
-    my $sample_name = $qc_call_set->{sample};
-
-    push @paired,
-      {pairs  => $self->pair_sample_calls($sample_name, $qc_calls),
-       sample => $sample_name};
-  }
-
-  $self->debug("Paired calls for ", scalar @paired, " samples");
-
-  return \@paired;
-}
-
 =head2 pair_sample_calls
 
   Arg [1]    : Str sample name (in Plink data)
@@ -281,7 +220,6 @@ sub pair_all_calls {
                  sample => <WTSI::NPG::Genotyping::Call>}
 
                The results are in the same order as the supplied QC calls.
-
   Returntype : ArrayRef[HashRef]
 
 =cut
@@ -302,8 +240,6 @@ sub pair_sample_calls {
     $self->logconfess("No sample calls are present for '$sample_name'");
   }
 
-  $self->debug("Pairing calls for '$sample_name'");
-
   my @pairs;
   foreach my $qc_call (@$qc_calls) {
     unless ($self->snpset->contains_snp($qc_call->snp->name)) {
@@ -314,9 +250,6 @@ sub pair_sample_calls {
 
     foreach my $sample_call (@$sample_calls) {
       if ($qc_call->snp->name eq $sample_call->snp->name) {
-        $self->debug("Comparing [", $qc_call->str, "] with [",
-                     $sample_call->str, "]");
-
         push @pairs, {qc     => $qc_call,
                       sample => $sample_call};
       }
@@ -326,6 +259,176 @@ sub pair_sample_calls {
   $self->debug("Paired ", scalar @pairs, " calls for '$sample_name'");
 
   return \@pairs;
+}
+
+=head2 count_sample_matches
+
+  Arg [1]    : Str sample name (in Plink data)
+  Arg [2]    : ArrayRef[WTSI::NPG::Genotyping::Call] QC calls
+
+  Example    : my $matches = $check->count_sample_matches($sample_name,
+                                                          $qc_calls)
+  Description: Count the calls for a give sample that correspond to the
+               supplied QC calls (i.e. are for the same SNP).
+
+               Return a HashRef whose keys and values are:
+
+                {match    => <ArrayRef[HashRef]>, # call pairs
+                 mismatch => <ArrayRef[HashRef]>, # call pairs
+                 identity => <Num>,
+                 missing  => <Bool>,
+                 failed   => <Bool>}
+
+               (The values under the key 'pairs' correspond to the return
+                values of pair_sample_calls).
+  Returntype : HashRef
+
+=cut
+
+sub count_sample_matches {
+  my ($self, $sample_name, $qc_calls) = @_;
+
+  defined $sample_name or
+    $self->logconfess('A defined sample_name argument is required');
+  $sample_name or
+    $self->logconfess('A non-empty sample_name argument is required');
+
+  defined $qc_calls or
+    $self->logconfess('A defined qc_calls argument is required');
+
+  my $matches;
+  if (scalar @$qc_calls) {
+    my @pairs = @{$self->pair_sample_calls($sample_name, $qc_calls)};
+    $matches = $self->_count_matches(\@pairs);
+  }
+  else {
+    $matches = {match     => [],
+                mismatch  => [],
+                identity  => undef,
+                missing   => 1,
+                failed    => undef}
+  }
+
+  return $matches;
+}
+
+=head2 count_all_matches
+
+  Arg [1]    : ArrayRef[HashRef]
+
+  Example    : my $matches = $self->count_all_matches($qc_call_sets);
+  Description: Count the calls for given samples that correspond to the
+               supplied QC calls (i.e. are for the same SNP).
+
+               Each HashRef in the argument must have the following keys
+               and values:
+
+                {sample => <Str>,
+                 calls  => <ArrayRef[WTSI::NPG::Genotyping::Call]>}
+
+               (These are the arguments used by pair_sample_calls). If the
+               calls for the sample are missing, the calls list may be
+               empty.
+
+               Return an array of HashRefs whose keys and values are:
+
+                {match    => <ArrayRef[HashRef]>, # call pairs
+                 mismatch => <ArrayRef[HashRef]>, # call pairs
+                 identity => <Num>,
+                 missing  => <Bool>,
+                 failed   => <Bool>}
+
+               (The values under the key 'pairs' correspond to the return
+                values of pair_sample_calls).
+  Returntype : ArrayRef[HashRef]
+
+=cut
+
+sub count_all_matches {
+  my ($self, $qc_call_sets) = @_;
+
+  defined $qc_call_sets or
+    $self->logconfess('A defined qc_call_sets argument is required');
+
+  my @matches;
+  foreach my $qc_call_set (@$qc_call_sets) {
+    my $sample_name = $qc_call_set->{sample};
+    my $qc_calls    = $qc_call_set->{calls};
+    push @matches, $self->count_sample_matches($sample_name, $qc_calls);
+  }
+
+  return \@matches;
+}
+
+sub report_all_matches {
+  my ($self, $qc_call_sets) = @_;
+
+  my %reports;
+  foreach my $qc_call_set (@$qc_call_sets) {
+    my $sample_name = $qc_call_set->{sample};
+    my $qc_calls    = $qc_call_set->{calls};
+
+    my $match_results = $self->count_sample_matches($sample_name, $qc_calls);
+    my $json_spec = $self->_make_result_json_spec($match_results);
+    $reports{$sample_name} = $json_spec;
+  }
+
+  return encode_json(\%reports);
+}
+
+# Convert the return value of _count_matches to a data structure that
+# may be output as JSON.
+sub _make_result_json_spec {
+  my ($self, $match_result) = @_;
+
+  my %genotypes;
+  foreach my $pair (@{$match_result->{match}}, @{$match_result->{mismatch}}) {
+    my $qc_call = $pair->{qc};
+    my $sa_call = $pair->{sample};
+    my $qc_snp = $qc_call->snp->name;
+    my $sa_snp = $sa_call->snp->name;
+
+    unless ($qc_snp eq $sa_snp) {
+      $self->logconfess("Invalid matched SNPs: QC: $qc_snp, sample: $sa_snp");
+    }
+    if (exists($genotypes{$qc_snp})) {
+      $self->logconfess("Multiple calls for SNP $qc_snp");
+    }
+
+    $genotypes{$qc_snp} = [$qc_call->genotype, $sa_call->genotype];
+  }
+
+  # Replace Calls with genotype strings
+  my %spec = %$match_result;
+  delete $spec{match};
+  delete $spec{mismatch};
+  $spec{genotypes} = \%genotypes;
+
+  return \%spec;
+}
+
+# Find the genotypes that are matched and mismatched. report them,
+# along with the faction matching and whether the sample has failed
+# due to too the faction matching being below the threshold.
+sub _count_matches {
+  my ($self, $paired_calls) = @_;
+
+  my $match = sub {
+    my $pair = shift;
+    return $pair->{qc}->equivalent($pair->{sample});
+  };
+
+  my @matches    = grep {  $match->($_) } @$paired_calls;
+  my @mismatches = grep { !$match->($_) } @$paired_calls;
+
+  my $identity = scalar @matches / scalar @$paired_calls;
+  my $failed   = ($identity < $self->pass_threshold);
+
+  return {match    => \@matches,
+          mismatch => \@mismatches,
+          identity => $identity,
+          missing  => 0,
+          failed   => $failed};
 }
 
 sub _from_illumina_snp_name {
