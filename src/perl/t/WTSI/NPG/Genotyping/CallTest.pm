@@ -11,7 +11,7 @@ use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use Test::Exception;
-use Test::More tests => 49;
+use Test::More tests => 64;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -277,6 +277,52 @@ sub merge : Test(9) {
 
     # test conflicting snps
     dies_ok(sub {$call->merge($other_snp_call)}, 'Dies on non-equal SNPs' );
+}
+
+sub equivalent : Test(15) {
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
+  my $snp = $snpset->named_snp('rs11096957'); # TG
+  my $other_snp = $snpset->named_snp('rs1805034'); # CT
+
+  my $call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                              genotype => 'TG',
+                                              is_call  => 1);
+
+  my $same_call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                                   genotype => 'TG',
+                                                   is_call  =>  1);
+  ok($same_call->is_heterozygous);
+  ok($call->equivalent($same_call), 'Exact equivalent');
+  ok($same_call->equivalent($call), 'Exact equivalent (reciprocal)');
+
+  my $comp_call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                                   genotype => 'AC',
+                                                   is_call  =>  1);
+  ok($comp_call->is_heterozygous_complement);
+  ok($call->equivalent($comp_call), 'Complement equivalent');
+  ok($comp_call->equivalent($call), 'Complement equivalent (reciprocal)');
+
+  my $rev_call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                                  genotype => 'GT',
+                                                  is_call  =>  1);
+  ok($rev_call->is_heterozygous);
+  ok($call->equivalent($rev_call), 'Reverse equivalent');
+  ok($rev_call->equivalent($call), 'Reverse equivalent (reciprocal)');
+
+  my $revcomp_call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                                      genotype => 'CA',
+                                                      is_call  =>  1);
+  ok($revcomp_call->is_heterozygous_complement);
+  ok($call->equivalent($revcomp_call), 'Reverse complement equivalent');
+  ok($revcomp_call->equivalent($call),
+     'Reverse complement equivalent (reciprocal)');
+
+  my $no_call = WTSI::NPG::Genotyping::Call->new(snp      => $snp,
+                                                genotype => 'TG',
+                                                is_call  => 0);
+  ok(!$call->equivalent($no_call), 'No call not equivalent');
+  ok(!$no_call->equivalent($call), 'No call not equivalent (reciprocal)');
+  ok(!$no_call->equivalent($no_call), 'No call not equivalent with self');
 }
 
 1;
