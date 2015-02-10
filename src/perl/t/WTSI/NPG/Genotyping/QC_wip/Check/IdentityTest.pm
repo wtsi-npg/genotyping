@@ -7,10 +7,8 @@ use File::Temp qw(tempdir);
 use JSON;
 use List::AllUtils qw(each_array);
 
-use Data::Dumper; ## TODO remove when development is stable
-
 use base qw(Test::Class);
-use Test::More tests => 73;
+use Test::More tests => 74;
 use Test::Exception;
 
 use plink_binary;
@@ -395,7 +393,7 @@ sub report_all_matches : Test(25) {
   is_deeply($result, $expected) or diag explain $result;
 }
 
-sub sample_swap_evaluation : Test(1) {
+sub sample_swap_evaluation : Test(2) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
@@ -524,6 +522,28 @@ sub sample_swap_evaluation : Test(1) {
                    genotype => $genotype) } @{$qc_data{$sample}};
         $all_qc_calls{$sample} = [ @qc_calls ];
     }
-    ok($check->sample_swap_evaluation(\@samples, \%all_qc_calls));
+    my $compared = $check->sample_swap_evaluation(\@samples, \%all_qc_calls);
+    ok($compared, "Failed pair comparison completed");
 
+    my @expected = (
+        [
+            'urn:wtsi:249442_C09_HELIC5102247',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            1,
+            1
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            0.5,
+            0
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249442_C09_HELIC5102247',
+            0.8,
+            0
+        ]
+    );
+    is_deeply($compared, \@expected, "Comparison matches expected values");
 }
