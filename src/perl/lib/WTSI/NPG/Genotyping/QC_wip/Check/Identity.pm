@@ -377,37 +377,42 @@ sub report_all_matches {
   return encode_json(\%reports);
 }
 
-# input: ArrayRef of failed sample_id's, HashRef of ArrayRefs of QC calls
-# compare (qc, sample) call pairs for all distinct pairs of sample_id's
+=head2 sample_swap_evaluation
+
+  Arg [1]    : ArrayRef[ArrayRef[Str, ArrayRef[WTSI::NPG::Genotyping::Call]]]
+
+  Example    : my $comparison = sample_swap_evaluation(
+                 [ [$sample_A, $calls_A], [$sample_B, $calls_B] ]
+               );
+
+  Description: Pairwise comparison of the given samples to look for possible
+               swaps. Warning of a swap occurs if similarity between
+               (calls_i, qc_j) for i != j is greater than
+               $self->swap_threshold. Typically, the input samples have
+               failed the standard identity metric.
+  Returntype : ArrayRef[ArrayRef[Str]]
+
+=cut
+
 sub sample_swap_evaluation {
-    my ($self, $sample_ids, $all_qc_calls) = @_;
-    my @samples = @{$sample_ids};
+    my ($self, $samples_qc_calls) = @_;
+    my @samples_qc_calls = @{$samples_qc_calls};
     my $total_warnings = 0;
     my @comparison = ();
-    for (my $i=0;$i<@samples;$i++) {
+    for (my $i=0;$i<@samples_qc_calls;$i++) {
         for (my $j=0;$j<$i;$j++) {
-            # for each distinct pair of sample id's
-            # get QC and Sample calls and check for possible swap
-            my ($qc_calls_i, $qc_calls_j);
-            if (defined($all_qc_calls->{$samples[$i]})) {
-                $qc_calls_i = $all_qc_calls->{$samples[$i]};
-            } else {
-                $self->logcroak("No QC data for sample ", $samples[$i]);
-            }
-            if (defined($all_qc_calls->{$samples[$j]})) {
-                $qc_calls_j = $all_qc_calls->{$samples[$j]};
-            } else {
-                $self->logcroak("No QC data for sample ", $samples[$j]);
-            }
-            my $pairs_i = $self->pair_sample_calls($samples[$i], $qc_calls_i);
-            my $pairs_j = $self->pair_sample_calls($samples[$j], $qc_calls_j);
+            my ($sample_i, $qc_calls_i) = @{$samples_qc_calls[$i]};
+            my ($sample_j, $qc_calls_j) = @{$samples_qc_calls[$j]};
+            # get sample calls and pair with QC calls
+            my $pairs_i = $self->pair_sample_calls($sample_i, $qc_calls_i);
+            my $pairs_j = $self->pair_sample_calls($sample_j, $qc_calls_j);
             my $similarity = $self->_sample_swap_metric($pairs_i, $pairs_j);
             my $warning = 0;
             if ($similarity >= $self->swap_threshold) {
                 $warning = 1;
                 $total_warnings++;
             }
-            my @row = ($samples[$i], $samples[$j], $similarity, $warning);
+            my @row = ($sample_i, $sample_j, $similarity, $warning);
             push(@comparison, [@row]);
         }
     }
