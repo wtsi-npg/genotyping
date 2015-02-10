@@ -8,7 +8,7 @@ use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 72;
+use Test::More tests => 74;
 use Test::Exception;
 
 use plink_binary;
@@ -20,6 +20,7 @@ Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 my $data_path = './t/qc/check/identity';
 my $plink_path = "$data_path/fake_qc_genotypes";
+my $plink_swap = "$data_path/fake_swap_genotypes";
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
 
 sub require : Test(1) {
@@ -390,4 +391,159 @@ sub report_all_matches : Test(25) {
   my $result = decode_json($json);
 
   is_deeply($result, $expected) or diag explain $result;
+}
+
+sub sample_swap_evaluation : Test(2) {
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_swap,
+         snpset     => $snpset);
+
+    # Required:
+    # - List of 3 'failed' sample names, 2 of which are swapped
+    # - Fake QC calls for each sample
+    # - Expected outputs for comparison
+
+    # Some fake QC data; x denotes a call mismatch when compared to the
+    # Plink data for the same sample
+    my @samples = qw/urn:wtsi:249441_F11_HELIC5102138
+                     urn:wtsi:249442_C09_HELIC5102247
+                     urn:wtsi:249461_G12_HELIC5215300/;
+    my %qc_data = (
+        # swap with urn:wtsi:249442_C09_HELIC5102247
+      $samples[0] =>
+            [ ['GS34251',    'TT'],
+              ['GS35205',    'TT'],
+              ['GS35219',    'TT'],
+              ['GS35220',    'CC'],
+              ['rs649058',   'AG'],
+              ['rs1131498',  'AA'],
+              ['rs1805087',  'AG'],
+              ['rs3795677',  'AG'], # AG
+              ['rs6166',     'AG'], # AG
+              ['rs1801262',  'AA'],
+              ['rs2286963',  'GT'], # GT
+              ['rs6759892',  'GT'], # GT
+              ['rs7627615',  'GA'], # AG
+              ['rs11096957', 'AA'],
+              ['rs2247870',  'CT'], # CT
+              ['rs4619',     'AG'], # AG
+              ['rs532841',   'CT'], # CT
+              ['rs6557634',  'CT'], # CT
+              ['rs4925',     'AC'], # AC
+              ['rs156697',   'AA'],
+              ['rs5215',     'CT'], # CT
+              ['rs12828016', 'AA'],
+              ['rs7298565',  'AG'], # AG
+              ['rs3742207',  'AC'], # AC
+              ['rs4075254',  'CT'], # CT
+              ['rs4843075',  'AG'], # AG
+              ['rs8065080',  'CT'], # CT
+              ['rs1805034',  'AA'],
+              ['rs2241714',  'CT'], # CT
+              ['rs753381',   'AG']  # AG
+          ],
+        # swap with urn:wtsi:249441_F11_HELIC5102138
+      $samples[1] =>
+            [ ['GS34251',    'TT'],
+              ['GS35205',    'TT'],
+              ['GS35219',    'TT'],
+              ['GS35220',    'CC'],
+              ['rs649058',   'GG'], # AG
+              ['rs1131498',  'AA'],
+              ['rs1805087',  'GG'], # AG
+              ['rs3795677',  'GG'], # AG
+              ['rs6166',     'GG'], # AG
+              ['rs1801262',  'AA'],
+              ['rs2286963',  'TT'], # GT
+              ['rs6759892',  'TT'], # GT
+              ['rs7627615',  'GG'], # AG
+              ['rs11096957', 'AA'],
+              ['rs2247870',  'TT'], # CT
+              ['rs4619',     'GG'], # AG
+              ['rs532841',   'TT'], # CT
+              ['rs6557634',  'TT'], # CT
+              ['rs4925',     'CC'], # AC
+              ['rs156697',   'AA'],
+              ['rs5215',     'TT'], # CT
+              ['rs12828016', 'AA'],
+              ['rs7298565',  'GG'], # AG
+              ['rs3742207',  'CC'], # AC
+              ['rs4075254',  'TT'], # CT
+              ['rs4843075',  'GG'], # AG
+              ['rs8065080',  'TT'], # CT
+              ['rs1805034',  'AA'],
+              ['rs2241714',  'TT'], # CT
+              ['rs753381',   'GG']  # AG
+          ],
+        # 'ordinary' failed sample
+        # x denotes a mismatch wrt Plink data
+      $samples[2] =>
+            [ ['GS34251',    'TT'],
+              ['GS35205',    'TT'],
+              ['GS35219',    'TT'],
+              ['GS35220',    'CC'],
+              ['rs649058',   'GA'], # AG (sample data)
+              ['rs1131498',  'AA'],
+              ['rs1805087',  'AA'], # AG x
+              ['rs3795677',  'TT'], # AG x
+              ['rs6166',     'GA'], # AG
+              ['rs1801262',  'AA'],
+              ['rs2286963',  'GT'], # GT
+              ['rs6759892',  'GT'], # GT
+              ['rs7627615',  'GA'], # AG
+              ['rs11096957', 'AA'],
+              ['rs2247870',  'TT'], # CT x
+              ['rs4619',     'AG'], # AG
+              ['rs532841',   'CT'], # CT
+              ['rs6557634',  'CT'], # CT
+              ['rs4925',     'AA'], # AC x
+              ['rs156697',   'AA'],
+              ['rs5215',     'CT'], # CT
+              ['rs12828016', 'AA'],
+              ['rs7298565',  'GA'], # AG
+              ['rs3742207',  'AC'], # AC
+              ['rs4075254',  'CT'], # CT
+              ['rs4843075',  'GA'], # AG
+              ['rs8065080',  'CT'], # CT
+              ['rs1805034',  'AA'],
+              ['rs2241714',  'GA'], # CT
+              ['rs753381',   'AG']  # AG
+            ]
+    );
+
+    my %all_qc_calls;
+    foreach my $sample (@samples) {
+        my @qc_calls =  map {
+            my ($snp, $genotype) = @$_;
+            WTSI::NPG::Genotyping::Call->new
+                  (snp      => $snpset->named_snp($snp),
+                   genotype => $genotype) } @{$qc_data{$sample}};
+        $all_qc_calls{$sample} = [ @qc_calls ];
+    }
+    my $compared = $check->sample_swap_evaluation(\@samples, \%all_qc_calls);
+    ok($compared, "Failed pair comparison completed");
+
+    my @expected = (
+        [
+            'urn:wtsi:249442_C09_HELIC5102247',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            1,
+            1
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            0.5,
+            0
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249442_C09_HELIC5102247',
+            0.8,
+            0
+        ]
+    );
+    is_deeply($compared, \@expected, "Comparison matches expected values");
 }
