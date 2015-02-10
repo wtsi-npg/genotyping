@@ -3,6 +3,7 @@ package WTSI::NPG::Genotyping::QC_wip::Check::Identity;
 
 use JSON;
 use Moose;
+use List::Util qw/max/;
 
 use plink_binary;
 
@@ -376,6 +377,47 @@ sub report_all_matches {
   return encode_json(\%reports);
 }
 
+# input: ArrayRef of failed sample_id's, HashRef of ArrayRefs of QC calls
+# compare (qc, sample) call pairs for all distinct pairs of sample_id's
+sub sample_swap_evaluation {
+    my ($self, $sample_ids, $all_qc_calls) = @_;
+    my @samples = @{$sample_ids};
+    my $total_warnings = 0;
+    my @comparison = ();
+    for (my $i=0;$i<@samples;$i++) {
+        for (my $j=0;$j<$i;$j++) {
+            # for each distinct pair of sample id's
+            # get QC and Sample calls and check for possible swap
+            my ($qc_calls_i, $qc_calls_j);
+            if (defined($all_qc_calls->{$samples[$i]})) {
+                $qc_calls_i = $all_qc_calls->{$samples[$i]};
+            } else {
+                $self->logcroak("No QC data for sample ", $samples[$i]);
+            }
+            if (defined($all_qc_calls->{$samples[$j]})) {
+                $qc_calls_j = $all_qc_calls->{$samples[$j]};
+            } else {
+                $self->logcroak("No QC data for sample ", $samples[$j]);
+            }
+            my $pairs_i = $self->pair_sample_calls($samples[$i], $qc_calls_i);
+            my $pairs_j = $self->pair_sample_calls($samples[$j], $qc_calls_j);
+            my $similarity = $self->_sample_swap_metric($pairs_i, $pairs_j);
+            my $warning = 0;
+            if ($similarity >= $self->swap_threshold) {
+                $warning = 1;
+                $total_warnings++;
+            }
+            my @row = ($samples[$i], $samples[$j], $similarity, $warning);
+            push(@comparison, [@row]);
+        }
+    }
+    if ($total_warnings > 0) {
+        $self->warn("Warning of possible sample swap for ", $total_warnings,
+                    " of ", scalar(@comparison), " pairs of failed samples.");
+    }
+    return \@comparison;
+}
+
 # Convert the return value of _count_matches to a data structure that
 # may be output as JSON.
 sub _make_result_json_spec {
@@ -437,6 +479,35 @@ sub _from_illumina_snp_name {
   my ($prefix, $body) = $name =~ m{^(exm-)?(.*)};
 
   return $body;
+}
+
+# Evaluate a cross-check metric on sample & QC calls for pairs of samples
+# Use to warn of possible sample swaps
+# Let r_AB = rate of matching calls between (Sample_A, QC_B)
+# we may have r_AB != r_BA, so define pairwise metric as max(r_AB, r_BA)
+sub _sample_swap_metric {
+    my ($self, $pairs_ref_A, $pairs_ref_B) = @_;
+    my @pairs_A = @{$pairs_ref_A};
+    my @pairs_B = @{$pairs_ref_B};
+    my $total_snps = scalar(@pairs_A);
+    if ($total_snps != scalar(@pairs_B)) {
+        $self->logcroak("Call pair argument lists are of different lengths");
+    }
+    my @match = (0,0);
+    for (my $i=0;$i<$total_snps;$i++) {
+        # compare results on both samples for the ith snp
+        if ($pairs_A[$i]{qc}->snp->name ne $pairs_B[$i]{qc}->snp->name) {
+            $self->logcroak("Mismatched SNP identities for ",
+                            "sample swap metric");
+        }
+        if ($pairs_A[$i]{qc}->equivalent($pairs_B[$i]{sample})) {
+            $match[0]++;
+        }
+        if ($pairs_A[$i]{sample}->equivalent($pairs_B[$i]{qc})) {
+            $match[1]++;
+        }
+    }
+    return max(@match)/$total_snps;
 }
 
 no Moose;
