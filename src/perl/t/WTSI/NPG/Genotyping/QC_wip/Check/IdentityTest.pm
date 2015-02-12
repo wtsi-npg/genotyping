@@ -7,8 +7,10 @@ use File::Temp qw(tempdir);
 use JSON;
 use List::AllUtils qw(each_array);
 
+use Data::Dumper; # TODO remove when development is stable
+
 use base qw(Test::Class);
-use Test::More tests => 74;
+use Test::More tests => 77;
 use Test::Exception;
 
 use plink_binary;
@@ -343,14 +345,17 @@ sub report_all_matches : Test(25) {
        'genotypes' => {'rs1805087' => ['AG', 'NN'],
                        'rs3795677' => ['TT', 'NN']},
        'identity'  => 0,
-       'missing'   => 0},
+       'missing'   => 0,
+       'sample'    => 'urn:wtsi:000000_A00_DUMMY-SAMPLE'
+      },
 
      'urn:wtsi:249441_F11_HELIC5102138' =>
       {'failed'    => 1,
        'genotypes' => {'rs1805087' => ['AG', 'AG'],
                        'rs3795677' => ['TT', 'AG']},
        'identity'  => 0.5,
-       'missing'   => 0
+       'missing'   => 0,
+       'sample'    => 'urn:wtsi:249441_F11_HELIC5102138'
       },
 
      'urn:wtsi:249442_C09_HELIC5102247' =>
@@ -358,7 +363,8 @@ sub report_all_matches : Test(25) {
       'genotypes' => {'rs1805087' => ['AG', 'AG'],
                       'rs3795677' => ['TT', 'AG']},
       'identity'  => 0.5,
-      'missing'   => 0
+      'missing'   => 0,
+      'sample'    => 'urn:wtsi:249442_C09_HELIC5102247'
      },
 
      'urn:wtsi:249461_G12_HELIC5215300' =>
@@ -366,7 +372,8 @@ sub report_all_matches : Test(25) {
       'genotypes' => {'rs1805087' => ['AG', 'NN'],
                       'rs3795677' => ['TT', 'NN']},
       'identity'  => 0,
-      'missing'   => 0
+      'missing'   => 0,
+      'sample'    => 'urn:wtsi:249461_G12_HELIC5215300'
      },
      'urn:wtsi:249469_H06_HELIC5274668' =>
      {
@@ -374,7 +381,8 @@ sub report_all_matches : Test(25) {
       'genotypes' => {'rs1805087' => ['AG', 'AG'],
                       'rs3795677' => ['TT', 'AG']},
       'identity' => 0.5,
-      'missing'  => 0
+      'missing'  => 0,
+      'sample'    => 'urn:wtsi:249469_H06_HELIC5274668'
      },
 
      'urn:wtsi:249470_F02_HELIC5274730' =>
@@ -383,7 +391,8 @@ sub report_all_matches : Test(25) {
       'genotypes' => {'rs1805087' => ['AG', 'AG'],
                       'rs3795677' => ['TT', 'AG']},
       'identity'  => 0.5,
-      'missing'   => 0
+      'missing'   => 0,
+      'sample'    => 'urn:wtsi:249470_F02_HELIC5274730'
      }
     };
 
@@ -400,13 +409,71 @@ sub sample_swap_evaluation : Test(2) {
         (plink_path => $plink_swap,
          snpset     => $snpset);
 
-    # Required:
+    my $samples_qc_calls = _get_qc_swap_calls();
+    my $compared = $check->evaluate_sample_swaps($samples_qc_calls);
+    ok($compared, "Failed pair comparison completed");
+
+    my @expected = (
+        [
+            'urn:wtsi:249442_C09_HELIC5102247',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            1,
+            1
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            0.5,
+            0
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249442_C09_HELIC5102247',
+            0.8,
+            0
+        ]
+    );
+    is_deeply($compared, \@expected, "Comparison matches expected values");
+}
+
+sub run_identity_check : Test(3) {
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_swap,
+         snpset     => $snpset);
+
+    # construct the input data structure
+    my @qc_call_sets = ();
+    foreach my $sample_qc (@{_get_qc_swap_calls()}) {
+        my ($sample, $qc_calls) = @{$sample_qc};
+        my %call_set = ('sample' => $sample,
+                        'calls'  => $qc_calls);
+        push(@qc_call_sets, \%call_set);
+    }
+
+    # run the identity check
+    my $combined_results = $check->run_identity_check(\@qc_call_sets);
+    ok($combined_results, 'Combined identity & swap check OK');
+    #print Dumper $combined_results;
+
+    my $combined_json = $check->combined_results_to_json($combined_results);
+    ok($combined_json, 'Combined results to JSON OK');
+
+    my $expected_json = '{"identity":[{"identity":0,"missing":0,"sample":"urn:wtsi:249441_F11_HELIC5102138","genotypes":{"rs6557634":["CT","TT"],"rs6759892":["GT","TT"],"rs753381":["AG","GG"],"rs7627615":["GA","GG"],"rs6166":["AG","GG"],"rs8065080":["CT","TT"],"rs4075254":["CT","TT"],"rs4925":["AC","CC"],"rs1805087":["AG","GG"],"rs532841":["CT","TT"],"rs2286963":["GT","TT"],"rs2247870":["CT","TT"],"rs649058":["AG","GG"],"rs2241714":["CT","GG"],"rs3742207":["AC","CC"],"rs3795677":["AG","GG"],"rs7298565":["AG","GG"],"rs5215":["CT","TT"],"rs4619":["AG","GG"],"rs4843075":["AG","GG"]},"failed":"1"},{"identity":0,"missing":0,"sample":"urn:wtsi:249442_C09_HELIC5102247","genotypes":{"rs6557634":["TT","CT"],"rs6759892":["TT","GT"],"rs753381":["GG","AG"],"rs7627615":["GG","AG"],"rs6166":["GG","AG"],"rs8065080":["TT","CT"],"rs4075254":["TT","CT"],"rs4925":["CC","AC"],"rs1805087":["GG","AG"],"rs532841":["TT","CT"],"rs2286963":["TT","GT"],"rs2247870":["TT","CT"],"rs649058":["GG","AG"],"rs2241714":["TT","AG"],"rs3742207":["CC","AC"],"rs3795677":["GG","AG"],"rs7298565":["GG","AG"],"rs5215":["TT","CT"],"rs4619":["GG","AG"],"rs4843075":["GG","AG"]},"failed":"1"},{"identity":0.5,"missing":0,"sample":"urn:wtsi:249461_G12_HELIC5215300","genotypes":{"rs6557634":["CT","CT"],"rs6759892":["GT","GT"],"rs753381":["AG","AG"],"rs7627615":["GA","AG"],"rs6166":["GA","AG"],"rs4075254":["CT","NN"],"rs4925":["AA","NN"],"rs1805087":["AA","NN"],"rs8065080":["CT","CT"],"rs532841":["CT","CT"],"rs2286963":["GT","NN"],"rs2247870":["TT","NN"],"rs649058":["GA","AG"],"rs2241714":["GA","NN"],"rs3742207":["AC","NN"],"rs3795677":["TT","NN"],"rs7298565":["GA","AG"],"rs5215":["CT","CT"],"rs4619":["AG","NN"],"rs4843075":["GA","NN"]},"failed":"1"}],"swap_comparison":[["urn:wtsi:249442_C09_HELIC5102247","urn:wtsi:249441_F11_HELIC5102138",0,0],["urn:wtsi:249461_G12_HELIC5215300","urn:wtsi:249441_F11_HELIC5102138",0,0],["urn:wtsi:249461_G12_HELIC5215300","urn:wtsi:249442_C09_HELIC5102247",0.5,0]]}';
+    is($combined_json, $expected_json, 'Combined JSON matches expected');
+}
+
+
+
+sub _get_qc_swap_calls {
+
+    # Some fake QC data
     # - List of 3 'failed' sample names, 2 of which are swapped
     # - Fake QC calls for each sample
-    # - Expected outputs for comparison
 
-    # Some fake QC data; x denotes a call mismatch when compared to the
-    # Plink data for the same sample
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+
     my @samples = qw/urn:wtsi:249441_F11_HELIC5102138
                      urn:wtsi:249442_C09_HELIC5102247
                      urn:wtsi:249461_G12_HELIC5215300/;
@@ -513,37 +580,14 @@ sub sample_swap_evaluation : Test(2) {
             ]
     );
 
-    my %all_qc_calls;
+    my @samples_qc_calls;
     foreach my $sample (@samples) {
         my @qc_calls =  map {
             my ($snp, $genotype) = @$_;
             WTSI::NPG::Genotyping::Call->new
                   (snp      => $snpset->named_snp($snp),
                    genotype => $genotype) } @{$qc_data{$sample}};
-        $all_qc_calls{$sample} = [ @qc_calls ];
+        push(@samples_qc_calls, [ $sample, [ @qc_calls ] ]);
     }
-    my $compared = $check->sample_swap_evaluation(\@samples, \%all_qc_calls);
-    ok($compared, "Failed pair comparison completed");
-
-    my @expected = (
-        [
-            'urn:wtsi:249442_C09_HELIC5102247',
-            'urn:wtsi:249441_F11_HELIC5102138',
-            1,
-            1
-        ],
-        [
-            'urn:wtsi:249461_G12_HELIC5215300',
-            'urn:wtsi:249441_F11_HELIC5102138',
-            0.5,
-            0
-        ],
-        [
-            'urn:wtsi:249461_G12_HELIC5215300',
-            'urn:wtsi:249442_C09_HELIC5102247',
-            0.8,
-            0
-        ]
-    );
-    is_deeply($compared, \@expected, "Comparison matches expected values");
+    return \@samples_qc_calls;
 }

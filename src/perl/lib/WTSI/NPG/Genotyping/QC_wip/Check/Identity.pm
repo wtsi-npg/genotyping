@@ -307,9 +307,10 @@ sub count_sample_matches {
                 mismatch  => [],
                 identity  => undef,
                 missing   => 1,
-                failed    => undef}
+                failed    => undef,
+            }
   }
-
+  $matches->{'sample'} = $sample_name; # TODO find better way of storing sample name
   return $matches;
 }
 
@@ -361,23 +362,8 @@ sub count_all_matches {
   return \@matches;
 }
 
-sub report_all_matches {
-  my ($self, $qc_call_sets) = @_;
 
-  my %reports;
-  foreach my $qc_call_set (@$qc_call_sets) {
-    my $sample_name = $qc_call_set->{sample};
-    my $qc_calls    = $qc_call_set->{calls};
-
-    my $match_results = $self->count_sample_matches($sample_name, $qc_calls);
-    my $json_spec = $self->_make_result_json_spec($match_results);
-    $reports{$sample_name} = $json_spec;
-  }
-
-  return encode_json(\%reports);
-}
-
-=head2 sample_swap_evaluation
+=head2 evaluate_sample_swaps
 
   Arg [1]    : ArrayRef[ArrayRef[Str, ArrayRef[WTSI::NPG::Genotyping::Call]]]
 
@@ -394,7 +380,7 @@ sub report_all_matches {
 
 =cut
 
-sub sample_swap_evaluation {
+sub evaluate_sample_swaps {
     my ($self, $samples_qc_calls) = @_;
     my @samples_qc_calls = @{$samples_qc_calls};
     my $total_warnings = 0;
@@ -422,6 +408,94 @@ sub sample_swap_evaluation {
     }
     return \@comparison;
 }
+
+sub report_all_matches {
+  my ($self, $qc_call_sets) = @_;
+
+  my %reports;
+  foreach my $qc_call_set (@$qc_call_sets) {
+    my $sample_name = $qc_call_set->{sample};
+    my $qc_calls    = $qc_call_set->{calls};
+
+    my $match_results = $self->count_sample_matches($sample_name, $qc_calls);
+    my $json_spec = $self->_make_result_json_spec($match_results);
+    $reports{$sample_name} = $json_spec;
+  }
+  return encode_json(\%reports);
+}
+
+
+# evaluate the identity check metric for given QC calls
+#
+# need to combine results across the different QC plexes
+# identity = min(plex identities)
+# sample pass/fail based on identity
+#
+#
+# IMPORTANT: most of this is found by the count_all_matches method
+#
+# input $qc_call_sets is ArrayRef[HashRef], see count_all_matches()
+# HashRef keys are sample names
+# values are ArrayRef[WTSI::NPG::Genotyping::Call]
+#
+# return value from count_all_matches: ArrayRef[HashRef] with name, identities, pass/fail, missing status by sample and qc plex
+#
+# example of hashref:
+# { name          => my_sample_name,
+#   identities    => [0.975, 1.0],
+#   pass          => [1, 1],
+#   sample_pass   => 1,
+#   missing       => [0,0] }
+#
+# later return an IdentityCheckResults object?
+#
+# given identity results, want to do sample swap check
+#
+# then output final results to JSON
+#
+sub run_identity_check {
+    my ($self, $qc_call_sets) = @_;
+    my $match_results = $self->count_all_matches($qc_call_sets);
+    my $failed = $self->_get_failed_results($match_results);
+    my $swap_comparison = $self->evaluate_sample_swaps($failed);
+    my %combined_results = ( 'identity'        => $match_results,
+                             'swap_comparison' => $swap_comparison );
+    return \%combined_results;
+}
+
+sub combined_results_to_json {
+    my ($self, $combined_results) = @_;
+    my $identity_results = $combined_results->{'identity'};
+    my @identity_results_json;
+    foreach my $id_result (@{$identity_results}) {
+        my $id_json = $self->_make_result_json_spec($id_result);
+        push(@identity_results_json, $id_json);
+    }
+    my %combined_results_json = (
+        'identity'        => \@identity_results_json,
+        'swap_comparison' => $combined_results->{'swap_comparison'}
+    );
+    return encode_json(\%combined_results_json);
+}
+
+
+sub _get_failed_results {
+    my ($self, $match_results) = @_;
+    my @failed_samples_calls;
+    foreach my $result (@{$match_results}) {
+        if ($result->{'failed'}) {
+            # TODO record the sample name in the result data structure
+            my $calls = $self->get_sample_calls($result->{'sample'});
+            push(@failed_samples_calls, [$result->{'sample'}, $calls]);
+        } else {
+            next;
+        }
+    }
+    return \@failed_samples_calls;
+
+
+}
+
 
 # Convert the return value of _count_matches to a data structure that
 # may be output as JSON.
