@@ -8,7 +8,7 @@ use base qw(Test::Class);
 use Test::More tests => 10;
 use Test::Exception;
 
-use Data::Dumper; # TODO remove when development is stable
+#use Data::Dumper; # TODO remove when development is stable
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::QC_wip::Check::IdentityResults;
@@ -71,16 +71,16 @@ sub add_remove_results : Test(9) {
                    missing  => 0,
                    failed   => 1 };
 
-    is($results->get_num_results, 0, 'Count starts at zero');
+    is($results->get_num_samples, 0, 'Count starts at zero');
     ok($results->add_sample_result($sample, $result), 'Added a result');
-    is($results->get_num_results, 1, 'Count updated correctly');
+    is($results->get_num_samples, 1, 'Count updated correctly');
     dies_ok(sub { $results->add_sample_result($sample, $result) },
             'Cannot add same sample twice');
     # TODO separate test for get_failed_results and to_json_spec ?
     my $failed = $results->get_failed_results();
     isa_ok($failed, 'WTSI::NPG::Genotyping::QC_wip::Check::IdentityResults',
        'Failed results object');
-    is($failed->get_num_results, 1, "Correct number of failed results");
+    is($failed->get_num_samples, 1, "Correct number of failed results");
     my $results_json = $results->to_json_spec();
     my $expected_json = [
           [
@@ -114,5 +114,5 @@ sub add_remove_results : Test(9) {
               "Results in JSON format match expected value");
     # now test deleting a result
     ok($results->delete_sample_result($sample), 'Deleted a result');
-    is($results->get_num_results, 0, 'Count updated correctly');
+    is($results->get_num_samples, 0, 'Count updated correctly');
 }
