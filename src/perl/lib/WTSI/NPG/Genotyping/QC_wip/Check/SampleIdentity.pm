@@ -106,6 +106,11 @@ sub get_paired_calls {
   return $self->paired_calls;
 }
 
+sub get_sample_name {
+  my ($self) = @_;
+  return $self->sample_name;
+}
+
 sub is_omitted {
     my $self = (@_);
     return $self->omitted;
