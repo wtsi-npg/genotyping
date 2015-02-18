@@ -50,7 +50,7 @@ has 'sample_plink_calls' =>
 
 sub BUILD {
     my ($self) = @_;
-    $self->sample_plink_calls = $self->_get_all_calls();
+    $self->sample_plink_calls($self->_get_all_calls());
 }
 
 =head2 get_num_samples
@@ -117,13 +117,17 @@ sub pairwise_swap_check {
     my @comparison = ();
     for (my $i=0;$i<@{$id_results};$i++) {
         for (my $j=0;$j<$i;$j++) {
-            my $similarity = $id_results[i]->find_swap_metric($id_results[j]);
+            my $similarity =
+                $id_results->[$i]->find_swap_metric($id_results->[$j]);
             my $warning = 0;
             if ($similarity >= $self->swap_threshold) {
                 $warning = 1;
                 $total_warnings++;
             }
-            my @row = ($sample_i, $sample_j, $similarity, $warning);
+            my @row = ($id_results->[$i]->get_sample_name(),
+                       $id_results->[$j]->get_sample_name(),
+                       $similarity,
+                       $warning);
             push(@comparison, [@row]);
         }
     }
@@ -152,7 +156,7 @@ sub find_identity {
     defined $qc_call_sets or
         $self->logconfess('A defined qc_call_sets argument is required');
     my @id_results = ();
-    my $has_qc = {};
+    my %has_qc = ();
     foreach my $qc_call_set (@$qc_call_sets) {
         my $sample_name = $qc_call_set->{sample};
         my $qc_calls    = $qc_call_set->{calls};
@@ -177,9 +181,6 @@ sub find_identity {
                 pass_threshold   => $self->pass_threshold,
                 omitted          => 1,
             );
-            $result->set_omit_flag();
-        if (scalar($production_calls) < $self->min_shared_snps) {
-            $result->set_omit_flag();
         }
         push(@id_results, $result);
         $has_qc{$sample_name} = 1;
@@ -203,10 +204,11 @@ sub find_identity {
 
 =head2 run_identity_checks
 
-  Arg [1]     : ArrayRef[HashRef]
+  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
 
-  Returntype  : (ArrayRef[WTSI::NPG::Genotyping::
-                          QC_wip::Check::SampleIdentity],
+  Returntype  : (ArrayRef[
+                  WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity
+                 ],
                  ArrayRef[ArrayRef[Str]])
 
   Description : Run the identity check on each sample, then carry out
@@ -225,11 +227,11 @@ sub run_identity_checks {
 
 =head2 run_identity_checks_json_spec
 
-  Arg [1]     : ArrayRef[HashRef]
+  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
 
   Returntype  : HashRef
 
-  Description : Run identity checks on each sample and return a data structure
+  Description : Run identity checks on all samples, returning a data structure
                 compatible with JSON output. Intended as a 'main' method to
                 run from a command-line script.
 
@@ -241,8 +243,8 @@ sub run_identity_checks_json_spec {
       self->run_identity_checks($qc_call_sets);
   my %spec;
   my @id_json_spec = ();
-  foreach my $sample_id (@{$identity_results}) {
-      push(@id_json_spec, $sample_id->to_json_spec());
+  foreach my $id_result (@{$identity_results}) {
+      push(@id_json_spec, $id_result->to_json_spec());
   }
   $spec{'identity'} = \@id_json_spec;
   $spec{'swap'} = $swap_evaluation;
@@ -258,18 +260,12 @@ sub _from_illumina_snp_name {
   return $body;
 }
 
-=head2 _get_all_calls
-
-  Arg [1]    : None
-
-  Example    : my $all_calls = $check->get_all_calls;
-               my @sample_calls = @{$all_calls->{$sample_name}};
-  Description: Return the Plink calls for all samples, indexed by sample
-               name. The calls retain the order of the Plink dataset.
-  Returntype : HashRef[Str] of sample names, where values are
-               ArrayRef[WTSI::NPG::Genotyping::Call]
-
-=cut
+# Return the Plink calls for all samples, indexed by sample
+# name. The calls retain the order of the Plink dataset.
+# Calls are only returned for SNPs in the QC plex, as
+# represented in $self->snpset.
+#  Returntype : HashRef[Str] of sample names, where values are
+#               ArrayRef[WTSI::NPG::Genotyping::Call]
 
 sub _get_all_calls {
   my ($self) = @_;
@@ -279,7 +275,7 @@ sub _get_all_calls {
   my $snp = new plink_binary::snp;
 
   my %shared_snp_index;
-  foreach my $name (@{$self->_get_shared_snp_names}) {
+  foreach my $name (@{$self->get_shared_snp_names}) {
     $shared_snp_index{$name}++;
   }
 
@@ -335,22 +331,17 @@ sub _get_failed_results {
     return \@failed;
 }
 
-=head2 _get_shared_snp_names
 
-  Arg [1]    : None
+# Return the names of SNPs common to both the Plink data
+# and the quality control SNPset, in their original order
+# in the Plink data.
 
-  Example    : my @names = @{$check->_get_shared_snp_names};
-  Description: Return the names of SNPs common to both the Plink data
-               and the quality control SNPset, in their original order
-               in the Plink data.
+# This method ignores the "exm-" prefix added by Illumina
+# to the real (dbSNP) SNP names.
 
-               This method ignores the "exm-" prefix added by Illumina
-               to the real (dbSNP) SNP names.
-  Returntype : ArrayRef[Str]
+# Returntype : ArrayRef[Str]
 
-=cut
-
-sub _get_shared_snp_names {
+sub get_shared_snp_names {
   my ($self) = @_;
 
   my %plex_snp_index;
