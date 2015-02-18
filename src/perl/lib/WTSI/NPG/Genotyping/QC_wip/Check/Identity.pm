@@ -50,7 +50,8 @@ has 'sample_plink_calls' =>
 
 sub BUILD {
     my ($self) = @_;
-    $self->sample_plink_calls($self->_get_all_calls());
+    # read Plink data into an attribute for later reference
+    $self->sample_plink_calls($self->get_production_calls());
 }
 
 =head2 get_num_samples
@@ -140,11 +141,12 @@ sub pairwise_swap_check {
 
 =head2 find_identity
 
-  Arg [1]     : ArrayRef[HashRef]
+  Arg [1]     : HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]
 
   Returntype  : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
 
-  Description : Find identity results for all samples
+  Description : Find identity results for all samples. Input is a hash of
+                arrays of Call objects, indexed by sample name.
 
 =cut
 
@@ -152,42 +154,46 @@ sub pairwise_swap_check {
 # should bail and write empty output if insufficient shared SNPs present
 
 sub find_identity {
-    my ($self, $qc_call_sets) = @_;
-    defined $qc_call_sets or
-        $self->logconfess('A defined qc_call_sets argument is required');
+    my ($self, $qc_calls_by_sample) = @_;
+    defined $qc_calls_by_sample or
+        $self->logconfess('Must have a defined qc_calls_by_sample argument');
     my @id_results = ();
-    my %has_qc = ();
-    foreach my $qc_call_set (@$qc_call_sets) {
-        my $sample_name = $qc_call_set->{sample};
-        my $qc_calls    = $qc_call_set->{calls};
-        my $production_calls = $self->sample_plink_calls->{$sample_name};
-        my $result;
-        if (scalar($production_calls) >= $self->min_shared_snps) {
-            $result->
-                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
-                    sample_name      => $sample_name,
-                    snpset           => $self->snpset,
-                    production_calls => $production_calls,
-                    qc_calls         => $qc_calls,
-                    pass_threshold   => $self->pass_threshold,
-                );
+    my %missing = ();
+    foreach my $sample_name (@{$self->get_sample_names()}) {
+        my $qc_calls = $qc_calls_by_sample->{$sample_name};
+        if (defined($qc_calls)) {
+            my $production_calls = $self->sample_plink_calls->{$sample_name};
+            my $result;
+            if (scalar($production_calls) >= $self->min_shared_snps) {
+                $result =
+                    WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
+                        sample_name      => $sample_name,
+                        snpset           => $self->snpset,
+                        production_calls => $production_calls,
+                        qc_calls         => $qc_calls,
+                        pass_threshold   => $self->pass_threshold,
+                    );
+            } else {
+                # insufficient shared SNPs; by convention, result is empty
+                $result =
+                    WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
+                        sample_name      => $sample_name,
+                        snpset           => $self->snpset,
+                        production_calls => [],
+                        qc_calls         => [],
+                        pass_threshold   => $self->pass_threshold,
+                        omitted          => 1,
+                    );
+            }
+            push(@id_results, $result);
         } else {
-            # insufficient shared SNPs; by convention, result is empty
-            WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
-                sample_name      => $sample_name,
-                snpset           => $self->snpset,
-                production_calls => [],
-                qc_calls         => [],
-                pass_threshold   => $self->pass_threshold,
-                omitted          => 1,
-            );
+            $missing{$sample_name} = 1;
         }
-        push(@id_results, $result);
-        $has_qc{$sample_name} = 1;
     }
-    # now append empty results for samples missing from the QC data
-    foreach my $sample_name ($self->get_sample_names) {
-        unless ($has_qc{$sample_name}) {
+    # now construct empty results for samples missing from QC data (if any)
+    # by convention, these are appended at the end of the results array
+    foreach my $sample_name ($self->get_sample_names()) {
+        if ($missing{$sample_name}) {
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
                     sample_name      => $sample_name,
@@ -267,7 +273,7 @@ sub _from_illumina_snp_name {
 #  Returntype : HashRef[Str] of sample names, where values are
 #               ArrayRef[WTSI::NPG::Genotyping::Call]
 
-sub _get_all_calls {
+sub get_production_calls {
   my ($self) = @_;
 
   my $plink = plink_binary::plink_binary->new($self->plink_path);
