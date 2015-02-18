@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
 
 use Moose;
 use JSON;
+use List::Util qw(max);
+
 use WTSI::NPG::Genotyping::Call;
 
 use Data::Dumper; # TODO remove when development is stable
@@ -90,12 +92,13 @@ sub BUILD {
     }
 }
 
-# find similarity to another SampleIdentity object
+# cross-check with another SampleIdentity object
+# compare this object's production calls to other's QC calls, and vice versa
 # use to detect possible sample swaps, by pairwise comparison of failed samples
 sub find_swap_metric {
     my ($self, $other) = @_;
     return $self->_sample_swap_metric($self->get_paired_calls(),
-                                      $other->get_paired_calls());
+                                            $other->get_paired_calls());
 }
 
 sub get_paired_calls {
