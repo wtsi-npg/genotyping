@@ -11,8 +11,6 @@ use WTSI::NPG::Genotyping::Call;
 # do pairing and evaluate match/mismatch
 # container for match, mismatch, identity, missing, failed, sample
 
-# get_result() method to get (match, mismatch, identity, missing, failed)
-
 # required input arguments
 
 has 'sample_name' =>
@@ -55,7 +53,7 @@ has 'omitted' => # sample present in QC data, but insufficient shared SNPs
 
 has 'paired_calls' =>
      (is  => 'rw',
-      isa => 'ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]])';
+      isa => 'ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]');
 
 has 'identity' =>
     (is  => 'rw',
@@ -136,9 +134,6 @@ sub to_json_spec {
   return \%spec;
 }
 
-# TODO count_all_matches populates an IdentityResultSet
-# with SampleIdentity objects
-
 # was in Identity.pm
 sub _pair_sample_calls {
   my ($self, $production_calls, $qc_calls) = @_;
@@ -156,7 +151,7 @@ sub _pair_sample_calls {
                             "being compared");
       }
       foreach my $production_call (@$production_calls) {
-          if ($qc_call->snp->name eq $sample_call->snp->name) {
+          if ($qc_call->snp->name eq $production_call->snp->name) {
               push @pairs, {qc         => $qc_call,
                             production => $production_call};
           }
