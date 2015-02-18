@@ -10,12 +10,13 @@ use List::AllUtils qw(each_array);
 use Data::Dumper; # TODO remove when development is stable
 
 use base qw(Test::Class);
-use Test::More tests => 24;
+use Test::More tests => 25;
 use Test::Exception;
 
 use plink_binary;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
+use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -26,9 +27,30 @@ my $plink_swap = "$data_path/fake_swap_genotypes";
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
 my $pass_threshold = 0.9;
 
+# sample names with fake QC data
+my @qc_sample_names = qw/urn:wtsi:249441_F11_HELIC5102138
+                         urn:wtsi:249442_C09_HELIC5102247
+                         urn:wtsi:249461_G12_HELIC5215300/;
+
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Check::Identity');
 }
+
+sub find_identity : Test(1) {
+
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    (plink_path => $plink_path,
+     snpset     => $snpset);
+  # get fake QC results for a few samples; others will appear as missing
+  my $qc_callsets = _get_qc_callsets();
+  ok($check->find_identity($qc_callsets),
+     "Find identity results for given QC calls");
+
+  # TODO validate the return value of find_identity
+
+}
+
 
 sub get_num_samples : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
@@ -87,13 +109,13 @@ sub get_shared_snp_names : Test(1) {
   is_deeply($shared, \@expected) or diag explain $shared;
 }
 
-sub get_all_calls : Test(18) {
+sub get_production_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
-  my $calls = $check->_get_all_calls;
+  my $calls = $check->get_production_calls;
 
   # Map of sample name to Plink genotypes
   my $expected_genotypes =
@@ -176,13 +198,39 @@ sub _get_swap_sample_identities {
     # - Create SampleIdentity object for each sample
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_swap,
+         snpset     => $snpset);
+    my $qc_callsets = _get_qc_callsets();
+    my $all_production_calls = $check->get_production_calls();
 
-    my @samples = qw/urn:wtsi:249441_F11_HELIC5102138
-                     urn:wtsi:249442_C09_HELIC5102247
-                     urn:wtsi:249461_G12_HELIC5215300/;
+    my @sample_identities;
+    my @qc_callsets = _get_qc_callsets();
+    foreach my $sample_name (@qc_sample_names) {
+        # need both QC and production calls to create a SampleIdentity object
+        my %args = (sample_name      => $sample_name,
+                    snpset           => $snpset,
+                    production_calls => $all_production_calls->{$sample_name},
+                    qc_calls         => $qc_callsets->{$sample_name},
+                    pass_threshold   => $pass_threshold);
+        my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
+            new(\%args);
+        push (@sample_identities, $sample_id);
+    }
+    return \@sample_identities;
+}
+
+sub _get_qc_callsets {
+
+   # Some fake QC data
+    # - List of 3 'failed' sample names, 2 of which are swapped
+    # - Create a hash of Call arrays
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+
     my %qc_data = (
         # swap with urn:wtsi:249442_C09_HELIC5102247
-      $samples[0] =>
+      $qc_sample_names[0] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -215,7 +263,7 @@ sub _get_swap_sample_identities {
               ['rs753381',   'AG']  # AG
           ],
         # swap with urn:wtsi:249441_F11_HELIC5102138
-      $samples[1] =>
+      $qc_sample_names[1] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -249,7 +297,7 @@ sub _get_swap_sample_identities {
           ],
         # 'ordinary' failed sample
         # x denotes a mismatch wrt Plink data
-      $samples[2] =>
+      $qc_sample_names[2] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -283,28 +331,16 @@ sub _get_swap_sample_identities {
             ]
     );
 
-    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-        (plink_path => $plink_swap,
-         snpset     => $snpset);
-    my $all_production_calls = $check->_get_all_calls();
-
-    my @sample_identities;
-    foreach my $sample_name (@samples) {
-        # need both QC and production calls to create a SampleIdentity object
+    my %qc_callsets;
+    foreach my $sample_name (@qc_sample_names) {
         my @qc_calls =  map {
             my ($snp, $genotype) = @$_;
             WTSI::NPG::Genotyping::Call->new
                   (snp      => $snpset->named_snp($snp),
                    genotype => $genotype) } @{$qc_data{$sample_name}};
-        my $production_calls = $all_production_calls->{$sample_name};
-        my %args = (sample_name         => $sample_name,
-                    snpset              => $snpset,
-                    production_calls    => $production_calls,
-                    qc_calls            => \@qc_calls,
-                    pass_threshold      => $pass_threshold);
-        my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
-            new(\%args);
-        push (@sample_identities, $sample_id);
+        $qc_callsets{$sample_name} = \@qc_calls;
     }
-    return \@sample_identities;
+    return \%qc_callsets;
 }
+
+1;
