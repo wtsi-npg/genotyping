@@ -7,6 +7,10 @@ use Moose;
 use JSON;
 use WTSI::NPG::Genotyping::Call;
 
+use Data::Dumper; # TODO remove when development is stable
+
+with 'WTSI::DNAP::Utilities::Loggable';
+
 # arguments: unpaired (sample, qc) calls
 # do pairing and evaluate match/mismatch
 # container for match, mismatch, identity, missing, failed, sample
@@ -63,16 +67,18 @@ has 'failed' =>
     (is  => 'rw',
      isa => 'Bool');
 
+our $QC_KEY = 'qc';
+our $PROD_KEY = 'production';
 
 sub BUILD {
     my ($self) = @_;
-    $self->paired_calls = $self->_pair_sample_calls($self->production_calls,
-                                                    $self->qc_calls);
+    $self->paired_calls($self->_pair_sample_calls($self->production_calls,
+                                                  $self->qc_calls));
     if (scalar($self->paired_calls) > 0) {
         # argument lists may be empty if sample has no QC data
         my $match = sub {
             my $pair = shift;
-            return $pair->{qc}->equivalent($pair->{sample});
+            return $pair->{$QC_KEY}->equivalent($pair->{$PROD_KEY});
         };
         my @matches = grep {  $match->($_) } @{$self->get_paired_calls()};
         my $identity = scalar @matches / scalar @{$self->get_paired_calls()};
@@ -116,8 +122,8 @@ sub to_json_spec {
                 failed   => $self->failed);
     my %genotypes;
     foreach my $pair (@{$self->get_paired_calls()}) {
-        my $qc_call = $pair->{qc};
-        my $pd_call = $pair->{production};
+        my $qc_call = $pair->{$QC_KEY};
+        my $pd_call = $pair->{$PROD_KEY};
         my $qc_snp = $qc_call->snp->name;
         my $pd_snp = $pd_call->snp->name;
 
@@ -152,8 +158,8 @@ sub _pair_sample_calls {
       }
       foreach my $production_call (@$production_calls) {
           if ($qc_call->snp->name eq $production_call->snp->name) {
-              push @pairs, {qc         => $qc_call,
-                            production => $production_call};
+              push @pairs, {$QC_KEY   => $qc_call,
+                            $PROD_KEY => $production_call};
           }
       }
   }
@@ -179,14 +185,15 @@ sub _sample_swap_metric {
     my @match = (0,0);
     for (my $i=0;$i<$total_snps;$i++) {
         # compare results on both samples for the ith snp
-        if ($pairs_A[$i]{qc}->snp->name ne $pairs_B[$i]{qc}->snp->name) {
+        if ($pairs_A[$i]{$QC_KEY}->snp->name ne
+                $pairs_B[$i]{$QC_KEY}->snp->name) {
             $self->logcroak("Mismatched SNP identities for ",
                             "sample swap metric");
         }
-        if ($pairs_A[$i]{qc}->equivalent($pairs_B[$i]{sample})) {
+        if ($pairs_A[$i]{$QC_KEY}->equivalent($pairs_B[$i]{$PROD_KEY})) {
             $match[0]++;
         }
-        if ($pairs_A[$i]{sample}->equivalent($pairs_B[$i]{qc})) {
+        if ($pairs_A[$i]{$PROD_KEY}->equivalent($pairs_B[$i]{$QC_KEY})) {
             $match[1]++;
         }
     }
