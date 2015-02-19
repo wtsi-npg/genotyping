@@ -216,6 +216,10 @@ sub find_identity {
         my $qc_calls = $qc_calls_by_sample->{$sample_name};
         if (defined($qc_calls)) {
             my $production_calls = $self->sample_plink_calls->{$sample_name};
+            my $total = scalar(@{$production_calls});
+            my $omit;
+            if ($total < $self->min_shared_snps) { $omit = 1; }
+            else { $omit = 0; }
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
                     sample_name      => $sample_name,
@@ -223,10 +227,8 @@ sub find_identity {
                     production_calls => $production_calls,
                     qc_calls         => $qc_calls,
                     pass_threshold   => $self->pass_threshold,
+                    omitted          => $omit
                 );
-            if (scalar(@{$production_calls}) < $self->min_shared_snps) {
-                $result->set_omitted();
-            }
             push(@id_results, $result);
         } else {
             $missing{$sample_name} = 1;

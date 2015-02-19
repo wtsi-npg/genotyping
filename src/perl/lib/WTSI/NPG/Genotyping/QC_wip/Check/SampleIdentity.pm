@@ -49,7 +49,7 @@ has 'missing' => # sample not present in QC data
      default  => 0);
 
 has 'omitted' => # sample present in QC data, but insufficient shared SNPs
-    (is       => 'rw',
+    (is       => 'ro',
      isa      => 'Bool',
      default  => 0);
 
@@ -106,26 +106,6 @@ sub get_paired_calls {
 sub get_sample_name {
     my ($self) = @_;
     return $self->sample_name;
-}
-
-sub is_omitted {
-    my ($self) = @_;
-    return $self->omitted;
-}
-
-sub set_omitted {
-    my ($self) = @_;
-    $self->omitted(1);
-}
-
-sub unset_omitted {
-    my ($self) = @_;
-    $self->omitted(0);
-}
-
-sub is_missing {
-    my $self = (@_);
-    return $self->missing;
 }
 
 # convert to a data structure which can be represented in JSON format
