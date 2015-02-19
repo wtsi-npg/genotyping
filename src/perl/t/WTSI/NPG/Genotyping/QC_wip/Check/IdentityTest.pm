@@ -382,8 +382,11 @@ sub _get_qc_callsets {
 }
 
 sub _get_qc_callsets_broken_snpset {
-    # modify QC callsets for consistency with 'broken' snpset file
-
+    # The 'broken' snpset tests the case of insufficient shared SNPs
+    # between production and QC calls: All but two of the SNPs in the
+    # standard QC plex are renamed so that they do not appear to be shared
+    # with the production snpset. This method renames the snps in QC calls
+    # for consistency with the 'broken' snpset.
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
     my %qc_callsets = %{_get_qc_callsets()};
     my %broken_callsets = ();
