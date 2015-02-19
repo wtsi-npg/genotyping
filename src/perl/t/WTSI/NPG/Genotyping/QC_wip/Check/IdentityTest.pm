@@ -4,13 +4,14 @@ package WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest;
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use File::Slurp qw(read_file);
 use JSON;
 use List::AllUtils qw(each_array);
 
 use Data::Dumper; # TODO remove when development is stable
 
 use base qw(Test::Class);
-use Test::More tests => 25;
+use Test::More tests => 26;
 use Test::Exception;
 
 use plink_binary;
@@ -25,6 +26,7 @@ my $data_path = './t/qc/check/identity';
 my $plink_path = "$data_path/fake_qc_genotypes";
 my $plink_swap = "$data_path/fake_swap_genotypes";
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
+my $expected_json_path = "$data_path/expected_identity_results.json";
 my $pass_threshold = 0.9;
 
 # sample names with fake QC data
@@ -36,21 +38,23 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Check::Identity');
 }
 
-sub find_identity : Test(1) {
-
+sub find_identity : Test(2) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
      snpset     => $snpset);
   # get fake QC results for a few samples; others will appear as missing
   my $qc_callsets = _get_qc_callsets();
-  ok($check->find_identity($qc_callsets),
-     "Find identity results for given QC calls");
-
-  # TODO validate the return value of find_identity
-
+  my $id_results = $check->find_identity($qc_callsets);
+  ok($id_results, "Find identity results for given QC calls");
+  my @json_spec_results;
+  foreach my $id_result (@{$id_results}) {
+      push(@json_spec_results, $id_result->to_json_spec());
+  }
+  my $expected_json = decode_json(read_file($expected_json_path));
+  is_deeply(\@json_spec_results, $expected_json,
+            "JSON output congruent with expected values");
 }
-
 
 sub get_num_samples : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
