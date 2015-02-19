@@ -76,7 +76,7 @@ sub BUILD {
     my ($self) = @_;
     $self->paired_calls($self->_pair_sample_calls($self->production_calls,
                                                   $self->qc_calls));
-    if (scalar($self->paired_calls) > 0) {
+    if (scalar(@{$self->paired_calls}) > 0) {
         # argument lists may be empty if sample has no QC data
         my $match = sub {
             my $pair = shift;
@@ -88,9 +88,6 @@ sub BUILD {
         $self->identity($identity);
         if ($identity < $self->pass_threshold) { $self->failed(1); }
         else { $self->failed(0); }
-    } else {
-        $self->identity(undef);
-        $self->failed(undef);
     }
 }
 
@@ -174,7 +171,6 @@ sub _pair_sample_calls {
           }
       }
   }
-
   $self->debug("Paired ", scalar @pairs, " calls for '",
                $self->sample_name, "'");
 
