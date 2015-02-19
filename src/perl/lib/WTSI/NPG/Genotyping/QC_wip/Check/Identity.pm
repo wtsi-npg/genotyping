@@ -164,7 +164,7 @@ sub find_identity {
         if (defined($qc_calls)) {
             my $production_calls = $self->sample_plink_calls->{$sample_name};
             my $result;
-            if (scalar($production_calls) >= $self->min_shared_snps) {
+            if (scalar(@{$production_calls}) >= $self->min_shared_snps) {
                 $result =
                     WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
                         sample_name      => $sample_name,
@@ -246,7 +246,7 @@ sub run_identity_checks {
 sub run_identity_checks_json_spec {
   my ($self, $qc_call_sets) = @_;
   my ($identity_results, $swap_evaluation) =
-      self->run_identity_checks($qc_call_sets);
+      $self->run_identity_checks($qc_call_sets);
   my %spec;
   my @id_json_spec = ();
   foreach my $id_result (@{$identity_results}) {
