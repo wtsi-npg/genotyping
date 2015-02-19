@@ -51,7 +51,7 @@ has 'missing' => # sample not present in QC data
      default  => 0);
 
 has 'omitted' => # sample present in QC data, but insufficient shared SNPs
-    (is       => 'ro',
+    (is       => 'rw',
      isa      => 'Bool',
      default  => 0);
 
@@ -101,18 +101,28 @@ sub find_swap_metric {
 }
 
 sub get_paired_calls {
-  my ($self) = @_;
-  return $self->paired_calls;
+    my ($self) = @_;
+    return $self->paired_calls;
 }
 
 sub get_sample_name {
-  my ($self) = @_;
-  return $self->sample_name;
+    my ($self) = @_;
+    return $self->sample_name;
 }
 
 sub is_omitted {
-    my $self = (@_);
+    my ($self) = @_;
     return $self->omitted;
+}
+
+sub set_omitted {
+    my ($self) = @_;
+    $self->omitted(1);
+}
+
+sub unset_omitted {
+    my ($self) = @_;
+    $self->omitted(0);
 }
 
 sub is_missing {
