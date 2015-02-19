@@ -84,8 +84,10 @@ sub BUILD {
         };
         my @matches = grep {  $match->($_) } @{$self->get_paired_calls()};
         my $identity = scalar @matches / scalar @{$self->get_paired_calls()};
+        # ensure $self->failed is 0 or 1, not undef
         $self->identity($identity);
-        $self->failed($identity < $self->pass_threshold);
+        if ($identity < $self->pass_threshold) { $self->failed(1); }
+        else { $self->failed(0); }
     } else {
         $self->identity(undef);
         $self->failed(undef);
@@ -124,10 +126,11 @@ sub is_missing {
 # convert to a data structure which can be represented in JSON format
 sub to_json_spec {
     my ($self) = @_;
-    my %spec = (identity => $self->identity,
-                missing  => $self->missing,
-                omitted  => $self->omitted,
-                failed   => $self->failed);
+    my %spec = (sample_name => $self->sample_name,
+                identity    => $self->identity,
+                missing     => $self->missing,
+                omitted     => $self->omitted,
+                failed      => $self->failed);
     my %genotypes;
     foreach my $pair (@{$self->get_paired_calls()}) {
         my $qc_call = $pair->{$QC_KEY};
