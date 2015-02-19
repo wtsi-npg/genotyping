@@ -9,8 +9,6 @@ use List::Util qw(max);
 
 use WTSI::NPG::Genotyping::Call;
 
-use Data::Dumper; # TODO remove when development is stable
-
 with 'WTSI::DNAP::Utilities::Loggable';
 
 # arguments: unpaired (sample, qc) calls

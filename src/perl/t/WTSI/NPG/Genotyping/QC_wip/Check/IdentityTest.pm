@@ -8,8 +8,6 @@ use File::Slurp qw(read_file);
 use JSON;
 use List::AllUtils qw(each_array);
 
-use Data::Dumper; # TODO remove when development is stable
-
 use base qw(Test::Class);
 use Test::More tests => 31;
 use Test::Exception;

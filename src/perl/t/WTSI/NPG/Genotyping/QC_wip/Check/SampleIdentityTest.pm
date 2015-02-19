@@ -7,8 +7,6 @@ use File::Slurp qw(read_file);
 use File::Temp qw(tempdir);
 use JSON;
 
-use Data::Dumper; # TODO remove when development is stable
-
 use base qw(Test::Class);
 use Test::More tests => 4;
 use Test::Exception;
