@@ -32,7 +32,7 @@ has 'min_shared_snps' =>
    isa     => 'Int',
    default => 8);
 
-has 'swap_threshold' =>
+has 'swap_threshold' => # minimum cross-similarity for swap warning
   (is      => 'ro',
    isa     => 'Num',
    default => 0.9);
@@ -72,206 +72,17 @@ sub get_num_samples {
   return $plink->{"individuals"}->size;
 }
 
-=head2 get_sample_names
+=head2 get_production_calls
 
   Arg [1]    : None
-
-  Example    : my @names = @{$check->get_num_samples};
-  Description: Return the names of the samples in the Plink data, in
-               their original order.
-  Returntype : ArrayRef[Str]
-
-=cut
-
-sub get_sample_names {
-  my ($self) = @_;
-
-  my $plink = plink_binary::plink_binary->new($self->plink_path);
-
-  my @names;
-  for (my $i = 0; $i < $self->get_num_samples; $i++) {
-    push @names, $plink->{'individuals'}->get($i)->{'name'};
-  }
-
-  return \@names;
-}
-
-
-=head2 pairwise_swap_check
-
-  Arg [1]    : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
-
-  Example    : my $comparison = pairwise_swap_check($results_ref);
-
-  Description: Pairwise comparison of the given samples to look for possible
-               swaps. Warning of a swap occurs if similarity between
-               (calls_i, qc_j) for i != j is greater than
-               $self->swap_threshold. Typically, the input samples have
-               failed the standard identity metric.
-  Returntype : ArrayRef[ArrayRef[Str]]
+  Example    : my $all_calls = $check->get_all_calls;
+               my @sample_calls = @{$all_calls->{$sample_name}};
+  Description: Return the production Plink calls for all samples, indexed by
+               samplename. The calls retain the order of the Plink dataset.
+  Returntype : HashRef[Str] of sample names, where values are
+               ArrayRef[WTSI::NPG::Genotyping::Call]
 
 =cut
-
-sub pairwise_swap_check {
-    my ($self, $id_results) = @_;
-    my $total_warnings = 0;
-    my @comparison = ();
-    for (my $i=0;$i<@{$id_results};$i++) {
-        for (my $j=0;$j<$i;$j++) {
-            my $similarity =
-                $id_results->[$i]->find_swap_metric($id_results->[$j]);
-            my $warning = 0;
-            if ($similarity >= $self->swap_threshold) {
-                $warning = 1;
-                $total_warnings++;
-            }
-            my @row = ($id_results->[$i]->get_sample_name(),
-                       $id_results->[$j]->get_sample_name(),
-                       $similarity,
-                       $warning);
-            push(@comparison, [@row]);
-        }
-    }
-    if ($total_warnings > 0) {
-        $self->warn("Warning of possible sample swap for ", $total_warnings,
-                    " of ", scalar(@comparison), " pairs of failed samples.");
-    }
-    return \@comparison;
-}
-
-=head2 find_identity
-
-  Arg [1]     : HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]
-
-  Returntype  : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
-
-  Description : Find identity results for all samples. Input is a hash of
-                arrays of Call objects, indexed by sample name.
-
-=cut
-
-# based on old count_all_matches method
-# should bail and write empty output if insufficient shared SNPs present
-
-sub find_identity {
-    my ($self, $qc_calls_by_sample) = @_;
-    defined $qc_calls_by_sample or
-        $self->logconfess('Must have a defined qc_calls_by_sample argument');
-    my @id_results = ();
-    my %missing = ();
-    foreach my $sample_name (@{$self->get_sample_names()}) {
-        my $qc_calls = $qc_calls_by_sample->{$sample_name};
-        if (defined($qc_calls)) {
-            my $production_calls = $self->sample_plink_calls->{$sample_name};
-            my $result;
-            if (scalar(@{$production_calls}) >= $self->min_shared_snps) {
-                $result =
-                    WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
-                        sample_name      => $sample_name,
-                        snpset           => $self->snpset,
-                        production_calls => $production_calls,
-                        qc_calls         => $qc_calls,
-                        pass_threshold   => $self->pass_threshold,
-                    );
-            } else {
-                # insufficient shared SNPs; by convention, result is empty
-                $result =
-                    WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
-                        sample_name      => $sample_name,
-                        snpset           => $self->snpset,
-                        production_calls => [],
-                        qc_calls         => [],
-                        pass_threshold   => $self->pass_threshold,
-                        omitted          => 1,
-                    );
-            }
-            push(@id_results, $result);
-        } else {
-            $missing{$sample_name} = 1;
-        }
-    }
-    # now construct empty results for samples missing from QC data (if any)
-    # by convention, these are appended at the end of the results array
-    foreach my $sample_name (@{$self->get_sample_names()}) {
-        if ($missing{$sample_name}) {
-            my $result =
-                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
-                    sample_name      => $sample_name,
-                    snpset           => $self->snpset,
-                    production_calls => [],
-                    qc_calls         => [],
-                    pass_threshold   => $self->pass_threshold,
-                    missing          => 1);
-            push(@id_results, $result);
-        }
-    }
-    return \@id_results;
-}
-
-=head2 run_identity_checks
-
-  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
-
-  Returntype  : (ArrayRef[
-                  WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity
-                 ],
-                 ArrayRef[ArrayRef[Str]])
-
-  Description : Run the identity check on each sample, then carry out
-                cross-check on failed samples to detect swaps. Return
-                results of both checks.
-
-=cut
-
-sub run_identity_checks {
-    my ($self, $qc_call_sets) = @_;
-    my $identity_results = $self->find_identity($qc_call_sets);
-    my $failed = $self->_get_failed_results($identity_results);
-    my $swap_evaluation = $self->pairwise_swap_check($failed);
-    return ($identity_results, $swap_evaluation);
-}
-
-=head2 run_identity_checks_json_spec
-
-  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
-
-  Returntype  : HashRef
-
-  Description : Run identity checks on all samples, returning a data structure
-                compatible with JSON output. Intended as a 'main' method to
-                run from a command-line script.
-
-=cut
-
-sub run_identity_checks_json_spec {
-  my ($self, $qc_call_sets) = @_;
-  my ($identity_results, $swap_evaluation) =
-      $self->run_identity_checks($qc_call_sets);
-  my %spec;
-  my @id_json_spec = ();
-  foreach my $id_result (@{$identity_results}) {
-      push(@id_json_spec, $id_result->to_json_spec());
-  }
-  $spec{'identity'} = \@id_json_spec;
-  $spec{'swap'} = $swap_evaluation;
-  return \%spec;
-}
-
-
-sub _from_illumina_snp_name {
-  my ($name) = @_;
-
-  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)};
-
-  return $body;
-}
-
-# Return the Plink calls for all samples, indexed by sample
-# name. The calls retain the order of the Plink dataset.
-# Calls are only returned for SNPs in the QC plex, as
-# represented in $self->snpset.
-#  Returntype : HashRef[Str] of sample names, where values are
-#               ArrayRef[WTSI::NPG::Genotyping::Call]
 
 sub get_production_calls {
   my ($self) = @_;
@@ -318,34 +129,47 @@ sub get_production_calls {
       }
     }
   }
-
   return \%sample_calls_index;
 }
 
-# get failed WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity results
-# only returns results confirmed as failed
-# 'missing' and 'omitted' results have undefined pass/fail status
 
-sub _get_failed_results {
-    my ($self, $id_results) = @_;
-    my @failed;
-    foreach my $result (@{$id_results}) {
-        if ($result->{'failed'}) {
-            push(@failed, $result);
-        }
-    }
-    return \@failed;
+=head2 get_sample_names
+
+  Arg [1]    : None
+
+  Example    : my @names = @{$check->get_num_samples};
+  Description: Return the names of the samples in the Plink data, in
+               their original order.
+  Returntype : ArrayRef[Str]
+
+=cut
+
+sub get_sample_names {
+  my ($self) = @_;
+
+  my $plink = plink_binary::plink_binary->new($self->plink_path);
+
+  my @names;
+  for (my $i = 0; $i < $self->get_num_samples; $i++) {
+    push @names, $plink->{'individuals'}->get($i)->{'name'};
+  }
+  return \@names;
 }
 
+=head2 get_shared_snp_names
 
-# Return the names of SNPs common to both the Plink data
-# and the quality control SNPset, in their original order
-# in the Plink data.
+  Arg [1]    : None
 
-# This method ignores the "exm-" prefix added by Illumina
-# to the real (dbSNP) SNP names.
+  Example    : my @names = @{$check->get_shared_snp_names};
+  Description: Return the names of SNPs common to both the Plink data
+               and the quality control SNPset, in their original order
+               in the Plink data.
 
-# Returntype : ArrayRef[Str]
+               This method ignores the "exm-" prefix added by Illumina
+               to the real (dbSNP) SNP names.
+  Returntype : ArrayRef[Str]
+
+=cut
 
 sub get_shared_snp_names {
   my ($self) = @_;
@@ -371,6 +195,175 @@ sub get_shared_snp_names {
   return \@shared_names;
 }
 
+=head2 find_identity
+
+  Arg [1]     : HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]
+
+  Returntype  : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
+
+  Description : Find identity results for all samples. Input is a hash of
+                arrays of Call objects, indexed by sample name.
+
+=cut
+
+sub find_identity {
+    my ($self, $qc_calls_by_sample) = @_;
+    defined $qc_calls_by_sample or
+        $self->logconfess('Must have a defined qc_calls_by_sample argument');
+    my @id_results = ();
+    my %missing = ();
+    foreach my $sample_name (@{$self->get_sample_names()}) {
+        my $qc_calls = $qc_calls_by_sample->{$sample_name};
+        if (defined($qc_calls)) {
+            my $production_calls = $self->sample_plink_calls->{$sample_name};
+            my $result =
+                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
+                    sample_name      => $sample_name,
+                    snpset           => $self->snpset,
+                    production_calls => $production_calls,
+                    qc_calls         => $qc_calls,
+                    pass_threshold   => $self->pass_threshold,
+                );
+            if (scalar(@{$production_calls}) < $self->min_shared_snps) {
+                $result->set_omitted();
+            }
+            push(@id_results, $result);
+        } else {
+            $missing{$sample_name} = 1;
+        }
+    }
+    # now construct empty results for any samples missing from QC data
+    # by convention, these are appended at the end of the results array
+    foreach my $sample_name (@{$self->get_sample_names()}) {
+        if ($missing{$sample_name}) {
+            my $result =
+                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
+                    sample_name      => $sample_name,
+                    snpset           => $self->snpset,
+                    production_calls => [],
+                    qc_calls         => [],
+                    pass_threshold   => $self->pass_threshold,
+                    missing          => 1);
+            push(@id_results, $result);
+        }
+    }
+    return \@id_results;
+}
+
+=head2 pairwise_swap_check
+
+  Arg [1]    : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
+
+  Example    : my $comparison = pairwise_swap_check($results_ref);
+
+  Description: Pairwise comparison of the given samples to look for possible
+               swaps. Warning of a swap occurs if similarity between
+               (calls_i, qc_j) for i != j is greater than
+               $self->swap_threshold. Typically, the input samples have
+               failed the standard identity metric.
+  Returntype : ArrayRef[ArrayRef[Str]]
+
+=cut
+
+sub pairwise_swap_check {
+    my ($self, $id_results) = @_;
+    my $total_warnings = 0;
+    my @comparison = ();
+    for (my $i=0;$i<@{$id_results};$i++) {
+        for (my $j=0;$j<$i;$j++) {
+            my $similarity =
+                $id_results->[$i]->find_swap_metric($id_results->[$j]);
+            my $warning = 0;
+            if ($similarity >= $self->swap_threshold) {
+                $warning = 1;
+                $total_warnings++;
+            }
+            my @row = ($id_results->[$i]->get_sample_name(),
+                       $id_results->[$j]->get_sample_name(),
+                       $similarity,
+                       $warning);
+            push(@comparison, [@row]);
+        }
+    }
+    if ($total_warnings > 0) {
+        $self->warn("Warning of possible sample swap for ", $total_warnings,
+                    " of ", scalar(@comparison), " pairs of failed samples.");
+    }
+    return \@comparison;
+}
+
+=head2 run_identity_checks
+
+  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
+
+  Returntype  : (ArrayRef[
+                  WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity
+                 ],
+                 ArrayRef[ArrayRef[Str]])
+
+  Description : Run the identity check on each sample, then carry out
+                cross-check on failed samples to detect swaps. Return
+                results of both checks.
+
+=cut
+
+sub run_identity_checks {
+    my ($self, $qc_call_sets) = @_;
+    my $identity_results = $self->find_identity($qc_call_sets);
+    my $failed = $self->_get_failed_results($identity_results);
+    my $swap_evaluation = $self->pairwise_swap_check($failed);
+    return ($identity_results, $swap_evaluation);
+}
+
+=head2 run_identity_checks_json_spec
+
+  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
+
+  Returntype  : HashRef[ArrayRef]
+
+  Description : Run identity checks on all samples, returning a data structure
+                compatible with JSON output. Intended as a 'main' method to
+                run from a command-line script.
+
+=cut
+
+sub run_identity_checks_json_spec {
+  my ($self, $qc_call_sets) = @_;
+  my ($identity_results, $swap_evaluation) =
+      $self->run_identity_checks($qc_call_sets);
+  my %spec;
+  my @id_json_spec = ();
+  foreach my $id_result (@{$identity_results}) {
+      push(@id_json_spec, $id_result->to_json_spec());
+  }
+  $spec{'identity'} = \@id_json_spec;
+  $spec{'swap'} = $swap_evaluation;
+  return \%spec;
+}
+
+
+sub _from_illumina_snp_name {
+  my ($name) = @_;
+
+  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)};
+
+  return $body;
+}
+
+# get failed WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity results
+# only returns results confirmed as failed
+# 'missing' and 'omitted' results have undefined pass/fail status
+
+sub _get_failed_results {
+    my ($self, $id_results) = @_;
+    my @failed;
+    foreach my $result (@{$id_results}) {
+        if ($result->{'failed'}) {
+            push(@failed, $result);
+        }
+    }
+    return \@failed;
+}
 
 no Moose;
 
