@@ -11,7 +11,7 @@ use List::AllUtils qw(each_array);
 use Data::Dumper; # TODO remove when development is stable
 
 use base qw(Test::Class);
-use Test::More tests => 26;
+use Test::More tests => 31;
 use Test::Exception;
 
 use plink_binary;
@@ -26,7 +26,11 @@ my $data_path = './t/qc/check/identity';
 my $plink_path = "$data_path/fake_qc_genotypes";
 my $plink_swap = "$data_path/fake_swap_genotypes";
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
+my $broken_snpset_file =
+    "$data_path/W30467_snp_set_info_1000Genomes_BROKEN.tsv";
 my $expected_json_path = "$data_path/expected_identity_results.json";
+my $expected_all_json_path = "$data_path/combined_identity_expected.json";
+my $expected_omit_path = "$data_path/expected_omit_results.json";
 my $pass_threshold = 0.9;
 
 # sample names with fake QC data
@@ -54,6 +58,20 @@ sub find_identity : Test(2) {
   my $expected_json = decode_json(read_file($expected_json_path));
   is_deeply(\@json_spec_results, $expected_json,
             "JSON output congruent with expected values");
+}
+
+sub find_identity_insufficient_snps : Test(2) {
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_path,
+         snpset     => $snpset);
+    # get fake QC results for a few samples; others will appear as missing
+    my $qc_callsets = _get_qc_callsets_broken_snpset();
+    my $id_results = $check->run_identity_checks_json_spec($qc_callsets);
+    ok($id_results, "Find identity results with insufficient shared SNPs");
+    my $expected_json = decode_json(read_file($expected_omit_path));
+    is_deeply($id_results, $expected_json,
+              "Results for insufficient SNPs congruent with expected values");
 }
 
 sub get_num_samples : Test(1) {
@@ -159,6 +177,24 @@ sub get_production_calls : Test(18) {
     is_deeply(\@genotypes, $expected_genotypes->{$sample_name})
       or diag explain \@genotypes;
   }
+}
+
+sub run_identity_checks : Test(3) {
+    # test combined output with identity and swap checks
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_path,
+         snpset     => $snpset);
+    # get fake QC results for a few samples; others will appear as missing
+    my $qc_callsets = _get_qc_callsets();
+    my @results = $check->run_identity_checks($qc_callsets);
+    my ($identity_results, $swap_evaluation) = @results;
+    ok($identity_results, "Identity metric results from combined method");
+    ok($swap_evaluation, "Swap check results from combined method");
+    my $json_results = $check->run_identity_checks_json_spec($qc_callsets);
+    my $json_expected = decode_json(read_file($expected_all_json_path));
+    is_deeply($json_results, $json_expected,
+              "Combined JSON results congruent with expected values");
 }
 
 sub sample_swap_evaluation : Test(2) {
@@ -345,6 +381,30 @@ sub _get_qc_callsets {
         $qc_callsets{$sample_name} = \@qc_calls;
     }
     return \%qc_callsets;
+}
+
+sub _get_qc_callsets_broken_snpset {
+    # modify QC callsets for consistency with 'broken' snpset file
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
+    my %qc_callsets = %{_get_qc_callsets()};
+    my %broken_callsets = ();
+
+    foreach my $sample_name (keys(%qc_callsets)) {
+        my @calls = @{$qc_callsets{$sample_name}};
+        my @broken_calls = ();
+        foreach my $call (@calls) {
+            my $snp = $call->snp->name;
+            unless ($snp eq 'rs1805087' || $snp eq 'rs2241714') {
+                $snp = $snp."_BROKEN";
+            }
+            my %args = (snp      => $snpset->named_snp($snp),
+                        genotype => $call->genotype);
+            push(@broken_calls, WTSI::NPG::Genotyping::Call->new(\%args));
+        }
+        $broken_callsets{$sample_name} = \@broken_calls;
+    }
+    return \%broken_callsets;
 }
 
 1;
