@@ -192,7 +192,7 @@ sub find_identity {
     }
     # now construct empty results for samples missing from QC data (if any)
     # by convention, these are appended at the end of the results array
-    foreach my $sample_name ($self->get_sample_names()) {
+    foreach my $sample_name (@{$self->get_sample_names()}) {
         if ($missing{$sample_name}) {
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
