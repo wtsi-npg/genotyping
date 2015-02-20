@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use Cwd;
 use Getopt::Long;
-use WTSI::NPG::Genotyping::QC::Identity;
+use WTSI::NPG::Genotyping::QC_wip::Identity;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -101,7 +101,7 @@ $swap ||= $swapDefault;
 
 $iniPath ||= $DEFAULT_INI;
 
-WTSI::NPG::Genotyping::QC::Identity->new(
+WTSI::NPG::Genotyping::QC_wip::Identity->new(
     db_path => $dbPath,
     ini_path => $iniPath,
     min_shared_snps => $minSNPs,
