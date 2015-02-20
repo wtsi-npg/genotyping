@@ -4,16 +4,18 @@ package WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest;
 use strict;
 use warnings;
 use File::Temp qw(tempdir);
+use File::Slurp qw(read_file);
 use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 74;
+use Test::More tests => 31;
 use Test::Exception;
 
 use plink_binary;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
+use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -22,9 +24,52 @@ my $data_path = './t/qc/check/identity';
 my $plink_path = "$data_path/fake_qc_genotypes";
 my $plink_swap = "$data_path/fake_swap_genotypes";
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
+my $broken_snpset_file =
+    "$data_path/W30467_snp_set_info_1000Genomes_BROKEN.tsv";
+my $expected_json_path = "$data_path/expected_identity_results.json";
+my $expected_all_json_path = "$data_path/combined_identity_expected.json";
+my $expected_omit_path = "$data_path/expected_omit_results.json";
+my $pass_threshold = 0.9;
+
+# sample names with fake QC data
+my @qc_sample_names = qw/urn:wtsi:249441_F11_HELIC5102138
+                         urn:wtsi:249442_C09_HELIC5102247
+                         urn:wtsi:249461_G12_HELIC5215300/;
 
 sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Check::Identity');
+}
+
+sub find_identity : Test(2) {
+  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    (plink_path => $plink_path,
+     snpset     => $snpset);
+  # get fake QC results for a few samples; others will appear as missing
+  my $qc_callsets = _get_qc_callsets();
+  my $id_results = $check->find_identity($qc_callsets);
+  ok($id_results, "Find identity results for given QC calls");
+  my @json_spec_results;
+  foreach my $id_result (@{$id_results}) {
+      push(@json_spec_results, $id_result->to_json_spec());
+  }
+  my $expected_json = decode_json(read_file($expected_json_path));
+  is_deeply(\@json_spec_results, $expected_json,
+            "JSON output congruent with expected values");
+}
+
+sub find_identity_insufficient_snps : Test(2) {
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_path,
+         snpset     => $snpset);
+    # get fake QC results for a few samples; others will appear as missing
+    my $qc_callsets = _get_qc_callsets_broken_snpset();
+    my $id_results = $check->run_identity_checks_json_spec($qc_callsets);
+    ok($id_results, "Find identity results with insufficient shared SNPs");
+    my $expected_json = decode_json(read_file($expected_omit_path));
+    is_deeply($id_results, $expected_json,
+              "Results for insufficient SNPs congruent with expected values");
 }
 
 sub get_num_samples : Test(1) {
@@ -84,13 +129,13 @@ sub get_shared_snp_names : Test(1) {
   is_deeply($shared, \@expected) or diag explain $shared;
 }
 
-sub get_all_calls : Test(18) {
+sub get_production_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
-  my $calls = $check->get_all_calls;
+  my $calls = $check->get_production_calls;
 
   # Map of sample name to Plink genotypes
   my $expected_genotypes =
@@ -132,265 +177,22 @@ sub get_all_calls : Test(18) {
   }
 }
 
-sub get_sample_calls : Test(14) {
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink_path => $plink_path,
-     snpset     => $snpset);
-
-  my @sample_names = ('urn:wtsi:000000_A00_DUMMY-SAMPLE',
-                      'urn:wtsi:249441_F11_HELIC5102138',
-                      'urn:wtsi:249442_C09_HELIC5102247',
-                      'urn:wtsi:249461_G12_HELIC5215300',
-                      'urn:wtsi:249469_H06_HELIC5274668',
-                      'urn:wtsi:249470_F02_HELIC5274730');
-
-  foreach my $name (@sample_names) {
-    my $calls = $check->get_sample_calls($name);
-    ok($calls, "$name calls");
-    cmp_ok(scalar @$calls, '==', 20, "Number of $name calls");
-  }
-
-  my @expected_snp_names = @{$check->get_shared_snp_names};
-  my $expected_genotypes =
-    [('NN') x 10,
-     'CT', 'CT', 'AG', 'AG', 'CT', 'GT', 'AG', 'AG', 'AG', 'CT'];
-
-  my $sample_name  = 'urn:wtsi:249461_G12_HELIC5215300';
-  my @calls = @{$check->get_sample_calls($sample_name)};
-
-  my @snp_names = map { $_->snp->name } @calls;
-  is_deeply(\@snp_names, \@expected_snp_names) or diag explain \@snp_names;
-
-  my @genotypes = map { $_->genotype } @calls;
-  is_deeply(\@genotypes, $expected_genotypes) or diag explain \@genotypes;
-}
-
-sub pair_sample_calls : Test(5) {
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink_path => $plink_path,
-     snpset     => $snpset);
-
-  my $sample_name  = 'urn:wtsi:249442_C09_HELIC5102247';
-
-  # Some fake QC data; x denotes a call mismatch when compared to the
-  # Plink data for the same sample
-  my @qc_data = (['GS34251',    'TT'],
-                 ['GS35205',    'TT'],
-                 ['GS35219',    'TT'],
-                 ['GS35220',    'CC'],
-                 ['rs649058',   'GA'], # AG (sample data)
-                 ['rs1131498',  'AA'],
-                 ['rs1805087',  'AA'], # AG x
-                 ['rs3795677',  'TT'], # AG x
-                 ['rs6166',     'GA'], # AG
-                 ['rs1801262',  'AA'],
-                 ['rs2286963',  'GT'], # GT
-                 ['rs6759892',  'GT'], # GT
-                 ['rs7627615',  'GA'], # AG
-                 ['rs11096957', 'AA'],
-                 ['rs2247870',  'TT'], # CT x
-                 ['rs4619',     'AG'], # AG
-                 ['rs532841',   'CT'], # CT
-                 ['rs6557634',  'CT'], # CT
-                 ['rs4925',     'AA'], # AC x
-                 ['rs156697',   'AA'],
-                 ['rs5215',     'CT'], # CT
-                 ['rs12828016', 'AA'],
-                 ['rs7298565',  'GA'], # AG
-                 ['rs3742207',  'AC'], # AC
-                 ['rs4075254',  'CT'], # CT
-                 ['rs4843075',  'GA'], # AG
-                 ['rs8065080',  'CT'], # CT
-                 ['rs1805034',  'AA'],
-                 ['rs2241714',  'GA'], # CT
-                 ['rs753381',   'AG']  # AG
-                 );
-
-  my @qc_calls = map {
-    my ($snp, $genotype) = @$_;
-
-    WTSI::NPG::Genotyping::Call->new
-        (snp      => $snpset->named_snp($snp),
-         genotype => $genotype) } @qc_data;
-
-  my @pairs = @{$check->pair_sample_calls($sample_name, \@qc_calls)};
-  my @matches    = grep {  $_->{qc}->equivalent($_->{sample}) } @pairs;
-  my @mismatches = grep { !$_->{qc}->equivalent($_->{sample}) } @pairs;
-  cmp_ok(scalar @pairs,      '==', 20, 'Number of pairs');
-  cmp_ok(scalar @matches,    '==', 16, 'Number of matches');
-  cmp_ok(scalar @mismatches, '==', 4,  'Number of mismatches');
-
-  # Expected match SNP list (retains QC order)
-  my @expected_matches = ('rs649058',
-                          'rs6166',
-                          'rs2286963',
-                          'rs6759892',
-                          'rs7627615',
-                          'rs4619',
-                          'rs532841',
-                          'rs6557634',
-                          'rs5215',
-                          'rs7298565',
-                          'rs3742207',
-                          'rs4075254',
-                          'rs4843075',
-                          'rs8065080',
-                          'rs2241714',
-                          'rs753381');
-  my @matched_snps = map { $_->{qc}->snp->name } @matches;
-  is_deeply(\@matched_snps, \@expected_matches)
-    or diag explain \@matched_snps;
-
-  # Expected mismatched SNP list (retains QC order)
-  my @expected_mismatches = ('rs1805087',
-                             'rs3795677',
-                             'rs2247870',
-                             'rs4925');
-  my @mismatched_snps = map { $_->{qc}->snp->name } @mismatches;
-  is_deeply(\@mismatched_snps, \@expected_mismatches)
-    or diag explain \@mismatched_snps;
-}
-
-sub count_sample_matches : Test(6) {
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink_path => $plink_path,
-     snpset     => $snpset);
-
-  my @qc_data = (['rs649058',   'GA'],
-                 ['rs1805087',  'AG'],
-                 ['rs3795677',  'AG'],
-                 ['rs6166',     'GA'],
-                 ['rs2286963',  'GT'],
-                 ['rs6759892',  'GT'],
-                 ['rs7627615',  'GA'],
-                 ['rs2247870',  'GA'],
-                 ['rs4619',     'AG'],
-                 ['rs532841',   'CC']);
-
-  my @qc_calls = map {
-    my ($snp, $genotype) = @$_;
-
-    WTSI::NPG::Genotyping::Call->new
-        (snp      => $snpset->named_snp($snp),
-         genotype => $genotype) } @qc_data;
-
-  my $matches = $check->count_sample_matches
-    ('urn:wtsi:249441_F11_HELIC5102138', \@qc_calls);
-
-  my @expected_matched_snps = ('rs649058',
-                               'rs1805087',
-                               'rs3795677',
-                               'rs6166',
-                               'rs2286963',
-                               'rs6759892',
-                               'rs7627615',
-                               'rs2247870',
-                               'rs4619');
-  ok(!$matches->{failed}, 'Sample not failed');
-  cmp_ok($matches->{identity} * 10, '==', 9, 'Fraction identical');
-
-  cmp_ok((scalar @{$matches->{match}}), '==', 9,
-         'Number of calls matched');
-
-  my @matched_snps = map { $_->{qc}->snp->name } @{$matches->{match}};
-  is_deeply(\@matched_snps, \@expected_matched_snps,
-            'Expected matched SNPS') or diag explain \@matched_snps;
-
-  my @expected_mismatched_snps = ('rs532841');
-  cmp_ok((scalar @{$matches->{mismatch}}), '==', 1,
-         'Number of calls mismatched');
-
-  my @mismatched_snps = map { $_->{qc}->snp->name } @{$matches->{mismatch}};
-  is_deeply(\@mismatched_snps, \@expected_mismatched_snps,
-            'Expected mismatched SNPS') or diag explain \@matched_snps;
-}
-
-sub report_all_matches : Test(25) {
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
-    (plink_path => $plink_path,
-     snpset     => $snpset);
-
-  my @sample_names = ('urn:wtsi:000000_A00_DUMMY-SAMPLE',
-                      'urn:wtsi:249441_F11_HELIC5102138',
-                      'urn:wtsi:249442_C09_HELIC5102247',
-                      'urn:wtsi:249461_G12_HELIC5215300',
-                      'urn:wtsi:249469_H06_HELIC5274668',
-                      'urn:wtsi:249470_F02_HELIC5274730');
-  # Extract pairs for just 2 SNPS from every sample
-  my @qc_data = (['rs1805087',  'AG'],
-                 ['rs3795677',  'TT']);
-
-  my @all_qc_calls;
-  foreach my $sample_name (@sample_names) {
-    my @qc_calls = map {
-      my ($snp, $genotype) = @$_;
-
-      WTSI::NPG::Genotyping::Call->new
-          (snp      => $snpset->named_snp($snp),
-           genotype => $genotype) } @qc_data;
-
-    push @all_qc_calls, {sample => $sample_name,
-                         calls  => \@qc_calls};
-  }
-
-  my $expected =
-    {'urn:wtsi:000000_A00_DUMMY-SAMPLE' =>
-      {'failed'    => 1,
-       'genotypes' => {'rs1805087' => ['AG', 'NN'],
-                       'rs3795677' => ['TT', 'NN']},
-       'identity'  => 0,
-       'missing'   => 0},
-
-     'urn:wtsi:249441_F11_HELIC5102138' =>
-      {'failed'    => 1,
-       'genotypes' => {'rs1805087' => ['AG', 'AG'],
-                       'rs3795677' => ['TT', 'AG']},
-       'identity'  => 0.5,
-       'missing'   => 0
-      },
-
-     'urn:wtsi:249442_C09_HELIC5102247' =>
-     {'failed'    => 1,
-      'genotypes' => {'rs1805087' => ['AG', 'AG'],
-                      'rs3795677' => ['TT', 'AG']},
-      'identity'  => 0.5,
-      'missing'   => 0
-     },
-
-     'urn:wtsi:249461_G12_HELIC5215300' =>
-     {'failed'    => 1,
-      'genotypes' => {'rs1805087' => ['AG', 'NN'],
-                      'rs3795677' => ['TT', 'NN']},
-      'identity'  => 0,
-      'missing'   => 0
-     },
-     'urn:wtsi:249469_H06_HELIC5274668' =>
-     {
-      'failed'    => 1,
-      'genotypes' => {'rs1805087' => ['AG', 'AG'],
-                      'rs3795677' => ['TT', 'AG']},
-      'identity' => 0.5,
-      'missing'  => 0
-     },
-
-     'urn:wtsi:249470_F02_HELIC5274730' =>
-     {
-      'failed'    => 1,
-      'genotypes' => {'rs1805087' => ['AG', 'AG'],
-                      'rs3795677' => ['TT', 'AG']},
-      'identity'  => 0.5,
-      'missing'   => 0
-     }
-    };
-
-  my $json = $check->report_all_matches(\@all_qc_calls);
-  my $result = decode_json($json);
-
-  is_deeply($result, $expected) or diag explain $result;
+sub run_identity_checks : Test(3) {
+    # test combined output with identity and swap checks
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_path,
+         snpset     => $snpset);
+    # get fake QC results for a few samples; others will appear as missing
+    my $qc_callsets = _get_qc_callsets();
+    my @results = $check->run_identity_checks($qc_callsets);
+    my ($identity_results, $swap_evaluation) = @results;
+    ok($identity_results, "Identity metric results from combined method");
+    ok($swap_evaluation, "Swap check results from combined method");
+    my $json_results = $check->run_identity_checks_json_spec($qc_callsets);
+    my $json_expected = decode_json(read_file($expected_all_json_path));
+    is_deeply($json_results, $json_expected,
+              "Combined JSON results congruent with expected values");
 }
 
 sub sample_swap_evaluation : Test(2) {
@@ -400,19 +202,73 @@ sub sample_swap_evaluation : Test(2) {
         (plink_path => $plink_swap,
          snpset     => $snpset);
 
-    # Required:
-    # - List of 3 'failed' sample names, 2 of which are swapped
-    # - Fake QC calls for each sample
-    # - Expected outputs for comparison
+    my $sample_ids = _get_swap_sample_identities();
+    my $compared = $check->pairwise_swap_check($sample_ids);
+    ok($compared, "Failed pair comparison completed");
 
-    # Some fake QC data; x denotes a call mismatch when compared to the
-    # Plink data for the same sample
-    my @samples = qw/urn:wtsi:249441_F11_HELIC5102138
-                     urn:wtsi:249442_C09_HELIC5102247
-                     urn:wtsi:249461_G12_HELIC5215300/;
+    my @expected = (
+        [
+            'urn:wtsi:249442_C09_HELIC5102247',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            1,
+            1
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249441_F11_HELIC5102138',
+            0.5,
+            0
+        ],
+        [
+            'urn:wtsi:249461_G12_HELIC5215300',
+            'urn:wtsi:249442_C09_HELIC5102247',
+            0.8,
+            0
+        ]
+    );
+    is_deeply($compared, \@expected, "Comparison matches expected values");
+}
+
+sub _get_swap_sample_identities {
+
+    # Some fake QC data
+    # - List of 3 'failed' sample names, 2 of which are swapped
+    # - Create SampleIdentity object for each sample
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+        (plink_path => $plink_swap,
+         snpset     => $snpset);
+    my $qc_callsets = _get_qc_callsets();
+    my $all_production_calls = $check->get_production_calls();
+
+    my @sample_identities;
+    my @qc_callsets = _get_qc_callsets();
+    foreach my $sample_name (@qc_sample_names) {
+        # need both QC and production calls to create a SampleIdentity object
+        my %args = (sample_name      => $sample_name,
+                    snpset           => $snpset,
+                    production_calls => $all_production_calls->{$sample_name},
+                    qc_calls         => $qc_callsets->{$sample_name},
+                    pass_threshold   => $pass_threshold);
+        my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
+            new(\%args);
+        push (@sample_identities, $sample_id);
+    }
+    return \@sample_identities;
+}
+
+sub _get_qc_callsets {
+
+   # Some fake QC data
+    # - List of 3 'failed' sample names, 2 of which are swapped
+    # - Create a hash of Call arrays
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+
     my %qc_data = (
         # swap with urn:wtsi:249442_C09_HELIC5102247
-      $samples[0] =>
+      $qc_sample_names[0] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -445,7 +301,7 @@ sub sample_swap_evaluation : Test(2) {
               ['rs753381',   'AG']  # AG
           ],
         # swap with urn:wtsi:249441_F11_HELIC5102138
-      $samples[1] =>
+      $qc_sample_names[1] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -479,7 +335,7 @@ sub sample_swap_evaluation : Test(2) {
           ],
         # 'ordinary' failed sample
         # x denotes a mismatch wrt Plink data
-      $samples[2] =>
+      $qc_sample_names[2] =>
             [ ['GS34251',    'TT'],
               ['GS35205',    'TT'],
               ['GS35219',    'TT'],
@@ -513,37 +369,43 @@ sub sample_swap_evaluation : Test(2) {
             ]
     );
 
-    my %all_qc_calls;
-    foreach my $sample (@samples) {
+    my %qc_callsets;
+    foreach my $sample_name (@qc_sample_names) {
         my @qc_calls =  map {
             my ($snp, $genotype) = @$_;
             WTSI::NPG::Genotyping::Call->new
                   (snp      => $snpset->named_snp($snp),
-                   genotype => $genotype) } @{$qc_data{$sample}};
-        $all_qc_calls{$sample} = [ @qc_calls ];
+                   genotype => $genotype) } @{$qc_data{$sample_name}};
+        $qc_callsets{$sample_name} = \@qc_calls;
     }
-    my $compared = $check->sample_swap_evaluation(\@samples, \%all_qc_calls);
-    ok($compared, "Failed pair comparison completed");
-
-    my @expected = (
-        [
-            'urn:wtsi:249442_C09_HELIC5102247',
-            'urn:wtsi:249441_F11_HELIC5102138',
-            1,
-            1
-        ],
-        [
-            'urn:wtsi:249461_G12_HELIC5215300',
-            'urn:wtsi:249441_F11_HELIC5102138',
-            0.5,
-            0
-        ],
-        [
-            'urn:wtsi:249461_G12_HELIC5215300',
-            'urn:wtsi:249442_C09_HELIC5102247',
-            0.8,
-            0
-        ]
-    );
-    is_deeply($compared, \@expected, "Comparison matches expected values");
+    return \%qc_callsets;
 }
+
+sub _get_qc_callsets_broken_snpset {
+    # The 'broken' snpset tests the case of insufficient shared SNPs
+    # between production and QC calls: All but two of the SNPs in the
+    # standard QC plex are renamed so that they do not appear to be shared
+    # with the production snpset. This method renames the snps in QC calls
+    # for consistency with the 'broken' snpset.
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
+    my %qc_callsets = %{_get_qc_callsets()};
+    my %broken_callsets = ();
+
+    foreach my $sample_name (keys(%qc_callsets)) {
+        my @calls = @{$qc_callsets{$sample_name}};
+        my @broken_calls = ();
+        foreach my $call (@calls) {
+            my $snp = $call->snp->name;
+            unless ($snp eq 'rs1805087' || $snp eq 'rs2241714') {
+                $snp = $snp."_BROKEN";
+            }
+            my %args = (snp      => $snpset->named_snp($snp),
+                        genotype => $call->genotype);
+            push(@broken_calls, WTSI::NPG::Genotyping::Call->new(\%args));
+        }
+        $broken_callsets{$sample_name} = \@broken_calls;
+    }
+    return \%broken_callsets;
+}
+
+1;
