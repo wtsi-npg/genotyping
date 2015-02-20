@@ -76,7 +76,7 @@ sub get_num_samples {
 
   Arg [1]    : None
   Example    : my $all_calls = $check->get_all_calls;
-               my @sample_calls = @{$all_calls->{$sample_name}};
+               my @calls = @{$all_calls->{$sample_name}};
   Description: Return the production Plink calls for all samples, indexed by
                samplename. The calls retain the order of the Plink dataset.
   Returntype : HashRef[Str] of sample names, where values are
