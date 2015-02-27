@@ -22,6 +22,7 @@ my $data_path = './t/qc/check/identity';
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
 my $json_file = "$data_path/expected_sample_identity.json";
 my $pass_threshold = 0.9;
+my $snp_threshold = 8;
 my $sample_name  = 'urn:wtsi:249442_C09_HELIC5102247';
 my ($qc_calls, $production_calls);
 
@@ -123,11 +124,12 @@ sub construct : Test(1) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
 
-    my @args = (sample_name         => $sample_name,
-                snpset              => $snpset,
-                production_calls    => $production_calls,
-                qc_calls            => $qc_calls,
-                pass_threshold      => $pass_threshold);
+    my @args = (sample_name      => $sample_name,
+                snpset           => $snpset,
+                production_calls => $production_calls,
+                qc_calls         => $qc_calls,
+                pass_threshold   => $pass_threshold,
+                snp_threshold    => $snp_threshold);
 
     new_ok('WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity' => \@args);
 }
@@ -136,11 +138,12 @@ sub json_spec : Test(1) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
 
-    my %args = (sample_name         => $sample_name,
-                snpset              => $snpset,
-                production_calls    => $production_calls,
-                qc_calls            => $qc_calls,
-                pass_threshold      => $pass_threshold);
+    my %args = (sample_name      => $sample_name,
+                snpset           => $snpset,
+                production_calls => $production_calls,
+                qc_calls         => $qc_calls,
+                pass_threshold   => $pass_threshold,
+                snp_threshold    => $snp_threshold);
     my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
         new(\%args);
     my $json_spec = $sample_id->to_json_spec();
@@ -149,15 +152,15 @@ sub json_spec : Test(1) {
               'JSON spec congruent with expected values');
 }
 
-
 sub swap_metric : Test(1) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-    my %args = (sample_name         => $sample_name,
-                snpset              => $snpset,
-                production_calls    => $production_calls,
-                qc_calls            => $qc_calls,
-                pass_threshold      => $pass_threshold);
+    my %args = (sample_name      => $sample_name,
+                snpset           => $snpset,
+                production_calls => $production_calls,
+                qc_calls         => $qc_calls,
+                pass_threshold   => $pass_threshold,
+                snp_threshold    => $snp_threshold);
     my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
         new(\%args);
 
@@ -240,11 +243,12 @@ sub swap_metric : Test(1) {
               (snp      => $snpset->named_snp($snp),
                genotype => $genotype) } @other_prod_data;
 
-    my %other_args = (sample_name         => $sample_name,
-                      snpset              => $snpset,
-                      production_calls    => \@other_prod_calls,
-                      qc_calls            => \@other_qc_calls,
-                      pass_threshold      => $pass_threshold);
+    my %other_args = (sample_name      => 'other_sample',
+                      snpset           => $snpset,
+                      production_calls => \@other_prod_calls,
+                      qc_calls         => \@other_qc_calls,
+                      pass_threshold   => $pass_threshold,
+                      snp_threshold    => $snp_threshold);
     my $other_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
         new(\%other_args);
 
@@ -252,6 +256,5 @@ sub swap_metric : Test(1) {
     ok(abs($swap - 0.96666667) < 0.0000001,
        "Swap metric matches expected value");
 }
-
 
 1;

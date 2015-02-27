@@ -267,12 +267,13 @@ sub equivalent {
 
   if ($self->is_call && $other->is_call) {
     if ($self->genotype eq $other->genotype) {
-      $self->debug($self->genotype, " is equivalent to ", $other->genotype);
+      $self->debug($self->genotype, " is equivalent to ", $other->genotype,
+                   " for ", $self->snp->name);
       $equivalent = 1;
     }
     elsif ((scalar reverse $self->genotype) eq $other->genotype) {
       $self->debug("Reverse of ", $self->genotype, " is equivalent to ",
-                   $other->genotype);
+                   $other->genotype, " for ", $self->snp->name);
       $equivalent = 1;
     }
     else {
@@ -280,7 +281,8 @@ sub equivalent {
 
       if ($complement->genotype eq $other->genotype) {
         $self->debug("Complement of ", $self->genotype,
-                     " is equivalent to ", $other->genotype);
+                     " is equivalent to ", $other->genotype, " for ",
+                     $self->snp->name);
         $equivalent = 1;
       }
       elsif ((scalar reverse $complement->genotype) eq $other->genotype) {
@@ -290,7 +292,7 @@ sub equivalent {
       }
       else {
         $self->debug($self->genotype, " is not equivalent to ",
-                     $other->genotype);
+                     $other->genotype, " for ", $self->snp->name);
       }
     }
   }
@@ -299,7 +301,7 @@ sub equivalent {
     my $oc = $other->is_call ? 'call' : 'no call';
 
     $self->debug($self->genotype, " ($sc) is not equivalent to ",
-                 $other->genotype, " ($oc)");
+                 $other->genotype, " ($oc) for ", $self->snp->name);
   }
 
   return $equivalent;
