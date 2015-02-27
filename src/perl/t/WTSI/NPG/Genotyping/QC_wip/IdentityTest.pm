@@ -11,7 +11,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 
 use base qw(Test::Class);
-use Test::More tests => 37;
+use Test::More tests => 28;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC_wip::Identity;
@@ -27,7 +27,7 @@ my $jsonName = 'identity_check.json';
 my $textName = 'identity_check_results.txt';
 my $gtName = 'identity_check_gt.txt';
 my $failPairsName = 'identity_check_failed_pairs.txt';
-my $pipelineTestDir = '/nfs/gapi/data/genotype/pipeline_test';
+my $pipelineTestDir = '/nfs/gapi/data/genotype/pipeline_test_wip';
 my $dataDir = $pipelineTestDir.'/identity_check';
 my $dbPath = $dataDir.'/id_test_genotyping.db';
 my $manifest = $pipelineTestDir.'/manifests/Human670-QuadCustom_v1_A.bpm.csv';
@@ -69,14 +69,14 @@ sub test_alternate_snp_names : Test(8) {
     validate_outputs();
 }
 
-sub test_command_line : Test(9) {
-    my $plink = $dataDir."/identity_test";
-    my $config = defaultJsonConfig();
-    my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
-	" --plink $plink --db $dbPath";
-    is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
-    validate_outputs();
-}
+#sub test_command_line : Test(9) {
+#    my $plink = $dataDir."/identity_test";
+#    my $config = defaultJsonConfig();
+#    my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
+#	" --plink $plink --db $dbPath";
+#    is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
+#    validate_outputs();
+#}
 
 sub test_manifest_intersection : Test(3) {
     my $expected = 25;
@@ -101,7 +101,7 @@ sub test_insufficient_snps : Test(2) {
         plink_path => $dataDir.'/identity_test'
     )->run_identity_check();
     ok(-e $jsonOutPath, "JSON output exists for insufficient SNPs");
-    my $failJson = $dataDir.'/identity_check_fail.json';
+    my $failJson = $dataDir.'/identity_check_insufficient_snps.json';
     my $failDataRef = decode_json(readFileToString($failJson));
     my $jsonOut = decode_json(readFileToString($jsonOutPath));
     is_deeply($jsonOut, $failDataRef, "JSON output is equivalent to reference");
