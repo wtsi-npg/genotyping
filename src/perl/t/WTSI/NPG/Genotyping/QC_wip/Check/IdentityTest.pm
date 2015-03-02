@@ -30,6 +30,7 @@ my $expected_json_path = "$data_path/expected_identity_results.json";
 my $expected_all_json_path = "$data_path/combined_identity_expected.json";
 my $expected_omit_path = "$data_path/expected_omit_results.json";
 my $pass_threshold = 0.9;
+my $snp_threshold = 8;
 
 # sample names with fake QC data
 my @qc_sample_names = qw/urn:wtsi:249441_F11_HELIC5102138
@@ -55,7 +56,8 @@ sub find_identity : Test(2) {
   }
   my $expected_json = decode_json(read_file($expected_json_path));
   is_deeply(\@json_spec_results, $expected_json,
-            "JSON output congruent with expected values");
+            "JSON output congruent with expected values") or
+              diag explain \@json_spec_results;
 }
 
 sub find_identity_insufficient_snps : Test(2) {
@@ -69,19 +71,20 @@ sub find_identity_insufficient_snps : Test(2) {
     ok($id_results, "Find identity results with insufficient shared SNPs");
     my $expected_json = decode_json(read_file($expected_omit_path));
     is_deeply($id_results, $expected_json,
-              "Results for insufficient SNPs congruent with expected values");
+              "Results for insufficient SNPs congruent with expected values")
+      or diag explain $expected_json;
 }
 
-sub get_num_samples : Test(1) {
+sub num_samples : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
-  cmp_ok($check->get_num_samples, '==', 6, 'Number of samples')
+  cmp_ok($check->num_samples, '==', 6, 'Number of samples')
 }
 
-sub get_sample_names : Test(1) {
+sub sample_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
@@ -94,11 +97,11 @@ sub get_sample_names : Test(1) {
                   'urn:wtsi:249469_H06_HELIC5274668',
                   'urn:wtsi:249470_F02_HELIC5274730');
 
-  my $names = $check->get_sample_names;
+  my $names = $check->sample_names;
   is_deeply($names, \@expected) or diag explain $names;
 }
 
-sub get_shared_snp_names : Test(1) {
+sub shared_snp_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
@@ -125,17 +128,17 @@ sub get_shared_snp_names : Test(1) {
                   'rs7627615',
                   'rs8065080');
 
-  my $shared = $check->get_shared_snp_names;
+  my $shared = $check->shared_snp_names;
   is_deeply($shared, \@expected) or diag explain $shared;
 }
 
-sub get_production_calls : Test(18) {
+sub production_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
   my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
-  my $calls = $check->get_production_calls;
+  my $calls = $check->production_calls;
 
   # Map of sample name to Plink genotypes
   my $expected_genotypes =
@@ -161,9 +164,9 @@ sub get_production_calls : Test(18) {
      ['AG', 'AG', 'CT', 'GT', 'AC', 'AG', 'CT', 'AG', 'AG', 'AC',
       'CT', 'CT', 'AG', 'AG', 'CT', 'GT', 'AG', 'AG', 'AG', 'CT']};
 
-  my @expected_snp_names = @{$check->get_shared_snp_names};
+  my @expected_snp_names = @{$check->shared_snp_names};
 
-  foreach my $sample_name (@{$check->get_sample_names}) {
+  foreach my $sample_name (@{$check->sample_names}) {
     my @calls = @{$calls->{$sample_name}};
 
     cmp_ok(scalar @calls, '==', 20, "Number of $sample_name calls");
@@ -192,7 +195,8 @@ sub run_identity_checks : Test(3) {
     my $json_results = $check->run_identity_checks_json_spec($qc_callsets);
     my $json_expected = decode_json(read_file($expected_all_json_path));
     is_deeply($json_results, $json_expected,
-              "Combined JSON results congruent with expected values");
+              "Combined JSON results congruent with expected values")
+      or diag explain $json_results;
 }
 
 sub sample_swap_evaluation : Test(2) {
@@ -240,7 +244,7 @@ sub _get_swap_sample_identities {
         (plink_path => $plink_swap,
          snpset     => $snpset);
     my $qc_callsets = _get_qc_callsets();
-    my $all_production_calls = $check->get_production_calls();
+    my $production_calls = $check->production_calls;
 
     my @sample_identities;
     my @qc_callsets = _get_qc_callsets();
@@ -248,9 +252,10 @@ sub _get_swap_sample_identities {
         # need both QC and production calls to create a SampleIdentity object
         my %args = (sample_name      => $sample_name,
                     snpset           => $snpset,
-                    production_calls => $all_production_calls->{$sample_name},
+                    production_calls => $production_calls->{$sample_name},
                     qc_calls         => $qc_callsets->{$sample_name},
-                    pass_threshold   => $pass_threshold);
+                    pass_threshold   => $pass_threshold,
+                    snp_threshold    => $snp_threshold);
         my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
             new(\%args);
         push (@sample_identities, $sample_id);
