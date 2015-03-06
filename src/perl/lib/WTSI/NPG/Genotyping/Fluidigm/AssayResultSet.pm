@@ -23,11 +23,6 @@ has 'assay_results' =>
    builder  => '_build_assay_results',
    lazy     => 1);
 
-# TODO: add snpset attribute with auto-loading from iRODS (much like
-# the reference(s) of a SNPSet are built.
-#
-# This would removev the need for a SNPSet to be passed to get_calls.
-
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
@@ -78,39 +73,6 @@ sub sample_name {
   return shift @names;
 }
 
-=head2 snpset_name
-
-  Arg [1]    : None
-
-  Example    : $result->snpset_name
-  Description: Return the name of the SNP set annotated in the iRODS
-               metadata. Fails if the data backing the result set is not
-               an iRODS data object.
-  Returntype : Str
-
-=cut
-
-sub snpset_name {
-  my ($self) = @_;
-
-  defined $self->data_object or
-    $self->logconfess("Failed to determine SNP set name: '", $self->str,
-                      "' is not in iRODS");
-
-  my @snpset_names = $self->data_object->find_in_metadata('fluidigm_plex');
-  my $num_names = scalar @snpset_names;
-
-  $num_names > 0 or
-    $self->logconfess("No SNP sets defined in metadata of '", $self->str, "'");
-  $num_names == 1 or
-    $self->logconfess("$num_names SNP sets defined in metadata of '",
-                      $self->str, "': [", join(', ', @snpset_names), "]");
-
-  my $avu = shift @snpset_names;
-
-  return $avu->{value};
-}
-
 =head2 snp_names
 
   Arg [1]    : None
@@ -157,7 +119,6 @@ sub assay_addresses {
   return \@addresses;
 }
 
-
 =head2 result_at
 
   Arg [1]    : Str Assay address
@@ -173,9 +134,9 @@ sub result_at {
   my ($self, $assay_address) = @_;
 
   defined $assay_address or
-    $self->logconfess('The assay_address argument was not defined');
+    $self->logconfess('A defined assay_address argument is required');
   $assay_address or
-    $self->logconfess('The assay_address argument was empty');
+    $self->logconfess('A nnon-empty assay_address argument is required');
 
   my @found = grep { $_->assay_address eq $assay_address }
     @{$self->assay_results};
@@ -205,7 +166,10 @@ sub filter_on_confidence {
   my ($self, $confidence_threshold) = @_;
 
   defined $confidence_threshold or
-    $self->logconfess('The confidence_threshold argument was not defined');
+    $self->logconfess('A confidence_threshold argument is required');
+  $confidence_threshold >= 0 or
+    $self->logconfess('A non-negative confidence_threshold argument ',
+                      'is required');
 
   my @filtered_results;
   foreach my $result (sort { $a->snp_assayed cmp
@@ -282,6 +246,28 @@ sub _parse_assay_results {
     $self->logconfess("Parse error within '", $self->str, "': ",
                       $csv->error_diag);
 
+  my @names =  uniq map { $_->sample_name } grep { ! $_->is_empty } @records;
+  if (scalar @names > 1) {
+    $self->logconfess("Assay result set '", $self->str, "' contains data for ",
+                      ">1 sample: [", join(', ', @names), "]");
+  }
+
+  my @sample_addrs = uniq map { $_->sample_address } @records;
+  if (scalar @sample_addrs > 1) {
+    $self->logconfess("Assay result set '", $self->str, "' contains data for ",
+                      ">1 sample address: [", join(', ', @sample_addrs), "]");
+  }
+
+  my @assay_addrs = uniq map { $_->assay_address } @records;
+  my $num_assay_addrs = scalar @assay_addrs;
+  my $num_records = scalar @records;
+  if ($num_assay_addrs != $num_records) {
+    $self->logconfess("Assay result set '", $self->str, "' contains data for ",
+                      "$num_assay_addrs assay addresses: [",
+                      join(', ', @assay_addrs), "] where $num_records are ",
+                      "expected");
+  }
+
   return \@records;
 }
 
@@ -308,7 +294,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
