@@ -5,11 +5,12 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 4;
+use Test::More tests => 5;
 use Test::Exception;
 
 use JSON;
 use File::Slurp qw/read_file/;
+use File::Temp qw/tempdir/;
 
 use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 
@@ -27,12 +28,16 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess');
 }
 
-sub write_csv: Test(2) {
-    my $outPath = '/tmp/genotype_merge_test.csv';
+sub write_csv: Test(3) {
+    my $workDir = tempdir('temp_identity_XXXXXX', CLEANUP=>1);
+    my $outPath = $workDir.'/genotype_merge_test.csv';
     my $processor = WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess->new();
     ok($processor->run(\%inputs, $outPath), "Run method to write CSV");
     ok(-e $outPath, "Output $outPath exists");
-    # TODO read output and check against reference CSV
+    my $expected_csv_fields = _read_csv($expected_csv);
+    my $output_csv_fields = _read_csv($outPath);
+    is_deeply($output_csv_fields, $expected_csv_fields,
+              'CSV fields match from output file');
 }
 
 sub create_csv_data: Test(1) {
@@ -44,7 +49,8 @@ sub create_csv_data: Test(1) {
     }
     my $processor = WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess->new();
     my $csv_fields_ref = $processor->mergeGenotypes(\%allResults);
-    is_deeply($csv_fields_ref, $expected_csv_fields, 'CSV fields match');
+    is_deeply($csv_fields_ref, $expected_csv_fields,
+              'CSV fields match from data structure');
 }
 
 sub _read_csv {
