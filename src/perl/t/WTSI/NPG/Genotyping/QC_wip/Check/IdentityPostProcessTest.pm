@@ -17,11 +17,12 @@ use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 my $data_path = './t/qc/check/identity';
-my $json_result_path = "$data_path/expected_identity_results.json";
+my $json_path = "$data_path/expected_identity_results.json";
+my $json_path_mod = "$data_path/expected_identity_results_modified.json";
 my $expected_csv = "$data_path/expected_identity_merged.csv";
-my %inputs = (qc_A => $json_result_path,
-              qc_B => $json_result_path,
-              qc_C => $json_result_path,
+my %inputs = (qc_A => $json_path,
+              qc_B => $json_path,
+              qc_C => $json_path_mod,
           );
 
 sub require : Test(1) {
