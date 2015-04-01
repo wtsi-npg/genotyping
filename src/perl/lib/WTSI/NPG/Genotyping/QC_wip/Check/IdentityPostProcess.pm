@@ -40,10 +40,22 @@ use JSON;
 with 'WTSI::DNAP::Utilities::Loggable';
 
 
-# merge of multiple results JSON structures
-# input: a hash of (named) results data structures
-# want to record calls (if any) for each sample/SNP pair in the input
-# call pairs in input are (qc, production)
+=head2 mergeGenotypes
+
+  Arg [1]    : HashRef[ArrayRef], where ArrayRef entries are JSON-spec data
+               structures output by the identity check. Keys of the HashRef
+               are names for each data structure.
+  Example    : my $merged = $id_post_process->mergeGenotypes($all_results);
+  Description: Merge of two or more identity result JSON structures. Record
+               calls (if any) for each sample/SNP pair, in each input
+               dataset. If a given sample/SNP pair is absent from one of the
+               datasets (eg. because of differing SNP panels for QC), record
+               as 'NA' (which is distinct from 'NN' for no call).
+  Returntype : ArrayRef[ArrayRef[Str]], suitable for output as CSV. First
+               row contains CSV column headers.
+
+=cut
+
 sub mergeGenotypes {
     my ($self, $resultsRef) = @_;
     my %results = %{$resultsRef};
@@ -66,8 +78,7 @@ sub mergeGenotypes {
     }
     @sampleNames = uniq @sampleNames;
     my @snps = sort(keys(%snpNames));
-    # now create the structure for CSV output
-    # for each SNP/sample pair, one production call and multiple QC calls
+    # create structure for CSV output
     # raise an error on conflicting production calls
     my @mergeHeaders = qw/sample_name snp_name production_call/;
     push(@mergeHeaders, @resultNames);
@@ -92,7 +103,6 @@ sub mergeGenotypes {
                 } else {
                     push(@qcCalls, 'NA');
                 }
-
             }
             $productionCall ||= 'NA';
             push(@mergedSnpCalls, $productionCall);
@@ -103,7 +113,19 @@ sub mergeGenotypes {
     return \@merged;
 }
 
-sub run {
+=head2 runPostProcess
+
+  Arg [1]    : HashRef[Str], giving (named) JSON input paths
+  Arg [2]    : Str, path for CSV output
+  Example    : $id_post_process->runPostProcess($all_result_paths, $outpath);
+  Description: 'Main' method to run post-processing on named JSON paths
+               which contain the results of two or more identity checks, and
+               output a CSV file with merged genotype calls.
+  Returntype : Int
+
+=cut
+
+sub runPostProcess {
     my ($self, $inPathsRef, $outPath) = @_;
     my %inPaths = %{$inPathsRef}; # hash of (named) JSON input paths
     my %allResults;
@@ -116,6 +138,17 @@ sub run {
     return 1;
 }
 
+
+=head2 writeMergedCsv
+
+  Arg [1]    : ArrayRef[ArrayRef[Str]], as output by mergeGenotypes
+  Arg [2]    : Str, path for CSV output
+  Example    : $id_post_process->writeMergedCsv($merged_results, $outpath);
+  Description: Write merged genotype calls in CSV format to the given path
+  Returntype : Int
+
+=cut
+
 sub writeMergedCsv {
     # take output from merge() and write in CSV format
     my ($self, $merged, $outPath) = @_;
@@ -126,6 +159,7 @@ sub writeMergedCsv {
         print $out join(',', @fields)."\n";
     }
     close $out || $self->logcroak("Cannot close output '$outPath'");
+    return 1;
 }
 
 no Moose;
