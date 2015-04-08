@@ -11,6 +11,7 @@ use Test::Exception;
 use JSON;
 use File::Slurp qw/read_file/;
 use File::Temp qw/tempdir/;
+use Text::CSV;
 
 use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 
@@ -43,7 +44,7 @@ sub write_csv: Test(4) {
     new_ok('WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess');
     my $processor =
         WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess->new();
-    ok($processor->runPostProcess(\%inputs, $outPath),
+    ok($processor->mergeIdentityFiles(\%inputs, $outPath),
        "Run method to write CSV");
     ok(-e $outPath, "Output $outPath exists");
     my $expected_csv_fields = _read_csv($expected_csv);
@@ -61,19 +62,19 @@ sub create_csv_data: Test(1) {
     }
     my $processor =
         WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess->new();
-    my $csv_fields_ref = $processor->mergeGenotypes(\%allResults);
+    my $csv_fields_ref = $processor->_mergeGenotypes(\%allResults);
     is_deeply($csv_fields_ref, $expected_csv_fields,
               'CSV fields match from data structure');
 }
 
 sub _read_csv {
     my ($inPath, ) = @_;
-    my @csv_lines = read_file($inPath);
-    my @csv_fields;
-    foreach my $line (@csv_lines) {
-        chomp $line;
-        my @fields = split(/,/, $line);
-        push(@csv_fields, \@fields);
-    }
-    return \@csv_fields;
+    my $csv = Text::CSV->new({eol              => "\n",
+                              sep_char         => ",",
+                              allow_whitespace => undef,
+                              quote_char       => undef});
+    open my $in, "<", $inPath || logcroak("Cannot open input '$inPath'");
+    my $csv_fields_ref = $csv->getline_all($in);
+    close $in || logcroak("Cannot close input '$inPath'");
+    return $csv_fields_ref;
 }

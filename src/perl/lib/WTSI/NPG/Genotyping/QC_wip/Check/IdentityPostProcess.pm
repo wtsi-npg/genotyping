@@ -36,33 +36,34 @@ use Moose;
 use File::Slurp qw/read_file/;
 use List::MoreUtils qw/uniq/;
 use JSON;
+use Text::CSV;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
 
-=head2 mergeGenotypes
+#=head2 _mergeGenotypes
+#
+#  Arg [1]    : HashRef[ArrayRef], where ArrayRef entries are JSON-spec data
+#               structures output by the identity check. Keys of the HashRef
+#               are names for each data structure.
+#  Example    : my $merged = $id_post_process->mergeGenotypes($all_results);
+#  Description: Merge of two or more identity result JSON structures. Record
+#               calls (if any) for each sample/SNP pair, in each input
+#               dataset. If a given sample/SNP pair is absent from one of the
+#               datasets (eg. because of differing SNP panels for QC), record
+#               as 'NA' (which is distinct from 'NN' for no call).
+#  Returntype : ArrayRef[ArrayRef[Str]], suitable for output as CSV. First
+#               row contains CSV column headers.
+#
+#=cut
 
-  Arg [1]    : HashRef[ArrayRef], where ArrayRef entries are JSON-spec data
-               structures output by the identity check. Keys of the HashRef
-               are names for each data structure.
-  Example    : my $merged = $id_post_process->mergeGenotypes($all_results);
-  Description: Merge of two or more identity result JSON structures. Record
-               calls (if any) for each sample/SNP pair, in each input
-               dataset. If a given sample/SNP pair is absent from one of the
-               datasets (eg. because of differing SNP panels for QC), record
-               as 'NA' (which is distinct from 'NN' for no call).
-  Returntype : ArrayRef[ArrayRef[Str]], suitable for output as CSV. First
-               row contains CSV column headers.
-
-=cut
-
-sub mergeGenotypes {
+sub _mergeGenotypes {
     my ($self, $resultsRef) = @_;
     my %results = %{$resultsRef};
     my @resultNames = sort(keys(%results));
-    my @sampleNames = (); # want to preserve order of sample names
-    my %snpNames = ();
-    my %mergedCalls = ();
+    my @sampleNames; # want to preserve order of sample names
+    my %snpNames; # using a hash instead of array to avoid memory issues
+    my %mergedCalls;
     foreach my $resultName (@resultNames) {
         my @result = @{$results{$resultName}};
         foreach my $sample (@result) {
@@ -113,19 +114,24 @@ sub mergeGenotypes {
     return \@merged;
 }
 
-=head2 runPostProcess
+=head2 mergeIdentityFiles
 
-  Arg [1]    : HashRef[Str], giving (named) JSON input paths
+  Arg [1]    : HashRef[Str], giving (named) JSON input paths.
   Arg [2]    : Str, path for CSV output
-  Example    : $id_post_process->runPostProcess($all_result_paths, $outpath);
-  Description: 'Main' method to run post-processing on named JSON paths
-               which contain the results of two or more identity checks, and
+  Example    : $id_post_process->mergeIdentityFiles($all_result_paths,
+                                                    $outpath);
+  Description: 'Main' method to read named JSON paths which contain the
+               results of one or more identity checks, and
                output a CSV file with merged genotype calls.
+
+               Each JSON input is an array of hashes, one for each sample.
+               The hash structure is defined in the to_json_spec method of
+               SampleIdentity.pm.
   Returntype : Int
 
 =cut
 
-sub runPostProcess {
+sub mergeIdentityFiles {
     my ($self, $inPathsRef, $outPath) = @_;
     my %inPaths = %{$inPathsRef}; # hash of (named) JSON input paths
     my %allResults;
@@ -133,33 +139,33 @@ sub runPostProcess {
         my $result = from_json(read_file($inPaths{$resultName}));
         $allResults{$resultName} = $result;
     }
-    my $merged = $self->mergeGenotypes(\%allResults);
-    $self->writeMergedCsv($merged, $outPath);
-    return 1;
+    my $merged = $self->_mergeGenotypes(\%allResults);
+    $self->_writeMergedCsv($merged, $outPath);
 }
 
 
-=head2 writeMergedCsv
+#=head2 _writeMergedCsv
+#
+#  Arg [1]    : ArrayRef[ArrayRef[Str]], as output by _mergeGenotypes
+#  Arg [2]    : Str, path for CSV output
+#  Example    : $id_post_process->writeMergedCsv($merged_results, $outpath);
+#  Description: Write merged genotype calls in CSV format to the given path
+#  Returntype : Int
+#
+#=cut
 
-  Arg [1]    : ArrayRef[ArrayRef[Str]], as output by mergeGenotypes
-  Arg [2]    : Str, path for CSV output
-  Example    : $id_post_process->writeMergedCsv($merged_results, $outpath);
-  Description: Write merged genotype calls in CSV format to the given path
-  Returntype : Int
-
-=cut
-
-sub writeMergedCsv {
+sub _writeMergedCsv {
     # take output from merge() and write in CSV format
     my ($self, $merged, $outPath) = @_;
+    my $csv = Text::CSV->new({eol              => "\n",
+                              allow_whitespace => undef,
+                              quote_char       => undef});
     open my $out, ">", $outPath || \
         $self->logcroak("Cannot open output '$outPath'");
     foreach my $rowRef (@{$merged}) {
-        my @fields = @{$rowRef};
-        print $out join(',', @fields)."\n";
+        $csv->print($out, $rowRef);
     }
     close $out || $self->logcroak("Cannot close output '$outPath'");
-    return 1;
 }
 
 no Moose;
