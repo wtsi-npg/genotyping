@@ -8,30 +8,45 @@
 use warnings;
 use strict;
 use Carp;
+use File::Slurp qw/read_file/;
 use Getopt::Long;
+use Text::CSV;
+use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultConfigDir/;
+use WTSI::NPG::Genotyping::SNP;
 
-my ($sampleGenderPath, $dbPath, $iniPath, $plateSize, $plateTotal, 
-    $flip, $excl, $help);
+my ($sampleGenderPath, $dbPath, $plexManifest, $iniPath, $plateSize,
+    $plateTotal, $qcPlexMethod, $qcPlexName, $flip, $excl, $help);
 
 GetOptions("sample-gender=s"   => \$sampleGenderPath,
+           "qc-plex=s"     => \$plexManifest,
            "dbpath=s"      => \$dbPath,
            "inipath=s"     => \$iniPath,
            "plate-size=i"  => \$plateSize,
            "plate-total=i" => \$plateTotal,
+           "plex-method=s" => \$$qcPlexMethod,
+           "plex-name=s"   => \$$qcPlexName,
            "excl=f"        => \$excl,
            "help"          => \$help,
     );
 
 if ($help) {
-    print STDERR "Usage: $0 [ options ] 
+    print STDERR "Usage: $0 [ options ]
 Options:
---sample-gender     Path to sample_xhet_gender.txt file, to input sample names and inferred genders
+--sample-gender     Path to sample_xhet_gender.txt file, to input sample
+                    names and inferred genders
+--qc-plex           Path to a tab-separated manifest file of QC plex SNPs.
 --dbpath            Path to pipeline.db file output
 --inipath           Path to .ini file for pipeline database
 --plate-size        Number of samples on each plate (maximum 384)
---plate-total       Total number of plates.  If (plate size)*(plate total) is less than number of samples, excess samples will have no plate information.
+--plate-total       Total number of plates.  If (plate size)*(plate total)
+                    is less than number of samples, excess samples will have
+                    no plate information.
+--qc-method         QC plex method, eg. Sequenom or Fluidigm. Must be defined
+                    in methods.ini file for pipeline DB.
+--qc-name           Name of QC plex in pipeline DB. Must be defined in
+                    snpsets.ini file for pipeline DB.
 --excl              Probability of sample being arbitrarily excluded
 --help              Print this help text and exit
 Unspecified options will receive default values.
@@ -46,17 +61,69 @@ $plateSize ||= 96;
 $plateTotal ||= 20;
 unless (defined($excl)) { $excl = 0.05; } # may have excl==0
 
+$plexManifest ||= '/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv';
+$qcPlexMethod ||= 'Sequenom';
+$qcPlexName ||= 'W30467';
+
+
 my $etcDir = defaultConfigDir($iniPath);
 if (! (-e $etcDir)) { 
     croak "Config directory \"$etcDir\" does not exist!";
 } elsif ($plateSize > 384) { 
     croak "Maximum plate size = 384\n"; 
 } elsif (! (-e $sampleGenderPath)) { 
-    croak "Input \"$sampleGenderPath\" does not exist!"; 
+    croak "Input \"$sampleGenderPath\" does not exist!";
 }
 if (-e $dbPath) { system("rm -f $dbPath"); }
 
-sub getSampleNamesGenders {
+sub addQcCalls {
+    # add dummy QC calls to a given sample in the pipeline database
+    my ($db, $sample, $plexManifest, $method) = @_;
+    $method ||= $db->method->find({name => 'Fluidigm'});
+    my $snpset = $db->snpset->find({name => 'qc'});
+    my $result = $sample->add_to_results({method => $method});
+    my $calls = createDummyCalls($plexManifest);
+    foreach my $call (@{$calls}) {
+        my $snp = $db->snp->find_or_create
+            ({name       => $call->snp->name,
+              chromosome => $call->snp->chromosome,
+              position   => $call->snp->position,
+              snpset     => $snpset});
+        $result->add_to_snp_results({snp   => $snp,
+                                     value => $call->genotype});
+    }
+}
+
+sub createDummyCalls {
+
+    my ($plexPath,) = @_;
+    my $csv = Text::CSV->new({eol              => "\n",
+                              sep_char         => "\t",
+                              allow_whitespace => undef,
+                              quote_char       => undef});
+    my @calls;
+    my @lines = read_file($plexPath);
+    foreach my $line (@lines) {
+        if ($line =~ /^#SNP_NAME/) { next; }
+        $csv->parse($line);
+        my @fields = $csv->fields();
+        my ($snp_name, $ref, $alt, $chrom, $pos, $strand) = @fields;
+        my $snp = WTSI::NPG::Genotyping::SNP->new
+            (name       => $snp_name,
+             ref_allele => $ref,
+             alt_allele => $alt,
+             chromosome => $chrom,
+             position   => $pos,
+             strand     => $strand);
+        # for now, all dummy calls are reference homozygote
+        my $call = WTSI::NPG::Genotyping::Call->new(snp => $snp,
+                                                    genotype => $ref.$ref);
+        push @calls, $call;
+    }
+    return \@calls;
+}
+
+sub readSampleNamesGenders {
     # from sample_xhet_gender.txt
     my $inPath = shift;
     open (my $in, "< $inPath");
@@ -84,21 +151,21 @@ sub addSampleGender {
     }
     my $gender;
     if ($genderCode==1) { 
-        $gender = $db->gender->find({name => 'Male'}); 
+        $gender = $db->gender->find({name => 'Male'});
     } elsif ($genderCode==2) { 
-        $gender = $db->gender->find({name => 'Female'}); 
+        $gender = $db->gender->find({name => 'Female'});
     } elsif ($genderCode==0) { 
-        $gender = $db->gender->find({name => 'Unknown'}); 
+        $gender = $db->gender->find({name => 'Unknown'});
     } else { 
-        $gender = $db->gender->find({name => 'Not available'}); 
+        $gender = $db->gender->find({name => 'Not available'});
     }
     $sample->add_to_genders($gender, {method => $method});
 }
 
 Log::Log4perl->init("etc/log4perl.conf");
 
-my ($namesRef, $gRefInferred, $gRefSupplied) 
-    = getSampleNamesGenders($sampleGenderPath);
+my ($namesRef, $gRefInferred, $gRefSupplied)
+    = readSampleNamesGenders($sampleGenderPath);
 my @sampleNames = @$namesRef;
 my @gInferred = @$gRefInferred;
 my @gSupplied = @$gRefSupplied;
@@ -136,7 +203,8 @@ for (my $i=0;$i<$plateTotal;$i++) {
 print "Plates added.\n";
 
 ## set sample genders & wells; arbitrarily exclude some samples
-my $flipTotal = 0;my $exclTotal = 0;
+my $flipTotal = 0;
+my $exclTotal = 0;
 my $wells = $plateSize * $plateTotal;
 $db->in_transaction(sub {
     foreach my $i (0..@sampleNames-1) {
@@ -156,6 +224,7 @@ $db->in_transaction(sub {
               include => $include});
         addSampleGender($db, $sample, $gInferred[$i], 1);
         addSampleGender($db, $sample, $gSupplied[$i], 0);
+        addQcCalls($db, $sample, $plexManifest);
         if ($i >= $wells) { next; }
         my $plateNum = int($i / $plateSize);
         my $plate = $plates[$plateNum];
