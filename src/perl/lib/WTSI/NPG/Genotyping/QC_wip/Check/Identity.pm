@@ -87,6 +87,8 @@ sub get_num_samples {
 sub get_production_calls {
   my ($self) = @_;
 
+  $self->debug("Reading production calls for plink path: ",
+               $self->plink_path);
   my $plink = plink_binary::plink_binary->new($self->plink_path);
   my $genotypes = new plink_binary::vectorstr;
   my $snp = new plink_binary::snp;

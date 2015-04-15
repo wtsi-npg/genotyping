@@ -9,7 +9,7 @@ use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 31;
+use Test::More tests => 33;
 use Test::Exception;
 
 use plink_binary;
@@ -20,6 +20,7 @@ use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
+my $pid = $$;
 my $data_path = './t/qc/check/identity';
 my $plink_path = "$data_path/fake_qc_genotypes";
 my $plink_swap = "$data_path/fake_swap_genotypes";
@@ -227,6 +228,32 @@ sub sample_swap_evaluation : Test(2) {
         ]
     );
     is_deeply($compared, \@expected, "Comparison matches expected values");
+}
+
+
+sub script : Test(2) {
+    # test of the new identity command-line script
+    # TODO maybe move this into Scripts.pm (which is very slow to run)
+
+    my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
+    my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
+    my $outPath = "$tempdir/identity.json";
+    my $plexDir = "/nfs/srpipe_references/genotypes";
+    my $plexFile = "$plexDir/W30467_snp_set_info_1000Genomes.tsv";
+    my $refPath = "$data_path/identity_script_output.json";
+
+    ok(system(join q{ }, "$identity_script_wip",
+              "--dbfile $data_path/fake_genotyping.db",
+              "--plink $data_path/fake_qc_genotypes",
+              "--out $outPath",
+              "--plex_manifest $plexFile",
+          ) == 0, 'Completed identity check');
+
+    my $outData = from_json(read_file($outPath));
+    my $refData = from_json(read_file($refPath));
+    is_deeply($outData, $refData,
+              "Identity check JSON output matches reference file");
+
 }
 
 sub _get_swap_sample_identities {

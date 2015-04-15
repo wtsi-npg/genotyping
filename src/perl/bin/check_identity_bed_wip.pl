@@ -46,7 +46,7 @@ sub run {
 
     my $config;
     my $debug;
-    my $dbpath;
+    my $dbfile;
     my $log4perl_config;
     my $min_shared_snps;
     my $outPath;
@@ -58,7 +58,7 @@ sub run {
 
     GetOptions(
         'config=s'          => \$config,
-        'dbpath=s'          => \$dbpath,
+        'dbfile=s'          => \$dbfile,
         'debug'             => \$debug,
         'help'              => sub { pod2usage(-verbose => 2,
                                                -exitval => 0) },
@@ -86,8 +86,8 @@ sub run {
         }
     }
 
-    my @file_args = ($dbpath, $plex_manifest);
-    my @file_arg_names = qw/dbpath plex_manifest/;
+    my @file_args = ($dbfile, $plex_manifest);
+    my @file_arg_names = qw/dbfile plex_manifest/;
     for (my $i=0; $i<@file_args; $i++) {
         if (!defined($file_args[$i])) {
             $log->logcroak("Must supply a --", $file_arg_names[$i],
@@ -115,7 +115,7 @@ sub run {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
 
-    my $qc_calls = read_qc_calls($dbpath, $config, $snpset);
+    my $qc_calls = read_qc_calls($dbfile, $config, $snpset);
 
     # $min_shared_snps, $swap_threshold, $pass_threshold may be null
     # if so, Identity.pm uses internal defaults
@@ -208,13 +208,13 @@ check_identity_bed_wip
 
 =head1 SYNOPSIS
 
-check_identity_bed_wip [--help] [--verbose]
+check_identity_bed_wip [--config <database .ini file>] --dbfile <SQLite file> [-- min-shared-snps <n>] [--pass-threshold <f>] --plex-manifest <path> [--out <path>] --plink <path stem> [--swap_threshold <f>] [--help] [--verbose]
 
 Options:
 
   --config=PATH          Load database configuration from a user-defined .ini
                          file. Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbpath=PATH          Path to pipeline SQLITE database file. Required.
+  --dbfile=PATH          Path to pipeline SQLITE database file. Required.
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
   --min-shared-snps=NUM  Minimum number of shared SNPs between production and
