@@ -299,7 +299,7 @@ sub qcNameFromPath {
     if (!($items[-1])) { pop @items; }
     my $qcName;
     foreach my $item (@items) {
-        if ($item =~ m/illuminus|genosnp|gencall/i) {
+        if ($item =~ m/illuminus|gencall/i) {
             $qcName = $item; last;
         }
     }

@@ -48,7 +48,7 @@ module Genotyping::Tasks
     # - args (Hash): Arguments for the operation.
     #
     #   :normalize (Boolean): Normalize the intensities. Should be false for
-    #   the GenoSNP caller.
+    #   the (obsolete) GenoSNP caller.
     #
     # - async (Hash): Arguments for asynchronous management.
     #

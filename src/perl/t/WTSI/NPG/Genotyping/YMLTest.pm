@@ -9,7 +9,7 @@ use File::Temp qw/tempdir/;
 use YAML qw/LoadFile/;
 
 use base qw(Test::Class);
-use Test::More tests => 11;
+use Test::More tests => 8;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -20,9 +20,9 @@ my $dataDir = "/nfs/gapi/data/genotype/pipeline_test/";
 my $manifest = $dataDir."Human670-QuadCustom_v1_A.bpm.csv";
 my $egt = $dataDir."Human670-QuadCustom_v1_A.egt";
 my $config = "config.yml";
-my @workflows = qw/null genosnp illuminus zcall/;
+my @workflows = qw/null illuminus zcall/;
 
-sub test_command_line : Test(11) {
+sub test_command_line : Test(8) {
     # test exit status and outputs of command line script
     my $temp = tempdir("generate_yml_test_XXXXXX", CLEANUP => 1);
     my $wd = "t/genotyping_yml"; # will not write any files here, but directory should exist to avoid warnings
