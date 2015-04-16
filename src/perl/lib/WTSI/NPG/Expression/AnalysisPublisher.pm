@@ -2,8 +2,10 @@ use utf8;
 
 package WTSI::NPG::Expression::AnalysisPublisher;
 
+use Data::Dump qw(dump);
 use File::Spec;
 use Moose;
+use Try::Tiny;
 
 use WTSI::NPG::Expression::ProfileAnnotation;
 use WTSI::NPG::Expression::ResultSet;
@@ -78,7 +80,7 @@ sub publish {
   my $num_samples = 0;
   my $num_objects = 0;
 
-  eval {
+  try {
     # Analysis directory
     my @analysis_meta;
 
@@ -93,6 +95,14 @@ sub publish {
     my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
       @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
+    if ($analysis_uuid) {
+      $self->debug("Found analysis_uuid '$analysis_uuid' in metadata: ",
+                   dump(\@analysis_meta));
+    }
+    else {
+      $self->logconfess("Failed to find an analysis UUID in metadata: ",
+                        dump(\@analysis_meta));
+    }
 
     $analysis_coll = $self->ensure_analysis_collection($publish_dest, $uuid);
     my @analysis_files = $self->find_analysis_files;
@@ -155,17 +165,14 @@ sub publish {
 
     my @groups = $analysis_coll->expected_groups;
     $analysis_coll->set_content_permissions('read', @groups);
-  };
 
-  if ($@) {
-    $self->error("Failed to publish: ", $@);
-    undef $analysis_uuid;
-  }
-  else {
     $self->info("Published '", $self->analysis_directory, "' to '",
                 $analysis_coll->str, "' and cross-referenced $num_objects ",
                 "data objects for $num_samples samples");
-  }
+  } catch {
+    $self->error("Failed to publish: ", $_);
+    undef $analysis_uuid;
+  };
 
   return $analysis_uuid;
 }
@@ -289,7 +296,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013-2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

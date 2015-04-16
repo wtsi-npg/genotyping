@@ -8,7 +8,7 @@ use warnings;
 use strict;
 use Config::IniFiles;
 use Getopt::Long;
-use List::AllUtils;
+use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -101,7 +101,7 @@ sub run {
              'pl-config-dir=s'  => \$pl_config_dir,
              'project=s'        => \$project_title,
              'qc-platform=s'    => \$qc_platform,
-	     'qc-plex=s'        => \$qc_plex,
+             'qc-plex=s'        => \$qc_plex,
              'reference-path=s' => \$reference_path,
              'run=s'            => \$run_name,
              'supplier=s'       => \$supplier_name,
@@ -240,7 +240,7 @@ sub run {
   my $gender_na = $pipedb->gender->find({name => 'Not Available'});
 
   if ($pipedb->dataset->find({if_project => $project_title})) {
-    $log->logcroak("Failed to load '", $project_title, 
+    $log->logcroak("Failed to load '", $project_title,
                    "'; it is present already.");
   }
 
@@ -455,11 +455,10 @@ sub validate_snpset {
   my ($run, $snpset) = @_;
 
   unless ($run->validate_snpset($snpset)) {
-    $log->logcroak("Cannot add this project to '", $run->name, 
-                   "'; design mismatch: '", $snpset->name, 
+    $log->logcroak("Cannot add this project to '", $run->name,
+                   "'; design mismatch: '", $snpset->name,
                    "' cannot be added to existing designs [",
                    join(", ", map { $_->snpset->name } $run->datasets), "]");
-
   }
 
   return $snpset;
@@ -470,26 +469,36 @@ sub insert_fluidigm_calls {
   my ($pipedb, $irods, $samples, $qc_plex, $reference_path, $log) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
-  my $snpset = $pipedb->snpset->find({name => $qc_plex});
-
   $method or $log->logcroak("The genotyping method 'Fluidigm' is ",
                             "not configured for use");
-  $snpset or $log->logcroak("The Fluidigm SNP set '", $qc_plex,
-                            "' is unknown");
+  my $snpset = $pipedb->snpset->find({name => $qc_plex});
+  $snpset or $log->logcroak("The Fluidigm SNP set '", $qc_plex, "' is unknown");
+  my $reference_name = 'Homo_sapiens (1000Genomes)';
+
+  my $inserted = 0;
+  my @sample_ids = uniq map { $_->sanger_sample_id } @$samples;
 
   my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
      data_path      => $DEFAULT_DATA_PATH,
      reference_path => $reference_path,
+     reference_name => $reference_name,
+     snpset_name    => $snpset->name,
      logger         => $log);
+  my $resultsets = $subscriber->get_assay_resultsets(\@sample_ids);
 
-  my $inserted = 0;
   foreach my $sample (@$samples) {
-    my $calls = $subscriber->get_calls('Homo_sapiens (1000Genomes)', $qc_plex,
-                                       $sample->sanger_sample_id);
+    my $sample_resultsets = $resultsets->{$sample->sanger_sample_id};
+    my $num_resultsets = scalar @$sample_resultsets;
+    if ($num_resultsets > 0) {
+      my $raw_data = join q{; }, map { $_->str } @$sample_resultsets;
+      my $result = $sample->add_to_results({method => $method,
+                                            value  => $raw_data});
 
-    if ($calls && @$calls) {
-      insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+      my $calls = $subscriber->get_calls($sample_resultsets);
+
+      # Make calls
+      insert_qc_calls($pipedb, $snpset, $result, $calls);
       $inserted++;
     }
     else {
@@ -530,7 +539,8 @@ sub insert_sequenom_calls {
     my $calls = $sequenom_results->{$sample->sanger_sample_id};
 
     if ($calls && @$calls) {
-      insert_qc_calls($pipedb, $snpset, $method, $sample, $calls);
+      my $result = $sample->add_to_results({method => $method});
+      insert_qc_calls($pipedb, $snpset, $result, $calls);
       $inserted++;
     }
     else {
@@ -542,9 +552,8 @@ sub insert_sequenom_calls {
 }
 
 sub insert_qc_calls {
-  my ($pipedb, $snpset, $method, $sample, $calls) = @_;
+  my ($pipedb, $snpset, $result, $calls) = @_;
 
-  my $result = $sample->add_to_results({method => $method});
   foreach my $call (@$calls) {
     my $snp = $pipedb->snp->find_or_create
       ({name       => $call->snp->name,
@@ -662,7 +671,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2013, 2014, 2015 Genome Research Limited. All
+Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -17,20 +17,36 @@ use utf8;
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
             name               => 'sample1',
             common_name        => 'Homo sapiens',
-            supplier_name      => 'WTSI',
+            supplier_name      => 'aaaaaaaaaa',
             accession_number   => 'A0123456789',
             gender             => 'Female',
             cohort             => 'AAA111222333',
             control            => 'XXXYYYZZZ',
             study_id           => 0,
             barcode_prefix     => 'DN',
-            barcode            => '0987654321',
+            barcode            => '294866',
             plate_purpose_name => 'GEX',
             map                => 'A01'};
   }
 
   sub find_infinium_gex_sample_by_sanger_id {
-    die "Should not call find_infinium_gex_sample_by_sanger_id\n";
+    return {internal_id        => 123456789,
+            sanger_sample_id   => 'QC1Hip-86',
+            consent_withdrawn  => 0,
+            donor_id           => 'D999',
+            uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
+            name               => 'sample1',
+            common_name        => 'Homo sapiens',
+            supplier_name      => 'aaaaaaaaaa',
+            accession_number   => 'A0123456789',
+            gender             => 'Female',
+            cohort             => 'AAA111222333',
+            control            => 'XXXYYYZZZ',
+            study_id           => 0,
+            barcode_prefix     => 'DN',
+            barcode            => '294866',
+            plate_purpose_name => 'GEX',
+            map                => 'A01'};
   }
 }
 
@@ -42,7 +58,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 13;
+use Test::More tests => 47;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -118,7 +134,7 @@ sub resultsets : Test(1) {
   cmp_ok(scalar @{$publisher->resultsets}, '==', 3, 'Found resultsets');
 }
 
-sub publish : Test(4) {
+sub publish : Test(21) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
     (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
@@ -144,9 +160,29 @@ sub publish : Test(4) {
     ($irods_tmp_coll,
      [beadchip             => '0123456789'],
      [beadchip_section     => 'A'],
-     ['dcterms:identifier' => 'QC1Hip-86'],
      [type                 => 'idat']);
   cmp_ok(scalar @idat_files, '==', 1, 'Number of idat files published');
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-86'},
+     {attribute => 'gex_plate',               value => 'DN294866F'}, # manifest
+     {attribute => 'gex_well',                value => 'A1'},        # manifest
+     {attribute => 'md5',
+      value     => 'd41d8cd98f00b204e9800998ecf8427e' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $idat_path = $idat_files[0];
+  my $is_modified = 0;
+  test_metadata($irods, $idat_path, $expected_meta, $is_modified);
 
   my @xml_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
@@ -157,7 +193,7 @@ sub publish : Test(4) {
   cmp_ok(scalar @xml_files, '==', 1, 'Number of XML files published');
 }
 
-sub publish_overwrite : Test(5) {
+sub publish_overwrite : Test(22) {
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
     (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
@@ -187,9 +223,29 @@ sub publish_overwrite : Test(5) {
     ($irods_tmp_coll,
      [beadchip             => '0123456789'],
      [beadchip_section     => 'A'],
-     ['dcterms:identifier' => 'QC1Hip-86'],
      [type                 => 'idat']);
   cmp_ok(scalar @idat_files, '==', 1, 'Number of idat files published');
+
+  my $expected_meta =
+    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-86'},
+     {attribute => 'gex_plate',               value => 'DN294866F'}, # manifest
+     {attribute => 'gex_well',                value => 'A1'},        # manifest
+     {attribute => 'md5',
+      value     => 'd41d8cd98f00b204e9800998ecf8427e' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $idat_path = $idat_files[0];
+  my $is_modified = 0; # Checking that we can republish the same data
+  test_metadata($irods, $idat_path, $expected_meta, $is_modified);
 
   my @xml_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
@@ -198,4 +254,26 @@ sub publish_overwrite : Test(5) {
      ['dcterms:identifier' => 'QC1Hip-86'],
      [type                 => 'xml']);
   cmp_ok(scalar @xml_files, '==', 1, 'Number of XML files published');
+}
+
+sub test_metadata {
+  my ($irods, $data_path, $expected_metadata, $is_modified) = @_;
+
+  my $data_object = WTSI::NPG::iRODS::DataObject->new($irods, $data_path);
+
+  ok($data_object->get_avu('dcterms:created'),  'Has dcterms:created');
+  ok($data_object->get_avu('dcterms:creator'),  'Has dcterms:creator');
+
+  if ($is_modified) {
+    ok($data_object->get_avu('dcterms:modified'), 'Has dcterms:modified');
+  }
+  else {
+    ok(!$data_object->get_avu('dcterms:modified'), 'Has no dcterms:modified');
+  }
+
+  foreach my $avu (@$expected_metadata) {
+    my $attr  = $avu->{attribute};
+    my $value = $avu->{value};
+    ok($data_object->find_in_metadata($attr, $value), "Found $attr => $value");
+  }
 }

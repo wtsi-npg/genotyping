@@ -184,7 +184,8 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'sequenom_well',           value => 'A10'},
      {attribute => 'study_id',                value => '0'}];
 
-  my $meta = $data_object->metadata;
+  my $meta =  [grep { $_->{attribute} !~ m{_history$} }
+               @{$data_object->metadata}];
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 

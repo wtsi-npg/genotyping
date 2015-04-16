@@ -31,10 +31,10 @@ sub make_infinium_metadata {
      [$self->expression_beadchip_section_attr => $resultset->beadchip_section]);
 
   if ($resultset->plate_id) {
-    push @meta,  [$self->expression_plate_name_attr => $resultset->plate_id];
+    push @meta, [$self->expression_plate_name_attr => $resultset->plate_id];
   }
   if ($resultset->well_id) {
-    push @meta,  [$self->expression_plate_well_attr => $resultset->well_id];
+    push @meta, [$self->expression_plate_well_attr => $resultset->well_id];
   }
 
   return @meta;
@@ -97,7 +97,9 @@ sub infinium_fingerprint {
   my ($self, @meta) = @_;
 
   return $self->make_fingerprint([$self->expression_beadchip_attr,
-                                  $self->expression_beadchip_section_attr],
+                                  $self->expression_beadchip_section_attr,
+                                  $self->expression_plate_name_attr,
+                                  $self->expression_plate_well_attr],
                                  \@meta);
 }
 
@@ -111,7 +113,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
