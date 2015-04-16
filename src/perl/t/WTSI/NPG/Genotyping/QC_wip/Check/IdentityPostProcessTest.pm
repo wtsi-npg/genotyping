@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 6;
+use Test::More tests => 8;
 use Test::Exception;
 
 use JSON;
@@ -65,6 +65,28 @@ sub create_csv_data: Test(1) {
     my $csv_fields_ref = $processor->_mergeGenotypes(\%allResults);
     is_deeply($csv_fields_ref, $expected_csv_fields,
               'CSV fields match from data structure');
+}
+
+sub csv_script: Test(2) {
+    # TODO maybe move this into Scripts.pm (which is very slow to run)
+    my $workDir = tempdir('temp_identity_script_XXXXXX', CLEANUP=>1);
+    my $write_csv_script = "./bin/write_identity_csv.pl";
+    my @names = sort(keys(%inputs));
+    my $outPath = $workDir."/merged_identity.csv";
+    ok(system(join q{ }, "$write_csv_script",
+              "--in ".$inputs{$names[0]},
+              "--name ".$names[0],
+              "--in ".$inputs{$names[1]},
+              "--name ".$names[1],
+              "--in ".$inputs{$names[2]},
+              "--name ".$names[2],
+              "--out ".$outPath
+          ) == 0, 'Ran identity CSV script');
+    my $expected_csv_fields = _read_csv($expected_csv);
+    my $output_csv_fields = _read_csv($outPath);
+    is_deeply($output_csv_fields, $expected_csv_fields,
+              'CSV fields match from output file');
+
 }
 
 sub _read_csv {
