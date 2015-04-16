@@ -84,6 +84,13 @@ sub equals {
           $self->y_marker->equals($other->y_marker));
 }
 
+sub str {
+  my ($self) = @_;
+
+  return join "\t", $self->name, $self->ref_allele, $self->alt_allele,
+    $self->chromosome, $self->position, $self->strand;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;

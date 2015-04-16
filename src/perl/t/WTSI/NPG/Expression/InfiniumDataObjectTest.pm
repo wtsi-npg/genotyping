@@ -150,7 +150,8 @@ sub update_secondary_metadata : Test(7) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'idat'}];
 
-  my $idat_meta = $idat_obj->metadata;
+  my $idat_meta = [grep { $_->{attribute} !~ m{_history$} }
+                   @{$idat_obj->metadata}];
   is_deeply($idat_meta, $idat_expected_meta, 'Secondary metadata added 1')
     or diag explain $idat_meta;
 
@@ -175,7 +176,8 @@ sub update_secondary_metadata : Test(7) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'xml'}];
 
-  my $xml_meta = $xml_obj->metadata;
+  my $xml_meta = [grep { $_->{attribute} !~ m{_history$} }
+                  @{$xml_obj->metadata}];
   is_deeply($xml_meta, $xml_expected_meta, 'Secondary metadata added 2')
     or diag explain $xml_meta;
 
