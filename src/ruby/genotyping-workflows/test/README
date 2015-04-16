@@ -5,9 +5,9 @@ Installation:
 1) The Perl libraries in this repository must be installed and the Perl and R
    scripts must be available on the PATH.
 
-2) The genotype callers Illuminus and GenoSNP must be available on the PATH.
+2) The genotype callers Illuminus and zCall must be available on the PATH.
 
-3) The Gftools library must be installed (required by Illuminus and GenoSNP).
+3) The Gftools library must be installed (required by Illuminus).
 
 4) The format-shifting utility program genotype-call must be available on the
    PATH.
@@ -22,7 +22,7 @@ Test data acquisition:
 
    This file cannot be distributed for reasons of data confidentiality.
 
-6) Expected Plink output from the genotype callers Illuminus, GenoSNP and 
+6) Expected Plink output from the genotype callers Illuminus and 
    ZCall with input from the genotyping.db described in step 5 must be placed 
    in an "external data" directory.
 
@@ -35,4 +35,4 @@ Test data acquisition:
 Shell environment setup:
 
 8) The environment variable GENOTYPE_TEST_DATA must be set to the absolute path
-   of the external data directory described in step 6 6.
+   of the external data directory described in step 6.

@@ -22,7 +22,6 @@ module Genotyping::Workflows
     include Genotyping
     include Genotyping::Tasks::Metadata
     include Genotyping::Tasks::GenotypeCall
-    include Genotyping::Tasks::GenoSNP
     include Genotyping::Tasks::Plink
     include Genotyping::Tasks::QualityControl
     include Genotyping::Tasks::Simtools
@@ -50,7 +49,7 @@ Arguments:
     manifest:      <path> of the chip manifest file. Required.
     egt:           <path> of the .EGT intensity cluster file. Required.
     chunk_size:    <integer> number of samples to analyse in a single 
-                   GenoSNP job. Optional, defaults to 20.
+                   job. Optional, defaults to 20.
     zstart:        <integer> start for range of candidate integer z scores. 
                    Optional.
     ztotal:        <integer> total number of candidate integer z scores. 
