@@ -31,10 +31,29 @@ sub assay_resultset {
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
 
+  my $fluidigm_barcode;
+  my $well;
+
   my $fluidigm_barcode_avu = $self->get_avu($self->fluidigm_plate_name_attr);
-  my $fluidigm_barcode = $fluidigm_barcode_avu->{value};
+  if ($fluidigm_barcode_avu) {
+    $fluidigm_barcode = $fluidigm_barcode_avu->{value};
+  }
+
   my $well_avu = $self->get_avu($self->fluidigm_plate_well_attr);
-  my $well = $well_avu->{value};
+  if ($well_avu) {
+    $well = $well_avu->{value};
+  }
+
+  unless ($fluidigm_barcode) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find an Fluidigm barcode in the existing ",
+                   "metadata");
+  }
+  unless ($well) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find a well address in the existing ",
+                   "metadata");
+  }
 
   $self->debug("Found plate well '$fluidigm_barcode': '$well' in ",
                "current metadata of '", $self->str, "'");
@@ -94,7 +113,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -235,6 +235,9 @@ sub find_data_files {
 
   my @samples = @{$manifest->samples};
 
+  $log->info("Finding sample data for: [",
+             join(", ", map { $_->{sample_id} } @samples), "]");
+
   my @beadchips = uniq(map { $_->{beadchip} } @samples);
   my @sections = map { $_->{beadchip_section} } @samples;
 
@@ -243,6 +246,8 @@ sub find_data_files {
   my $sections_patt = join('|', @sections);
   my $filename_regex =
     qr{($beadchips_patt)_($sections_patt)_$channel.(idat|xml)$}mi;
+
+  $log->debug("Finding sample data files matching regex '$filename_regex'");
 
   my $sample_dir = abs_path($sample_source);
   my $file_test = sub { return $_[0] =~ $filename_regex };
