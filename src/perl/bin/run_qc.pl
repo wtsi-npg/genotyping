@@ -227,10 +227,33 @@ sub verifyAbsPath {
     return $path;
 }
 
+sub run_qc_wip {
+  # run the work-in-progess refactored QC in parallel with the old one
+  my ($plinkPrefix, $dbPath, $iniPath, $outDir) = @_;
+  my $plexManifest = "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
+  $outDir = $outDir."/qc_wip";
+  mkdir($outDir);
+  my $script = "check_identity_bed_wip.pl";
+  my $outPath = $outDir."/identity_wip.json";
+  my @args = ("--config=$iniPath",
+	      "--dbfile=$dbPath",
+	      "--out=$outPath",
+	      "--plink=$plinkPrefix",
+	      "--plex_manifest=$plexManifest"
+	     );
+  my $cmd = $script." ".join(" ", @args);
+  my $result = system($cmd);
+  if ($result!=0) {
+    croak "Command finished with non-zero exit status: \"$cmd\"";
+  }
+
+}
+
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
         $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
         $exclude) = @_;
+    run_qc_wip($plinkPrefix, $dbPath, $iniPath, $outDir);
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###

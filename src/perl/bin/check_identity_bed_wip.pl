@@ -217,14 +217,14 @@ Options:
   --dbfile=PATH          Path to pipeline SQLITE database file. Required.
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
-  --min-shared-snps=NUM  Minimum number of shared SNPs between production and
+  --min_shared_snps=NUM  Minimum number of shared SNPs between production and
                          QC plex to carry out identity check. Optional.
   --out=PATH             Path for JSON output. Optional, defaults to STDOUT.
-  --pass-threshold=NUM   Minimum similarity to pass identity check. Optional.
-  --plex-manifest=PATH   Path to .csv manifest for the QC plex SNP set.
+  --pass_threshold=NUM   Minimum similarity to pass identity check. Optional.
+  --plex_manifest=PATH   Path to .csv manifest for the QC plex SNP set.
   --plink=STEM           Plink binary stem (path omitting the .bed, .bim, .fam
                          suffix) for production data.
-  --swap-threshold=NUM   Minimum cross-similarity to warn of sample swap.
+  --swap_threshold=NUM   Minimum cross-similarity to warn of sample swap.
                          Optional.
   --verbose              Print messages while processing. Optional.
 

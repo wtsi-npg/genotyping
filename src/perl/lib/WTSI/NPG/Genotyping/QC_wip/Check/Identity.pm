@@ -318,6 +318,7 @@ sub _read_shared_snp_names {
 sub _read_production_calls {
   my ($self) = @_;
 
+
   my $plink = plink_binary::plink_binary->new($self->plink_path);
   my $genotypes = plink_binary::vectorstr->new;
   my $snp = plink_binary::snp->new;
@@ -328,8 +329,14 @@ sub _read_production_calls {
   }
 
   my $sample_names = $self->sample_names;
-
   my %prod_calls_index;
+  # Initializing %prod_calls_index so that it returns an empty list
+  # (not undef), if shared SNP set is empty for a given sample.
+  # Samples with no shared SNPs appear as 'missing' in JSON output.
+  foreach my $sample_name (@{$sample_names}) {
+    $prod_calls_index{$sample_name} = [];
+  }
+
   while ($plink->next_snp($snp, $genotypes)) {
     my $illumina_name = $snp->{'name'};
     my $snp_name      = _from_illumina_snp_name($illumina_name);
@@ -348,9 +355,6 @@ sub _read_production_calls {
            genotype => $genotypes->get($i));
 
         my $sample_name = $sample_names->[$i];
-        unless (exists $prod_calls_index{$sample_name}) {
-          $prod_calls_index{$sample_name} = [];
-        }
 
         $self->debug("Plink call: ", $call->str);
         push @{$prod_calls_index{$sample_name}}, $call;
