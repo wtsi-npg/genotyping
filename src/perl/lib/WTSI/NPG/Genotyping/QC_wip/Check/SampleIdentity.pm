@@ -246,20 +246,31 @@ sub _sample_swap_metric {
     if ($total_snps != scalar(@pairs_B)) {
         $self->logcroak("Call pair argument lists are of different lengths");
     }
+    # SNPs in the input lists may be in different order
+    my %pairs_B_by_SNP;
+    for (my $i=0;$i<$total_snps;$i++) {
+        my $snp_qc = $pairs_B[$i]{$QC_KEY}->snp->name;
+        my $snp_prod = $pairs_B[$i]{$QC_KEY}->snp->name;
+        if ($snp_qc ne $snp_prod) {
+            $self->logcroak("Inconsistent SNP names in call pair: QC = '",
+                            $snp_qc, "', production = '", $snp_prod, "'");
+        } else {
+            $pairs_B_by_SNP{$snp_qc} = $pairs_B[$i];
+        }
+    }
     my @match = (0,0);
     for (my $i=0;$i<$total_snps;$i++) {
         # compare results on both samples for the ith snp
-        if ($pairs_A[$i]{$QC_KEY}->snp->name ne
-                $pairs_B[$i]{$QC_KEY}->snp->name) {
-            $self->logcroak("Mismatched SNP identities for ",
-                            "sample swap metric: ",
-                            $pairs_A[$i]{$QC_KEY}->snp->name,
-                            " vs. ", $pairs_B[$i]{$QC_KEY}->snp->name);
+        my $snp_name = $pairs_A[$i]{$QC_KEY}->snp->name;
+        my $pair_B = $pairs_B_by_SNP{$snp_name};
+        if (!defined($pair_B)) {
+            $self->logcroak("No data found for swap check on SNP '",
+                            $snp_name, "'");
         }
-        if ($pairs_A[$i]{$QC_KEY}->equivalent($pairs_B[$i]{$PROD_KEY})) {
+        if ($pairs_A[$i]{$QC_KEY}->equivalent($pair_B->{$PROD_KEY})) {
             $match[0]++;
         }
-        if ($pairs_A[$i]{$PROD_KEY}->equivalent($pairs_B[$i]{$QC_KEY})) {
+        if ($pairs_A[$i]{$PROD_KEY}->equivalent($pair_B->{$QC_KEY})) {
             $match[1]++;
         }
     }
