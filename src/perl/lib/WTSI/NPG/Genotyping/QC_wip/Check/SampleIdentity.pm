@@ -252,7 +252,9 @@ sub _sample_swap_metric {
         if ($pairs_A[$i]{$QC_KEY}->snp->name ne
                 $pairs_B[$i]{$QC_KEY}->snp->name) {
             $self->logcroak("Mismatched SNP identities for ",
-                            "sample swap metric");
+                            "sample swap metric: ",
+                            $pairs_A[$i]{$QC_KEY}->snp->name,
+                            " vs. ", $pairs_B[$i]{$QC_KEY}->snp->name);
         }
         if ($pairs_A[$i]{$QC_KEY}->equivalent($pairs_B[$i]{$PROD_KEY})) {
             $match[0]++;
