@@ -6,9 +6,10 @@ package WTSI::NPG::Genotyping::Fluidigm::SubscriberTest;
 use strict;
 use warnings;
 use DateTime;
+use List::AllUtils qw(uniq);
 
 use base qw(Test::Class);
-use Test::More tests => 37;
+use Test::More tests => 41;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -27,6 +28,9 @@ my @sample_identifiers = qw(ABC0123456789 ABC0123456789 XYZ0123456789);
 my @sample_plates = qw(1381735059 1381735060 1381735059);
 my @sample_wells = qw(S01 S01 S02);
 my $non_unique_identifier = 'ABCDEFGHI';
+
+my $reference_name = 'Homo_sapiens (1000Genomes)';
+my $snpset_name = 'qc';
 my $snpset_file = 'qc.tsv';
 
 my $irods_tmp_coll;
@@ -41,15 +45,15 @@ sub make_fixture : Test(setup) {
 
   my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
     ($irods,"$irods_tmp_coll/$snpset_file")->absolute;
-  $snpset_obj->add_avu('fluidigm_plex', 'qc');
-  $snpset_obj->add_avu('reference_name', 'Homo_sapiens (1000Genomes)');
+  $snpset_obj->add_avu('fluidigm_plex', $snpset_name);
+  $snpset_obj->add_avu('reference_name', $reference_name);
 
   foreach my $i (0..2) {
     my $file = $assay_resultset_files[$i];
     $irods->add_object("$data_path/$file", "$irods_tmp_coll/$file");
     my $resultset_obj = WTSI::NPG::iRODS::DataObject->new
       ($irods,"$irods_tmp_coll/$file")->absolute;
-    $resultset_obj->add_avu('fluidigm_plex', 'qc');
+    $resultset_obj->add_avu('fluidigm_plex', $snpset_name);
     $resultset_obj->add_avu('fluidigm_plate', $sample_plates[$i]);
     $resultset_obj->add_avu('fluidigm_well', $sample_wells[$i]);
     $resultset_obj->add_avu('dcterms:identifier', $sample_identifiers[$i]);
@@ -72,18 +76,44 @@ sub constructor : Test(1) {
   new_ok('WTSI::NPG::Genotyping::Fluidigm::Subscriber',
          [irods          => $irods,
           data_path      => $irods_tmp_coll,
-          reference_path => $irods_tmp_coll]);
+          reference_path => $irods_tmp_coll,
+          reference_name => $reference_name,
+          snpset_name    => $snpset_name]);
 }
 
-sub get_assay_resultsets : Test(1) {
+sub get_assay_resultsets : Test(5) {
   my $irods = WTSI::NPG::iRODS->new;
-  my @resultsets = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+  my $resultsets1 = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
      data_path      => $irods_tmp_coll,
-     reference_path => $irods_tmp_coll)->get_assay_resultsets
-       ('qc', $non_unique_identifier);
+     reference_path => $irods_tmp_coll,
+     reference_name => $reference_name,
+     snpset_name    => $snpset_name)->get_assay_resultsets
+       ([uniq @sample_identifiers]);
 
-  cmp_ok(scalar @resultsets, '==', 3, 'Assay resultsets');
+  cmp_ok(scalar keys %$resultsets1, '==', 2, 'Assay resultsets for 2 samples');
+  cmp_ok(scalar @{$resultsets1->{ABC0123456789}}, '==', 2,
+         '2 of 3 results for 1 sample');
+  cmp_ok(scalar @{$resultsets1->{XYZ0123456789}}, '==', 1,
+         '1 of 3 results for 1 sample');
+
+  dies_ok {
+    WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+        (irods          => $irods,
+         data_path      => $irods_tmp_coll,
+         reference_path => $irods_tmp_coll,
+         reference_name => $reference_name,
+         snpset_name    => $snpset_name)->get_assay_resultsets
+           ([$non_unique_identifier]);
+  } 'Fails when query finds results for >1 sample';
+
+  ok(defined WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+     (irods          => $irods,
+      data_path      => $irods_tmp_coll,
+      reference_path => $irods_tmp_coll,
+      reference_name => $reference_name,
+      snpset_name    => $snpset_name)->get_assay_resultsets
+     ([map { 'X' . $_ } 1 .. 100]), "'IN' query of 100 args");
 }
 
 sub get_assay_resultset : Test(2) {
@@ -91,16 +121,19 @@ sub get_assay_resultset : Test(2) {
   my $resultset = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
      data_path      => $irods_tmp_coll,
-     reference_path => $irods_tmp_coll)->get_assay_resultset
-       ('qc', 'XYZ0123456789');
+     reference_path => $irods_tmp_coll,
+     reference_name => $reference_name,
+     snpset_name    => $snpset_name)->get_assay_resultset('XYZ0123456789');
 
   ok($resultset, 'Assay resultsets');
   dies_ok {
     WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
         (irods          => $irods,
          data_path      => $irods_tmp_coll,
-         reference_path => $irods_tmp_coll)->get_assay_resultset
-           ('qc', $non_unique_identifier);
+         reference_path => $irods_tmp_coll,
+         reference_name => $reference_name,
+         snpset_name    => $snpset_name)->get_assay_resultset
+           ($non_unique_identifier);
   } 'Fails on matching multiple results';
 }
 
@@ -108,8 +141,6 @@ sub get_calls : Test(31) {
   my $irods = WTSI::NPG::iRODS->new;
 
   # check we can correctly read a single resultset
-  my $reference_name = 'Homo_sapiens (1000Genomes)';
-  my $snpset_name = 'qc';
   my @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
                                            $reference_name, $snpset_name,
                                            'XYZ0123456789');
@@ -145,7 +176,7 @@ sub get_calls : Test(31) {
 
   is_deeply(\@calls_observed, \@calls_expected,
             "All calls match in singular resultset") or
-                diag explain \@calls_observed;
+              diag explain \@calls_observed;
 
   # get merged results for S01_1381735059.csv and S01_1381735060.csv
   # S01_1381735060.csv differs by a no call for rs8065080
@@ -186,7 +217,7 @@ sub get_calls : Test(31) {
 
   is_deeply(\@calls_observed, \@calls_expected,
             "All calls match in merged resultset") or
-                diag explain \@calls_observed;
+              diag explain \@calls_observed;
 
   # add a third, non-matching call set to iRODS and repeat the get_calls
   my $file = 'S01_1381735061.csv';
@@ -222,16 +253,19 @@ sub get_calls : Test(31) {
 
 sub _get_observed_calls {
   # get (snp_name, genotype) pair observed for each call
-  my ($irods, $irods_coll, $reference_name, $snpset_name, $sample_id) = @_;
+  my ($irods, $irods_coll, $rname, $sname, $sample_id) = @_;
 
-  my @calls = @{WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-      (irods          => $irods,
-       data_path      => $irods_coll,
-       reference_path => $irods_coll)->get_calls
-         ($reference_name, $snpset_name, $sample_id)};
+  my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+    (irods          => $irods,
+     data_path      => $irods_coll,
+     reference_path => $irods_coll,
+     reference_name => $rname,
+     snpset_name    => $sname);
+  my $assay_resultsets = $subscriber->get_assay_resultsets([$sample_id]);
+  my $calls = $subscriber->get_calls($assay_resultsets->{$sample_id});
 
   my @calls_observed;
-  foreach my $call (@calls) {
+  foreach my $call (@$calls) {
     push @calls_observed, [$call->snp->name, $call->genotype],
   }
 

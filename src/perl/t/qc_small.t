@@ -13,7 +13,7 @@ use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use JSON;
 
-use Test::More tests => 47;
+use Test::More tests => 48;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readFileToString readSampleInclusion/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
@@ -141,6 +141,13 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 # omit --title argument, to test default title function
 $cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config"; 
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
+
+## check work-in-progress output files
+my $outDirWip = $outDir."/qc_wip";
+my @output_wip = ("identity_wip.json", );
+foreach my $file (@output_wip) {
+  ok(-e $outDirWip."/".$file, "QC WIP output $file exists")
+}
 
 ## check (non-heatmap) outputs again
 foreach my $png (@png) {

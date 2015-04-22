@@ -152,7 +152,8 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'gtc'}];
 
-  my $meta = $data_object->metadata;
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 
@@ -198,7 +199,8 @@ sub update_consent_withdrawn : Test(4) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'gtc'}];
 
-  my $meta = $data_object->metadata;
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 

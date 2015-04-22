@@ -160,7 +160,7 @@ sub latexResultNotes {
     my @lines;
     push @lines, "\\subsection{Plots}\n";
     push @lines, "\\subsubsection*{Metric scatterplots}\n";
-    push @lines, "Scatterplots are produced for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plots may be absent if Sequenom results are not available.\n\n";
+    push @lines, "Scatterplots are produced for each metric. For analyses with a large number of plates, the results for a given metric may be split across more than one plot.  Note that the identity metric plots may be absent if QC plex results are not available.\n\n";
     push @lines, "\\subsubsection*{Other}\n";
     push @lines, "The following additional plots are included:\n";
     push @lines, "\\begin{itemize}\n";
@@ -299,7 +299,7 @@ sub qcNameFromPath {
     if (!($items[-1])) { pop @items; }
     my $qcName;
     foreach my $item (@items) {
-        if ($item =~ m/illuminus|genosnp|gencall/i) {
+        if ($item =~ m/illuminus|gencall/i) {
             $qcName = $item; last;
         }
     }

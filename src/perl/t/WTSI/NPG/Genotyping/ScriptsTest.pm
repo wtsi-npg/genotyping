@@ -11,7 +11,7 @@ use Log::Log4perl;
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 31;
+use Test::More tests => 33;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -27,6 +27,8 @@ our $PUBLISH_INFINIUM_ANALYSIS   = './bin/publish_infinium_analysis.pl';
 
 our $PUBLISH_EXPRESSION_ANALYSIS = './bin/publish_expression_analysis.pl';
 our $UPDATE_EXPRESSION_METADATA  = './bin/update_expression_metadata.pl';
+
+our $QUERY_PROJECT_SAMPLES = './bin/query_project_samples.pl';
 
 our $READY_PIPE     = './bin/ready_pipe.pl';
 our $READY_INFINIUM = './bin/ready_infinium.pl';
@@ -112,6 +114,65 @@ sub test_publish_infinium_genotypes : Test(3) {
             "--dest $irods_tmp_coll",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
+}
+
+sub test_query_project_samples : Test(2) {
+
+  # add dummy files to iRODS temp collection & update metadata
+  my $irods = WTSI::NPG::iRODS->new;
+  my $irods_query_coll = $irods_tmp_coll.'/SampleQueryTest';
+  my $tempdir = tempdir("SampleQueryTest.$pid.XXXXXX", CLEANUP => 1);
+  $irods->add_collection($irods_query_coll);
+  my @data_files = qw/9298751015_R01C01_Grn.idat  9298751015_R01C01_Red.idat
+                      9298751015_R03C02_Grn.idat  9298751015_R03C02_Red.idat
+                      9298751015_R01C01.gtc  9298751015_R03C02.gtc/;
+  my $data_path = './t/scripts/query_project_samples/coreex_bbgahs/';
+  my $infinium_plate = 'WG0206900-DNA';
+  my $beadchip = '9298751015';
+  foreach my $file (@data_files) {
+    if ($file =~ /\.idat$/) {
+      $irods->add_object($data_path.'idat/'.$file, $irods_tmp_coll);
+    } elsif ($file =~ /\.gtc$/) {
+      $irods->add_object($data_path.'gtc/'.$file, $irods_tmp_coll);
+    }
+    my $irods_obj = $irods_tmp_coll.'/'.$file;
+    $irods->add_object_avu($irods_obj, 'infinium_plate', $infinium_plate);
+    $irods->add_object_avu($irods_obj, 'beadchip', $beadchip);
+    if ($file =~ /_R01C01/) {
+        $irods->add_object_avu($irods_obj, 'infinium_well', 'A01');
+        $irods->add_object_avu($irods_obj, 'beadchip_section', 'R01C01');
+        $irods->add_object_avu($irods_obj, 'infinium_sample',
+                               '285293_A01_SC_SEPI5488306');
+    } elsif  ($file =~ /_R03C02/) {
+        $irods->add_object_avu($irods_obj, 'infinium_well', 'A02');
+        $irods->add_object_avu($irods_obj, 'beadchip_section', 'R03C02');
+        $irods->add_object_avu($irods_obj, 'infinium_sample',
+                               '285293_A02_SC_SEPI5488315');
+    }
+  }
+  # run script and check exit status
+  my $outpath = $tempdir.'/query_results.txt';
+  ok(system(join q{ }, "$QUERY_PROJECT_SAMPLES",
+            "--project coreex_bbgahs",
+            "--limit 2",
+            "--header",
+            "--root $irods_tmp_coll",
+            "--out $outpath") == 0,
+     'Query samples in LIMS, iRODS, SequenceScape for given project');
+  # validate output
+  if (-e $outpath) {
+    my $in;
+    open $in, "<", $outpath || die "Cannot open '$outpath'";
+    my @results = <$in>;
+    close $in || die "Cannot close '$outpath'";
+    my $expect = './t/scripts/query_project_samples/expected_results.txt';
+    open $in, "<", $expect || die "Cannot open '$expect'";
+    my @expected = <$in>;
+    close $in || die "Cannot close '$expect'";
+    is_deeply(\@results, \@expected, "Query results match expected values");
+  } else {
+    die "Expected output '$outpath' does not exist";
+  }
 }
 
 sub test_update_infinium_metadata : Test(2) {

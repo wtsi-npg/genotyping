@@ -22,6 +22,9 @@ my $data_path = './t/fluidigm_assay_data_object/1381735059';
 my $data_file = 'S01_1381735059.csv';
 my $resultset;
 
+my $mixed_address_data_file = 'S02_1381735059.csv';
+my $mixed_sample_data_file = 'S03_1381735059.csv';
+
 my $snpset_path = './t/fluidigm_assay_data_object/';
 my $snpset_file = 'qc.tsv';
 
@@ -93,9 +96,19 @@ sub size : Test(1) {
   cmp_ok($resultset->size, '==', 96, 'Expected size');
 }
 
-sub assay_results : Test(1) {
+sub assay_results : Test(3) {
   cmp_ok(scalar @{$resultset->assay_results}, '==', 96,
          'Contains expected number of assay results');
+
+  dies_ok {
+    WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
+        ("$data_path/$mixed_address_data_file")->assay_results;
+  } 'Fails where assay results are from >1 address';
+
+  dies_ok {
+    WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
+        ("$data_path/$mixed_sample_data_file")->assay_results;
+  } 'Fails where assay results are from >1 sample';
 }
 
 sub assay_addresses : Test(1) {
@@ -107,18 +120,6 @@ sub assay_addresses : Test(1) {
 
 sub sample_name : Test(1) {
   is($resultset->sample_name, 'ABC0123456789', 'Correct sample name');
-}
-
-sub snpset_name : Test(2) {
-  my $irods = WTSI::NPG::iRODS->new;
-
-  is($resultset->snpset_name, 'qc', 'Correct SNP set name');
-
-  $irods->add_object_avu($resultset->data_object->str,
-                         'fluidigm_plex', 'test');
-  $resultset->data_object->clear_metadata; # Clear metadata cache
-
-  dies_ok { $resultset->snpset_name }, 'Cannot have multiple names';
 }
 
 sub snp_names : Test(1) {
@@ -159,9 +160,9 @@ sub filter_on_confidence : Test(1) {
 
 sub result_at : Test(53) {
   my $irods = WTSI::NPG::iRODS->new;
-  my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
-    ($irods, "$irods_tmp_coll/$snpset_file")->absolute;
-  my $snpset = WTSI::NPG::Genotyping::SNPSet->new(data_object => $snpset_obj);
+  # my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
+  #   ($irods, "$irods_tmp_coll/$snpset_file")->absolute;
+  # my $snpset = WTSI::NPG::Genotyping::SNPSet->new(data_object => $snpset_obj);
 
   my @expected_calls = (['GS34251',    'TC'],
                         ['GS34251',    'TC'],
