@@ -90,14 +90,21 @@ sub find_identity {
     my ($self, $qc_calls_by_sample) = @_;
     defined $qc_calls_by_sample or
         $self->logconfess('Must have a defined qc_calls_by_sample argument');
+    $self->debug("Calculating identity with QC calls");
     my @id_results;
     my %missing;
+    my $total_samples = scalar @{$self->sample_names};
+    my $i = 0;
     foreach my $sample_name (@{$self->sample_names}) {
+        $i++;
+        $self->debug("Finding identity for '", $sample_name, "', sample ",
+                     $i, " of ", $total_samples);
         my $qc_calls = $qc_calls_by_sample->{$sample_name};
         if (defined($qc_calls)) {
             my $production_calls = $self->production_calls->{$sample_name};
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->new(
+                    logger           => $self->logger,
                     sample_name      => $sample_name,
                     snpset           => $self->snpset,
                     production_calls => $production_calls,
@@ -112,6 +119,7 @@ sub find_identity {
     }
     # now construct empty results for any samples missing from QC data
     # by convention, these are appended at the end of the results array
+    $self->debug("Inserting empty results for missing samples");
     foreach my $sample_name (@{$self->sample_names}) {
         if ($missing{$sample_name}) {
             my $result =
@@ -126,7 +134,7 @@ sub find_identity {
             push @id_results, $result;
         }
       }
-
+    $self->debug("Finished calculating identity metric.");
     return \@id_results;
 }
 
@@ -149,7 +157,10 @@ sub pairwise_swap_check {
     my ($self, $id_results) = @_;
     my $total_warnings = 0;
     my @comparison;
-    for (my $i=0;$i<@{$id_results};$i++) {
+    my $total_results = scalar @{$id_results};
+    for (my $i=0;$i<$total_results;$i++) {
+        $self->debug("Doing pairwise swap check for sample ", $i+1, " of ",
+                     $total_results);
         for (my $j=0;$j<$i;$j++) {
             my $similarity =
                 $id_results->[$i]->find_swap_metric($id_results->[$j]);
@@ -348,20 +359,21 @@ sub _read_production_calls {
     $self->debug("Checking for SNP '$snp_name' in [",
                  join(', ', keys %shared_snp_index), "]");
 
-    for (my $i = 0; $i < $genotypes->size; $i++) {
-      if (exists $shared_snp_index{$snp_name}) {
-        my $call = WTSI::NPG::Genotyping::Call->new
-          (snp      => $self->snpset->named_snp($snp_name),
-           genotype => $genotypes->get($i));
+    if (exists $shared_snp_index{$snp_name}) {
+        $self->debug("SNP name '$snp_name' found.");
+        for (my $i = 0; $i < $genotypes->size; $i++) {
+            my $call = WTSI::NPG::Genotyping::Call->new
+                (snp      => $self->snpset->named_snp($snp_name),
+                 genotype => $genotypes->get($i));
 
-        my $sample_name = $sample_names->[$i];
+            my $sample_name = $sample_names->[$i];
 
-        $self->debug("Plink call: ", $call->str);
-        push @{$prod_calls_index{$sample_name}}, $call;
-      }
-      else {
-        $self->debug("Skipping ", $snp_name);
-      }
+            $self->debug("Plink call for SNP '", $snp_name, "', sample '",
+                         $sample_name, "' = ", $call->str);
+            push @{$prod_calls_index{$sample_name}}, $call;
+        }
+    } else {
+        $self->debug("SNP name '", $snp_name, "' not found; skipping.");
     }
   }
   return \%prod_calls_index;
@@ -381,9 +393,9 @@ sub _from_illumina_snp_name {
 
 sub _get_failed_results {
   my ($self, $id_results) = @_;
-
   my @failed = grep { $_->assayed && $_->failed } @$id_results;
-
+  my $total = scalar @failed;
+  $self->debug("Found ", $total, " failed identity results.");
   return \@failed;
 }
 

@@ -114,19 +114,22 @@ sub run {
     }
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
+    $log->debug("Read QC plex snpset from ", $plex_manifest);
 
     my $qc_calls = read_qc_calls($dbfile, $config, $snpset);
 
     # $min_shared_snps, $swap_threshold, $pass_threshold may be null
     # if so, Identity.pm uses internal defaults
     my %args = (plink_path         => $plink,
-                snpset             => $snpset);
+                snpset             => $snpset,
+                logger             => $log);
     if (defined($min_shared_snps)) {
         $args{'min_shared_snps'} = $min_shared_snps;
     }
     if (defined($swap_threshold)) {$args{'swap_threshold'} = $swap_threshold;}
     if (defined($pass_threshold)) {$args{'pass_threshold'} = $pass_threshold;}
 
+    $log->debug("Creating identity check object");
     my $checker = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new(%args);
 
     my $result = $checker->run_identity_checks_json_spec($qc_calls);

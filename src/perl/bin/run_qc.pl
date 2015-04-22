@@ -25,7 +25,7 @@ our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title,
     $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter,
-    $illuminusFilter, $include);
+    $illuminusFilter, $include, $plexManifest);
 
 GetOptions("help"              => \$help,
            "output-dir=s"      => \$outDir,
@@ -40,6 +40,7 @@ GetOptions("help"              => \$help,
 	   "zcall-filter"      => \$zcallFilter,
 	   "illuminus-filter"  => \$illuminusFilter,
 	   "include"           => \$include,
+           "plex-manifest"     => \$plexManifest,
     );
 
 if ($help) {
@@ -112,7 +113,8 @@ my $exclude = !($include);
 
 ### run QC
 run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
-$runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude);
+$runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude,
+$plexManifest);
 
 sub cleanup {
     # create a 'supplementary' subdirectory of the output directory
@@ -229,8 +231,8 @@ sub verifyAbsPath {
 
 sub run_qc_wip {
   # run the work-in-progess refactored QC in parallel with the old one
-  my ($plinkPrefix, $dbPath, $iniPath, $outDir) = @_;
-  my $plexManifest = "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
+  my ($plinkPrefix, $dbPath, $iniPath, $outDir, $plexManifest) = @_;
+  $plexManifest ||= "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
@@ -252,8 +254,8 @@ sub run_qc_wip {
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
         $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
-        $exclude) = @_;
-    run_qc_wip($plinkPrefix, $dbPath, $iniPath, $outDir);
+        $exclude, $plexManifest) = @_;
+    run_qc_wip($plinkPrefix, $dbPath, $iniPath, $outDir, $plexManifest);
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###
