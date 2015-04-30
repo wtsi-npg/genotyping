@@ -28,8 +28,9 @@ my $build = Build->new
                           'Test::Exception' => '>= 0.32',
                          },
    requires          => {
-                         'Carp'             => '>= 1.20',
-                         'WTSI::NPG::iRODS' => 0
+                         'Carp'                          => '>= 1.20',
+                         'WTSI::DNAP::Warehouse::Schema' => '>= 1.0',
+                         'WTSI::NPG::iRODS'              => '>= 0.14.0'
                         },
    ini_files => {'etc/genders.ini'   => 'etc/genders.ini',
                  'etc/methods.ini'   => 'etc/methods.ini',

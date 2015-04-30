@@ -5,11 +5,9 @@ package WTSI::NPG::Genotyping::Database::Infinium;
 use Carp;
 use Moose;
 
-use Data::Dumper;
-
 extends 'WTSI::NPG::Database';
 
-with 'WTSI::DNAP::Utilities::Cacheable';
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 has 'red_cache' =>
   (is       => 'ro',
