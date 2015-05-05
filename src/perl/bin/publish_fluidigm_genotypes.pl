@@ -13,7 +13,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
@@ -91,13 +91,13 @@ sub run {
     }
   }
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name    => 'sequencescape_warehouse',
+  my $ssdb = WTSI::NPG::Database::MLWarehouse->new
+    (name    => 'multi_lims_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch

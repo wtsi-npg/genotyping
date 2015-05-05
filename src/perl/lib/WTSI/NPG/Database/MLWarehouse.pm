@@ -28,8 +28,8 @@ sub find_fluidigm_plate {
     $self->logconfess("The fluidigm_barcode argument was empty");
 
   my $plate = $self->schema->resultset('FlgenPlate')->search
-    ({'plate_barcode' => $fluidigm_barcode},
-     {join => 'sample'});
+    ({plate_barcode => $fluidigm_barcode},
+     {prefetch      => 'sample'});
 
   my %plate;
   while (my $row = $plate->next) {
@@ -59,9 +59,9 @@ sub find_fluidigm_sample_by_plate {
   $well_address or $self->logconfess("The map argument was empty");
 
   my $plate = $self->schema->resultset('FlgenPlate')->search
-    ({'plate_barcode' => $fluidigm_barcode,
-      'well_label'    => $well_address},
-     {join => 'sample'});
+    ({plate_barcode => $fluidigm_barcode,
+      well_label    => $well_address},
+     {prefetch      => ['sample', 'study']});
 
   # (plate_barcode . well_label) cardinality is not constrained in the
   # warehouse, so check that we get one result only.
@@ -83,7 +83,8 @@ sub find_fluidigm_sample_by_plate {
 sub _make_well_result {
   my ($plate_row) = @_;
 
-  return {sanger_sample_id   => $plate_row->sample->sanger_sample_id,
+  return {id_sample_lims     => $plate_row->sample->id_sample_lims,
+          sanger_sample_id   => $plate_row->sample->sanger_sample_id,
           consent_withdrawn  => $plate_row->sample->consent_withdrawn,
           donor_id           => $plate_row->sample->donor_id,
           uuid               => $plate_row->sample->uuid_sample_lims,
