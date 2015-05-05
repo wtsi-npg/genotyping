@@ -4,6 +4,7 @@ use utf8;
 package WTSI::NPG::Expression::InfiniumDataObject;
 
 use Moose;
+use Try::Tiny;
 
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
@@ -44,6 +45,7 @@ sub update_secondary_metadata {
                 "; using its Sanger sample ID instead");
   }
 
+  use Data::Dump qw(dump);
   if ($ss_sample) {
     $self->info("Updating metadata for '", $self->str, "' from plate '",
                 $ss_sample->{barcode}, "' well '", $ss_sample->{map}, "'");
@@ -51,7 +53,14 @@ sub update_secondary_metadata {
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
     foreach my $avu (@meta) {
-      $self->supersede_avus(@$avu);
+      $self->debug("Superseding AVUs with ", dump($avu));
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->logcroak("Failed to supersede AVUs on '", $self->str, "' ",
+                        " with AVU ", dump($avu), " of AVUs ", dump(@meta),
+                        ": ", $_);
+      };
     }
 
     $self->update_group_permissions;

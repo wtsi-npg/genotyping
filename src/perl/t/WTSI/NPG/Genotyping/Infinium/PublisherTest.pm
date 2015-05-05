@@ -24,7 +24,7 @@ use utf8;
        plate             => 'plate1',
        well              => 'A10',
        sample            => 'sample1',
-       beadchip          => '012345689',
+       beadchip          => '111345689',
        beadchip_section  => 'R01C01',
        beadchip_design   => $self->test_chip_design,
        beadchip_revision => '1',
@@ -42,7 +42,7 @@ use utf8;
        plate             => 'plate1',
        well              => 'A10',
        sample            => 'sample1',
-       beadchip          => '012345689',
+       beadchip          => '111345689',
        beadchip_section  => 'R01C01',
        beadchip_design   => $self->test_chip_design,
        beadchip_revision => '1',
@@ -119,7 +119,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 231;
+use Test::More tests => 260;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -282,7 +282,7 @@ sub dryrun : Test(4) {
   cmp_ok(scalar @idat_files, '==', 0, 'IDAT files not published in dry run');
 }
 
-sub publish : Test(58) {
+sub publish : Test(67) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
@@ -311,7 +311,10 @@ sub publish : Test(58) {
   cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'beadchip',                value => '111345689'},
+     {attribute => 'beadchip_design',         value => 'design1'},
+     {attribute => 'beadchip_section',        value => 'R01C01'},
+     {attribute => 'dcterms:identifier',      value => '0123456789'},
      {attribute => 'infinium_plate',          value => 'plate1'},
      {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'md5',
@@ -332,7 +335,7 @@ sub publish : Test(58) {
   }
 }
 
-sub publish_longer_barcode : Test(58) {
+sub publish_longer_barcode : Test(67) {
   # 11 digits instead of 10 in barcode
   my $publication_time = DateTime->now;
 
@@ -353,16 +356,21 @@ sub publish_longer_barcode : Test(58) {
                                                [infinium_plate => 'plate1'],
                                                [infinium_well  => 'A10'],
                                                [type           => 'gtc']);
-  cmp_ok(scalar @gtc_files, '==', 1, 'Number of GTC files published for 11-digit barcode');
+  cmp_ok(scalar @gtc_files, '==', 1,
+         'Number of GTC files published for 11-digit barcode');
 
   my @idat_files = $irods->find_objects_by_meta($irods_tmp_coll,
                                                 [infinium_plate => 'plate1'],
                                                 [infinium_well  => 'A10'],
                                                 [type           => 'idat']);
-  cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published for 11-digit barcode');
+  cmp_ok(scalar @idat_files, '==', 2,
+         'Number of idat files published for 11-digit barcode');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'beadchip',                value => '111345689'},
+     {attribute => 'beadchip_design',         value => 'design1'},
+     {attribute => 'beadchip_section',        value => 'R01C01'},
+     {attribute => 'dcterms:identifier',      value => '0123456789'},
      {attribute => 'infinium_plate',          value => 'plate1'},
      {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'md5',
@@ -383,7 +391,7 @@ sub publish_longer_barcode : Test(58) {
   }
 }
 
-sub publish_methylation : Test(43) {
+sub publish_methylation : Test(45) {
   my $publication_time = DateTime->now;
 
   my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
@@ -412,7 +420,10 @@ sub publish_methylation : Test(43) {
   cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files published');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'beadchip',                value => '111345689'},
+     {attribute => 'beadchip_design',         value => 'methylation_design1'},
+     {attribute => 'beadchip_section',        value => 'R01C01'},
+     {attribute => 'dcterms:identifier',      value => '0123456789'},
      {attribute => 'infinium_plate',          value => 'plate1'},
      {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'md5',
@@ -433,7 +444,7 @@ sub publish_methylation : Test(43) {
   }
 }
 
-sub publish_overwrite : Test(60) {
+sub publish_overwrite : Test(69) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
@@ -475,7 +486,10 @@ sub publish_overwrite : Test(60) {
   cmp_ok(scalar @idat_files, '==', 2, 'Number of idat files re-published');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'beadchip',                value => '111345689'},
+     {attribute => 'beadchip_design',         value => 'design1'},
+     {attribute => 'beadchip_section',        value => 'R01C01'},
+     {attribute => 'dcterms:identifier',      value => '0123456789'},
      {attribute => 'infinium_plate',          value => 'plate1'},
      {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'md5',
@@ -515,7 +529,8 @@ sub test_metadata {
   foreach my $avu (@$expected_metadata) {
     my $attr  = $avu->{attribute};
     my $value = $avu->{value};
-    ok($data_object->find_in_metadata($attr, $value), "Found $attr => $value");
+    ok($data_object->find_in_metadata($attr, $value),
+       "Found $attr => $value") or diag explain $data_object->metadata;
   }
 }
 
