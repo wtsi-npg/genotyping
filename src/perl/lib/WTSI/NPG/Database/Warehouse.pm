@@ -10,7 +10,7 @@ use WTSI::NPG::Utilities qw(depad_well);
 
 extends 'WTSI::NPG::Database';
 
-with 'WTSI::DNAP::Utilities::Cacheable';
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 # Method names for MOP operations
 our $FIND_SAMPLE_BY_PLATE = 'find_sample_by_plate';

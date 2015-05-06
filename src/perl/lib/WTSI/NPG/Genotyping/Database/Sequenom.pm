@@ -8,6 +8,8 @@ use Moose;
 
 extends 'WTSI::NPG::Database';
 
+with 'WTSI::NPG::Database::DBI';
+
 =head2 find_finished_plate_names
 
   Arg [1]    : start DateTime

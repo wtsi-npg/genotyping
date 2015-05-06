@@ -73,7 +73,7 @@ has 'snpsets' =>
 
 has 'ss_warehouse_db' =>
   (is       => 'ro',
-   isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'WTSI::NPG::Database',
    isa      => 'Object',
    required => 1);
 

@@ -6,9 +6,11 @@ use Carp;
 use Moose;
 
 use WTSI::NPG::Genotyping;
-use WTSI::NPG::Genotyping::Schema;
+use WTSI::NPG::Genotyping::Database::Pipeline::Schema;
 
 extends 'WTSI::NPG::Database';
+
+with 'WTSI::NPG::Database::DBIx';
 
 has 'config_dir' =>
   (is      => 'ro',
@@ -42,7 +44,7 @@ has 'overwrite' =>
 
 has 'schema' =>
   (is       => 'rw',
-   isa      => 'WTSI::NPG::Genotyping::Schema',
+   isa      => 'WTSI::NPG::Genotyping::Database::Pipeline::Schema',
    required => 0);
 
 our $AUTOLOAD;
@@ -157,114 +159,15 @@ sub populate {
   return $self;
 }
 
-=head2 connect
-
-  See WTSI::NPG::Database.
-
-=cut
-
 sub connect {
   my ($self, %args) = @_;
-
-  unless ($self->is_connected) {
-    $self->info('Connecting to ', $self->data_source);
-
-    my $schema = WTSI::NPG::Genotyping::Schema->connect($self->data_source,
-                                                        $self->username,
-                                                        $self->password,
-                                                        \%args);
-    $self->schema($schema);
-    $self->dbh($self->schema->storage->dbh);
-  }
-
+  $self->schema(WTSI::NPG::Genotyping::Database::Pipeline::Schema->connect
+                ($self->data_source,
+                 $self->username,
+                 $self->password,
+                 \%args));
   return $self;
 }
-
-=head2 disconnect
-
-  See WTSI::NPG::Database.
-
-=cut
-
-sub disconnect {
-  my ($self) = @_;
-  if ($self->is_connected) {
-    $self->info('Disconnecting from ', $self->data_source);
-    $self->schema->storage->disconnect;
-  }
-  else {
-    $self->warn("Attempted to disconnect when not connected");
-  }
-
-  return $self;
-}
-
-=head2 is_connected
-
-  See WTSI::NPG::Database.
-
-=cut
-
-sub is_connected {
-  my ($self) = @_;
-  if ($self->schema) {
-    return $self->schema->storage->connected;
-  }
-}
-
-=head2 dbh
-
-  See WTSI::NPG::Database.
-
-=cut
-
-sub dbh {
-  my ($self) = @_;
-  if ($self->schema) {
-    return $self->schema->storage->dbh;
-  }
-}
-
-=head2 in_transaction
-
-  Arg [1]    : Subroutine reference
-  Arg [n]    : Subroutine arguments
-
-  Example    : $db->in_transaction(sub {  my $ds = shift;
-                                          my @sm = @_;
-                                          foreach (@sm) {
-                                            $ds->add_to_samples($_);
-                                          }
-                                        }, $dataset, @samples);
-  Description: Executes a subroutine in the context of a transaction
-               which will rollback on error.
-  Returntype : As subroutine.
-
-=cut
-
-sub in_transaction {
-  my ($self, $code, @args) = @_;
-
-  my @result;
-
-  eval {
-    @result = $self->schema->txn_do($code, @args);
-  };
-
-  if ($@) {
-    my $error = $@;
-
-    if ($error =~ /Rollback failed/) {
-      $self->logconfess("$error. Rollback failed! ",
-                        "WARNING: data may be inconsistent.");
-    } else {
-      $self->logconfess("$error. Rollback successful");
-    }
-  };
-
-  return wantarray ? @result : $result[0];
-}
-
 
 =head2 snpset_names_for_method
 
@@ -516,7 +419,11 @@ sub AUTOLOAD {
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
-  unless ($self->is_connected) {
+  #if (!$self->is_connected) {
+  #  $self->connect;
+  #}
+
+  if (!$self->is_connected) {
     $self->logconfess("$self is not connected");
   }
 

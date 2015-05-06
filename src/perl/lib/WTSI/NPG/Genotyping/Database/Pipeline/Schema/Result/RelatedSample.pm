@@ -1,6 +1,5 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema::Result::RelatedSample;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::RelatedSample;
 
 use strict;
 use warnings;
@@ -21,17 +20,20 @@ __PACKAGE__->add_columns
 
 __PACKAGE__->set_primary_key('id_sample_a', 'id_sample_b', 'id_relation');
 
-__PACKAGE__->belongs_to('relation',
-                        'WTSI::NPG::Genotyping::Schema::Result::Relation',
-                        { 'foreign.id_relation' => 'self.id_relation' });
+__PACKAGE__->belongs_to
+  ('relation',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Relation',
+   { 'foreign.id_relation' => 'self.id_relation' });
 
-__PACKAGE__->belongs_to('sample_a',
-                        'WTSI::NPG::Genotyping::Schema::Result::Sample',
-                        { 'foreign.id_sample' => 'self.id_sample_a' });
+__PACKAGE__->belongs_to
+  ('sample_a',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample',
+   { 'foreign.id_sample' => 'self.id_sample_a' });
 
-__PACKAGE__->belongs_to('sample_b',
-                        'WTSI::NPG::Genotyping::Schema::Result::Sample',
-                        { 'foreign.id_sample' => 'self.id_sample_b' });
+__PACKAGE__->belongs_to
+  ('sample_b',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample',
+   { 'foreign.id_sample' => 'self.id_sample_b' });
 
 1;
 
@@ -43,7 +45,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
