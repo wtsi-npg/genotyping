@@ -90,6 +90,26 @@ sub canonical_sample_id {
     return $self->sample_id;
 }
 
+
+=head2 quality_score
+
+  Arg [1]    : None
+
+  Example    : $boolean = $result->has_quality_score
+  Description: Placeholder. In the Fluidigm::AssayResult class, the function
+               of this name returns a Phred-scaled quality score. This
+               function returns -1 to indicate 'no score' (since Phred
+               scores by definition are non-negative).
+  Returntype : Str
+
+=cut
+
+sub quality_score {
+    my ($self) = @_;
+    return -1;
+}
+
+
 =head2 is_control
 
   Arg [1]    : None
@@ -104,6 +124,24 @@ sub canonical_sample_id {
 sub is_control {
     return 0;
 }
+
+
+=head2 is_empty
+
+  Arg [1]    : None
+
+  Example    : $result->is_control == 0
+  Description: Placeholder. In the Fluidigm::AssayResult class, the function
+               of this name checks for an 'empty' flag.
+  Returntype : Str
+
+=cut
+
+sub is_empty {
+    return 0;
+}
+
+
 
 sub snpset_name {
   my ($self) = @_;
@@ -139,6 +177,8 @@ sub _split_assay_id {
 
   return [$snpset_name, $snp_name];
 }
+
+
 
 __PACKAGE__->meta->make_immutable;
 

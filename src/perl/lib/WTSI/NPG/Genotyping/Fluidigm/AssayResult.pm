@@ -4,6 +4,7 @@ use utf8;
 package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
+use POSIX qw/log10/;
 use WTSI::NPG::Genotyping::Types qw(SNPGenotype);
 
 with 'WTSI::DNAP::Utilities::Loggable';
@@ -237,6 +238,29 @@ sub sample_address {
   my ($sample_address, $assay_num) = $self->_parse_assay;
   return $sample_address;
 }
+
+=head2 quality_score
+
+  Arg [1]    : None
+
+  Example    : $qscore = $result->quality_score
+  Description: Return the Phred-scaled quality score from the Fluidigm result.
+               Fluidigm has a percentage quality score, eg. 99.99.
+               Convert this to Phred: -10 * log10(Pr(error))
+               Round to nearest integer
+  Returntype : Num
+
+=cut
+
+sub quality_score {
+    my ($self) = @_;
+    my $pr_error = 1 - ($self->confidence / 100);
+    my $qscore = -10 * log10($pr_error);
+    $qscore = int($qscore + 0.5); # initial qscore is guaranteed non-negative
+    return $qscore;
+}
+
+
 
 sub _parse_assay {
   # Parse the 'assay' field and return the assay identifier. Field
