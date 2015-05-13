@@ -24,6 +24,10 @@ has 'is_call' =>
    isa      => 'Bool',
    default  => 1); # used to represent 'no calls'
 
+has 'qscore' =>
+  (is      => 'ro',
+   isa     => 'Num');
+
 sub BUILD {
   my ($self) = @_;
 
