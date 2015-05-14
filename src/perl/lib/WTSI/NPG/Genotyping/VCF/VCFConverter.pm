@@ -224,7 +224,8 @@ sub _generate_vcf_records {
         push(@sample_calls, $calls->{$snp->name}{$sample});
     }
     my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-        calls => \@sample_calls
+        calls => \@sample_calls,
+	additional_info => "ORIGINAL_STRAND=".$snp->strand
     );
     push(@records, $data_row->to_string());
     return @records;
