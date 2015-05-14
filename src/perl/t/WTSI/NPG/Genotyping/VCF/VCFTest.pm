@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 41;
+use Test::More tests => 42;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -29,8 +29,10 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 BEGIN {
     use_ok('WTSI::NPG::Genotyping::VCF::VCFConverter');
     use_ok('WTSI::NPG::Genotyping::VCF::VCFGtcheck');
+    use_ok('WTSI::NPG::Genotyping::VCF::DataRow');
 }
 
+use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::Genotyping::VCF::VCFConverter;
 use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 
