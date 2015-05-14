@@ -38,6 +38,10 @@ has 'vcf_chromosome' => # chromosome; may be 1-22, X, Y
     (is       => 'rw',
      isa      => 'Str');
 
+# TODO populate the additional_info string with the original SNP strand
+# eg. ORIGINAL_STRAND=+
+
+
 # genotype sub-fields GT = genotype; GQ = genotype quality; DP = read depth
 # TODO are GQ and DP required by bcftools?
 our $GENOTYPE_FORMAT = 'GT:GQ:DP';
