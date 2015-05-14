@@ -15,8 +15,10 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
+use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
+
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -161,7 +163,7 @@ sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
     my ($callsRef, $samplesRef) = $self->_parse_calls_samples();
-    my %calls = %{$callsRef};
+    #my %calls = %{$callsRef};
 
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
@@ -169,6 +171,11 @@ sub _generate_vcf_complete {
     $snpset = $self->snpset;
     my $total = scalar(@{$snpset->snps()});
     push(@output, $self->_generate_vcf_header(\@samples));
+    # TODO use a new VCF Header class to generate the header string
+    # update or remove the _parse_calls_samples method
+
+    # now, we need Call objects to generate the VCF body
+    my %calls = %{$self->_assay_results_to_calls()};
 
     foreach my $snp (@{$snpset->snps}) {
         if (is_GenderMarker($snp)) {
@@ -185,41 +192,41 @@ sub _generate_vcf_complete {
     return @output;
 }
 
+sub _assay_results_to_calls {
+    # convert the AssayResultSet into Call objects
+    # return a hash of hashes, indexed by SNP and sample name
+    my ($self, ) = @_;
+    my %calls;
+    foreach my $resultSet (@{$self->resultsets()}) {
+        foreach my $ar (@{$resultSet->assay_results()}) {
+            # foreach AssayResult (Sequenom or Fluidigm)
+            # use 'npg' methods to get snp, sample, call in standard format
+            if ($ar->is_empty()) { next; }
+            my $sample_id = $ar->canonical_sample_id();
+            my $snp_id = $ar->snp_assayed();
+            my $snp = $self->snpset->named_snp($snp_id);
+            my $call = WTSI::NPG::Genotyping::Call->new(
+                snp      => $snp,
+                qscore   => $ar->quality_score(),
+                genotype => $ar->canonical_call()
+            );
+            $calls{$snp_id}{$sample_id} = $call;
+        }
+    }
+    return \%calls;
+}
+
 sub _generate_vcf_records {
     my ($self, $snp, $calls, $samples) = @_;
-
-    my $read_depth = $DEFAULT_READ_DEPTH; # placeholder
-    my $qscore = $DEFAULT_QUALITY;        # placeholder genotype quality
-
-    my $ref = $snp->ref_allele();
-    my $alt = $snp->alt_allele();
-    my $chrom = $snp->chromosome();
-    if ($self->normalize_chromosome) {
-        $chrom = $self->_normalize_chromosome_name($chrom);
-    }
-
-    my @fields = ( $chrom,                    # CHROM
-                   $snp->position(),          # POS
-                   $snp->name(),              # ID
-                   $ref,                      # REF
-                   $alt,                      # ALT
-                   '.', '.',                  # QUAL, FILTER
-                   'ORIGINAL_STRAND='.$snp->strand(),  # INFO
-                   'GT:GQ:DP',                # FORMAT
-                 );
-
     my @records;
+    my @sample_calls;
     foreach my $sample (@$samples) {
-        my $call_raw = $calls->{$snp->name}{$sample};
-        my $call = $self->_call_to_vcf($call_raw, $ref, $alt, $snp->strand());
-        $call_raw ||= ".";
-        $call ||= ".";
-        my @sample_fields = ($call, $qscore, $read_depth);
-        push(@fields, join(':', @sample_fields));
+        push(@sample_calls, $calls->{$snp->name}{$sample});
     }
-
-    push(@records, join("\t", @fields));
-
+    my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+        calls => \@sample_calls
+    );
+    push(@records, $data_row->to_string());
     return @records;
 }
 
