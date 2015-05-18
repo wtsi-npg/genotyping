@@ -66,7 +66,7 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 # Database handle stubs
-my $ssdb;
+my $whdb;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
@@ -86,7 +86,7 @@ sub make_fixture : Test(setup) {
   $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_directory);
 
-  $ssdb = WTSI::NPG::Database::WarehouseStub->new
+  $whdb = WTSI::NPG::Database::WarehouseStub->new
     (name    => 'sequencescape_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 }
@@ -109,7 +109,7 @@ sub constructor : Test(1) {
          [publication_time => $publication_time,
           resultset        => $resultset,
           reference_path   => $reference_path,
-          ss_warehouse_db  => $ssdb]);
+          warehouse_db     => $whdb]);
 }
 
 sub publish : Test(21) {
@@ -119,7 +119,7 @@ sub publish : Test(21) {
     (publication_time => $publication_time,
      resultset        => $resultset,
      reference_path   => $reference_path,
-     ss_warehouse_db  => $ssdb);
+     warehouse_db     => $whdb);
 
   my @addresses_to_publish = qw(S01);
   my $num_published = $publisher->publish($irods_tmp_coll,
@@ -181,7 +181,7 @@ sub publish_overwrite : Test(21) {
     (publication_time => $publication_time,
      resultset        => $resultset,
      reference_path   => $reference_path,
-     ss_warehouse_db  => $ssdb);
+     warehouse_db     => $whdb);
 
   my $repub_resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_repub_directory);
@@ -189,7 +189,7 @@ sub publish_overwrite : Test(21) {
     (publication_time => $publication_time,
      resultset        => $repub_resultset,
      reference_path   => $reference_path,
-     ss_warehouse_db  => $ssdb);
+     warehouse_db     => $whdb);
 
   my @addresses_to_publish = qw(S01);
 
@@ -252,7 +252,7 @@ sub publish_ambiguous_snpset : Test(1) {
     (publication_time => $publication_time,
      resultset        => $resultset,
      reference_path   => $reference_path,
-     ss_warehouse_db  => $ssdb);
+     warehouse_db     => $whdb);
 
   my @addresses_to_publish = qw(S01);
   ok(!$publisher->publish($irods_tmp_coll, @addresses_to_publish),
@@ -272,7 +272,7 @@ sub publish_ambiguous_metadata : Test(1) {
     (publication_time => $publication_time,
      resultset        => $resultset,
      reference_path   => $reference_path,
-     ss_warehouse_db  => $ssdb);
+     warehouse_db     => $whdb);
 
   my @addresses_to_publish = qw(S01);
   ok(!$publisher->publish($irods_tmp_coll, @addresses_to_publish),

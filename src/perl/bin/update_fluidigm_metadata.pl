@@ -1,6 +1,4 @@
-#!/software/bin/perl
-
-use utf8;
+#!/usr/bin/env perl
 
 package main;
 
@@ -10,6 +8,7 @@ use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
@@ -132,19 +131,16 @@ sub run {
   }
 
   foreach my $data_object (@fluidigm_data) {
-    eval {
+    try {
       my $fdo = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
         ($irods, $data_object);
       $fdo->update_secondary_metadata($ssdb);
       ++$updated;
+    } catch {
+      $log->error("Failed to update metadata for '$data_object': ", $_);
     };
 
-    if ($@) {
-      $log->error("Failed to update metadata for '$data_object': ", $@);
-    }
-    else {
-      $log->info("Updated metadata for '$data_object': $updated of $total");
-    }
+    $log->info("Updated metadata for '$data_object': $updated of $total");
   }
 
   if ($stdio) {
