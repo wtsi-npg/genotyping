@@ -37,7 +37,7 @@ sub ACTION_test {
 
   {
     # Ensure that the tests can see the Perl scripts
-    local $ENV{PATH} = "./bin";
+    local $ENV{PATH} = "./bin:" . $ENV{PATH};
 
     $self->SUPER::ACTION_test;
   }
