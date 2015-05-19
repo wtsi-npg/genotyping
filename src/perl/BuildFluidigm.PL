@@ -30,7 +30,16 @@ my $build = BuildFluidigm->new
                          'Carp'                          => '>= 1.20',
                          'WTSI::DNAP::Warehouse::Schema' => '>= 1.0',
                          'WTSI::NPG::iRODS'              => '>= 0.14.0'
-                        }
+                        },
+   test_files        => [
+                         './t/fluidigm_assay_data_object.t',
+                         './t/fluidigm_assay_resultset.t',
+                         './t/fluidigm_assay_result.t',
+                         './t/fluidigm_export_file.t',
+                         './t/fluidigm_publisher.t',
+                         './t/fluidigm_resultset.t',
+                         './t/fluidigm_subscriber.t'
+                        ]
   );
 
 $build->create_build_script;
