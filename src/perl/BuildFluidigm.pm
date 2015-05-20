@@ -18,6 +18,7 @@ our @fluidigm_subset = ('publish_fluidigm_genotypes.pl',
                         'WTSI/NPG/Database/MLWarehouse.pm',
                         'WTSI/NPG/Genotyping/Annotation.pm',
                         'WTSI/NPG/Genotyping/Annotator.pm',
+                        'WTSI/NPG/Genotyping/Call.pm',
                         'WTSI/NPG/Genotyping/Fluidigm/AssayDataObject.pm',
                         'WTSI/NPG/Genotyping/Fluidigm/AssayResult.pm',
                         'WTSI/NPG/Genotyping/Fluidigm/AssayResultSet.pm',
@@ -25,12 +26,15 @@ our @fluidigm_subset = ('publish_fluidigm_genotypes.pl',
                         'WTSI/NPG/Genotyping/Fluidigm/Publisher.pm',
                         'WTSI/NPG/Genotyping/Fluidigm/ResultSet.pm',
                         'WTSI/NPG/Genotyping/Fluidigm/Subscriber.pm',
+                        'WTSI/NPG/Genotyping/GenderMarker.pm',
                         'WTSI/NPG/Genotyping/Reference.pm',
                         'WTSI/NPG/Genotyping/SNP.pm',
                         'WTSI/NPG/Genotyping/SNPSet.pm',
                         'WTSI/NPG/Genotyping/SNPSetPublisher.pm',
                         'WTSI/NPG/Genotyping/Types.pm',
-                        'WTSI/NPG/Publisher.pm');
+                        'WTSI/NPG/Publisher.pm',
+                        'WTSI/NPG/Utilities.pm',
+                       );
 
 sub ACTION_test {
   my ($self) = @_;
