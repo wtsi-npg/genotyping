@@ -1,10 +1,7 @@
 
-use utf8;
-
 package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 
 use Moose;
-
 use List::AllUtils qw(all natatime reduce uniq);
 use Try::Tiny;
 

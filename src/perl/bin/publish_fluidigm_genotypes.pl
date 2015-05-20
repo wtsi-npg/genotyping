@@ -1,6 +1,4 @@
-#!/software/bin/perl
-
-use utf8;
+#!/usr/bin/env perl
 
 package main;
 
@@ -12,6 +10,7 @@ use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
@@ -91,7 +90,7 @@ sub run {
     }
   }
 
-  my $ssdb = WTSI::NPG::Database::MLWarehouse->new
+  my $whdb = WTSI::NPG::Database::MLWarehouse->new
     (name    => 'multi_lims_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
@@ -127,7 +126,7 @@ sub run {
   $log->debug("Publishing $total Fluidigm data directories in '$source_dir'");
 
   foreach my $dir (@dirs) {
-    eval {
+    try {
       my $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
         (directory => $dir);
 
@@ -135,20 +134,17 @@ sub run {
         (publication_time => $now,
          resultset        => $resultset,
          reference_path   => $reference_path,
-         ss_warehouse_db  => $ssdb,
+         warehouse_db     => $whdb,
          logger           => $log);
       $publisher->irods->logger($log);
 
       $publisher->publish($publish_dest);
       $num_published++;
+    } catch {
+      $log->error("Failed to publish '$dir': ", $_);
     };
 
-    if ($@) {
-      $log->error("Failed to publish '$dir': ", $@);
-    }
-    else {
-      $log->debug("Published '$dir': $num_published of $total");
-    }
+    $log->debug("Published '$dir': $num_published of $total");
   }
 }
 
@@ -193,7 +189,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
