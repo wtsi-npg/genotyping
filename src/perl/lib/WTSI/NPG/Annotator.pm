@@ -11,6 +11,9 @@ with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
 
 our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
 
+our $CLARITY_LIMS_ID       = 'CLARITY';
+our $SEQUENCESCAPE_LIMS_ID = 'SQSCP';
+
 =head2 make_creation_metadata
 
   Arg [1]    : DateTime creation time
@@ -94,26 +97,6 @@ sub make_sample_metadata {
     }
   };
 
-  # The following is a shim to generate annotation from either the
-  # Sequencescape warehouse (which calls the identifier "internal_id")
-  # or the Multi-LIMS warehouse (which calls its corresponding
-  # metadata "id_sample_lims")
-  if (defined $record->{id_sample_lims}) {
-    # ML warehouse
-    $ensure->('id_sample_lims', $self->sample_id_attr);
-  }
-  elsif (defined $record->{internal_id}) {
-    # Legacy SScape warehouse
-    $ensure->('internal_id',    $self->sample_id_attr);
-  }
-  else {
-    $self->logcluck("Malformed warehouse record (no primary identifier) :",
-                    dump($record));
-  }
-  $ensure->('name',             $self->sample_name_attr);
-  $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
-  $ensure->('study_id',         $self->study_id_attr);
-
   # Maybe add these, only if present.
   my $maybe = sub {
     my ($key, $meta_attr) = @_;
@@ -121,6 +104,34 @@ sub make_sample_metadata {
       push @meta, [$meta_attr, $record->{$key}];
     }
   };
+
+  # The following is a shim to generate annotation from either the
+  # Sequencescape warehouse or the Multi-LIMS warehouse. Only the ML
+  # warehouse has an 'id_lims' key.
+  if (defined $record->{id_lims}) {
+    # ML warehouse
+    if ($record->{id_lims} eq $CLARITY_LIMS_ID) {
+      # May not be present when from CLARITY
+      $maybe->('sanger_sample_id', $self->dcterms_identifier_attr);
+    }
+    else {
+      # Must be present
+      $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+    }
+
+    # Sample ID comes from 'id_sample_lims' column
+    $ensure->('id_sample_lims', $self->sample_id_attr);
+  }
+  else {
+    # SScape warehouse
+    # Sample ID comes from 'internal_id' column
+    $ensure->('internal_id', $self->sample_id_attr);
+    # Must be present
+    $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+  }
+
+  $ensure->('name',             $self->sample_name_attr);
+  $ensure->('study_id',         $self->study_id_attr);
 
   $maybe->('study_title',      $self->study_title_attr);
   $maybe->('supplier_name',    $self->sample_supplier_name_attr);

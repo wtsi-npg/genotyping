@@ -83,7 +83,8 @@ sub find_fluidigm_sample_by_plate {
 sub _make_well_result {
   my ($plate_row) = @_;
 
-  return {id_sample_lims     => $plate_row->sample->id_sample_lims,
+  return {id_lims            => $plate_row->sample->id_lims,
+          id_sample_lims     => $plate_row->sample->id_sample_lims,
           sanger_sample_id   => $plate_row->sample->sanger_sample_id,
           consent_withdrawn  => $plate_row->sample->consent_withdrawn,
           donor_id           => $plate_row->sample->donor_id,
