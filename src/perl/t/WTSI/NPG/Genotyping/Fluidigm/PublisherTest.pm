@@ -16,7 +16,8 @@ use utf8;
     $well eq 'S01' or
       confess "WarehouseStub expected well argument 'S01' but got '$well'";
 
-    return {internal_id        => 123456789,
+    return {id_lims            => 'SQSCP',
+            id_sample_lims     => 123456789,
             sanger_sample_id   => '0123456789',
             consent_withdrawn  => 0,
             donor_id           => 'D999',

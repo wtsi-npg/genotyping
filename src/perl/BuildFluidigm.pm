@@ -33,6 +33,7 @@ our @fluidigm_subset = ('publish_fluidigm_genotypes.pl',
                         'WTSI/NPG/Genotyping/SNPSetPublisher.pm',
                         'WTSI/NPG/Genotyping/Types.pm',
                         'WTSI/NPG/Publisher.pm',
+                        'WTSI/NPG/SimplePublisher.pm',
                         'WTSI/NPG/Utilities.pm',
                        );
 
