@@ -109,25 +109,31 @@ sub make_sample_metadata {
   # Sequencescape warehouse or the Multi-LIMS warehouse. Only the ML
   # warehouse has an 'id_lims' key.
   if (defined $record->{id_lims}) {
-    # ML warehouse
-    if ($record->{id_lims} eq $CLARITY_LIMS_ID) {
-      # May not be present when from CLARITY
-      $maybe->('sanger_sample_id', $self->dcterms_identifier_attr);
+    # This metadata obtained from from ML warehouse
+
+    if ($record->{id_lims} eq $SEQUENCESCAPE_LIMS_ID) {
+      # Sample processed by Sequencescape; sanger_sample_id must be
+      # present
+      $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
     }
     else {
-      # Must be present
-      $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+      # Sample processed elsewhere; sanger_sample_id may not be
+      # present
+      $maybe->('sanger_sample_id', $self->dcterms_identifier_attr);
     }
 
     # Sample ID comes from 'id_sample_lims' column
     $ensure->('id_sample_lims', $self->sample_id_attr);
   }
-  else {
-    # SScape warehouse
+  else {                                 # SScape warehouse
+    # This metadata obtained from Sequencescape warehouse.
+
+    # Sample processed by Sequencescape; sanger_sample_id must be
+    # present
+    $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+
     # Sample ID comes from 'internal_id' column
     $ensure->('internal_id', $self->sample_id_attr);
-    # Must be present
-    $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
   }
 
   $ensure->('name',             $self->sample_name_attr);
