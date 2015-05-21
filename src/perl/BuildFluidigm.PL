@@ -32,13 +32,20 @@ my $build = BuildFluidigm->new
                          'WTSI::NPG::iRODS'              => '>= 0.14.0'
                         },
    test_files        => [
+                         './t/call.t',
                          './t/fluidigm_assay_data_object.t',
-                         './t/fluidigm_assay_resultset.t',
                          './t/fluidigm_assay_result.t',
+                         './t/fluidigm_assay_resultset.t',
                          './t/fluidigm_export_file.t',
                          './t/fluidigm_publisher.t',
                          './t/fluidigm_resultset.t',
-                         './t/fluidigm_subscriber.t'
+                         './t/fluidigm_subscriber.t',
+                         './t/gender_marker.t',
+                         './t/publisher.t',
+                         './t/simple_publisher.t',
+                         './t/snp.t',
+                         './t/snpset_publisher.t',
+                         './t/utilities.t'
                         ]
   );
 

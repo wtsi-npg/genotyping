@@ -159,17 +159,20 @@ publish_fluidigm_genotypes
 
 Options:
 
-  --days-ago    The number of days ago that the publication window ends.
-                Optional, defaults to zero (the current day).
-  --days        The number of days in the publication window, ending at
-                the day given by the --days-ago argument. Any sample data
-                modified during this period will be considered
-                for publication. Optional, defaults to 7 days.
-  --dest        The data destination root collection in iRODS.
-  --help        Display help.
-  --logconf     A log4perl configuration file. Optional.
-  --source      The root directory to search for sample data.
-  --verbose     Print messages while processing. Optional.
+  --days-ago        The number of days ago that the publication window
+                    ends. Optional, defaults to zero (the current day).
+  --days            The number of days in the publication window, ending
+                    at the day given by the --days-ago argument. Any sample
+                    data modified during this period will be considered
+                    for publication. Optional, defaults to 7 days.
+  --dest            The data destination root collection in iRODS.
+  --help            Display help.
+  --logconf         A log4perl configuration file. Optional.
+  --reference-path  Provides an iRODS path (and therfore zone hint) as
+                    to where to look for SNP set manifests. Optional,
+                    defaults to 'seq'.
+  --source          The root directory to search for sample data.
+  --verbose         Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
@@ -178,6 +181,10 @@ have been modified within the n days prior to a specific time.
 (N.B. limits search to 1 level of directories.) Any files identified
 are published to iRODS with metadata obtained from the exported CSV
 file contained in each directory.
+
+The SNPs reported in the Fluidigm data files are matched against
+reference manifests of SNPs stored in iRODS in order to tell which set
+of SNPs has been analysed.
 
 =head1 METHODS
 
