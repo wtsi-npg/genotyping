@@ -4,11 +4,22 @@ use utf8;
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
-  use warnings;
+  use Moose;
   use Carp;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
+
+  has 'test_id_lims' =>
+    (is       => 'rw',
+     isa      => 'Str',
+     required => 0,
+     default  => sub { 'SQSCP' });
+
+  has 'test_sanger_sample_id' =>
+    (is       => 'rw',
+     isa      => 'Str | Undef',
+     required => 0,
+     default  => sub { '0123456789' });
 
   sub find_fluidigm_sample_by_plate {
     my ($self, $fluidigm_barcode, $well) = @_;
@@ -16,9 +27,9 @@ use utf8;
     $well eq 'S01' or
       confess "WarehouseStub expected well argument 'S01' but got '$well'";
 
-    return {id_lims            => 'SQSCP',
+    return {id_lims            => $self->test_id_lims,
             id_sample_lims     => 123456789,
-            sanger_sample_id   => '0123456789',
+            sanger_sample_id   => $self->test_sanger_sample_id,
             consent_withdrawn  => 0,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
@@ -44,7 +55,7 @@ use warnings;
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 47;
+use Test::More tests => 86;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -66,9 +77,6 @@ my $irods_tmp_coll;
 
 my $pid = $$;
 
-# Database handle stubs
-my $whdb;
-
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
 
@@ -86,10 +94,6 @@ sub make_fixture : Test(setup) {
 
   $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
     (directory => $fluidigm_directory);
-
-  $whdb = WTSI::NPG::Database::WarehouseStub->new
-    (name    => 'sequencescape_warehouse',
-     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 }
 
 sub teardown : Test(teardown) {
@@ -104,6 +108,11 @@ sub require : Test(1) {
 }
 
 sub constructor : Test(1) {
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP');
+
   my $publication_time = DateTime->now;
 
   new_ok('WTSI::NPG::Genotyping::Fluidigm::Publisher',
@@ -113,7 +122,12 @@ sub constructor : Test(1) {
           warehouse_db     => $whdb]);
 }
 
-sub publish : Test(21) {
+sub publish_sqscp : Test(21) {
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP');
+
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
@@ -175,7 +189,144 @@ sub publish : Test(21) {
   test_metadata($irods, $data_path, $expected_meta);
 }
 
+sub publish_sqscp_no_id : Test(19) {
+  # Test that publishing fails for SQSCP LIMS when there is no
+  # sanger_sample_id
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP',
+     test_sanger_sample_id => undef);
+
+  my $publication_time = DateTime->now;
+
+  my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
+    (publication_time => $publication_time,
+     resultset        => $resultset,
+     reference_path   => $reference_path,
+     warehouse_db     => $whdb);
+
+  my @addresses_to_publish = qw(S01);
+  my $num_published = $publisher->publish($irods_tmp_coll,
+                                          @addresses_to_publish);
+  cmp_ok($num_published, '==', scalar @addresses_to_publish,
+         "Number of chunks published");
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my $audience = 'http://psd-production.internal.sanger.ac.uk';
+  my @aggregate_data =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [fluidigm_plate     => '1381735059'],
+                                 ['dcterms:audience' => "$audience%", 'like']);
+  cmp_ok(scalar @aggregate_data, '==', 1,
+         "Number of aggregate data published with dcterms:audience metadata");
+
+  my @chunked_data =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [fluidigm_plate => '1381735059'],
+                                 [fluidigm_well  => 'S01'],
+                                 [fluidigm_plex  => 'qc']);
+  cmp_ok(scalar @chunked_data, '==', scalar @addresses_to_publish,
+         "Number of chunks published with fluidigm_plate metadata");
+
+  # dcterms:identifier absent because there is no sanger_sample_id
+  my $expected_meta =
+    [{attribute => 'fluidigm_plate',          value => '1381735059'},
+     {attribute => 'fluidigm_well',           value => 'S01'},
+     {attribute => 'md5',
+      value     => 'f5f1aaa74edd3167a95b9081ebcc3a40' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $data_path = $chunked_data[0];
+  test_metadata($irods, $data_path, $expected_meta);
+}
+
+sub publish_c_gclp : Test(20) {
+  # Set LIMS to C_GCLP and provide no sanger_sample_id. Everything
+  # should work. There will be no dcterm:identifier in the iRODS
+  # metadata.
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'C_GCLP',
+     test_sanger_sample_id => undef);
+
+  my $publication_time = DateTime->now;
+
+  my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
+    (publication_time => $publication_time,
+     resultset        => $resultset,
+     reference_path   => $reference_path,
+     warehouse_db     => $whdb);
+
+  my @addresses_to_publish = qw(S01);
+  my $num_published = $publisher->publish($irods_tmp_coll,
+                                          @addresses_to_publish);
+  cmp_ok($num_published, '==', scalar @addresses_to_publish,
+         "Number of chunks published");
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my $audience = 'http://psd-production.internal.sanger.ac.uk';
+  my @aggregate_data =
+     $irods->find_objects_by_meta($irods_tmp_coll,
+                                  [fluidigm_plate     => '1381735059'],
+                                  ['dcterms:audience' => "$audience%", 'like']);
+  cmp_ok(scalar @aggregate_data, '==', 1,
+         "Number of aggregate data published with dcterms:audience metadata");
+
+  my @chunked_data =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [fluidigm_plate => '1381735059'],
+                                 [fluidigm_well  => 'S01'],
+                                 [fluidigm_plex  => 'qc']);
+  cmp_ok(scalar @chunked_data, '==', scalar @addresses_to_publish,
+         "Number of chunks published with fluidigm_plate metadata");
+
+  my @chunked_audience =
+    $irods->find_objects_by_meta($irods_tmp_coll,
+                                 [fluidigm_plate     => '1381735059'],
+                                 [fluidigm_well      => 'S01'],
+                                 [fluidigm_plex      => 'qc'],
+                                 ['dcterms:audience' => "$audience%", 'like']);
+  cmp_ok(scalar @chunked_audience, '==', 0,
+         "Number of chunks published with dcterms:audience metadata");
+
+  # dcterms:identifier absent because there is no sanger_sample_id
+  my $expected_meta =
+    [{attribute => 'fluidigm_plate',          value => '1381735059'},
+     {attribute => 'fluidigm_well',           value => 'S01'},
+     {attribute => 'md5',
+      value     => 'f5f1aaa74edd3167a95b9081ebcc3a40' },
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $data_path = $chunked_data[0];
+  test_metadata($irods, $data_path, $expected_meta);
+}
+
 sub publish_overwrite : Test(21) {
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP');
+
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Fluidigm::Publisher->new
@@ -237,6 +388,11 @@ sub publish_overwrite : Test(21) {
 }
 
 sub publish_ambiguous_snpset : Test(1) {
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP');
+
   my $irods = WTSI::NPG::iRODS->new;
 
   # Add a new copy of the SNP set containing the same SNPS, but having
@@ -261,6 +417,11 @@ sub publish_ambiguous_snpset : Test(1) {
 }
 
 sub publish_ambiguous_metadata : Test(1) {
+  my $whdb = WTSI::NPG::Database::WarehouseStub->new
+    (name         => 'ml_warehouse',
+     inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_id_lims => 'SQSCP');
+
   my $irods = WTSI::NPG::iRODS->new;
 
   # Add a new fluidigm_plex name to the existing SNP set
