@@ -11,7 +11,6 @@ with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
 
 our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
 
-our $CLARITY_LIMS_ID       = 'CLARITY';
 our $SEQUENCESCAPE_LIMS_ID = 'SQSCP';
 
 =head2 make_creation_metadata
@@ -83,17 +82,17 @@ sub make_sample_metadata {
     push @meta, [$self->sample_consent_attr => $flag];
   }
   else {
-    $self->logcluck(sprintf($msg, 'consent_withdrawn', dump($record)));
+    $self->logcarp(sprintf($msg, 'consent_withdrawn', dump($record)));
   }
 
-  # Ensure that these are added, or abort.
+  # Ensure that these are added, or log an error.
   my $ensure = sub {
     my ($key, $meta_attr) = @_;
     if (defined $record->{$key}) {
       push @meta, [$meta_attr, $record->{$key}];
     }
     else {
-      $self->logcluck(sprintf($msg, $key, dump($record)));
+      $self->logcarp(sprintf($msg, $key, dump($record)));
     }
   };
 
@@ -125,7 +124,7 @@ sub make_sample_metadata {
     # Sample ID comes from 'id_sample_lims' column
     $ensure->('id_sample_lims', $self->sample_id_attr);
   }
-  else {                                 # SScape warehouse
+  else {
     # This metadata obtained from Sequencescape warehouse.
 
     # Sample processed by Sequencescape; sanger_sample_id must be
