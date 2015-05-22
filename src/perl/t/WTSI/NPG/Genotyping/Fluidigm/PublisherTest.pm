@@ -190,8 +190,8 @@ sub publish_sqscp : Test(21) {
 }
 
 sub publish_sqscp_no_id : Test(19) {
-  # Test that publishing fails for SQSCP LIMS when there is no
-  # sanger_sample_id
+  # Test that publishing succeeds for SQSCP LIMS when there is no
+  # sanger_sample_id (errors are logged).
   my $whdb = WTSI::NPG::Database::WarehouseStub->new
     (name         => 'ml_warehouse',
      inifile      => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
