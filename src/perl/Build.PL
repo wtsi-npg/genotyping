@@ -33,7 +33,7 @@ my $build = Build->new
                          'DBIx::Class'                   => '>= 0.082',
                          'Data::Dump'                    => '>= 1.22',
                          'DateTime'                      => '>= 1.18',
-                         'List::AllUtils'                => '>= 0.9',
+                         'List::AllUtils'                => '>= 0.09',
                          'Log::Log4perl'                 => '>= 1.46',
                          'Moose'                         => '>= 2.1',
                          'MooseX::Types'                 => '>= 0.45',
