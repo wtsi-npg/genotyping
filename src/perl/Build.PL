@@ -28,9 +28,24 @@ my $build = Build->new
                           'Test::Exception' => '>= 0.32',
                          },
    requires          => {
-                         'Carp'                          => '>= 1.20',
-                         'WTSI::DNAP::Warehouse::Schema' => '>= 1.0',
-                         'WTSI::NPG::iRODS'              => '>= 0.14.0'
+                         'Config::IniFiles'              => '>= 2.8.6',
+                         'DBI'                           => '>= 1.63',
+                         'DBIx::Class'                   => '>= 0.082',
+                         'Data::Dump'                    => '>= 1.22',
+                         'DateTime'                      => '>= 1.18',
+                         'List::AllUtils'                => '>= 0.09',
+                         'Log::Log4perl'                 => '>= 1.46',
+                         'Moose'                         => '>= 2.1',
+                         'MooseX::Types'                 => '>= 0.45',
+                         'Set::Scalar'                   => '>= 1.29',
+                         'Text::CSV'                     => '>= 1.33',
+                         'Try::Tiny'                     => '>= 0.22',
+                         'URI'                           => '>= 1.67',
+                         'WTSI::DNAP::Warehouse::Schema' => '>= 1.1',
+                         'WTSI::NPG::iRODS'              => '>= 0.15.0'
+                        },
+   recommends        => {
+                         'UUID' => '>= 0.24',
                         },
    ini_files => {'etc/genders.ini'   => 'etc/genders.ini',
                  'etc/methods.ini'   => 'etc/methods.ini',
