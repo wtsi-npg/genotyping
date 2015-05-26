@@ -41,9 +41,11 @@ my $build = Build->new
                          'Text::CSV'                     => '>= 1.33',
                          'Try::Tiny'                     => '>= 0.22',
                          'URI'                           => '>= 1.67',
-                         'UUID'                          => '>= 0.24',
                          'WTSI::DNAP::Warehouse::Schema' => '>= 1.1',
                          'WTSI::NPG::iRODS'              => '>= 0.15.0'
+                        },
+   recommends        => {
+                         'UUID' => '>= 0.24',
                         },
    ini_files => {'etc/genders.ini'   => 'etc/genders.ini',
                  'etc/methods.ini'   => 'etc/methods.ini',
