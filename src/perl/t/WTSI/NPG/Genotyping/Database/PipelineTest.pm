@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 68;
+use Test::More tests => 67;
 use Test::Exception;
 
 use File::Temp qw(tempdir);
@@ -68,7 +68,7 @@ sub autoload : Test(4) {
   ok($tmpdb->snpset->all, 'AUTOLOAD succeeds when connected');
 }
 
-sub connect : Test(7) {
+sub connect : Test(6) {
   my $tmpdb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (name    => 'pipeline',
      inifile => "$ini_path/pipeline.ini",
@@ -81,7 +81,6 @@ sub connect : Test(7) {
   ok(!$tmpdb->is_connected, 'Initially, is not connected');
   ok($tmpdb->connect, 'Can connect');
   ok($tmpdb->is_connected, 'Is connected');
-  ok($tmpdb->dbh, 'Has a database handle');
 }
 
 sub disconnect : Test(4) {
@@ -407,7 +406,6 @@ sub pi_excluded_state : Test(3) {
   } 'Sample be both pi_approved and pi_excluded';
 }
 
-
 sub snpset_names : Test(2) {
 
     # load some Sequenom results into the test database
@@ -459,7 +457,6 @@ sub snpset_names : Test(2) {
     my @names = @{$db->snpset_names_for_method("Sequenom")};
     is (scalar(@names), 1, 'One snpset name found for Sequenom');
     is ($names[0], $snpset_name_input, "Correct name for Sequenom snpset");
-
 }
 
 sub total_results : Test(3) {
@@ -497,7 +494,6 @@ sub total_results : Test(3) {
 
     dies_ok { $db->total_results_for_method("Nonsense")}
         'Result counter fails for unknown method';
-
 }
 
 1;

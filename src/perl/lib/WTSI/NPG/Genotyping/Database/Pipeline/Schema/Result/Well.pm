@@ -1,12 +1,10 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema::Result::Well;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Well;
 
 use strict;
 use warnings;
 
 use base 'DBIx::Class::Core';
-
 
 __PACKAGE__->table('well');
 __PACKAGE__->add_columns
@@ -26,18 +24,21 @@ __PACKAGE__->add_columns
 __PACKAGE__->set_primary_key('id_well');
 __PACKAGE__->add_unique_constraint(['id_address', 'id_plate']);
 
-__PACKAGE__->belongs_to('sample',
-                        'WTSI::NPG::Genotyping::Schema::Result::Sample',
-                        { 'foreign.id_sample' => 'self.id_sample' },
-                        { join_type => 'LEFT' });
+__PACKAGE__->belongs_to
+  ('sample',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample',
+   { 'foreign.id_sample' => 'self.id_sample' },
+   { join_type => 'LEFT' });
 
-__PACKAGE__->belongs_to('plate',
-                        'WTSI::NPG::Genotyping::Schema::Result::Plate',
-                        { 'foreign.id_plate' => 'self.id_plate' });
+__PACKAGE__->belongs_to
+  ('plate',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Plate',
+   { 'foreign.id_plate' => 'self.id_plate' });
 
-__PACKAGE__->belongs_to('address',
-                        'WTSI::NPG::Genotyping::Schema::Result::Address',
-                        { 'foreign.id_address' => 'self.id_address' });
+__PACKAGE__->belongs_to
+  ('address',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Address',
+   { 'foreign.id_address' => 'self.id_address' });
 
 1;
 
@@ -49,7 +50,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

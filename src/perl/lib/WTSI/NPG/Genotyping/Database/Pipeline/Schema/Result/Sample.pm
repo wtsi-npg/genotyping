@@ -1,6 +1,5 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema::Result::Sample;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample;
 
 use strict;
 use warnings;
@@ -35,36 +34,41 @@ __PACKAGE__->add_columns
 __PACKAGE__->set_primary_key('id_sample');
 __PACKAGE__->add_unique_constraint(['name']);
 
+__PACKAGE__->belongs_to
+  ('dataset',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Dataset',
+   { 'foreign.id_dataset' => 'self.id_dataset' });
 
-__PACKAGE__->belongs_to('dataset',
-                        'WTSI::NPG::Genotyping::Schema::Result::Dataset',
-                        { 'foreign.id_dataset' => 'self.id_dataset' });
+__PACKAGE__->has_many
+  ('wells',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Well',
+   { 'foreign.id_sample' => 'self.id_sample' });
 
-__PACKAGE__->has_many('wells',
-                      'WTSI::NPG::Genotyping::Schema::Result::Well',
-                      { 'foreign.id_sample' => 'self.id_sample' });
+__PACKAGE__->has_many
+  ('results',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Result',
+   { 'foreign.id_sample' => 'self.id_sample' });
 
-__PACKAGE__->has_many('results', 'WTSI::NPG::Genotyping::Schema::Result::Result',
-                      { 'foreign.id_sample' => 'self.id_sample' });
+__PACKAGE__->has_many
+  ('sample_genders',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::SampleGender',
+   { 'foreign.id_sample' => 'self.id_sample' });
 
-__PACKAGE__->has_many('sample_genders',
-                      'WTSI::NPG::Genotyping::Schema::Result::SampleGender',
-                      { 'foreign.id_sample' => 'self.id_sample' });
-
-__PACKAGE__->has_many('sample_states',
-                      'WTSI::NPG::Genotyping::Schema::Result::SampleState',
-                      { 'foreign.id_sample' => 'self.id_sample' });
+__PACKAGE__->has_many
+  ('sample_states',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::SampleState',
+   { 'foreign.id_sample' => 'self.id_sample' });
 
 __PACKAGE__->many_to_many('genders' => 'sample_genders', 'gender');
 
 __PACKAGE__->many_to_many('states' => 'sample_states', 'state');
 
-__PACKAGE__->has_many('related_samples',
-                      'WTSI::NPG::Genotyping::Schema::Result::RelatedSample',
-                      { 'foreign.id_sample_a' => 'self.id_sample' });
+__PACKAGE__->has_many
+  ('related_samples',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::RelatedSample',
+   { 'foreign.id_sample_a' => 'self.id_sample' });
 
 __PACKAGE__->many_to_many('related' => 'related_samples', 'sample_b');
-
 
 sub update {
   my ($self, @args) = @_;
@@ -237,7 +241,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
