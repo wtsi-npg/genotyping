@@ -3,6 +3,7 @@ use utf8;
 
 package WTSI::NPG::Expression::InfiniumDataObject;
 
+use Data::Dump qw(dump);
 use Moose;
 use Try::Tiny;
 
@@ -45,21 +46,24 @@ sub update_secondary_metadata {
                 "; using its Sanger sample ID instead");
   }
 
-  use Data::Dump qw(dump);
   if ($ss_sample) {
     $self->info("Updating metadata for '", $self->str, "' from plate '",
                 $ss_sample->{barcode}, "' well '", $ss_sample->{map}, "'");
 
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
+    $self->debug("Superseding AVUs in order of attributes: [",
+                 join(q{, }, map { $_->[0] } @meta), "]");
+
     foreach my $avu (@meta) {
-      $self->debug("Superseding AVUs with ", dump($avu));
       try {
         $self->supersede_avus(@$avu);
       } catch {
-        $self->logcroak("Failed to supersede AVUs on '", $self->str, "' ",
-                        " with AVU ", dump($avu), " of AVUs ", dump(@meta),
-                        ": ", $_);
+        $self->error("Failed to supersede with AVU ", dump($avu), ": ", $_);
       };
     }
 
