@@ -1,7 +1,9 @@
 
 package WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 
+use Data::Dump qw(dump);
 use Moose;
+use Try::Tiny;
 
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
@@ -46,9 +48,16 @@ sub update_secondary_metadata {
 
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
     foreach my $avu (@meta) {
-      $self->debug("Superseding [", join(', ', @$avu, "]"));
-      $self->supersede_avus(@$avu);
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->error("Failed to supersede with AVU ", dump($avu), ": ", $_);
+      };
     }
 
     $self->update_group_permissions;
