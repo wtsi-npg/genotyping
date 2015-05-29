@@ -3,7 +3,9 @@ use utf8;
 
 package WTSI::NPG::Expression::InfiniumDataObject;
 
+use Data::Dump qw(dump);
 use Moose;
+use Try::Tiny;
 
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
@@ -50,8 +52,19 @@ sub update_secondary_metadata {
 
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
+    $self->debug("Superseding AVUs in order of attributes: [",
+                 join(q{, }, map { $_->[0] } @meta), "]");
+
     foreach my $avu (@meta) {
-      $self->supersede_avus(@$avu);
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->error("Failed to supersede with AVU ", dump($avu), ": ", $_);
+      };
     }
 
     $self->update_group_permissions;

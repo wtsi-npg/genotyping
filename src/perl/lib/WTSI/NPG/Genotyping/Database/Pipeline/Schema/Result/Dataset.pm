@@ -1,12 +1,10 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema::Result::Dataset;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Dataset;
 
 use strict;
 use warnings;
 
 use base 'DBIx::Class::Core';
-
 
 __PACKAGE__->table('dataset');
 __PACKAGE__->add_columns
@@ -28,21 +26,25 @@ __PACKAGE__->add_columns
 __PACKAGE__->set_primary_key('id_dataset');
 __PACKAGE__->add_unique_constraint(['if_project']);
 
-__PACKAGE__->belongs_to('piperun',
-                        'WTSI::NPG::Genotyping::Schema::Result::Piperun',
-                        { 'foreign.id_piperun' => 'self.id_piperun' });
+__PACKAGE__->belongs_to
+  ('piperun',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Piperun',
+   { 'foreign.id_piperun' => 'self.id_piperun' });
 
-__PACKAGE__->belongs_to('snpset',
-                        'WTSI::NPG::Genotyping::Schema::Result::Snpset',
-                        { 'foreign.id_snpset' => 'self.id_snpset' });
+__PACKAGE__->belongs_to
+  ('snpset',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Snpset',
+   { 'foreign.id_snpset' => 'self.id_snpset' });
 
-__PACKAGE__->belongs_to('datasupplier',
-                        'WTSI::NPG::Genotyping::Schema::Result::Datasupplier',
-                        { 'foreign.id_datasupplier' => 'self.id_datasupplier' });
+__PACKAGE__->belongs_to
+  ('datasupplier',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Datasupplier',
+   { 'foreign.id_datasupplier' => 'self.id_datasupplier' });
 
-__PACKAGE__->has_many('samples',
-                      'WTSI::NPG::Genotyping::Schema::Result::Sample',
-                      { 'foreign.id_dataset' => 'self.id_dataset' });
+__PACKAGE__->has_many
+  ('samples',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample',
+   { 'foreign.id_dataset' => 'self.id_dataset' });
 
 1;
 
@@ -54,7 +56,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

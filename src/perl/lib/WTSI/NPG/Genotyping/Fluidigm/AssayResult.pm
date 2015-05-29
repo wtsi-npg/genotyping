@@ -1,6 +1,4 @@
 
-use utf8;
-
 package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;

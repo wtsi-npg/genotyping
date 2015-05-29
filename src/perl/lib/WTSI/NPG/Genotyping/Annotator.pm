@@ -21,13 +21,14 @@ with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation';
 sub make_infinium_metadata {
   my ($self, $if_sample) = @_;
 
-  return ([$self->infinium_beadchip_attr         => $if_sample->{beadchip}],
-          [$self->infinium_beadchip_section_attr => $if_sample->{beadchip_section}],
-          [$self->infinium_beadchip_design_attr  => $if_sample->{beadchip_design}],
-          [$self->infinium_project_title_attr    => $if_sample->{project}],
-          [$self->infinium_sample_name_attr      => $if_sample->{sample}],
-          [$self->infinium_plate_name_attr       => $if_sample->{plate}],
-          [$self->infinium_plate_well_attr       => $if_sample->{well}]);
+  return
+    ([$self->infinium_beadchip_attr         => $if_sample->{beadchip}],
+     [$self->infinium_beadchip_section_attr => $if_sample->{beadchip_section}],
+     [$self->infinium_beadchip_design_attr  => $if_sample->{beadchip_design}],
+     [$self->infinium_project_title_attr    => $if_sample->{project}],
+     [$self->infinium_sample_name_attr      => $if_sample->{sample}],
+     [$self->infinium_plate_name_attr       => $if_sample->{plate}],
+     [$self->infinium_plate_well_attr       => $if_sample->{well}]);
 }
 
 sub make_sequenom_metadata {
@@ -83,7 +84,7 @@ sub infinium_fingerprint {
 
   return $self->make_fingerprint([$self->infinium_beadchip_attr,
                                   $self->infinium_beadchip_section_attr,
-                                  # $self->infinium_beadchip_design_attr,
+                                  $self->infinium_beadchip_design_attr,
                                   $self->infinium_project_title_attr,
                                   $self->infinium_sample_name_attr,
                                   $self->infinium_plate_name_attr,

@@ -9,6 +9,7 @@ with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'beadchip'         => (is => 'ro', isa => 'Str',  required => 1);
 has 'beadchip_section' => (is => 'ro', isa => 'Str',  required => 1);
+has 'beadchip_design'  => (is => 'ro', isa => 'Str',  required => 1);
 
 has 'gtc_file'         => (is => 'ro', isa => 'Str',  required => 0);
 has 'red_idat_file'    => (is => 'ro', isa => 'Str',  required => 1);

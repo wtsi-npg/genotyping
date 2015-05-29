@@ -1,6 +1,4 @@
 
-use utf8;
-
 package WTSI::NPG::Genotyping::Fluidigm::Publisher;
 
 use File::Basename qw(basename);
@@ -8,6 +6,7 @@ use File::Spec;
 use File::Temp qw(tempdir);
 use Set::Scalar;
 use Moose;
+use Try::Tiny;
 use URI;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
@@ -71,9 +70,9 @@ has 'snpsets' =>
    lazy     => 1,
    builder  => '_build_snpsets');
 
-has 'ss_warehouse_db' =>
+has 'warehouse_db' =>
   (is       => 'ro',
-   isa      => 'WTSI::NPG::Database::Warehouse',
+   isa      => 'WTSI::NPG::Database',
    isa      => 'Object',
    required => 1);
 
@@ -168,7 +167,7 @@ sub publish_samples {
   my @snpsets = $self->snpsets;
 
   foreach my $address (@addresses) {
-    eval {
+    try {
       my $file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
                          $export_file->fluidigm_barcode);
       $current_file = $file;
@@ -194,19 +193,16 @@ sub publish_samples {
       # Now that adding the secondary metadata is fast enough, we can
       # run it inline here, so that the data are available
       # immediately.
-      $obj->update_secondary_metadata($self->ss_warehouse_db);
+      $obj->update_secondary_metadata($self->warehouse_db);
 
       ++$num_published;
+    } catch {
+      $self->error("Failed to publish '$current_file' to ",
+                   "'$publish_dest': ", $_);
     };
 
-    if ($@) {
-      $self->error("Failed to publish '$current_file' to ",
-                   "'$publish_dest': ", $@);
-    }
-    else {
-      $self->debug("Published '$current_file': $num_published of $total ",
-                   "from a possible $possible");
-    }
+    $self->debug("Published '$current_file': $num_published of $total ",
+                 "from a possible $possible");
   }
 
   return $num_published;
@@ -387,7 +383,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
