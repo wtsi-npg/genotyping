@@ -126,39 +126,6 @@ sub convert {
     return $outString;
 }
 
-sub _call_to_vcf {
-    # input a 'canonical' call from an AssayResult (Sequenom or Fluidigm)
-    # convert to VCF representation
-    my ($self, $call, $ref, $alt, $strand) = @_;
-    if (!defined($call) || !$call) {
-        return './.';
-    }
-    my %complement = ('A' => 'T',
-                      'C' => 'G',
-                      'G' => 'C',
-                      'T' => 'A',
-                      'N' => 'N');
-    my $reverse;
-    if ($strand eq '+') { $reverse = 0; }
-    elsif ($strand eq '-') { $reverse = 1; }
-    else { $self->logcroak("Unknown strand value '$strand'"); }
-    my (@new_alleles, $new_call);
-    my @alleles = split(//, $call);
-    my $alleles_ok = 1;
-    foreach my $allele (@alleles) {
-        if ($reverse) { $allele = $complement{$allele}; }
-        if ($allele eq $ref) { push(@new_alleles, '0'); }
-        elsif ($allele eq $alt) { push(@new_alleles, '1'); }
-        elsif ($allele eq $NULL_ALLELE) { push(@new_alleles, '.'); }
-        elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
-        else { $self->logcroak("Non-null call '$allele' does not match ",
-                               "reference '$ref' or alternate '$alt'");  }
-    }
-    if ($alleles_ok) { $new_call = join('/', @new_alleles); }
-    else { $new_call = ''; } # special case; failed gender marker
-    return $new_call;
-}
-
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
@@ -260,24 +227,6 @@ sub _generate_vcf_header {
     push(@colHeads, @samples);
     push(@header, "#".join("\t", @colHeads));
     return @header;
-}
-
-sub _normalize_chromosome_name {
-    # convert the chromosome field to standard GRCh37 format
-    # chromsome names: 1, 2, 3, ... , 22, X, Y
-    my ($self, $input) = @_;
-    my $output;
-    if ($input =~ /^[0-9]+$/ && $input >= 1 && $input <= 22 ) {
-        $output = $input; # already in numeric chromosome format
-    } elsif ($input eq 'X' || $input eq 'Y') {
-        $output = $input; # already in standard X/Y format
-    } elsif ($input =~ /^Chr/) {
-        $input =~ s/Chr//g; # strip off 'Chr' prefix
-        $output = $self->_normalize_chromosome_name($input);
-    } else {
-        $self->logcroak("Unknown chromosome string: \"$input\"");
-    }
-    return $output;
 }
 
 sub _parse_calls_samples {
