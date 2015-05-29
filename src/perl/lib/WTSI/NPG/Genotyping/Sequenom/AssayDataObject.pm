@@ -2,7 +2,9 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 
+use Data::Dump qw(dump);
 use Moose;
+use Try::Tiny;
 
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
@@ -58,8 +60,16 @@ sub update_secondary_metadata {
 
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
     foreach my $avu (@meta) {
-      $self->supersede_avus(@$avu);
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->error("Failed to supersede with AVU ", dump($avu), ": ", $_);
+      };
     }
 
     $self->update_group_permissions;
@@ -90,8 +100,16 @@ sub update_qc_metadata {
                 "' from plate '$plate_name' well '$well'");
 
     my @meta = $self->make_manual_qc_metadata($manual_qc);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
     foreach my $avu (@meta) {
-      $self->supersede_avus(@$avu);
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->logcarp("Failed to supersede with AVU ", dump($avu), ": ", $_);
+      };
     }
   }
   else {

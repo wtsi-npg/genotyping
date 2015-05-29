@@ -1,12 +1,10 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema::Result::SampleGender;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::SampleGender;
 
 use strict;
 use warnings;
 
 use base 'DBIx::Class::Core';
-
 
 __PACKAGE__->table('sample_gender');
 __PACKAGE__->add_columns
@@ -22,17 +20,20 @@ __PACKAGE__->add_columns
 
 __PACKAGE__->set_primary_key('id_sample', 'id_gender', 'id_method');
 
-__PACKAGE__->belongs_to('sample',
-                        'WTSI::NPG::Genotyping::Schema::Result::Sample',
-                        { 'foreign.id_sample' => 'self.id_sample' });
+__PACKAGE__->belongs_to
+  ('sample',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample',
+   { 'foreign.id_sample' => 'self.id_sample' });
 
-__PACKAGE__->belongs_to('gender',
-                        'WTSI::NPG::Genotyping::Schema::Result::Gender',
-                        { 'foreign.id_gender' => 'self.id_gender' });
+__PACKAGE__->belongs_to
+  ('gender',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Gender',
+   { 'foreign.id_gender' => 'self.id_gender' });
 
-__PACKAGE__->belongs_to('method',
-                        'WTSI::NPG::Genotyping::Schema::Result::Method',
-                        { 'foreign.id_method' => 'self.id_method' });
+__PACKAGE__->belongs_to
+  ('method',
+   'WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Method',
+   { 'foreign.id_method' => 'self.id_method' });
 
 1;
 
@@ -44,7 +45,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

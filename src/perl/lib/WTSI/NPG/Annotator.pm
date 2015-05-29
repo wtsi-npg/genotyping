@@ -1,7 +1,7 @@
-use utf8;
 
 package WTSI::NPG::Annotator;
 
+use Data::Dump qw(dump);
 use Moose::Role;
 use File::Basename;
 
@@ -10,6 +10,8 @@ use WTSI::NPG::Utilities qw(md5sum);
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
 
 our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
+
+our $SEQUENCESCAPE_LIMS_ID = 'SQSCP';
 
 =head2 make_creation_metadata
 
@@ -50,9 +52,10 @@ sub make_modification_metadata {
 
 =head2 make_sample_metadata
 
-  Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse
+  Arg [1]    : sample hashref from WTSI::NPG::Database::Warehouse or
+               WTSI::NPG::Database::MLWarehouse
 
-  Example    : my @meta = $obj->make_sample_metadata($sample)
+  Example    : my @meta = $obj->make_sample_metadata($record)
   Description: Return a list of metadata key/value pairs describing the
                sample in the SequenceScape warehouse.
   Returntype : array of arrayrefs
@@ -60,74 +63,88 @@ sub make_modification_metadata {
 =cut
 
 sub make_sample_metadata {
-  my ($self, $ss_sample) = @_;
+  my ($self, $record) = @_;
 
-  my $internal_id = $ss_sample->{internal_id};
+  # These defensive checks are here because the data are sometimes missing
+  my $msg = "The '%s' value is missing from the warehouse record: %s";
 
-  my @meta = ([$self->sample_id_attr => $internal_id]);
+  my @meta;
 
-  # These defensive checks are here because the SS data are sometimes missing
-  my $message_template =
-    "The %s value for sample with internal_id '$internal_id' " .
-      "is missing from the Sequencescape Warehouse";
-
-  if (defined $ss_sample->{name}) {
-    push(@meta, [$self->sample_name_attr => $ss_sample->{name}]);
-  }
-  else {
-    $self->logcluck(sprintf($message_template, 'name'));
-  }
-
-  if (defined $ss_sample->{consent_withdrawn}) {
+  if (defined $record->{consent_withdrawn}) {
     my $flag;
-    if ($ss_sample->{consent_withdrawn}) {
+    if ($record->{consent_withdrawn}) {
       $flag = 0;
     }
     else {
       $flag = 1;
     }
 
-    push(@meta, [$self->sample_consent_attr => $flag]);
+    push @meta, [$self->sample_consent_attr => $flag];
   }
   else {
-    $self->logcluck(sprintf($message_template, 'consent_withdrawn'));
+    $self->logcarp(sprintf($msg, 'consent_withdrawn', dump($record)));
   }
 
-  if (defined $ss_sample->{sanger_sample_id}) {
-    push(@meta, [$self->dcterms_identifier_attr => $ss_sample->{sanger_sample_id}]);
+  # Ensure that these are added, or log an error.
+  my $ensure = sub {
+    my ($key, $meta_attr) = @_;
+    if (defined $record->{$key}) {
+      push @meta, [$meta_attr, $record->{$key}];
+    }
+    else {
+      $self->logcarp(sprintf($msg, $key, dump($record)));
+    }
+  };
+
+  # Maybe add these, only if present.
+  my $maybe = sub {
+    my ($key, $meta_attr) = @_;
+    if (defined $record->{$key}) {
+      push @meta, [$meta_attr, $record->{$key}];
+    }
+  };
+
+  # The following is a shim to generate annotation from either the
+  # Sequencescape warehouse or the Multi-LIMS warehouse. Only the ML
+  # warehouse has an 'id_lims' key.
+  if (defined $record->{id_lims}) {
+    # This metadata obtained from from ML warehouse
+
+    if ($record->{id_lims} eq $SEQUENCESCAPE_LIMS_ID) {
+      # Sample processed by Sequencescape; sanger_sample_id must be
+      # present
+      $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+    }
+    else {
+      # Sample processed elsewhere; sanger_sample_id may not be
+      # present
+      $maybe->('sanger_sample_id', $self->dcterms_identifier_attr);
+    }
+
+    # Sample ID comes from 'id_sample_lims' column
+    $ensure->('id_sample_lims', $self->sample_id_attr);
   }
   else {
-    $self->logcluck(sprintf($message_template, 'sanger_sample_id'));
+    # This metadata obtained from Sequencescape warehouse.
+
+    # Sample processed by Sequencescape; sanger_sample_id must be
+    # present
+    $ensure->('sanger_sample_id', $self->dcterms_identifier_attr);
+
+    # Sample ID comes from 'internal_id' column
+    $ensure->('internal_id', $self->sample_id_attr);
   }
 
-  if (defined $ss_sample->{study_id}) {
-     push(@meta, [$self->study_id_attr => $ss_sample->{study_id}]);
-  }
-  else {
-    $self->logcluck(sprintf($message_template, 'study_id'));
-  }
+  $ensure->('name',             $self->sample_name_attr);
+  $ensure->('study_id',         $self->study_id_attr);
 
-  if (defined $ss_sample->{study_title}) {
-    push(@meta, [$self->study_title_attr => $ss_sample->{study_title}]);
-  }
-  if (defined $ss_sample->{supplier_name}) {
-    push(@meta, [$self->sample_supplier_name_attr => $ss_sample->{supplier_name}]);
-  }
-  if (defined $ss_sample->{accession_number}) {
-    push(@meta, [$self->sample_accession_number_attr => $ss_sample->{accession_number}]);
-  }
-  if (defined $ss_sample->{cohort}) {
-    push(@meta, [$self->sample_cohort_attr => $ss_sample->{cohort}]);
-  }
-  if (defined $ss_sample->{control}) {
-    push(@meta, [$self->sample_control_attr => $ss_sample->{control}]);
-  }
-  if (defined $ss_sample->{donor_id}) {
-    push(@meta, [$self->sample_donor_id_attr => $ss_sample->{donor_id}]);
-  }
-  if (defined $ss_sample->{common_name}) {
-    push(@meta, [$self->sample_common_name_attr => $ss_sample->{common_name}]);
-  }
+  $maybe->('study_title',      $self->study_title_attr);
+  $maybe->('supplier_name',    $self->sample_supplier_name_attr);
+  $maybe->('accession_number', $self->sample_accession_number_attr);
+  $maybe->('cohort',           $self->sample_cohort_attr);
+  $maybe->('control',          $self->sample_control_attr);
+  $maybe->('donor_id',         $self->sample_donor_id_attr);
+  $maybe->('common_name',      $self->sample_common_name_attr);
 
   return @meta;
 }
@@ -213,7 +230,7 @@ sub make_fingerprint {
                         "missing '$key'");
     }
 
-    push(@fingerprint, @tuple);
+    push @fingerprint, @tuple;
   }
 
   return @fingerprint;
@@ -240,7 +257,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

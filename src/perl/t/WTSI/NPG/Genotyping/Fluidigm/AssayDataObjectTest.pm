@@ -4,11 +4,16 @@ use utf8;
 {
   package WTSI::NPG::Database::WarehouseStub;
 
-  use strict;
-  use warnings;
+  use Moose;
   use Carp;
 
-  use base 'WTSI::NPG::Database';
+  extends 'WTSI::NPG::Database';
+
+  has 'test_sanger_sample_id' =>
+    (is       => 'rw',
+     isa      => 'Str | Undef',
+     required => 0,
+     default  => sub { '0123456789' });
 
   sub find_fluidigm_sample_by_plate {
     my ($self, $fluidigm_barcode, $well) = @_;
@@ -17,7 +22,7 @@ use utf8;
       confess "WarehouseStub expected well argument 'S01' but got '$well'";
 
     return {internal_id        => 123456789,
-            sanger_sample_id   => '0123456789',
+            sanger_sample_id   => $self->test_sanger_sample_id,
             consent_withdrawn  => 0,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
@@ -43,7 +48,7 @@ use warnings;
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 9;
+use Test::More tests => 11;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -113,7 +118,7 @@ sub update_secondary_metadata : Test(4) {
     ($irods, "$irods_tmp_coll/1381735059/$data_file");
 
   my $ssdb = WTSI::NPG::Database::WarehouseStub->new
-    (name    => 'sequencescape_warehouse',
+    (name    => 'ml_warehouse',
      inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
 
   my $expected_groups_before = ['ss_10', 'ss_100'];
@@ -148,4 +153,44 @@ sub update_secondary_metadata : Test(4) {
 
   is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
     or diag explain \@groups_after;
+}
+
+sub update_secondary_metadata_missing_value : Test(2) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $data_object = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/1381735059/$data_file");
+
+  my $ssdb = WTSI::NPG::Database::WarehouseStub->new
+    (name    => 'ml_warehouse',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_sanger_sample_id => q{});
+
+  ok($data_object->update_secondary_metadata($ssdb));
+
+  # The (empty) sanger_sample_id gets mapped to dcterms:identifier in
+  # the metadata. The attributes are superseded in lexical sort order,
+  # so this one is done first. The test ensures that an invalid AVU
+  # value only causes that AVU to be skipped - all subsequent ones are
+  # applied.
+  my $expected_meta =
+    [# {attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'fluidigm_plate',          value => '1381735059'},
+     {attribute => 'fluidigm_well',           value => 'S01'},
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'}];
+
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
+  is_deeply($meta, $expected_meta,
+            'Secondary metadata addition skips bad value')
+    or diag explain $meta;
 }

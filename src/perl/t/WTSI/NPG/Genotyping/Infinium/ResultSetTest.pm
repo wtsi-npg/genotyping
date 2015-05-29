@@ -29,6 +29,7 @@ sub constructor : Test(8) {
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
          [beadchip         => '0123456789',
           beadchip_section => 'R01C01',
+          beadchip_design  => 'design1',
           gtc_file         => $gtc_path,
           grn_idat_file    => $grn_path,
           red_idat_file    => $red_path],
@@ -37,15 +38,16 @@ sub constructor : Test(8) {
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
          [beadchip         => '0123456789',
           beadchip_section => 'R01C01',
+          beadchip_design  => 'design1',
           is_methylation   => 1,
           grn_idat_file    => $grn_path,
           red_idat_file    => $red_path],
          'methylation constructor');
 
-
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
          [beadchip         => '01234567890',
           beadchip_section => 'R01C01',
+          beadchip_design  => 'design1',
           gtc_file         => $gtc_path,
           grn_idat_file    => $grn_path,
           red_idat_file    => $red_path],
@@ -55,6 +57,7 @@ sub constructor : Test(8) {
       WTSI::NPG::Genotyping::Infinium::ResultSet->new
          (beadchip         => '012345678901',
           beadchip_section => 'R01C01',
+          beadchip_design  => 'design1',
           gtc_file         => $gtc_path,
           grn_idat_file    => $grn_path,
           red_idat_file    => $red_path),
@@ -64,6 +67,7 @@ sub constructor : Test(8) {
     WTSI::NPG::Genotyping::Infinium::ResultSet->new
         (beadchip         => '0123456789',
          beadchip_section => 'R01C01',
+         beadchip_design  => 'design1',
          gtc_file         => 'no_such_path',
          grn_idat_file    => $grn_path,
          red_idat_file    => $red_path)
@@ -74,6 +78,7 @@ sub constructor : Test(8) {
     WTSI::NPG::Genotyping::Infinium::ResultSet->new
         (beadchip         => '0123456789',
          beadchip_section => 'R01C01',
+         beadchip_design  => 'design1',
          is_methylation   => 1,
          gtc_file         => $gtc_path,
          grn_idat_file    => $grn_path,
@@ -85,6 +90,7 @@ sub constructor : Test(8) {
     WTSI::NPG::Genotyping::Infinium::ResultSet->new
         (beadchip         => '0123456789',
          beadchip_section => 'R01C01',
+         beadchip_design  => 'design1',
          gtc_file         => $gtc_path,
          grn_idat_file    => 'no_such_path',
          red_idat_file    => $red_path)
@@ -95,6 +101,7 @@ sub constructor : Test(8) {
     WTSI::NPG::Genotyping::Infinium::ResultSet->new
         (beadchip         => '0123456789',
          beadchip_section => 'R01C01',
+         beadchip_design  => 'design1',
          gtc_file         => $gtc_path,
          grn_idat_file    => $grn_path,
          red_idat_file    => 'no_such_path')

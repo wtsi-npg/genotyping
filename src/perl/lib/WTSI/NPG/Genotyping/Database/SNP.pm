@@ -12,7 +12,7 @@ use WTSI::NPG::Genotyping::SNPSet;
 
 extends 'WTSI::NPG::Database';
 
-with 'WTSI::DNAP::Utilities::Cacheable';
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 # Method names for MOP operations
 our $FIND_SEQUENOM_PLATE_ID  = 'find_sequenom_plate_id';

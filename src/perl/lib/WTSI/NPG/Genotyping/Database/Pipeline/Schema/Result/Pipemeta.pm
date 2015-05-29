@@ -1,15 +1,17 @@
-use utf8;
 
-package WTSI::NPG::Genotyping::Schema;
+package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Pipemeta;
 
 use strict;
 use warnings;
 
-use Config::IniFiles;
+use base 'DBIx::Class::Core';
 
-use base 'DBIx::Class::Schema';
-
-__PACKAGE__->load_namespaces;
+__PACKAGE__->table('pipemeta');
+__PACKAGE__->add_columns
+  ('schema_version',   { data_type => 'text',
+                         is_nullable => 0 },
+   'pipeline_version', { data_type => 'text',
+                         is_nullable => 0 });
 
 1;
 
@@ -21,7 +23,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
