@@ -27,48 +27,42 @@ has 'calls'   => # Genotype::ScoredCall objects; convert to VCF format
     (is       => 'ro',
      isa      => 'ArrayRef[WTSI::NPG::Genotyping::Call]');
 
-has 'is_haploid' =>
-    (is       => 'ro',
-     isa      => 'Bool',
-     default  => 0
-    );
-
 # attributes derived from the list of input Genotype::Call objects
 
 has 'snp' =>
-    (is       => 'rw',
-     isa      => Variant);
+    (is       => 'ro',
+     isa      => Variant,
+     lazy     => 1,
+     builder  => '_build_snp');
 
-has 'vcf_chromosome' => # chromosome; may be 1-22, X, Y
-    (is       => 'rw',
-     isa      => 'Str');
+has 'vcf_chromosome_name' =>
+    (is       => 'ro',
+     isa      => 'Str',
+     lazy     => 1,
+     builder => '_build_vcf_chromosome_name',
+     documentation => 'Chromosome name string; may be 1-22, X, Y');
+
+has 'is_haploid' =>
+    (is       => 'ro',
+     isa      => 'Bool',
+     builder  => '_build_haploid_status',
+     lazy     => 1,
+     documentation => 'True for human Y chromosome, false otherwise'
+    );
 
 # genotype sub-fields GT = genotype; GQ = genotype quality; DP = read depth
-# TODO are GQ and DP required by bcftools?
 our $GENOTYPE_FORMAT = 'GT:GQ:DP';
 our $DEPTH_PLACEHOLDER = 1;
 our $DEFAULT_QUALITY_STRING = '.';
-
 our $NULL_ALLELE = 'N';
 
 # NB this class does not have the sample names; they are stored in VCF header
 
 sub BUILD {
-
     my ($self, ) = @_;
-    my $snp;
-    foreach my $call (@{$self->calls}) {
-        if (!defined($snp)) {
-            $snp = $call->snp;
-        } elsif ($call->snp->name ne $snp->name) {
-            $self->logcroak("Inconsistent SNP names for input to ",
-                            "VCF::DataRow: '", $snp->name, "', '",
-                            $call->snp->name, "'");
-        }
+    if (scalar @{$self->calls} == 0) {
+        $self->logcroak("Must input at least one Call to create a VCF row");
     }
-    $self->snp($snp);
-    $self->vcf_chromosome($self->_chromosome_name_to_vcf($snp->chromosome));
-    my $total_calls = scalar(@{$self->calls});
 }
 
 sub to_string {
@@ -80,7 +74,7 @@ sub to_string {
     my $qual;
     if ($self->qual == -1) { $qual = '.'; }
     else {$qual = $self->qual; }
-    push(@fields, ($self->vcf_chromosome,
+    push(@fields, ($self->vcf_chromosome_name,
                    $self->snp->position,
                    $self->snp->name,
                    $self->snp->ref_allele,
@@ -93,6 +87,42 @@ sub to_string {
         push(@fields, $self->_call_to_vcf_field($call));
     }
     return join("\t", @fields);
+}
+
+sub _build_haploid_status {
+    my ($self) = @_;
+    if (is_YMarker($self->snp)) {return 1; }
+    else { return 0; }
+}
+
+sub _build_snp {
+    # find SNP from input calls; check that SNP name is consistent
+    my ($self) = @_;
+    my $snp;
+    foreach my $call (@{$self->calls}) {
+        if (!defined($snp)) {
+            $snp = $call->snp;
+        } elsif ($call->snp->name ne $snp->name) {
+            $self->logcroak("Inconsistent SNP names for input to ",
+                            "VCF::DataRow: '", $snp->name, "', '",
+                            $call->snp->name, "'");
+        }
+    }
+    return $snp;
+}
+
+sub _build_vcf_chromosome_name {
+    # find a vcf-compatible chromosome name string
+    my ($self) = @_;
+    my $chr = $self->snp->chromosome;
+    if ($chr =~ /^Chr/) {
+        $chr =~ s/Chr//; # strip off 'Chr' prefix, if any
+    }
+    unless (is_HsapiensChromosomeVCF($chr)) {
+        $self->logcroak("Unknown chromosome string: '",
+                        $self->snp->chromosome, "'");
+    }
+    return $chr;
 }
 
 sub _call_to_vcf_field {
@@ -144,24 +174,6 @@ sub _call_to_vcf_field {
     return join(':', @subfields);
 }
 
-sub _chromosome_name_to_vcf {
-    # cf.  _normalize_chromosome_name in VCFConverter
-    my ($self, $input) = @_;
-    my $output;
-    if ($input =~ /^[0-9]+$/ && $input >= 1 && $input <= 22 ) {
-        $output = $input; # already in numeric chromosome format
-    } elsif ($input eq 'X' || $input eq 'Y') {
-        $output = $input; # already in standard X/Y format
-    } elsif ($input =~ /^Chr/) {
-        $input =~ s/Chr//g; # strip off 'Chr' prefix
-        $output = $self->_chromosome_name_to_vcf($input);
-    } else {
-        $self->logcroak("Unknown chromosome string: \"$input\"");
-    }
-    return $output;
-}
-
-
 no Moose;
 
 1;
@@ -170,12 +182,13 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::VCF::Call
+WTSI::NPG::Genotyping::VCF::DataRow
 
 =head1 DESCRIPTION
 
 Class to represent one row in the main body of a VCF file. Contains
-data for a particular SNP, including one or more genotype calls.
+data for a particular variant (eg. a SNP or gender marker), including one
+or more genotype calls.
 
 =head1 AUTHOR
 

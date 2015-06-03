@@ -190,7 +190,6 @@ sub _generate_vcf_records {
         );
         my $y_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
             calls => \@y_calls,
-            is_haploid => 1,
             additional_info => "ORIGINAL_STRAND=".$snp->strand
         );
         push(@records, $x_row->to_string());

@@ -15,6 +15,7 @@ use MooseX::Types -declare =>
       GenderMarker
       HsapiensAutosome
       HsapiensChromosome
+      HsapiensChromosomeVCF
       HsapiensHeterosome
       HsapiensMT
       HsapiensX
@@ -34,6 +35,11 @@ subtype HsapiensChromosome,
   as Str,
   where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$} },
   message { "'$_' is not a valid H. sapiens chromosome name" };
+
+subtype HsapiensChromosomeVCF,
+  as Str,
+  where { $_ =~ m{^([0-9]+|[MT|X|Y]{1})$} },
+  message { "'$_' is not a valid H. sapiens chromosome name for VCF" };
 
 subtype HsapiensX,
   as Str,
