@@ -10,6 +10,8 @@ use Log::Log4perl::Level;
 use Moose;
 
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::GenderMarkerCall;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
@@ -27,7 +29,7 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 our $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $DEFAULT_READ_DEPTH = 1;
 our $DEFAULT_QUALITY = 40;
-our $NULL_ALLELE = 'N';
+our $NULL_GENOTYPE = 'NN';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
@@ -46,13 +48,7 @@ has 'irods'   =>
      return WTSI::NPG::iRODS->new;
      });
 
-has 'input_type' => (
-    is           => 'ro',
-    isa          => 'Str',
-    default      => 'sequenom', # sequenom or fluidigm
-);
-
-has 'snpset' => ( # pipeline SNPSet object
+has 'snpset' => (
     is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',
     required => 1,
@@ -67,23 +63,13 @@ has 'sort' => ( # sort the sample names before output?
     is        => 'ro',
     isa       => 'Bool',
     default   => 1,
+    documentation => 'If true, output rows are sorted in (chromosome, position) order',
     );
-
-has 'normalize_chromosome' => ( # normalize the chromosome name to GRCh37?
-    is        => 'ro',
-    isa       => 'Bool',
-    default   => 1,
-);
 
 sub BUILD {
   my $self = shift;
   # Make our iRODS handle use our logger by default
   $self->irods->logger($self->logger);
-  my @results;
-  my $input_type = $self->input_type;
-  if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
-      $self->logcroak("Unknown input data type: '$input_type'");
-  }
 }
 
 
@@ -129,58 +115,17 @@ sub convert {
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
-    my ($callsRef, $samplesRef) = $self->_parse_calls_samples();
-    #my %calls = %{$callsRef};
-
+    my ($calls, $samples) = $self->_parse_assay_results();
     my @output; # lines of text for output
-    my @samples = sort(keys(%{$samplesRef}));
     my ($chroms, $snpset);
     $snpset = $self->snpset;
-    my $total = scalar(@{$snpset->snps()});
-    push(@output, $self->_generate_vcf_header(\@samples));
     # TODO use a new VCF Header class to generate the header string
-    # update or remove the _parse_calls_samples method
-
-    # now, we need Call objects to generate the VCF body
-    my %calls = %{$self->_assay_results_to_calls()};
-
+    push(@output, $self->_generate_vcf_header($samples));
     foreach my $snp (@{$snpset->snps}) {
-        if (is_GenderMarker($snp)) {
-          push @output,
-            $self->_generate_vcf_records($snp->x_marker, \%calls, \@samples),
-            $self->_generate_vcf_records($snp->y_marker, \%calls, \@samples);
-        }
-        else {
-            push @output,
-              $self->_generate_vcf_records($snp, \%calls, \@samples);
-        }
+        push @output, $self->_generate_vcf_records($snp, $calls, $samples);
     }
 
     return @output;
-}
-
-sub _assay_results_to_calls {
-    # convert the AssayResultSet into Call objects
-    # return a hash of hashes, indexed by SNP and sample name
-    my ($self, ) = @_;
-    my %calls;
-    foreach my $resultSet (@{$self->resultsets()}) {
-        foreach my $ar (@{$resultSet->assay_results()}) {
-            # foreach AssayResult (Sequenom or Fluidigm)
-            # use 'npg' methods to get snp, sample, call in standard format
-            if ($ar->is_empty()) { next; }
-            my $sample_id = $ar->canonical_sample_id();
-            my $snp_id = $ar->snp_assayed();
-            my $snp = $self->snpset->named_snp($snp_id);
-            my $call = WTSI::NPG::Genotyping::Call->new(
-                snp      => $snp,
-                qscore   => $ar->quality_score(),
-                genotype => $ar->canonical_call()
-            );
-            $calls{$snp_id}{$sample_id} = $call;
-        }
-    }
-    return \%calls;
 }
 
 sub _generate_vcf_records {
@@ -190,11 +135,73 @@ sub _generate_vcf_records {
     foreach my $sample (@$samples) {
         push(@sample_calls, $calls->{$snp->name}{$sample});
     }
-    my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-        calls => \@sample_calls,
-	additional_info => "ORIGINAL_STRAND=".$snp->strand
-    );
-    push(@records, $data_row->to_string());
+    if (is_GenderMarker($snp)) {
+        my (@x_calls, @y_calls);
+        foreach my $call (@sample_calls) {
+            # use the called allele to identify X or Y chromosome
+            # output two data rows, for X and Y respectively
+            # (at least) one of the two outputs is a no-call
+            my $base = substr($call->genotype(), 0, 1);
+            if ($call->is_x_call()) {
+                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->x_marker(),
+                    genotype => $call->genotype(),
+                    qscore   => $call->qscore(),
+                ));
+                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->y_marker(),
+                    genotype => $NULL_GENOTYPE,
+                    is_call  => 0,
+                ));
+            } elsif ($call->is_y_call()) {
+                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->x_marker(),
+                    genotype => $NULL_GENOTYPE,
+                    is_call  => 0,
+                ));
+                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->y_marker(),
+                    genotype => $call->genotype(),
+                    qscore   => $call->qscore(),
+                ));
+            } elsif (!$call->is_call()) {
+                # ensure the 'no calls' are distinct objects
+                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->x_marker(),
+                    genotype => $NULL_GENOTYPE,
+                    is_call  => 0,
+                ));
+                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp->y_marker(),
+                    genotype => $NULL_GENOTYPE,
+                    is_call  => 0,
+                ));
+            } else {
+                $self->logcroak("Invalid genotype of '", $call->genotype(),
+                                "' for gender marker ", $snp->name(),
+                                "; valid non-null alleles are ",
+                                $snp->ref_allele(), " or ",
+                                $snp->alt_allele());
+            }
+        }
+        my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+            calls => \@x_calls,
+            additional_info => "ORIGINAL_STRAND=".$snp->strand
+        );
+        my $y_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+            calls => \@y_calls,
+            is_haploid => 1,
+            additional_info => "ORIGINAL_STRAND=".$snp->strand
+        );
+        push(@records, $x_row->to_string());
+        push(@records, $y_row->to_string());
+    } else {
+        my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+            calls => \@sample_calls,
+            additional_info => "ORIGINAL_STRAND=".$snp->strand
+        );
+        push(@records, $data_row->to_string());
+    }
     return @records;
 }
 
@@ -229,46 +236,43 @@ sub _generate_vcf_header {
     return @header;
 }
 
-sub _parse_calls_samples {
-    # parse calls and sample IDs from reference to an array of ResultSets
-    #  use 'npg' methods to get snp, sample, call in standard format
-    # for either Fluidigm or Sequenom
-    my ($self) = @_;
-    my (%calls, %samples);
-    # generate a hash of calls by SNP and sample, and list of sample IDs
+sub _parse_assay_results {
+    # convert the AssayResultSet into Call objects
+    # return a hash of hashes, indexed by marker and sample name
+    my ($self, ) = @_;
+    my %calls;
+    my %samples;
     my $controls = 0;
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
+            # foreach AssayResult (Sequenom or Fluidigm)
+            # use 'npg' methods to get snp, sample, call in standard format
+            if ($ar->is_empty()) { next; }
             my $assay_adr = $ar->assay_address();
             if ($ar->is_control()) {
                 $self->info("Found control assay in position ".$assay_adr);
                 $controls++;
                 next;
             }
-            my $sam_id = $ar->canonical_sample_id();
-            unless ($sam_id) {
-                $self->logwarn("Missing sample ID for assay ".$assay_adr);
-                next;
-            }
+            my $sample_id = $ar->canonical_sample_id();
+            $samples{$sample_id} = 1;
             my $snp_id = $ar->snp_assayed();
-            unless ($snp_id) {
-                # missing SNP ID is normal for control position
-                my ($sample, $assay_num) = $ar->parse_assay();
-                my $msg = "Missing SNP ID for sample '$sam_id', ".
-                    "assay '$assay_adr'";
-                $self->logwarn($msg);
-                next;
+            my $snp = $self->snpset->named_snp($snp_id);
+            my $call;
+            if (is_GenderMarker($snp)) {
+                $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
+                    snp      => $snp,
+                    qscore   => $ar->quality_score(),
+                    genotype => $ar->canonical_call()
+                );
+            } else {
+                $call = WTSI::NPG::Genotyping::Call->new(
+                    snp      => $snp,
+                    qscore   => $ar->quality_score(),
+                    genotype => $ar->canonical_call()
+                );
             }
-            my $call = $ar->canonical_call();
-            my $previous_call = $calls{$snp_id}{$sam_id};
-            if ($previous_call && $previous_call ne $call) {
-                my $msg = 'Conflicting genotype calls for SNP '.$snp_id.
-                    ' sample '.$sam_id.': '.$call.', '.$previous_call;
-                $self->logwarn($msg);
-                $call = '';
-            }
-            $calls{$snp_id}{$sam_id} = $call;
-            $samples{$sam_id} = 1;
+            $calls{$snp_id}{$sample_id} = $call;
         }
     }
     if ($controls > 0) { 
@@ -276,7 +280,8 @@ sub _parse_calls_samples {
             scalar(@{$self->resultsets()})." samples.";
         $self->info($msg);
     }
-    return (\%calls, \%samples);
+    my @sortedSamples = sort(keys(%samples));
+    return (\%calls, \@sortedSamples);
 }
 
 sub _read_json {
