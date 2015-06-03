@@ -100,7 +100,7 @@ sub fluidigm_irods_test : Test(7) {
          input_type => 'fluidigm',
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths,
-         'fluidigm_plex_coll' => $irods_tmp_coll);
+         );
     my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
     ok($converter->convert($vcf),
        "Converted Fluidigm results to VCF with input from iRODS");
@@ -143,7 +143,7 @@ sub sequenom_irods_test : Test(7) {
          input_type => 'sequenom',
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths,
-         'sequenom_plex_coll' => $irods_tmp_coll);
+         );
     my $vcf = $tmp.'/conversion_test_sequenom.vcf';
     ok($converter->convert($vcf),
        "Converted Sequenom results to VCF with input from iRODS");
