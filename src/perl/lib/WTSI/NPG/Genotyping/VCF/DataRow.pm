@@ -126,25 +126,12 @@ sub _build_vcf_chromosome_name {
 }
 
 sub _call_to_vcf_field {
-    # cf. _call_to_vcf in VCFConverter
-    # sub-fields are call, quality score, read depth
+    # convert Call object to string of colon-separated sub-fields
+    # sub-fields are genotype in VCf format, quality score, read depth
     my ($self, $call) = @_;
-    my $ref = $self->snp->ref_allele;
-    my $alt = $self->snp->alt_allele;
-    my $strand = $self->snp->strand;
-    if (!defined($call) || !$call) {
-        return './.';
+    if ($self->snp->strand eq '-') { # reverse strand, use complement of call
+        $call = $call->complement();
     }
-    # TODO use the complement method of the Call class here
-    my %complement = ('A' => 'T',
-                      'C' => 'G',
-                      'G' => 'C',
-                      'T' => 'A',
-                      'N' => 'N');
-    my $reverse;
-    if ($strand eq '+') { $reverse = 0; }
-    elsif ($strand eq '-') { $reverse = 1; }
-    else { $self->logcroak("Unknown strand value '$strand'"); }
     my @alleles = split(//, $call->genotype);
     my $allele_total;
     if ($self->is_haploid()) { $allele_total = 1; }
@@ -153,9 +140,8 @@ sub _call_to_vcf_field {
     my @vcf_alleles;
     while ($i < $allele_total) {
         my $allele = $alleles[$i];
-        if ($reverse) { $allele = $complement{$allele}; }
-        if ($allele eq $ref) { push(@vcf_alleles, '0'); }
-        elsif ($allele eq $alt) { push(@vcf_alleles, '1'); }
+        if ($allele eq $self->snp->ref_allele) { push(@vcf_alleles, '0'); }
+        elsif ($allele eq $self->snp->alt_allele) { push(@vcf_alleles, '1'); }
         elsif ($allele eq $NULL_ALLELE) { push(@vcf_alleles, '.'); }
         $i++;
     }
