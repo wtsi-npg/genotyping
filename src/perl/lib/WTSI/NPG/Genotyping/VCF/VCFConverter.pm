@@ -18,17 +18,9 @@ use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
-use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::DataObject;
-
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-our $SEQUENOM_TYPE = 'sequenom';
-our $FLUIDIGM_TYPE = 'fluidigm';
-our $CHROMOSOME_JSON_KEY = 'chromosome_json';
-our $DEFAULT_READ_DEPTH = 1;
-our $DEFAULT_QUALITY = 40;
 our $NULL_GENOTYPE = 'NN';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
@@ -39,14 +31,6 @@ has 'chromosome_lengths' => ( # must be compatible with given snpset
     isa          => 'HashRef',
     required     => 1,
 );
-
-has 'irods'   =>
-    (is       => 'ro',
-     isa      => 'WTSI::NPG::iRODS',
-     required => 1,
-     default  => sub {
-     return WTSI::NPG::iRODS->new;
-     });
 
 has 'snpset' => (
     is           => 'ro',
@@ -65,13 +49,6 @@ has 'sort' => ( # sort the sample names before output?
     default   => 1,
     documentation => 'If true, output rows are sorted in (chromosome, position) order',
     );
-
-sub BUILD {
-  my $self = shift;
-  # Make our iRODS handle use our logger by default
-  $self->irods->logger($self->logger);
-}
-
 
 =head2 convert
 
@@ -330,7 +307,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
