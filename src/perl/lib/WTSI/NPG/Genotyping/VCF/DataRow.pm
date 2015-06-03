@@ -27,6 +27,11 @@ has 'calls'   => # Genotype::ScoredCall objects; convert to VCF format
     (is       => 'ro',
      isa      => 'ArrayRef[WTSI::NPG::Genotyping::Call]');
 
+has 'is_haploid' =>
+    (is       => 'ro',
+     isa      => 'Bool',
+     default  => 0
+    );
 
 # attributes derived from the list of input Genotype::Call objects
 
@@ -37,10 +42,6 @@ has 'snp' =>
 has 'vcf_chromosome' => # chromosome; may be 1-22, X, Y
     (is       => 'rw',
      isa      => 'Str');
-
-# TODO populate the additional_info string with the original SNP strand
-# eg. ORIGINAL_STRAND=+
-
 
 # genotype sub-fields GT = genotype; GQ = genotype quality; DP = read depth
 # TODO are GQ and DP required by bcftools?
@@ -73,6 +74,9 @@ sub BUILD {
 sub to_string {
     my ($self,)= @_;
     my @fields = ();
+    my $alt;
+    if ($self->is_haploid) { $alt = '.'; }
+    else { $alt = $self->snp->alt_allele; }
     my $qual;
     if ($self->qual == -1) { $qual = '.'; }
     else {$qual = $self->qual; }
@@ -80,7 +84,7 @@ sub to_string {
                    $self->snp->position,
                    $self->snp->name,
                    $self->snp->ref_allele,
-                   $self->snp->alt_allele,
+                   $alt,
                    $qual,
                    $self->filter,
                    $self->additional_info,
@@ -93,6 +97,7 @@ sub to_string {
 
 sub _call_to_vcf_field {
     # cf. _call_to_vcf in VCFConverter
+    # sub-fields are call, quality score, read depth
     my ($self, $call) = @_;
     my $ref = $self->snp->ref_allele;
     my $alt = $self->snp->alt_allele;
@@ -100,6 +105,7 @@ sub _call_to_vcf_field {
     if (!defined($call) || !$call) {
         return './.';
     }
+    # TODO use the complement method of the Call class here
     my %complement = ('A' => 'T',
                       'C' => 'G',
                       'G' => 'C',
@@ -109,26 +115,31 @@ sub _call_to_vcf_field {
     if ($strand eq '+') { $reverse = 0; }
     elsif ($strand eq '-') { $reverse = 1; }
     else { $self->logcroak("Unknown strand value '$strand'"); }
-    my (@vcf_alleles, $vcf_call);
     my @alleles = split(//, $call->genotype);
-    my $alleles_ok = 1;
-    foreach my $allele (@alleles) {
+    my $allele_total;
+    if ($self->is_haploid()) { $allele_total = 1; }
+    else { $allele_total = 2; }
+    my $i = 0;
+    my @vcf_alleles;
+    while ($i < $allele_total) {
+        my $allele = $alleles[$i];
         if ($reverse) { $allele = $complement{$allele}; }
         if ($allele eq $ref) { push(@vcf_alleles, '0'); }
         elsif ($allele eq $alt) { push(@vcf_alleles, '1'); }
         elsif ($allele eq $NULL_ALLELE) { push(@vcf_alleles, '.'); }
-        elsif ($ref eq $alt && $allele ne $ref) { $alleles_ok = 0; last; }
-        else { $self->logcroak("Non-null call '$allele' does not match ",
-                               "reference '$ref' or alternate '$alt'");  }
+        $i++;
     }
-    if ($alleles_ok) { $vcf_call = join('/', @vcf_alleles); }
-    else { $vcf_call = ''; } # special case; failed gender marker
-    # construct a VCF genotype field
-    # sub-fields are call, quality score, read depth
-    # TODO are read depth and a non-null quality score required?
+    my $vcf_call = join('/', @vcf_alleles);
     my $qual;
-    if ($call->qscore == -1) { $qual = $DEFAULT_QUALITY_STRING; }
-    else { $qual = $call->qscore; }
+    if (defined($call->qscore)) {
+        if ($call->qscore == -1) {
+            $qual = $DEFAULT_QUALITY_STRING;
+        } else {
+            $qual = $call->qscore;
+        }
+    } else {
+        $qual = $DEFAULT_QUALITY_STRING;
+    }
     my @subfields = ($vcf_call, $qual, $DEPTH_PLACEHOLDER);
     return join(':', @subfields);
 }
