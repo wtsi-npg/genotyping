@@ -8,24 +8,30 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-has 'qual'    => # Phred quality score for alternate allele; -1 if missing
+has 'qual'    =>
     (is       => 'ro',
      isa      => 'Int',
-     default  => -1);
+     default  => -1,
+     documentation => 'Phred quality score for alternate reference allele; -1 if missing. Not to be confused with quality scores of the calls for each sample.'
+ );
 
-has 'filter'  => # filter status; if missing, represent by '.'
+has 'filter'  =>
     (is       => 'ro',
      isa      => 'Str',
-     default  => '.');
+     default  => '.',
+     documentation => 'Filter status; if missing, represent by "."');
 
-has 'additional_info'  => # miscellaneous information string
+has 'additional_info'  =>
     (is       => 'ro',
      isa      => 'Str',
-     default  => '.');
+     default  => '.',
+     documentation => 'Miscellaneous information string for VCF output');
 
-has 'calls'   => # Genotype::ScoredCall objects; convert to VCF format
+has 'calls'   =>
     (is       => 'ro',
-     isa      => 'ArrayRef[WTSI::NPG::Genotyping::Call]');
+     isa      => 'ArrayRef[WTSI::NPG::Genotyping::Call]',
+     required => 1,
+     documentation => 'Call objects to convert to VCF row format');
 
 # attributes derived from the list of input Genotype::Call objects
 
@@ -50,13 +56,13 @@ has 'is_haploid' =>
      documentation => 'True for human Y chromosome, false otherwise'
     );
 
+# NB this class does not have the sample names; they are stored in VCF header
+
 # genotype sub-fields GT = genotype; GQ = genotype quality; DP = read depth
 our $GENOTYPE_FORMAT = 'GT:GQ:DP';
 our $DEPTH_PLACEHOLDER = 1;
 our $DEFAULT_QUALITY_STRING = '.';
 our $NULL_ALLELE = 'N';
-
-# NB this class does not have the sample names; they are stored in VCF header
 
 sub BUILD {
     my ($self, ) = @_;
@@ -64,6 +70,17 @@ sub BUILD {
         $self->logcroak("Must input at least one Call to create a VCF row");
     }
 }
+
+
+=head2 to_string
+
+  Arg [1]    : None
+
+  Example    : $data_row->to_string
+  Description: Return a string for output in the body of a VCF file.
+  Returntype : Str
+
+=cut
 
 sub to_string {
     my ($self,)= @_;
@@ -90,8 +107,10 @@ sub to_string {
 }
 
 sub _build_haploid_status {
+    # set haploid status to true or false
+    # for now, the only haploid variants supported are human Y chromosome
     my ($self) = @_;
-    if (is_YMarker($self->snp)) {return 1; }
+    if (is_YMarker($self->snp)) { return 1; }
     else { return 0; }
 }
 
@@ -173,8 +192,8 @@ WTSI::NPG::Genotyping::VCF::DataRow
 =head1 DESCRIPTION
 
 Class to represent one row in the main body of a VCF file. Contains
-data for a particular variant (eg. a SNP or gender marker), including one
-or more genotype calls.
+data for a particular variant (eg. a SNP or gender marker), including
+genotype calls for one or more samples.
 
 =head1 AUTHOR
 
