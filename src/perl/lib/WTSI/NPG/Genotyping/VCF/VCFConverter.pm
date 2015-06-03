@@ -112,6 +112,16 @@ sub convert {
     return $outString;
 }
 
+sub _generate_no_call {
+    # convenience method to generate a no-call on the given variant
+    my ($self, $snp) = @_;
+    return WTSI::NPG::Genotyping::Call->new(
+        snp      => $snp,
+        genotype => $NULL_GENOTYPE,
+        is_call  => 0,
+    );
+}
+
 sub _generate_vcf_complete {
     # generate VCF data given a SNPSet and one or more AssayResultSets
     my ($self, @args) = @_;
@@ -138,50 +148,32 @@ sub _generate_vcf_records {
     if (is_GenderMarker($snp)) {
         my (@x_calls, @y_calls);
         foreach my $call (@sample_calls) {
-            # use the called allele to identify X or Y chromosome
             # output two data rows, for X and Y respectively
             # (at least) one of the two outputs is a no-call
-            my $base = substr($call->genotype(), 0, 1);
+            my $base = substr($call->genotype, 0, 1);
             if ($call->is_x_call()) {
                 push(@x_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->x_marker(),
-                    genotype => $call->genotype(),
-                    qscore   => $call->qscore(),
+                    snp      => $snp->x_marker,
+                    genotype => $call->genotype,
+                    qscore   => $call->qscore,
                 ));
-                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->y_marker(),
-                    genotype => $NULL_GENOTYPE,
-                    is_call  => 0,
-                ));
+                push(@y_calls, $self->_generate_no_call($snp->y_marker));
             } elsif ($call->is_y_call()) {
-                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->x_marker(),
-                    genotype => $NULL_GENOTYPE,
-                    is_call  => 0,
-                ));
+                push(@x_calls, $self->_generate_no_call($snp->x_marker));
                 push(@y_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->y_marker(),
+                    snp      => $snp->y_marker,
                     genotype => $call->genotype(),
                     qscore   => $call->qscore(),
                 ));
             } elsif (!$call->is_call()) {
-                # ensure the 'no calls' are distinct objects
-                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->x_marker(),
-                    genotype => $NULL_GENOTYPE,
-                    is_call  => 0,
-                ));
-                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->y_marker(),
-                    genotype => $NULL_GENOTYPE,
-                    is_call  => 0,
-                ));
+                push(@x_calls, $self->_generate_no_call($snp->x_marker));
+                push(@y_calls, $self->_generate_no_call($snp->y_marker));
             } else {
-                $self->logcroak("Invalid genotype of '", $call->genotype(),
-                                "' for gender marker ", $snp->name(),
+                $self->logcroak("Invalid genotype of '", $call->genotype,
+                                "' for gender marker ", $snp->name,
                                 "; valid non-null alleles are ",
-                                $snp->ref_allele(), " or ",
-                                $snp->alt_allele());
+                                $snp->ref_allele, " or ",
+                                $snp->alt_allele);
             }
         }
         my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
