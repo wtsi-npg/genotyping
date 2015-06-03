@@ -119,6 +119,7 @@ lib/WTSI/NPG/Genotyping/Fluidigm/Publisher.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/ResultSet.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/Subscriber.pm
 lib/WTSI/NPG/Genotyping/GenderMarker.pm
+lib/WTSI/NPG/Genotyping/GenderMarkerCall.pm
 lib/WTSI/NPG/Genotyping/Illuminus.pm
 lib/WTSI/NPG/Genotyping/Infinium/AnalysisPublisher.pm
 lib/WTSI/NPG/Genotyping/Infinium/InfiniumDataObject.pm
