@@ -18,6 +18,7 @@ use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
+use WTSI::NPG::Genotyping::VCF::Header;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -104,14 +105,14 @@ sub _generate_vcf_complete {
     my ($self, @args) = @_;
     my ($calls, $samples) = $self->_parse_assay_results();
     my @output; # lines of text for output
-    my ($chroms, $snpset);
-    $snpset = $self->snpset;
-    # TODO use a new VCF Header class to generate the header string
-    push(@output, $self->_generate_vcf_header($samples));
-    foreach my $snp (@{$snpset->snps}) {
+    my $header = WTSI::NPG::Genotyping::VCF::Header->new (
+        sample_names       => $samples,
+        chromosome_lengths => $self->chromosome_lengths,
+    );
+    push(@output, $header->to_string());
+    foreach my $snp (@{$self->snpset->snps}) {
         push @output, $self->_generate_vcf_records($snp, $calls, $samples);
     }
-
     return @output;
 }
 
@@ -171,37 +172,6 @@ sub _generate_vcf_records {
         push(@records, $data_row->to_string());
     }
     return @records;
-}
-
-sub _generate_vcf_header {
-    my ($self, $samplesRef) = @_;
-    my %lengths = %{$self->chromosome_lengths};
-    my @samples = @{$samplesRef};
-    my $dt = DateTime->now(time_zone=>'local');
-    my @header = ();
-    push(@header, '##fileformat=VCFv4.0');
-    push(@header, '##fileDate='.$dt->ymd(''));
-    push(@header, '##source=WTSI_NPG_genotyping_pipeline');
-    # add contig tags with chromosome lengths to prevent bcftools warnings
-    my @chromosomes = sort(keys(%lengths));
-    foreach my $chr (@chromosomes) {
-        my $line = "##contig=<ID=$chr,length=$lengths{$chr},".
-            "species=\"Homo sapiens\">";
-        push(@header, $line);
-    }
-    my @lines = (
-        '##INFO=<ID=ORIGINAL_STRAND,Number=1,Type=String,'.
-            'Description="Direction of strand in input file">',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
-        '##FORMAT=<ID=GQ,Number=1,Type=Integer,'.
-            'Description="Genotype Quality">',
-        '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">',
-    );
-    foreach my $line (@lines) { push(@header, $line); }
-    my @colHeads = @COLUMN_HEADS;
-    push(@colHeads, @samples);
-    push(@header, "#".join("\t", @colHeads));
-    return @header;
 }
 
 sub _parse_assay_results {
