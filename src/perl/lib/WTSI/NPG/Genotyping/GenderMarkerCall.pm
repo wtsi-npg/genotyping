@@ -11,9 +11,6 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-# extension of Call class for gender markers
-# adds a gender attribute and is_male, is_female methods
-
 has 'snp' =>
   (is       => 'ro',
    isa      => GenderMarker,
@@ -29,11 +26,42 @@ our $UNKNOWN_GENDER = 0;
 our $FEMALE_GENDER = 1;
 our $MALE_GENDER = 2;
 
+
+=head2 is_x_call
+
+  Arg [1]    : None
+
+  Example    : $is_x = $gender_marker_call->is_x_call()
+  Description: Determine whether the called genotype is an X chromosome call
+               for this gender marker. Returns true for a call on the X
+               chromosome, false for a call on the Y chromosome or no call.
+               IMPORTANT: This only evaluates a single gender marker. It is
+               not to be confused with evaluating the gender status of a
+               given sample (which typically uses multiple markers).
+  Returntype : Bool
+
+=cut
+
 sub is_x_call {
     my ($self) = @_;
     if ($self->gender == $FEMALE_GENDER) { return 1; }
     else { return 0; }
 }
+
+=head2 is_y_call
+
+  Arg [1]    : None
+
+  Example    : $is_y = $gender_marker_call->is_y_call()
+  Description: Determine whether the called genotype is a Y chromosome call
+               for this gender marker. Returns true for a call on the Y
+               chromosome, false for a call on the X chromosome or no call.
+               IMPORTANT: This only evaluates a single gender marker. It is
+               not to be confused with evaluating the gender status of a
+               given sample (which typically uses multiple markers).
+  Returntype : Bool
+
+=cut
 
 sub is_y_call {
     my ($self) = @_;
@@ -66,3 +94,37 @@ sub _build_gender {
     }
     return $gender;
 }
+
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::Genotyping::GenderMarkerCall
+
+=head1 DESCRIPTION
+
+Extension of the WTSI::NPG::Genotyping::Call class to handle gender markers.
+The input variant is required to be of the GenderMarker type. Includes methods
+to determine whether the call is consistent with an X (female) or Y (male)
+variant.
+
+=head1 AUTHOR
+
+Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
