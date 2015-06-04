@@ -3,7 +3,6 @@ use utf8;
 
 package WTSI::NPG::Genotyping::VCF::VCFConverter;
 
-use DateTime;
 use JSON;
 use List::AllUtils qw(uniq);
 use Log::Log4perl::Level;
