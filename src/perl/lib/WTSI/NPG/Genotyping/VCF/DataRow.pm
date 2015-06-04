@@ -193,7 +193,8 @@ WTSI::NPG::Genotyping::VCF::DataRow
 
 Class to represent one row in the main body of a VCF file. Contains
 data for a particular variant (eg. a SNP or gender marker), including
-genotype calls for one or more samples.
+genotype calls for one or more samples. General information on a VCF dataset,
+including sample identifiers, is contained in a Header object.
 
 =head1 AUTHOR
 
