@@ -4,7 +4,6 @@ package WTSI::NPG::Genotyping::VCF::Header;
 
 use DateTime;
 use Moose;
-use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
