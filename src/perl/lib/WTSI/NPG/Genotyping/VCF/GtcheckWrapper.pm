@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+package WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 use JSON;
 use Log::Log4perl::Level;

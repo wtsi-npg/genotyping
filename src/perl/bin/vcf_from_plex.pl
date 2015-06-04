@@ -13,7 +13,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::VCF::VCFConverter;
+use WTSI::NPG::Genotyping::VCF::AssayResultReader;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 my $uid = `whoami`;
@@ -160,12 +160,12 @@ $log->info("Found $total assay results");
 ### convert to VCF ###
 my $converter;
 if ($use_irods) {
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
+    $converter = WTSI::NPG::Genotyping::VCF::AssayResultReader->new(
         resultsets => \@results, input_type => $inputType,
         snpset => $snpset, chromosome_lengths => $chroms,
         normalize_chromosome => $normalize_chromosome, logger => $log);
 } else {
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new(
+    $converter = WTSI::NPG::Genotyping::VCF::AssayResultReader->new(
         resultsets => \@results, input_type => $inputType,
         snpset => $snpset, chromosome_lengths => $chroms,
         normalize_chromosome => $normalize_chromosome, logger => $log);

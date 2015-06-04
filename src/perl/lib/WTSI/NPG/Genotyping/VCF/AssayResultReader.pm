@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::VCFConverter;
+package WTSI::NPG::Genotyping::VCF::AssayResultReader;
 
 use JSON;
 use List::AllUtils qw(uniq);
