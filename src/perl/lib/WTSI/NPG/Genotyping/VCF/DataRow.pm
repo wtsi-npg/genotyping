@@ -75,8 +75,7 @@ sub BUILD {
 =head2 to_string
 
   Arg [1]    : None
-
-  Example    : $data_row->to_string
+  Example    : my $row_string = $data_row->to_string();
   Description: Return a string for output in the body of a VCF file.
   Returntype : Str
 

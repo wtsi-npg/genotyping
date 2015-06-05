@@ -45,6 +45,16 @@ sub BUILD {
     $self->info($msg);
 }
 
+
+=head2 to_string
+
+  Arg [1]    : None
+  Example    : my $vcf_string = $vcf_data_set->to_string()
+  Description: Return a string which can be output as a VCF file.
+  Returntype : Str
+
+=cut
+
 sub to_string {
     my ($self) = @_;
     my @output;
@@ -58,6 +68,16 @@ sub to_string {
     unshift(@output, $self->header->to_string());
     return join("\n", @output);
 }
+
+=head2 write_vcf
+
+  Arg [1]    : Output path, or '-' for STDOUT
+  Example    : $vcf_data_set->write_vcf($output_path);
+  Description: Write the dataset in VCF format to the given path, or
+               STDOUT if the path is a dash, '-'.
+  Returntype : Int
+
+=cut
 
 sub write_vcf {
     # convert to string and write to the path (or - for STDOUT)
