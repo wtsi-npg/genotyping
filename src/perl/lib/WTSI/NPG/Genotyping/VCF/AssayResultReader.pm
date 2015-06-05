@@ -8,6 +8,7 @@ use List::AllUtils qw(uniq);
 use Log::Log4perl::Level;
 use Moose;
 
+use WTSI::NPG::iRODS;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::GenderMarkerCall;
@@ -18,75 +19,193 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::Genotyping::VCF::Header;
+use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
 our $NULL_GENOTYPE = 'NN';
-our $X_CHROM_NAME = 'X';
-our $Y_CHROM_NAME = 'Y';
+our $SEQUENOM_TYPE = 'sequenom'; # TODO remove redundancy wrt vcf_from_plex.pl
+our $FLUIDIGM_TYPE = 'fluidigm';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
-has 'chromosome_lengths' => ( # must be compatible with given snpset
-    is           => 'ro',
-    isa          => 'HashRef',
-    required     => 1,
-);
+has 'chromosome_lengths' => # must be compatible with given snpset
+   (is            => 'ro',
+    isa           => 'HashRef[Int]',
+    required      => 1,
+    documentation => 'Used to generate contig tags required by bcftools',
+   );
 
-has 'snpset' => (
-    is           => 'ro',
-    isa          => 'WTSI::NPG::Genotyping::SNPSet',
-    required => 1,
-);
+has 'inputs'      =>
+   (is            => 'ro',
+    isa           => 'ArrayRef[Str]',
+    required      => 1,
+    documentation => 'Input paths in iRODS or local filesystem',
+   );
+
+has 'input_type'  =>
+   (is            => 'ro',
+    isa           => Platform,
+    required      => 1,
+   );
+
+has 'irods'       =>
+   (is            => 'ro',
+    isa           => 'WTSI::NPG::iRODS',
+    documentation => '(Optional) iRODS instance from which to read data. '.
+                     'If not given, inputs are assumed to be paths on the '.
+                     'local filesystem.',
+   );
 
 has 'resultsets' =>
-    (is       => 'rw',
-     isa      => 'ArrayRef', # Array of Sequenom OR Fluigidm AssayResultSet
-    );
+   (is       => 'ro',
+    isa      => ArrayRefOfResultSet,
+    lazy     => 1,
+    builder  => '_build_resultsets',
+   );
 
-has 'sort' => ( # sort the sample names before output?
-    is        => 'ro',
-    isa       => 'Bool',
-    default   => 1,
-    documentation => 'If true, output rows are sorted in (chromosome, position) order',
-    );
+has 'snpset' => 
+   (is           => 'ro',
+    isa          => 'WTSI::NPG::Genotyping::SNPSet',
+    required => 1,
+   );
 
-=head2 convert
+sub BUILD {
+    my ($self) = @_;
+    if (scalar @{$self->inputs} == 0) {
+        $self->logcroak("Must have at least one input path",
+                        " or iRODS location!");
+    }
+}
 
-  Arg [1]    : Path for VCF output (optional)
+=head2 get_vcf_dataset
 
-  Example    : $vcf_string = $converter->convert('/home/foo/output.vcf')
-  Description: Convert the sample results stored in $self->resultsets to a
-               single VCF format file. If the output argument is equal to '-',
-               VCF will be printed to STDOUT; if a different output argument
-               is given, it is used as the path for an output file; if the
-               output argument is omitted, output will not be written. Return
-               value is a string containing the VCF output.
-  Returntype : Str
+  Arg [1]    : None
+
+  Example    : my $vcf_data = $reader->get_vcf_dataset();
+  Description: Create a VCFDataSet object using the AssayResultSets which
+               have been read.
+  Returntype : WTSI::NPG::Genotyping::VCF::VCFDataSet
 
 =cut
 
-sub convert {
-    my ($self, $output) = @_;
-    my @out_lines = $self->_generate_vcf_complete();
-    if ($self->sort) {
-        @out_lines = $self->_sort_output_lines(\@out_lines);
-    }
-    my $out;
-    my $outString = join("\n", @out_lines)."\n";
-    if ($output) {
-        $self->logger->info("Printing VCF output to $output");
-        if ($output eq '-') {
-            $out = *STDOUT;
+sub get_vcf_dataset {
+    my ($self) = @_;
+    my ($calls, $samples) = $self->_parse_assay_results();
+    my $header = WTSI::NPG::Genotyping::VCF::Header->new(
+        sample_names => $samples,
+        chromosome_lengths => $self->chromosome_lengths,
+    );
+    my @rows;
+    foreach my $snp (@{$self->snpset->snps}) {
+        my @sample_calls;
+        foreach my $sample (@$samples) {
+            push(@sample_calls, $calls->{$snp->name}{$sample});
+        }
+        if (is_GenderMarker($snp)) {
+            my ($x_row, $y_row) = $self->_gender_rows($snp, \@sample_calls);
+            push(@rows, $x_row);
+            push(@rows, $y_row);
         } else {
-            open $out, '>:encoding(utf8)', $output ||
-                $self->logcroak("Cannot open output '$output'");
-        }
-        print $out $outString;
-        if ($output ne '-') {
-            close $out || $self->logcroak("Cannot close output '$output'");
+            my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+                calls => \@sample_calls,
+                additional_info => "ORIGINAL_STRAND=".$snp->strand
+            );
+            push(@rows, $data_row);
         }
     }
-    return $outString;
+    my $vcf_dataset = WTSI::NPG::Genotyping::VCF::VCFDataSet->new
+        (header => $header,
+         data   => \@rows);
+    return $vcf_dataset;
+}
+
+sub _build_resultsets {
+    my ($self) = @_;
+    my @results;
+    if (defined($self->irods)) { # read input from iRODS
+        foreach my $input (@{$self->inputs}) {
+            my $resultSet;
+            if ($self->input_type eq $SEQUENOM_TYPE) {
+                my $data_obj =
+                    WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
+                        $self->irods, $input);
+                $resultSet =
+                    WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                        data_object => $data_obj);
+            } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
+                my $data_obj =
+                    WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new(
+                        $self->irods, $input);
+                $resultSet =
+                    WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                        data_object => $data_obj);
+            } else {
+                $self->logcroak();
+            }
+            push(@results, $resultSet);
+        }
+    } else { # read input from local filesystem
+         foreach my $input (@{$self->inputs}) {
+             my $resultSet;
+             if ($self->input_type eq $SEQUENOM_TYPE) {
+                 $resultSet =
+                     WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                         $input);
+             } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
+                 $resultSet =
+                     WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                         $input);
+             } else {
+                 $self->logcroak();
+             }
+             push(@results, $resultSet);
+         }
+    }
+    return \@results;
+}
+
+sub _gender_rows {
+    # create X and Y DataRow objects for the given gender marker and calls
+    my ($self, $snp, $calls) = @_;
+    my (@x_calls, @y_calls);
+    foreach my $call (@{$calls}) {
+        # output two data rows, for X and Y respectively
+        # (at least) one of the two outputs is a no-call
+        my $base = substr($call->genotype, 0, 1);
+        if ($call->is_x_call()) {
+            push(@x_calls, WTSI::NPG::Genotyping::Call->new(
+                snp      => $snp->x_marker,
+                genotype => $call->genotype,
+                qscore   => $call->qscore,
+            ));
+            push(@y_calls, $self->_generate_no_call($snp->y_marker));
+        } elsif ($call->is_y_call()) {
+            push(@x_calls, $self->_generate_no_call($snp->x_marker));
+            push(@y_calls, WTSI::NPG::Genotyping::Call->new(
+                snp      => $snp->y_marker,
+                genotype => $call->genotype(),
+                qscore   => $call->qscore(),
+            ));
+        } elsif (!$call->is_call()) {
+            push(@x_calls, $self->_generate_no_call($snp->x_marker));
+            push(@y_calls, $self->_generate_no_call($snp->y_marker));
+        } else {
+            $self->logcroak("Invalid genotype of '", $call->genotype,
+                            "' for gender marker ", $snp->name,
+                            "; valid non-null alleles are ",
+                            $snp->ref_allele, " or ",
+                            $snp->alt_allele);
+        }
+    }
+    my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+        calls => \@x_calls,
+        additional_info => "ORIGINAL_STRAND=".$snp->strand
+    );
+    my $y_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
+        calls => \@y_calls,
+        additional_info => "ORIGINAL_STRAND=".$snp->strand
+    );
+    return ($x_row, $y_row);
 }
 
 sub _generate_no_call {
@@ -99,84 +218,10 @@ sub _generate_no_call {
     );
 }
 
-sub _generate_vcf_complete {
-    # generate VCF data given a SNPSet and one or more AssayResultSets
-    my ($self, @args) = @_;
-    my ($calls, $samples) = $self->_parse_assay_results();
-    my @output; # lines of text for output
-    my $header = WTSI::NPG::Genotyping::VCF::Header->new (
-        sample_names       => $samples,
-        chromosome_lengths => $self->chromosome_lengths,
-    );
-    push(@output, $header->to_string());
-    foreach my $snp (@{$self->snpset->snps}) {
-        push @output, $self->_generate_vcf_records($snp, $calls, $samples);
-    }
-    return @output;
-}
-
-sub _generate_vcf_records {
-    my ($self, $snp, $calls, $samples) = @_;
-    my @records;
-    my @sample_calls;
-    foreach my $sample (@$samples) {
-        push(@sample_calls, $calls->{$snp->name}{$sample});
-    }
-    if (is_GenderMarker($snp)) {
-        my (@x_calls, @y_calls);
-        foreach my $call (@sample_calls) {
-            # output two data rows, for X and Y respectively
-            # (at least) one of the two outputs is a no-call
-            my $base = substr($call->genotype, 0, 1);
-            if ($call->is_x_call()) {
-                push(@x_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->x_marker,
-                    genotype => $call->genotype,
-                    qscore   => $call->qscore,
-                ));
-                push(@y_calls, $self->_generate_no_call($snp->y_marker));
-            } elsif ($call->is_y_call()) {
-                push(@x_calls, $self->_generate_no_call($snp->x_marker));
-                push(@y_calls, WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp->y_marker,
-                    genotype => $call->genotype(),
-                    qscore   => $call->qscore(),
-                ));
-            } elsif (!$call->is_call()) {
-                push(@x_calls, $self->_generate_no_call($snp->x_marker));
-                push(@y_calls, $self->_generate_no_call($snp->y_marker));
-            } else {
-                $self->logcroak("Invalid genotype of '", $call->genotype,
-                                "' for gender marker ", $snp->name,
-                                "; valid non-null alleles are ",
-                                $snp->ref_allele, " or ",
-                                $snp->alt_allele);
-            }
-        }
-        my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-            calls => \@x_calls,
-            additional_info => "ORIGINAL_STRAND=".$snp->strand
-        );
-        my $y_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-            calls => \@y_calls,
-            additional_info => "ORIGINAL_STRAND=".$snp->strand
-        );
-        push(@records, $x_row->to_string());
-        push(@records, $y_row->to_string());
-    } else {
-        my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-            calls => \@sample_calls,
-            additional_info => "ORIGINAL_STRAND=".$snp->strand
-        );
-        push(@records, $data_row->to_string());
-    }
-    return @records;
-}
-
 sub _parse_assay_results {
     # convert the AssayResultSet into Call objects
     # return a hash of hashes, indexed by marker and sample name
-    my ($self, ) = @_;
+    my ($self) = @_;
     my %calls;
     my %samples;
     my $controls = 0;
@@ -219,40 +264,6 @@ sub _parse_assay_results {
     }
     my @sortedSamples = sort(keys(%samples));
     return (\%calls, \@sortedSamples);
-}
-
-sub _read_json {
-    # read given path into a string and decode as JSON
-    my ($self, $input) = @_;
-    open my $in, '<:encoding(utf8)', $input || 
-        $self->logcroak("Cannot open input '$input'");
-    my $data = decode_json(join("", <$in>));
-    close $in || $self->logcroak("Cannot close input '$input'");
-    return $data;
-}
-
-sub _sort_output_lines {
-    # sort output lines by chromosome & position (1st, 2nd fields)
-    # header lines are unchanged
-    my ($self, $inputRef) = @_;
-    my @input = @{$inputRef};
-    my (@output, %chrom, %pos, @data);
-    foreach my $line (@input) {
-        if ($line =~ /^#/) {
-            push @output, $line;
-        } else {
-            push(@data, $line);
-            my @fields = split(/\s+/, $line);
-            my $chr = shift(@fields);
-            if ($chr eq $X_CHROM_NAME) { $chr = 23; }
-            elsif ($chr eq $Y_CHROM_NAME) { $chr = 24; }
-            $chrom{$line} = $chr;
-            $pos{$line} = shift(@fields);
-        }
-    }
-    @data = sort { $chrom{$a} <=> $chrom{$b} || $pos{$a} <=> $pos{$b} } @data;
-    push @output, @data;
-    return @output;
 }
 
 no Moose;

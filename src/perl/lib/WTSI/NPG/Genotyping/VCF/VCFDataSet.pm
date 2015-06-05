@@ -59,7 +59,7 @@ sub to_string {
     return join("\n", @output);
 }
 
-sub write_data {
+sub write_vcf {
     # convert to string and write to the path (or - for STDOUT)
     my ($self, $output) = @_;
     my $outString = $self->to_string();
@@ -78,7 +78,6 @@ sub write_data {
         }
     }
 }
-
 
 sub _build_num_samples {
     my ($self) = @_;
