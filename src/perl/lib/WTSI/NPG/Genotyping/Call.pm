@@ -24,6 +24,10 @@ has 'is_call' =>
    isa      => 'Bool',
    default  => 1); # used to represent 'no calls'
 
+has 'qscore' =>
+  (is      => 'ro',
+   isa     => 'Num');
+
 sub BUILD {
   my ($self) = @_;
 
@@ -186,18 +190,25 @@ sub is_complement {
 
   Example    : my $new_call = $call->complement
   Description: Return a new call object whose genotype is complemented
-               with respect to the original.
+               with respect to the original, retaining qscore (if any).
   Returntype : WTSI::NPG::Genotyping::Call
 
 =cut
 
 sub complement {
   my ($self) = @_;
-
-  return WTSI::NPG::Genotyping::Call->new
-    (snp      => $self->snp,
-     genotype => _complement($self->genotype),
-     is_call  => $self->is_call);
+  if (defined($self->qscore)) {
+      return WTSI::NPG::Genotyping::Call->new
+          (snp      => $self->snp,
+           genotype => _complement($self->genotype),
+           qscore   => $self->qscore,
+           is_call  => $self->is_call);
+  } else {
+      return WTSI::NPG::Genotyping::Call->new
+          (snp      => $self->snp,
+           genotype => _complement($self->genotype),
+           is_call  => $self->is_call);
+  }
 }
 
 =head2 merge
