@@ -35,7 +35,6 @@ BEGIN {
 }
 
 use WTSI::NPG::Genotyping::VCF::AssayResultReader;
-use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 my $data_path = './t/vcf';
