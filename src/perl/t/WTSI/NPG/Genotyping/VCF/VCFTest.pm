@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 42;
+use Test::More tests => 44;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -27,14 +27,16 @@ our $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 our $FLUIDIGM_TYPE = 'fluidigm';
 
 BEGIN {
-    use_ok('WTSI::NPG::Genotyping::VCF::VCFConverter');
-    use_ok('WTSI::NPG::Genotyping::VCF::VCFGtcheck');
+    use_ok('WTSI::NPG::Genotyping::VCF::AssayResultReader');
     use_ok('WTSI::NPG::Genotyping::VCF::DataRow');
+    use_ok('WTSI::NPG::Genotyping::VCF::Header');
+    use_ok('WTSI::NPG::Genotyping::VCF::GtcheckWrapper');
+    use_ok('WTSI::NPG::Genotyping::VCF::VCFDataSet');
 }
 
+use WTSI::NPG::Genotyping::VCF::AssayResultReader;
 use WTSI::NPG::Genotyping::VCF::DataRow;
-use WTSI::NPG::Genotyping::VCF::VCFConverter;
-use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 my $data_path = './t/vcf';
 my $sequenom_snpset_name = 'W30467_snp_set_info_GRCh37.tsv';
@@ -47,14 +49,18 @@ my $discordance_sequenom = $data_path."/pairwise_discordance_sequenom.json";
 my $vcf_fluidigm = $data_path."/fluidigm.vcf";
 my $vcf_sequenom = $data_path."/sequenom.vcf";
 
+my $irods;
 my $irods_tmp_coll;
 my $pid = $$;
+my $testnum = 0;
 
 sub setup: Test(setup) {
-    $tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
+    #$tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
+    $tmp = '/tmp/';
 
-    my $irods = WTSI::NPG::iRODS->new;
-    $irods_tmp_coll = "VCFTest.$pid";
+    $irods = WTSI::NPG::iRODS->new;
+    $irods_tmp_coll = "VCFTest.$pid.$testnum";
+    $testnum++;
     $irods->add_collection($irods_tmp_coll);
     $irods_tmp_coll = $irods->absolute_path($irods_tmp_coll);
     # read chromosome lengths
@@ -62,93 +68,85 @@ sub setup: Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-    my $irods = WTSI::NPG::iRODS->new;
-    $irods->remove_collection($irods_tmp_coll);
+    #my $irods = WTSI::NPG::iRODS->new;
+    #$irods->remove_collection($irods_tmp_coll);
 }
 
 sub fluidigm_file_test : Test(7) {
-    # upload test data to temporary irods collection
-    my (@csv, $converter);
+    my @inputs;
     foreach my $name (@fluidigm_csv) {
-        push(@csv, abs_path($data_path."/".$name));
+        push(@inputs, abs_path($data_path."/".$name));
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
-    my @inputs;
-    foreach my $csvPath (@csv) {
-        my $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
-            ($csvPath);
-        push(@inputs, $resultSet);
-    }
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
-        (resultsets => \@inputs,
-         input_type => 'fluidigm',
+    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
+        (inputs => \@inputs,
+         input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths);
-    my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
-    ok($converter->convert($vcf),
+    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
+    ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Fluidigm results to VCF with input from file");
-    _test_vcf_output($vcf_fluidigm, $vcf);
-    _test_fluidigm_gtcheck($vcf);
+    _test_vcf_output($vcf_fluidigm, $vcf_file);
+    _test_fluidigm_gtcheck($vcf_file);
 }
 
 sub fluidigm_irods_test : Test(7) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
-    my $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
-        (resultsets => \@inputs,
-         input_type => 'fluidigm',
+    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
+        (inputs => \@inputs,
+         irods => $irods,
+         input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths,
          );
-    my $vcf = $tmp.'/conversion_test_fluidigm.vcf';
-    ok($converter->convert($vcf),
-       "Converted Fluidigm results to VCF with input from iRODS");
-    _test_vcf_output($vcf_fluidigm, $vcf);
-    _test_fluidigm_gtcheck($vcf);
+    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
+    ok($vcf_dataset->write_vcf($vcf_file),
+       "Converted Fluidigm results to VCF with input from file");
+    _test_vcf_output($vcf_fluidigm, $vcf_file);
+    _test_fluidigm_gtcheck($vcf_file);
 }
 
 sub sequenom_file_test : Test(7) {
     # sequenom test with input from local filesystem
-    my (@csv, $converter);
-    foreach my $name (@sequenom_csv) { 
-        push(@csv, abs_path($data_path."/".$name));
+    my @inputs;
+    foreach my $name (@sequenom_csv) {
+        push(@inputs, abs_path($data_path."/".$name));
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
-    my @inputs;
-    foreach my $csvPath (@csv) {
-        my $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
-            $csvPath);
-        push(@inputs, $resultSet);
-    }
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
-        (resultsets => \@inputs,
-         input_type => 'sequenom',
+    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
+        (inputs => \@inputs,
+         input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths);
-    my $vcf = $tmp.'/conversion_test_sequenom.vcf';
-    ok($converter->convert($vcf),
+    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
+    ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Sequenom results to VCF with input from file");
-    _test_vcf_output($vcf_sequenom, $vcf);
-    _test_sequenom_gtcheck($vcf);
+    _test_vcf_output($vcf_sequenom, $vcf_file);
+    _test_sequenom_gtcheck($vcf_file);
 }
 
 sub sequenom_irods_test : Test(7) {
     # upload test data to temporary irods collection
-    my (@inputs, $converter, $output);
-    @inputs = _upload_sequenom();
+    my @inputs = _upload_sequenom();
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
-    $converter = WTSI::NPG::Genotyping::VCF::VCFConverter->new
-        (resultsets => \@inputs,
-         input_type => 'sequenom',
+    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
+        (inputs => \@inputs,
+         irods => $irods,
+         input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
          chromosome_lengths => $chromosome_lengths,
          );
-    my $vcf = $tmp.'/conversion_test_sequenom.vcf';
-    ok($converter->convert($vcf),
-       "Converted Sequenom results to VCF with input from iRODS");
-    _test_vcf_output($vcf_sequenom, $vcf);
-    _test_sequenom_gtcheck($vcf);
+    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
+    ok($vcf_dataset->write_vcf($vcf_file),
+       "Converted Sequenom results to VCF with input from file");
+    _test_vcf_output($vcf_sequenom, $vcf_file);
+    _test_sequenom_gtcheck($vcf_file);
 }
 
 sub script_conversion_test : Test(3) {
@@ -158,16 +156,16 @@ sub script_conversion_test : Test(3) {
     my $irods = WTSI::NPG::iRODS->new;
     my @inputs = _upload_sequenom(); # write list of iRODS inputs
     my $sequenomList = "$tmp/sequenom_inputs.txt";
-    open my $out, ">", $sequenomList || 
+    open my $out, ">", $sequenomList ||
         log->logcroak("Cannot open output $sequenomList");
-    foreach my $input (@inputs) { print $out $input->str()."\n"; }
+    foreach my $input (@inputs) { print $out $input."\n"; }
     close $out || log->logcroak("Cannot close output $sequenomList");
     my $tmpJson = "$tmp/sequenom.json";
     my $tmpText = "$tmp/sequenom.txt";
     my $vcfOutput = "$tmp/vcf.txt";
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
-        "--snpset $snpset_ipath --gtcheck --irods --plex_type $SEQUENOM_TYPE ".
+        "--snpset $snpset_ipath --irods --plex_type $SEQUENOM_TYPE ".
         "< $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $vcfOutput, "VCF output written");
@@ -252,7 +250,7 @@ sub _compare_json {
 
 sub _test_fluidigm_gtcheck {
     my $vcf = shift;
-    my $gtcheck = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new();
+    my $gtcheck = WTSI::NPG::Genotyping::VCF::GtcheckWrapper->new();
     my ($resultRef, $maxDiscord) = $gtcheck->run($vcf);
     ok($resultRef, "Gtcheck result");
     is(scalar(keys(%{$resultRef})), 4, "Correct number of samples in result");
@@ -267,7 +265,7 @@ sub _test_fluidigm_gtcheck {
 
 sub _test_sequenom_gtcheck {
     my $vcf = shift;
-    my $gtcheck = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new();
+    my $gtcheck = WTSI::NPG::Genotyping::VCF::GtcheckWrapper->new();
     my ($resultRef, $maxDiscord) = $gtcheck->run($vcf);
     ok($resultRef, "Gtcheck result");
     is(scalar(keys(%{$resultRef})), 4, "Correct number of samples in result");
@@ -305,7 +303,7 @@ sub _upload_sequenom {
 sub _upload_plex_files {
     # upload plex data to the test irods, including manifest & chromosomes
     # adds metadata to the manifest, denoting location of chromosome file
-    # construct AssayResultSet objects from the uploaded data and return them
+    # return the irods paths of the uploaded files
     # return array does *not* include the manifest & chromosome file
     my $irods = WTSI::NPG::iRODS->new;
     my @csv_files = @{ shift() };
@@ -317,20 +315,7 @@ sub _upload_plex_files {
     foreach my $csv (@csv_files) {
         my $ipath = "$irods_tmp_coll/$csv";
         $irods->add_object("$data_path/$csv", $ipath);
-        my ($data_obj, $resultSet);
-        if ($data_type eq $SEQUENOM_TYPE) {
-            $data_obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
-                ($irods, $ipath);
-            $resultSet = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
-                (data_object => $data_obj);
-        } else {
-            $data_obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-                ($irods, $ipath);
-            $resultSet = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new
-                (data_object => $data_obj);
-        }
-        $data_obj->add_avu($manifest_key, $manifest_value);
-        push(@inputs, $resultSet);
+        push(@inputs, $ipath);
     }
     my $manifest_path = "$data_path/$manifest";
     $irods->add_object($manifest_path, $irods_tmp_coll);
