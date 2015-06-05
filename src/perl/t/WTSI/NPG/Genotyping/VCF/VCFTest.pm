@@ -52,12 +52,10 @@ my $vcf_sequenom = $data_path."/sequenom.vcf";
 my $irods;
 my $irods_tmp_coll;
 my $pid = $$;
-my $testnum = 0;
+my $testnum = 0; # use to create distinct temporary irods collections
 
 sub setup: Test(setup) {
-    #$tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
-    $tmp = '/tmp/';
-
+    $tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = "VCFTest.$pid.$testnum";
     $testnum++;
@@ -68,8 +66,8 @@ sub setup: Test(setup) {
 }
 
 sub teardown : Test(teardown) {
-    #my $irods = WTSI::NPG::iRODS->new;
-    #$irods->remove_collection($irods_tmp_coll);
+    my $irods = WTSI::NPG::iRODS->new;
+    $irods->remove_collection($irods_tmp_coll);
 }
 
 sub fluidigm_file_test : Test(7) {
@@ -105,7 +103,7 @@ sub fluidigm_irods_test : Test(7) {
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
-       "Converted Fluidigm results to VCF with input from file");
+       "Converted Fluidigm results to VCF with input from iRODS");
     _test_vcf_output($vcf_fluidigm, $vcf_file);
     _test_fluidigm_gtcheck($vcf_file);
 }
@@ -144,7 +142,7 @@ sub sequenom_irods_test : Test(7) {
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
-       "Converted Sequenom results to VCF with input from file");
+       "Converted Sequenom results to VCF with input from iRODS");
     _test_vcf_output($vcf_sequenom, $vcf_file);
     _test_sequenom_gtcheck($vcf_file);
 }
