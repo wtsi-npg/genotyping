@@ -8,6 +8,7 @@ use Getopt::Long;
 use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
+use Pod::Usage;
 
 use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 
