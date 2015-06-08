@@ -9,18 +9,23 @@ use MooseX::Types -declare =>
   [
    qw(
       ArrayRefOfReference
+      ArrayRefOfResultSet
       ArrayRefOfVariant
       DNABase
       DNAStrand
+      FluidigmResultSet
       GenderMarker
       HsapiensAutosome
       HsapiensChromosome
+      HsapiensChromosomeVCF
       HsapiensHeterosome
       HsapiensMT
       HsapiensX
       HsapiensY
       Platform
       Reference
+      ResultSet
+      SequenomResultSet
       SNP
       SNPGenotype
       SNPSet
@@ -34,6 +39,11 @@ subtype HsapiensChromosome,
   as Str,
   where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$} },
   message { "'$_' is not a valid H. sapiens chromosome name" };
+
+subtype HsapiensChromosomeVCF,
+  as Str,
+  where { $_ =~ m{^([0-9]+|[MT|X|Y]{1})$} },
+  message { "'$_' is not a valid H. sapiens chromosome name for VCF" };
 
 subtype HsapiensX,
   as Str,
@@ -68,6 +78,13 @@ subtype Platform,
   where { $_ eq 'fluidigm' || $_ eq 'sequenom' },
   message { "'$_' is not a valid genotyping platform" };
 
+class_type FluidigmResultSet, {
+    class => 'WTSI::NPG::Genotyping::Fluidigm::AssayResultSet' };
+class_type SequenomResultSet, {
+    class => 'WTSI::NPG::Genotyping::Sequenom::AssayResultSet' };
+subtype ResultSet,
+  as FluidigmResultSet | SequenomResultSet;
+
 class_type GenderMarker, { class => 'WTSI::NPG::Genotyping::GenderMarker' };
 class_type Reference,    { class => 'WTSI::NPG::Genotyping::Reference' };
 class_type SNP,          { class => 'WTSI::NPG::Genotyping::SNP' };
@@ -91,6 +108,9 @@ subtype YMarker,
 subtype ArrayRefOfReference,
   as ArrayRef[Reference];
 
+subtype ArrayRefOfResultSet,
+  as ArrayRef[ResultSet];
+
 subtype ArrayRefOfVariant,
   as ArrayRef[Variant];
 
@@ -108,11 +128,11 @@ The non-core Moose types for genotyping are all defined here.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

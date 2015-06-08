@@ -12,7 +12,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 my $uid = `whoami`;
@@ -73,7 +73,7 @@ my $vcf = join('', @inputs);
 if ($input ne '-') {
     close $in || $log->logcroak("Cannot close input '$input'");
 }
-my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(
+my $checker = WTSI::NPG::Genotyping::VCF::GtcheckWrapper->new(
     verbose => $verbose);
 my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
 my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;

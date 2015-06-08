@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+package WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 use JSON;
 use Log::Log4perl::Level;
@@ -260,7 +260,7 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::VCF::VCFGtcheck
+WTSI::NPG::Genotyping::VCF::GtcheckWrapper
 
 =head1 DESCRIPTION
 
@@ -273,7 +273,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

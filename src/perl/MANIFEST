@@ -119,6 +119,7 @@ lib/WTSI/NPG/Genotyping/Fluidigm/Publisher.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/ResultSet.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/Subscriber.pm
 lib/WTSI/NPG/Genotyping/GenderMarker.pm
+lib/WTSI/NPG/Genotyping/GenderMarkerCall.pm
 lib/WTSI/NPG/Genotyping/Illuminus.pm
 lib/WTSI/NPG/Genotyping/Infinium/AnalysisPublisher.pm
 lib/WTSI/NPG/Genotyping/Infinium/InfiniumDataObject.pm
@@ -148,8 +149,11 @@ lib/WTSI/NPG/Genotyping/SNP.pm
 lib/WTSI/NPG/Genotyping/SNPSet.pm
 lib/WTSI/NPG/Genotyping/SNPSetPublisher.pm
 lib/WTSI/NPG/Genotyping/Types.pm
-lib/WTSI/NPG/Genotyping/VCF/VCFConverter.pm
-lib/WTSI/NPG/Genotyping/VCF/VCFGtcheck.pm
+lib/WTSI/NPG/Genotyping/VCF/AssayResultReader.pm
+lib/WTSI/NPG/Genotyping/VCF/DataRow.pm
+lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
+lib/WTSI/NPG/Genotyping/VCF/Header.pm
+lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/Publisher.pm
