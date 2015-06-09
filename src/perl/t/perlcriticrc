@@ -5,9 +5,11 @@
 [-Documentation::PodSpelling]
 [-Documentation::RequirePodAtEnd]
 
-[Documentation::RequirePodSections]
-lib_sections    = AUTHOR
-script_sections = NAME | SYNOPSIS | DESCRIPTION | AUTHOR
+# BEGIN temporary reprieve
+[-Documentation::RequirePodSections]
+#lib_sections    = AUTHOR
+#script_sections = NAME | SYNOPSIS | DESCRIPTION | AUTHOR
+# END temporary reprieve
 
 [-ControlStructures::ProhibitUnlessBlocks]
 [ControlStructures::ProhibitPostfixControls]
@@ -17,28 +19,111 @@ allow = if unless until
 packages = :no_restriction
 
 # BEGIN temporary reprieve
+global_variables = :no_restriction
 subroutines = :no_restriction
 local_lexical_variables = :no_restriction
 scoped_lexical_variables = :no_restriction
+file_lexical_variables = :no_restriction
 # END temporary reprieve
 
-[Subroutines::ProhibitUnusedPrivateSubroutines]
-private_name_regex = _(?!build_)\w+
+# BEGIN temporary reprieve
+[-Subroutines::ProhibitUnusedPrivateSubroutines]
+# private_name_regex = _(?!build_)\w+
+# END temporary reprieve
 
 [-InputOutput::RequireBriefOpen]
 [-InputOutput::ProhibitBacktickOperators]
 [-InputOutput::RequireBracedFileHandleWithPrint]
 
-[InputOutput::RequireCheckedSyscalls]
-functions = open opendir read readline readdir close closedir
+# BEGIN temporary reprieve
+[-InputOutput::RequireCheckedSyscalls]
+# functions = open opendir read readline readdir close closedir
+# END temporary reprieve
 
 [-References::ProhibitDoubleSigils]
 
 [-ValuesAndExpressions::ProhibitInterpolationOfLiterals]
 
-[ValuesAndExpressions::ProhibitMagicNumbers]
-allowed_values = -1 0 1 2 4 8 16 32 64 128 256 512 1024 4096
+# BEGIN temporary reprieve
+[-ValuesAndExpressions::ProhibitMagicNumbers]
+#allowed_values = -1 0 1 2 4 8 16 32 64 128 256 512 1024 4096
+# END temporary reprieve
 
 [-Variables::ProhibitPunctuationVars]
 
 [-Modules::ProhibitExcessMainComplexity]
+
+
+# BEGIN temporary reprieve
+
+[-RegularExpressions::RequireLineBoundaryMatching]
+[-RegularExpressions::RequireDotMatchAnything]
+[-RegularExpressions::RequireExtendedFormatting]
+[-RegularExpressions::ProhibitEscapedMetacharacters]
+[-RegularExpressions::ProhibitEnumeratedClasses]
+[-RegularExpressions::ProhibitFixedStringMatches]
+
+[-CodeLayout::ProhibitTrailingWhitespace]
+[-CodeLayout::ProhibitParensWithBuiltins]
+[-CodeLayout::ProhibitHardTabs]
+[-CodeLayout::ProhibitQuotedWordLists]
+
+[-ControlStructures::ProhibitCStyleForLoops]
+[-ControlStructures::ProhibitNegativeExpressionsInUnlessAndUntilConditions]
+[-ControlStructures::ProhibitCascadingIfElse]
+[-ControlStructures::ProhibitDeepNests]
+[-ControlStructures::ProhibitUnreachableCode]
+
+[-NamingConventions::ProhibitAmbiguousNames]
+
+[-ValuesAndExpressions::ProhibitEmptyQuotes]
+[-ValuesAndExpressions::ProhibitNoisyQuotes]
+[-ValuesAndExpressions::ProhibitImplicitNewlines]
+[-ValuesAndExpressions::ProhibitCommaSeparatedStatements]
+[-ValuesAndExpressions::RequireInterpolationOfMetachars]
+[-ValuesAndExpressions::ProhibitMixedBooleanOperators]
+[-ValuesAndExpressions::ProhibitLongChainsOfMethodCalls]
+[-ValuesAndExpressions::RequireNumberSeparators]
+[-ValuesAndExpressions::ProhibitMismatchedOperators]
+
+[-ErrorHandling::RequireCarping]
+[-ErrorHandling::RequireCheckingReturnValueOfEval]
+
+[-Modules::RequireExplicitPackage]
+[-Modules::RequireEndWithOne]
+[-Modules::RequireNoMatchVarsWithUseEnglish]
+
+[-Variables::ProhibitUnusedVariables]
+[-Variables::ProhibitReusedNames]
+[-Variables::ProhibitPackageVars]
+[-Variables::ProhibitAugmentedAssignmentInDeclaration]
+[-Variables::RequireLocalizedPunctuationVars]
+
+[-ClassHierarchies::ProhibitExplicitISA]
+[-ClassHierarchies::ProhibitAutoloading]
+
+[-BuiltinFunctions::ProhibitBooleanGrep]
+[-BuiltinFunctions::ProhibitStringySplit]
+[-BuiltinFunctions::ProhibitReverseSortBlock]
+
+[-Objects::ProhibitIndirectSyntax]
+
+[-Subroutines::ProhibitManyArgs]
+[-Subroutines::RequireArgUnpacking]
+[-Subroutines::RequireFinalReturn]
+[-Subroutines::ProhibitBuiltinHomonyms]
+[-Subroutines::ProhibitExcessComplexity]
+[-Subroutines::ProhibitReturnSort]
+
+[-Documentation::RequirePackageMatchesPodName]
+
+[-InputOutput::RequireCheckedOpen]
+[-InputOutput::RequireCheckedClose]
+[-InputOutput::ProhibitTwoArgOpen]
+[-InputOutput::ProhibitJoinedReadline]
+[-InputOutput::RequireEncodingWithUTF8Layer]
+
+[-TestingAndDebugging::RequireUseWarnings]
+[-TestingAndDebugging::RequireUseStrict]
+[-TestingAndDebugging::ProhibitNoStrict]
+# END temporary reprieve
