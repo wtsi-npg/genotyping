@@ -4,6 +4,8 @@ package WTSI::NPG::Expression::ResultSet;
 
 use Moose;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'sample_id'        => (is => 'ro', isa => 'Str', required => 1);

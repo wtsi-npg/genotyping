@@ -30,6 +30,8 @@ use MooseX::Types -declare =>
     )
   ];
 
+our $VERSION = '';
+
 subtype HsapiensChromosome,
   as Str,
   where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$} },

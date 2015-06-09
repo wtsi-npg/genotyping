@@ -19,6 +19,9 @@ use Exporter;
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/createReports qcNameFromPath/; 
+
+our $VERSION = '';
+
 our @dbInfoHeaders = qw/run project data_supplier snpset
                         supplier_name rowcol beadchip_number/;
 our $allMetricsName = "ALL_METRICS";

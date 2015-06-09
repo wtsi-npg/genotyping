@@ -8,6 +8,8 @@ use Text::CSV;
 
 use WTSI::NPG::Utilities qw(trim);
 
+our $VERSION = '';
+
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
 

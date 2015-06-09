@@ -4,6 +4,8 @@ package WTSI::NPG::Expression::Annotation;
 
 use Moose::Role;
 
+our $VERSION = '';
+
 our %EXPRESSION_METADATA_ATTR =
   (analysis_uuid               => 'analysis_uuid',
    expression_project_title    => 'dcterms:title',

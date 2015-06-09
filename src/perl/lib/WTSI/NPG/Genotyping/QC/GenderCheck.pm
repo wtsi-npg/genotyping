@@ -38,6 +38,8 @@ our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/$ini_path $helpText $helpTextDB processOptions run
   diffGenders readBenchmark readGenderOutput/;
 
+our $VERSION = '';
+
 use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey 
   $supplyKey $ini_path $helpText $helpTextDB/;
 ($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);

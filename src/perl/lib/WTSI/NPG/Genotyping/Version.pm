@@ -5,17 +5,18 @@ use strict;
 use warnings;
 use Carp;
 
-use vars qw/$VERSION $YEAR @ISA @EXPORT_OK/;
+use vars qw/@ISA @EXPORT_OK/;
 use Exporter;
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/version_text write_version_log/;
 
-$VERSION = '0.0.0';
-$YEAR = '2014'; # year of last update
+our $VERSION = '';
+
+our $YEARS = '2014, 2015';
 
 sub version_text {
     my $text = "WTSI Genotyping Pipeline version $VERSION\n".
-        "Pipeline software copyright (c) $YEAR Genome Research Ltd.\n".
+        "Pipeline software copyright (C) $YEARS Genome Research Ltd.\n".
         "All rights reserved.\n";
     return $text;
 }

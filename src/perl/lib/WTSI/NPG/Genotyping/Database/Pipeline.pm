@@ -8,6 +8,19 @@ use Moose;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline::Schema;
 
+our $VERSION = '';
+
+our $AUTOLOAD;
+
+our $default_sqlite   = 'sqlite3';
+our $default_ddl_file = 'pipeline_ddl.sql';
+our $pipeline_ini  = 'pipeline.ini';
+our $genders_ini   = 'genders.ini';
+our $methods_ini   = 'methods.ini';
+our $relations_ini = 'relations.ini';
+our $snpsets_ini   = 'snpsets.ini';
+our $states_ini    = 'states.ini';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBIx';
@@ -46,18 +59,6 @@ has 'schema' =>
   (is       => 'rw',
    isa      => 'WTSI::NPG::Genotyping::Database::Pipeline::Schema',
    required => 0);
-
-our $AUTOLOAD;
-
-our $default_sqlite   = 'sqlite3';
-our $default_ddl_file = 'pipeline_ddl.sql';
-
-our $pipeline_ini  = 'pipeline.ini';
-our $genders_ini   = 'genders.ini';
-our $methods_ini   = 'methods.ini';
-our $relations_ini = 'relations.ini';
-our $snpsets_ini   = 'snpsets.ini';
-our $states_ini    = 'states.ini';
 
 sub BUILD {
   my ($self) = @_;

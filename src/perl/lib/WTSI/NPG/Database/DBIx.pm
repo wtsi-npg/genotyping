@@ -5,6 +5,8 @@ use DBIx::Class::Schema;
 use Moose::Role;
 use Try::Tiny;
 
+our $VERSION = '';
+
 has 'schema' =>
   (is       => 'rw',
    isa      => 'DBIx::Class::Schema',

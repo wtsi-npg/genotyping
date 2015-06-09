@@ -5,6 +5,15 @@ package WTSI::NPG::Genotyping::Database::Infinium;
 use Carp;
 use Moose;
 
+our $VERSION = '';
+
+# The string the LIMS used to indicate a GTC file has passed autocall
+our $AUTOCALL_PASS = 'Pass';
+
+# Method names for MOP operations
+our $FIND_PROJECT_CHIP_DESIGN   = 'find_project_chip_design';
+our $IS_METHYLATION_CHIP_DESIGN = 'is_methylation_chip_design';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
@@ -22,13 +31,6 @@ has 'gtc_cache' =>
    required => 1,
    default  => sub { return {} },
    init_arg => undef);
-
-# The string the LIMS used to indicate a GTC file has passed autocall
-our $AUTOCALL_PASS = 'Pass';
-
-# Method names for MOP operations
-our $FIND_PROJECT_CHIP_DESIGN   = 'find_project_chip_design';
-our $IS_METHYLATION_CHIP_DESIGN = 'is_methylation_chip_design';
 
 our $COMMON_SAMPLE_SELECT =
   qq(project project

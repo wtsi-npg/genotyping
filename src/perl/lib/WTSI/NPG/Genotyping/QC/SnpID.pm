@@ -14,6 +14,8 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/convertFromIlluminaExomeSNP convertToIlluminaExomeSNP/;
 
+our $VERSION = '';
+
 sub convertFromIlluminaExomeSNP {
     # strip off exm- prefix, if any
     my $id = shift;

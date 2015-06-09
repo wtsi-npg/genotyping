@@ -1,11 +1,44 @@
 
-exclude = InputOutput::RequireBriefOpen Modules::RequireVersionVar Modules::RequireFilenameMatchesPackage Modules::RequireExplicitPackage ValuesAndExpressions::RequireInterpolationOfMetachars Miscellanea::RequireRcsKeywords CodeLayout::RequireTidyCode 
+[-CodeLayout::RequireTidyCode]
+[-CodeLayout::RequireTrailingCommas]
 
-
-[ControlStructures::ProhibitPostfixControls]
-allow = if unless
-
+[-Documentation::PodSpelling]
+[-Documentation::RequirePodAtEnd]
 
 [Documentation::RequirePodSections]
-lib_sections    = AUTHOR | COPYRIGHT AND DISCLAIMER
-script_sections = NAME | SYNOPSIS | DESCRIPTION | COPYRIGHT AND DISCLAIMER | AUTHOR
+lib_sections    = AUTHOR
+script_sections = NAME | SYNOPSIS | DESCRIPTION | AUTHOR
+
+[-ControlStructures::ProhibitUnlessBlocks]
+[ControlStructures::ProhibitPostfixControls]
+allow = if unless until
+
+[NamingConventions::Capitalization]
+packages = :no_restriction
+
+# BEGIN temporary reprieve
+subroutines = :no_restriction
+local_lexical_variables = :no_restriction
+scoped_lexical_variables = :no_restriction
+# END temporary reprieve
+
+[Subroutines::ProhibitUnusedPrivateSubroutines]
+private_name_regex = _(?!build_)\w+
+
+[-InputOutput::RequireBriefOpen]
+[-InputOutput::ProhibitBacktickOperators]
+[-InputOutput::RequireBracedFileHandleWithPrint]
+
+[InputOutput::RequireCheckedSyscalls]
+functions = open opendir read readline readdir close closedir
+
+[-References::ProhibitDoubleSigils]
+
+[-ValuesAndExpressions::ProhibitInterpolationOfLiterals]
+
+[ValuesAndExpressions::ProhibitMagicNumbers]
+allowed_values = -1 0 1 2 4 8 16 32 64 128 256 512 1024 4096
+
+[-Variables::ProhibitPunctuationVars]
+
+[-Modules::ProhibitExcessMainComplexity]

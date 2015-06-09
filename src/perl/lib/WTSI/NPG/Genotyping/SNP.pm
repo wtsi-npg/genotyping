@@ -7,6 +7,8 @@ use Moose;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 has 'name' =>
   (is       => 'ro',
    isa      => 'Str',

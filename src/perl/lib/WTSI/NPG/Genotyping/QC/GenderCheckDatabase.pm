@@ -32,6 +32,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw/getDatabaseObject/;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/readDatabaseGenders updateDatabase/;
 
+our $VERSION = '';
+
 sub readDatabaseGenders {
     # read inferred genders from database -- use for testing database update
     # return hash of genders indexed by sample URI (not sample name)

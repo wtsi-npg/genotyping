@@ -10,6 +10,8 @@ use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 has '+data_object' =>

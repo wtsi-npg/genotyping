@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Infinium::ResultSet;
 
 use Moose;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'beadchip'         => (is => 'ro', isa => 'Str',  required => 1);

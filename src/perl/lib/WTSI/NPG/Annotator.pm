@@ -7,11 +7,13 @@ use File::Basename;
 
 use WTSI::NPG::Utilities qw(md5sum);
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
+our $VERSION = '';
 
 our @DEFAULT_FILE_SUFFIXES = qw(.csv .gtc .idat .tif .tsv .txt .xls .xlsx .xml);
 
 our $SEQUENCESCAPE_LIMS_ID = 'SQSCP';
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation';
 
 =head2 make_creation_metadata
 

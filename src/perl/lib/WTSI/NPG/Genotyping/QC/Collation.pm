@@ -23,6 +23,8 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/collate readMetricThresholds/;
 
+our $VERSION = '';
+
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 # metric names

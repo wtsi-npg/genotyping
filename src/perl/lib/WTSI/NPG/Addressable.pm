@@ -4,6 +4,8 @@ package WTSI::NPG::Addressable;
 
 use Moose::Role;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'size' =>

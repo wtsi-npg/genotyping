@@ -8,6 +8,8 @@ use Moose;
 
 use WTSI::NPG::Utilities qw(trim);
 
+our $VERSION = '';
+
 extends 'WTSI::NPG::Expression::ChipLoadingManifest';
 
 sub BUILD {

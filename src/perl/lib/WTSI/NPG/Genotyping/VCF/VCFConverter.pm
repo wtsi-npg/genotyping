@@ -18,7 +18,7 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+our $VERSION = '';
 
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
@@ -29,6 +29,8 @@ our $NULL_ALLELE = 'N';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
+
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'chromosome_lengths' => ( # must be compatible with given snpset
     is           => 'ro',

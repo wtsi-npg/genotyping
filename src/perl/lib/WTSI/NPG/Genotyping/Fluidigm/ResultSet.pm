@@ -5,6 +5,8 @@ use Moose;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
+our $VERSION = '';
+
 our $DATA_DIRECTORY_NAME = 'Data';
 our $EXPECTED_TIF_TOTAL = 3;
 
