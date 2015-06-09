@@ -1,7 +1,7 @@
 
 package WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
-use English;
+use English qw(-no_match_vars);
 use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
