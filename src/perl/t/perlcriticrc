@@ -90,7 +90,6 @@ file_lexical_variables = :no_restriction
 
 [-Modules::RequireExplicitPackage]
 
-[-Variables::ProhibitUnusedVariables]
 [-Variables::ProhibitReusedNames]
 [-Variables::ProhibitPackageVars]
 [-Variables::ProhibitAugmentedAssignmentInDeclaration]

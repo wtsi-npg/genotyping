@@ -38,7 +38,6 @@ sub run {
   my $config;
   my $debug;
   my $log4perl_config;
-  my $num_processes;
   my $publish_dest;
   my $verbose;
   my @filter_key;

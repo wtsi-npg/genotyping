@@ -64,7 +64,6 @@ run() unless caller();
 
 sub run {
   my $analysis_source;
-  my $dbfile;
   my $debug;
   my $log4perl_config;
   my $manifest_path;

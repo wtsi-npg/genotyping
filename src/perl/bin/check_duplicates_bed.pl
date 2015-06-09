@@ -33,7 +33,7 @@ our $VERSION = '';
 # duplicate.log, basic log info
 
 my (%defaults, %snps, %pos, %chr);
-my ($bfile, $af, $log, $sample_cr, $help, $help_text, $dir);
+my ($bfile, $af, $log, $help, $help_text, $dir);
 my ($maf_min, $maf_max, $max_snps, $min_snp_cr, $min_dist);
 my @use_snps;
 

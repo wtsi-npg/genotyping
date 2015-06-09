@@ -23,7 +23,7 @@ run() unless caller();
 
 sub run {
 
-    my ($outdir, $workdir, $manifest, $dbfile, $run, $egt, $help, $verbose, 
+    my ($outdir, $workdir, $manifest, $dbfile, $run, $egt, $verbose, 
 	$host, $workflow, $chunk_size, $memory, $zstart, $ztotal);
 
     my $log = Log::Log4perl->get_logger();

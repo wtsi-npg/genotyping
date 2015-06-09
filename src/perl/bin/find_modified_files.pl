@@ -39,7 +39,6 @@ sub run {
   my $debug;
   my $depth;
   my $log4perl_config;
-  my $publish_dest;
   my $root;
   my $type;
   my $verbose;

@@ -37,7 +37,6 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
-  my $type;
   my $verbose;
   my @filter_key;
   my @filter_value;

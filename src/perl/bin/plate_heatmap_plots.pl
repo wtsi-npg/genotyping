@@ -18,7 +18,7 @@ use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 our $VERSION = '';
 
-my ($dbPath, $iniPath, $mode, $RScriptPath, $outDir, $help);
+my ($dbPath, $iniPath, $mode, $outDir, $help);
 
 GetOptions("dbpath=s"  => \$dbPath,
 	   "inipath=s" => \$iniPath,

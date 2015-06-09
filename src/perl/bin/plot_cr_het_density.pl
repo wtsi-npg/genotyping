@@ -16,7 +16,7 @@ use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
 our $VERSION = '';
 
-my ($RScriptPath, $outDir, $title, $help);
+my ($outDir, $title, $help);
 
 GetOptions("out_dir=s"  => \$outDir,
 	   "title=s"    => \$title,
@@ -115,7 +115,7 @@ sub run {
                  'hetHistogram.png');
     my @paths = ();
     foreach my $name (@names) { push(@paths, $outDir.'/'.$name); }
-    my ($cmd, $output, @args, @outputs, $result);
+    my ($output, @args, @outputs);
     my ($heatText, $heatPdf, $heatPng, $scatterText, $scatterPdf, $scatterPng, $crHist, $hetHist) = @paths;
     my $heatPlotScript = "heatmapCrHetDensity.R";
     ### read input and do heatmap plot ###

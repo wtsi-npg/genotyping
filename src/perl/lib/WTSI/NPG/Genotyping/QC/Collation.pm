@@ -677,7 +677,7 @@ sub collate {
     my ($inputDir, $configPath, $thresholdPath, $dbPath, $iniPath,
         $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef,
         $verbose) = @_;
-    my (%config, %t, %thresholdConfig, @metricNames);
+    my (%config, %thresholdConfig, @metricNames);
     if ($verbose) { print STDERR "Started collating QC results.\n";    }
     %thresholdConfig = %{readMetricThresholds($thresholdPath)};
     if ($metricsRef) { 

@@ -28,7 +28,6 @@ sub run {
   my $config;
   my $dbfile;
   my $input;
-  my $maximum;
   my $namespace;
   my $run_name;
   my $supplier_name;

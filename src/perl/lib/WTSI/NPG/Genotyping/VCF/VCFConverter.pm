@@ -79,7 +79,7 @@ sub BUILD {
   my $self = shift;
   # Make our iRODS handle use our logger by default
   $self->irods->logger($self->logger);
-  my @results;
+
   my $input_type = $self->input_type;
   if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
       $self->logcroak("Unknown input data type: '$input_type'");
@@ -167,8 +167,7 @@ sub _generate_vcf_complete {
 
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
-    my ($chroms, $snpset);
-    $snpset = $self->snpset;
+    my $snpset = $self->snpset;
     my $total = scalar(@{$snpset->snps()});
     push(@output, $self->_generate_vcf_header(\@samples));
 

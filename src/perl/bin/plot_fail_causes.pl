@@ -24,8 +24,8 @@ our $VERSION = '';
 
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
     $comboText, $causeText, $crHetFail,  $comboPdf, $causePdf, $comboPng, 
-    $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng, $minCR, 
-    $maxHetSd, $title, $iniPath);
+    $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng,
+    $title, $iniPath);
 
 GetOptions("config=s"      => \$configPath,
            "input=s"       => \$inPath,

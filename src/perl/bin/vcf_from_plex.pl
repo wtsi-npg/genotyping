@@ -38,7 +38,7 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
-my ($input, $inputType, $plexColl, $vcfPath, $gtCheck, $jsonOut, $textOut,
+my ($input, $inputType, $vcfPath, $gtCheck,
     $log, $logConfig, $use_irods, $debug, $quiet,
     $snpset_path, $chromosome_json, $raw_chromosome, $normalize_chromosome);
 

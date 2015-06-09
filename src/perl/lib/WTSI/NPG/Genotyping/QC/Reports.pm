@@ -88,7 +88,7 @@ sub getPlateInfo {
     # foreach plate, get failure counts and percentage
     # want stats for each individual metric, and for all metrics combined
     my %records = %{ shift() };
-    my (%passCounts, %sampleCounts, %passRates, $key);
+    my (%passCounts, %sampleCounts);
     my ($sampleTotal, $passTotal) = (0,0);
     foreach my $sample (keys(%records)) {
         $sampleTotal++;
