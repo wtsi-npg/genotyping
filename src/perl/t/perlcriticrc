@@ -120,6 +120,5 @@ file_lexical_variables = :no_restriction
 [-InputOutput::RequireCheckedClose]
 [-InputOutput::ProhibitTwoArgOpen]
 [-InputOutput::ProhibitJoinedReadline]
-[-InputOutput::RequireEncodingWithUTF8Layer]
 
 # END temporary reprieve

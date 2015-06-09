@@ -19,7 +19,7 @@ sub BUILD {
     $self->logdie("Manifest file '", $self->file_name,
                   "' does not exist");
 
-  open my $in, '<:encoding(utf8)', $self->file_name
+  open my $in, '<:encoding(UTF-8)', $self->file_name
     or $self->logdie("Failed to open Manifest file '",
                      $self->file_name, "': $!");
 
@@ -51,7 +51,6 @@ sub BUILD {
 # Any whitespace-only lines are ignored.
 sub _parse_beadchip_table {
   my ($self, $fh) = @_;
-  binmode($fh, ':utf8');
 
   # Channel is always Grn (Cy3)
   my $channel = 'Grn';
