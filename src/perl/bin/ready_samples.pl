@@ -14,6 +14,7 @@ use WTSI::DNAP::Utilities::IO qw(maybe_stdin maybe_stdout);
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 Log::Log4perl->easy_init($ERROR);

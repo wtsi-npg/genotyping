@@ -6,6 +6,8 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 
+our $VERSION = '';
+
 __PACKAGE__->table('datasupplier');
 __PACKAGE__->add_columns
   ('id_datasupplier', { data_type => 'integer',

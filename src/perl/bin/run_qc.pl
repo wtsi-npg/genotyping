@@ -19,6 +19,7 @@ use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 our $MAF_HET_EXECUTABLE = "het_by_maf.py";

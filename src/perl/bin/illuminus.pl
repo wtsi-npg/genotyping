@@ -24,6 +24,7 @@ use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
                                         update_it_columns
                                         write_gt_calls
                                         write_it_header);
+our $VERSION = '';
 
 Log::Log4perl->easy_init($ERROR);
 

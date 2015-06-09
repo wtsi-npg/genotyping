@@ -12,6 +12,7 @@ use Pod::Usage;
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 Log::Log4perl->easy_init($ERROR);

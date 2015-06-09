@@ -6,6 +6,8 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 
+our $VERSION = '';
+
 __PACKAGE__->table('piperun');
 __PACKAGE__->add_columns
   ('id_piperun', { data_type => 'integer',

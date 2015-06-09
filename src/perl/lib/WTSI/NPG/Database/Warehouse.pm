@@ -8,12 +8,14 @@ use Moose;
 
 use WTSI::NPG::Utilities qw(depad_well);
 
-extends 'WTSI::NPG::Database';
-
-with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
+our $VERSION = '';
 
 # Method names for MOP operations
 our $FIND_SAMPLE_BY_PLATE = 'find_sample_by_plate';
+
+extends 'WTSI::NPG::Database';
+
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 my $meta = __PACKAGE__->meta;
 

@@ -17,6 +17,7 @@ use WTSI::NPG::iRODS qw(group_exists add_group);
 
 $| = 1;
 
+our $VERSION = '';
 
 my $embedded_conf = q(
    log4perl.logger.verbose        = DEBUG, A1

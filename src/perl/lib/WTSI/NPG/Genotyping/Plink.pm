@@ -16,6 +16,8 @@ our @EXPORT_OK = qw(update_placeholder
                     update_snp_locations
                     update_sample_genders);
 
+our $VERSION = '';
+
 sub update_placeholder {
     my ($input, $output, $placeholder, $tmp_dir) = @_;
     my ($in_base, $in_path, $in_suffix) = fileparse($input, '.bed');

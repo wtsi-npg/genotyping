@@ -38,6 +38,8 @@ use List::MoreUtils qw/uniq/;
 use JSON;
 use Text::CSV;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 

@@ -8,6 +8,8 @@ use UUID;
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation';
 
+our $VERSION = '';
+
 our @VALID_PROFILE_GROUPINGS = qw(group sample);
 our @VALID_SUMMARY_TYPES     = qw(gene probe annotation);
 

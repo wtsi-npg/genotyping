@@ -10,9 +10,7 @@ use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 
-extends 'WTSI::NPG::Database';
-
-with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
+our $VERSION = '';
 
 # Method names for MOP operations
 our $FIND_SEQUENOM_PLATE_ID  = 'find_sequenom_plate_id';
@@ -23,6 +21,10 @@ our $PLATE_STATUS_GENOTYPING_DONE   = 'Genotyping Done';
 our $PLATE_STATUS_GENOTYPING_FAILED = 'Genotyping Failed';
 our $WELL_STATUS_GENOTYPING_DONE    = 'OK';
 our $WELL_STATUS_GENOTYPING_FAILED  = 'No call';
+
+extends 'WTSI::NPG::Database';
+
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 my $meta = __PACKAGE__->meta;
 

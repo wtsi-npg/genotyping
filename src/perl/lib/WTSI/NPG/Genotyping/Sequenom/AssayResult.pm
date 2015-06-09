@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Sequenom::AssayResult;
 use Moose;
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'allele'        => (is => 'ro', isa => 'Str', required => 1);

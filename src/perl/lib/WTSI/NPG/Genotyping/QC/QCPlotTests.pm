@@ -21,6 +21,8 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames wrapCommand wrapPlotCommand $ini_path/;
 
+our $VERSION = '';
+
 sub createTestDatabase {
     # create temporary test database with given sample names
     my ($namesRef, $dbfile, $runName, $projectName, $uriStrip) = @_;

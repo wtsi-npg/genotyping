@@ -16,6 +16,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultPipelineDBConfig
                                                readQCMetricInputs);
 use WTSI::NPG::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 
+our $VERSION = '';
+
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");
 

@@ -4,6 +4,8 @@ package WTSI::NPG::Genotyping::Annotation;
 
 use Moose::Role;
 
+our $VERSION = '';
+
 our %GENOTYPING_METADATA_ATTR =
   (analysis_uuid             => 'analysis_uuid',
    infinium_project_title    => 'dcterms:title',

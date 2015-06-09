@@ -15,6 +15,8 @@ our @EXPORT_OK = qw(base_dir
                     read_sample_json
                     read_snp_json);
 
+our $VERSION = '';
+
 =head2 base_dir
 
   Arg [1]    : None.

@@ -5,6 +5,8 @@ use Moose;
 
 use WTSI::DNAP::Warehouse::Schema;
 
+our $VERSION = '';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBIx';

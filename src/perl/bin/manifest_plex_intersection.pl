@@ -13,6 +13,8 @@ use Pod::Usage;
 use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
 use WTSI::NPG::Genotyping::SNPSet;
 
+our $VERSION = '';
+
 my ($manifestPath, $plexPath, $outPath, $verbose);
 
 GetOptions('manifest=s'        => \$manifestPath,

@@ -15,13 +15,14 @@ use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Utilities qw(user_session_log);
 
-with 'WTSI::DNAP::Utilities::Loggable';
+our $VERSION = '';
 
 our $EXPECTED_IRODS_FILES = 3;
 our @DATA_SOURCE_NAMES = qw(LIMS_ IRODS SS_WH);
 our @HEADER_FIELDS = qw(data_source plate well sample infinium_beadchip
                         infinium_beadchip_section sequencescape_barcode);
 
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'infinium_db'  =>
   (is       => 'ro',

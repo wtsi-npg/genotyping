@@ -3,8 +3,10 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Types;
 
-use MooseX::Types::Moose qw(ArrayRef Str Int);
+use strict;
+use warnings;
 
+use MooseX::Types::Moose qw(ArrayRef Str Int);
 use MooseX::Types -declare =>
   [
    qw(
@@ -34,6 +36,8 @@ use MooseX::Types -declare =>
       YMarker
     )
   ];
+
+our $VERSION = '';
 
 subtype HsapiensChromosome,
   as Str,

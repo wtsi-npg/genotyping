@@ -5,6 +5,16 @@ use Moose;
 use POSIX qw/log10/;
 use WTSI::NPG::Genotyping::Types qw(SNPGenotype);
 
+our $VERSION = '';
+
+our $EMPTY_NAME          = '[ Empty ]';
+our $NO_TEMPLATE_CONTROL = 'NTC';
+our $NO_CALL             = 'No Call';
+our $INVALID_NAME        = 'Invalid';
+
+# TODO Remove duplication of $NO_CALL_GENOTYPE in Subscriber.pm
+our $NO_CALL_GENOTYPE    = 'NN';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'assay'          => (is => 'ro', isa => 'Str', required => 1);
@@ -20,14 +30,6 @@ has 'converted_call' => (is => 'ro', isa => 'Str', required => 1);
 has 'x_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'y_intensity'    => (is => 'ro', isa => 'Num', required => 1);
 has 'str'            => (is => 'ro', isa => 'Str', required => 1);
-
-our $EMPTY_NAME          = '[ Empty ]';
-our $NO_TEMPLATE_CONTROL = 'NTC';
-our $NO_CALL             = 'No Call';
-our $INVALID_NAME        = 'Invalid';
-
-# TODO Remove duplication of $NO_CALL_GENOTYPE in Subscriber.pm
-our $NO_CALL_GENOTYPE    = 'NN';
 
 =head2 is_empty
 

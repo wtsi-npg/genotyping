@@ -16,6 +16,8 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/run/;
 
+our $VERSION = '';
+
 sub getCsvLine {
     # get CSV line with stats for given plate
     # fields: index, plate, total samples, and
@@ -282,3 +284,5 @@ sub runAllMetrics {
                   $iniPath, $resultPath, $maxBatch);
     }
 }
+
+1;

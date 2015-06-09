@@ -18,6 +18,8 @@ use WTSI::NPG::Utilities qw(user_session_log);
 use WTSI::NPG::Genotyping::VCF::AssayResultReader;
 use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
+our $VERSION = '';
+
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'vcf_from_plex');
@@ -38,7 +40,8 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
-my ($input, $inputType, $plexColl, $vcfPath, $jsonOut, $textOut,
+
+my ($input, $inputType, $vcfPath, $gtCheck,
     $log, $logConfig, $use_irods, $debug, $quiet,
     $snpset_path, $chromosome_json);
 

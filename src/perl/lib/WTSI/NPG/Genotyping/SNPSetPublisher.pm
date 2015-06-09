@@ -11,6 +11,8 @@ use WTSI::NPG::Genotyping::Types qw(Platform);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::SimplePublisher;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator';
 
