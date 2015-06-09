@@ -14,10 +14,12 @@ use WTSI::NPG::Genotyping::SNP;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
-  'WTSI::NPG::Annotation';
+our $VERSION = '';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
+  'WTSI::NPG::Annotation';
 
 has 'name' =>
   (is       => 'ro',

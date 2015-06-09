@@ -40,6 +40,22 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir
 use WTSI::NPG::Genotyping::QC::SnpID qw(convertFromIlluminaExomeSNP);
 use WTSI::NPG::Genotyping::SNPSet;
 
+our $VERSION = '';
+
+our $SEQUENOM = 'Sequenom';
+our $FLUIDIGM = 'Fluidigm';
+our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
+our %PLEX_MANIFESTS = (
+    $FLUIDIGM => {
+        qc => $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv',
+    },
+    $SEQUENOM => {
+        W30467 => $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv',
+        W34340 => $PLEX_DIR.'/W34340_snp_set_info_1000Genomes.tsv',
+        W35540 => $PLEX_DIR.'/W35540_snp_set_info_1000Genomes.tsv',
+    },
+);
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'db_path' =>
@@ -106,20 +122,6 @@ has 'swap_threshold' => # minimum similarity to be flagged as possible swap
     (is              => 'rw',
      isa             => 'Num',
      default         => 0.9,
-);
-
-our $SEQUENOM = 'Sequenom';
-our $FLUIDIGM = 'Fluidigm';
-our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
-our %PLEX_MANIFESTS = (
-    $FLUIDIGM => {
-        qc => $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv',
-    },
-    $SEQUENOM => {
-        W30467 => $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv',
-        W34340 => $PLEX_DIR.'/W34340_snp_set_info_1000Genomes.tsv',
-        W35540 => $PLEX_DIR.'/W35540_snp_set_info_1000Genomes.tsv',
-    },
 );
 
 sub BUILD {

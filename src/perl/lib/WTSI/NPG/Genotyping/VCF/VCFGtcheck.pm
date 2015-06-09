@@ -8,14 +8,16 @@ use Log::Log4perl::Level;
 use Moose;
 use WTSI::DNAP::Utilities::Runnable;
 
-with 'WTSI::DNAP::Utilities::Loggable';
-
 # front-end for bcftools gtcheck function
 # use to cross-check sample results in a single VCF file for consistency
 # parse results and output in useful formats
 
+our $VERSION = '';
+
 our $MAX_DISCORDANCE_KEY = 'MAX_DISCORDANCE';
 our $PAIRWISE_DISCORDANCE_KEY = 'PAIRWISE_DISCORDANCE';
+
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'environment' =>
     (is       => 'ro',

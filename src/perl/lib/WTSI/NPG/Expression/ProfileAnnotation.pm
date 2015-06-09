@@ -4,6 +4,8 @@ package WTSI::NPG::Expression::ProfileAnnotation;
 
 use Moose;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
   'WTSI::NPG::iRODS::Storable';
 

@@ -4,6 +4,8 @@ package WTSI::NPG::Expression::ChipLoadingManifest;
 
 use Moose;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'file_name' =>

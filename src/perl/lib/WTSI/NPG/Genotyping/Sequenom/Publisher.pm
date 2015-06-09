@@ -15,6 +15,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 

@@ -16,6 +16,7 @@ use Cwd qw/abs_path/;
 use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::Collation qw(collate);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my ($inputDir, $metricJson, $statusJson, $csv, $iniPath, $dbPath, $thresholds, 

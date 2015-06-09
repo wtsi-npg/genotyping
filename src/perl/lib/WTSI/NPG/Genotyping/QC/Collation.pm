@@ -23,6 +23,8 @@ use Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/collate readMetricThresholds/;
 
+our $VERSION = '';
+
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 # metric names
@@ -675,7 +677,7 @@ sub collate {
     my ($inputDir, $configPath, $thresholdPath, $dbPath, $iniPath,
         $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef,
         $verbose) = @_;
-    my (%config, %t, %thresholdConfig, @metricNames);
+    my (%config, %thresholdConfig, @metricNames);
     if ($verbose) { print STDERR "Started collating QC results.\n";    }
     %thresholdConfig = %{readMetricThresholds($thresholdPath)};
     if ($metricsRef) { 

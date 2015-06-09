@@ -6,6 +6,8 @@ use lib ( -d "$Bin/../lib/perl5" ? "$Bin/../lib/perl5" : "$Bin/../lib" );
 use WTSI::NPG::iRODS::GroupAdmin;
 use npg_warehouse::Schema;
 
+our $VERSION = '';
+
 my $what_on_earth =<<'WOE';
 
 Script to update WTSI iRODS systems with groups corresponding to Sequencescape studies.

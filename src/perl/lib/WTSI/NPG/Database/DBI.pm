@@ -5,6 +5,8 @@ use DBI;
 use Moose::Role;
 use Try::Tiny;
 
+our $VERSION = '';
+
 has 'dbh' =>
   (is       => 'rw',
    isa      => 'Any',

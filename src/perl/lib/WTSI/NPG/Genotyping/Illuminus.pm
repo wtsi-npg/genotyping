@@ -24,6 +24,8 @@ our @EXPORT_OK = qw(filter_gt_columns
                     write_it_header
                     write_gt_calls);
 
+our $VERSION = '';
+
 =head2 read_it_column_names
 
   Arg [1]    : filehandle

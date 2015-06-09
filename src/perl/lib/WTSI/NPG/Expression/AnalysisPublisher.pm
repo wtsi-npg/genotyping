@@ -15,11 +15,13 @@ use WTSI::NPG::SimplePublisher;
 use WTSI::NPG::Utilities qw(collect_files);
 use WTSI::NPG::iRODS;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
-  'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
+our $VERSION = '';
 
 our $FILE_TESTER = 'file';
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/exp/infinium';
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
 has 'irods' =>
   (is       => 'ro',

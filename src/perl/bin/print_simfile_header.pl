@@ -9,5 +9,7 @@ use warnings;
 use strict;
 use WTSI::NPG::Genotyping::QC::SimFiles qw/printSimHeader/;
 
+our $VERSION = '';
+
 printSimHeader($ARGV[0]);
 

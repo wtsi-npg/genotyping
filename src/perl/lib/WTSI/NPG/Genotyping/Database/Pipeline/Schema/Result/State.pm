@@ -6,6 +6,8 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 
+our $VERSION = '';
+
 __PACKAGE__->table('state');
 __PACKAGE__->add_columns
   ('id_state',   { data_type => 'integer',

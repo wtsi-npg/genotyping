@@ -5,6 +5,8 @@ package WTSI::NPG::Database;
 use Config::IniFiles;
 use Moose;
 
+our $VERSION = '';
+
 has 'name' =>
   (is       => 'ro',
    isa      => 'Str',

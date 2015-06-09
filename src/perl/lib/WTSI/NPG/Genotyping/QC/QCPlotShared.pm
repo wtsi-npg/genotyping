@@ -22,6 +22,8 @@ Log::Log4perl->easy_init($ERROR);
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
+our $VERSION = '';
+
 use vars qw/$UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 $UNKNOWN_PLATE = "Unknown_plate";
