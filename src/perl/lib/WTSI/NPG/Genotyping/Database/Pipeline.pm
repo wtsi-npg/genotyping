@@ -420,10 +420,6 @@ sub AUTOLOAD {
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
-  #if (!$self->is_connected) {
-  #  $self->connect;
-  #}
-
   if (!$self->is_connected) {
     $self->logconfess("$self is not connected");
   }
@@ -443,9 +439,8 @@ sub AUTOLOAD {
                       join(", ", sort keys %lookup), "]");
   }
 
-
  SYMBOL_TABLE: {
-    no strict qw(refs);
+    no strict qw(refs); ## no critic (TestingAndDebugging::ProhibitNoStrict)
 
     *$AUTOLOAD = sub {
       my $self = shift;
