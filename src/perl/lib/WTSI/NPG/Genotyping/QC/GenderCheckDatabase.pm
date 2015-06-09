@@ -105,3 +105,5 @@ sub updateDatabase {
     $db->disconnect();
     return 1;
 }
+
+1;

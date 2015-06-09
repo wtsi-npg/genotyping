@@ -35,4 +35,4 @@ sub write_version_log {
     return 1;
 }
 
-return 1;
+1;

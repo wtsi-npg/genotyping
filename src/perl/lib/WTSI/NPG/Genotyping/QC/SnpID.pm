@@ -42,3 +42,5 @@ sub convertToIlluminaExomeSNP {
     }
     return $newID;
 }
+
+1;

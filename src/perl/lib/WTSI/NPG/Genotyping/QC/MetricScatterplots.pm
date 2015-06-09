@@ -284,3 +284,5 @@ sub runAllMetrics {
                   $iniPath, $resultPath, $maxBatch);
     }
 }
+
+1;

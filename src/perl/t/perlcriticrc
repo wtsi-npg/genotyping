@@ -89,7 +89,6 @@ file_lexical_variables = :no_restriction
 [-ErrorHandling::RequireCheckingReturnValueOfEval]
 
 [-Modules::RequireExplicitPackage]
-[-Modules::RequireEndWithOne]
 [-Modules::RequireNoMatchVarsWithUseEnglish]
 
 [-Variables::ProhibitUnusedVariables]

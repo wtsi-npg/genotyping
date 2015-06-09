@@ -411,3 +411,4 @@ sub readGenderOutput {
     return %genders;
 }
 
+1;
