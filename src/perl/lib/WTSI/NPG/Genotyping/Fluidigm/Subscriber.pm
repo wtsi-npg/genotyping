@@ -12,6 +12,15 @@ use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 
+our $VERSION = '';
+
+# TODO Remove duplication of $NO_CALL_GENOTYPE in AssayResult.pm
+our $NO_CALL_GENOTYPE = 'NN';
+
+# The largest number of bind variables iRODS supports for 'IN'
+# queries.
+our $BATCH_QUERY_CHUNK_SIZE = 100;
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation',
   'WTSI::NPG::Genotyping::Annotation';
 
@@ -59,14 +68,6 @@ has '_snpset' =>
    builder  => '_build_snpset',
    lazy     => 1,
    init_arg => undef);
-
-
-# TODO Remove duplication of $NO_CALL_GENOTYPE in AssayResult.pm
-our $NO_CALL_GENOTYPE = 'NN';
-
-# The largest number of bind variables iRODS supports for 'IN'
-# queries.
-our $BATCH_QUERY_CHUNK_SIZE = 100;
 
 sub BUILD {
   my ($self) = @_;

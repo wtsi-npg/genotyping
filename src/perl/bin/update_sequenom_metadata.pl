@@ -28,6 +28,7 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 4;
 
@@ -37,7 +38,6 @@ sub run {
   my $config;
   my $debug;
   my $log4perl_config;
-  my $num_processes;
   my $publish_dest;
   my $verbose;
   my @filter_key;

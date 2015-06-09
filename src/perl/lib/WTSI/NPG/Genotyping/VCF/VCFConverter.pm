@@ -18,7 +18,7 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+our $VERSION = '';
 
 our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
@@ -29,6 +29,8 @@ our $NULL_ALLELE = 'N';
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
+
+with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'chromosome_lengths' => ( # must be compatible with given snpset
     is           => 'ro',
@@ -77,7 +79,7 @@ sub BUILD {
   my $self = shift;
   # Make our iRODS handle use our logger by default
   $self->irods->logger($self->logger);
-  my @results;
+
   my $input_type = $self->input_type;
   if ($input_type ne $SEQUENOM_TYPE && $input_type ne $FLUIDIGM_TYPE) {
       $self->logcroak("Unknown input data type: '$input_type'");
@@ -165,8 +167,7 @@ sub _generate_vcf_complete {
 
     my @output; # lines of text for output
     my @samples = sort(keys(%{$samplesRef}));
-    my ($chroms, $snpset);
-    $snpset = $self->snpset;
+    my $snpset = $self->snpset;
     my $total = scalar(@{$snpset->snps()});
     push(@output, $self->_generate_vcf_header(\@samples));
 

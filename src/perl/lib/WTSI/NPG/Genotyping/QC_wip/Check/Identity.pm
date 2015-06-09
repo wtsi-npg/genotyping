@@ -13,6 +13,8 @@ use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'plink_path' =>

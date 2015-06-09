@@ -28,6 +28,8 @@ use warnings;
 use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::GenderCheck;
 
+our $VERSION = '';
+
 my %opts = ();
 GetOptions(\%opts, "help", "input=s", "input-format=s", "output-dir=s", 
            "json", "title=s", "include-par", "default=f", 

@@ -12,6 +12,8 @@ our @EXPORT_OK = qw(read_fon
                     find_column_indices
                     filter_columns);
 
+our $VERSION = '';
+
 =head2 read_fon
 
   Arg [1]    : filehandle

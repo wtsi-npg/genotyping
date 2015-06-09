@@ -13,6 +13,8 @@ use warnings;
 use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::SimFiles;
 
+our $VERSION = '';
+
 my ($help, $inPath, $outPath, $fh, $out, $verbose, $probeNum);
 
 GetOptions("help"         => \$help,

@@ -33,6 +33,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw/$ini_path/;
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/checkPlinkBinaryInputs/;
 
+our $VERSION = '';
+
 sub checkPlinkBinaryInputs {
     # check that PLINK binary files exist and are readable
     my $plinkPrefix = shift;

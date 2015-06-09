@@ -25,6 +25,7 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my $log;
@@ -36,7 +37,6 @@ sub run {
   my $debug;
   my $log4perl_config;
   my $publish_dest;
-  my $type;
   my $verbose;
   my @filter_key;
   my @filter_value;

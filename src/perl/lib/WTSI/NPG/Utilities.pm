@@ -21,6 +21,8 @@ our @EXPORT_OK = qw(collect_dirs
                     depad_well
                     user_session_log);
 
+our $VERSION = '';
+
 our $MD5SUM = 'md5sum';
 our $USER_SESSION_LOG_DIR = '/nfs/srpipe_data/logs/user_session_logs/';
 

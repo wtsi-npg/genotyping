@@ -8,6 +8,19 @@ use Moose;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline::Schema;
 
+our $VERSION = '';
+
+our $AUTOLOAD;
+
+our $default_sqlite   = 'sqlite3';
+our $default_ddl_file = 'pipeline_ddl.sql';
+our $pipeline_ini  = 'pipeline.ini';
+our $genders_ini   = 'genders.ini';
+our $methods_ini   = 'methods.ini';
+our $relations_ini = 'relations.ini';
+our $snpsets_ini   = 'snpsets.ini';
+our $states_ini    = 'states.ini';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBIx';
@@ -46,18 +59,6 @@ has 'schema' =>
   (is       => 'rw',
    isa      => 'WTSI::NPG::Genotyping::Database::Pipeline::Schema',
    required => 0);
-
-our $AUTOLOAD;
-
-our $default_sqlite   = 'sqlite3';
-our $default_ddl_file = 'pipeline_ddl.sql';
-
-our $pipeline_ini  = 'pipeline.ini';
-our $genders_ini   = 'genders.ini';
-our $methods_ini   = 'methods.ini';
-our $relations_ini = 'relations.ini';
-our $snpsets_ini   = 'snpsets.ini';
-our $states_ini    = 'states.ini';
 
 sub BUILD {
   my ($self) = @_;
@@ -419,10 +420,6 @@ sub AUTOLOAD {
 
   return if $AUTOLOAD =~ /::DESTROY$/;
 
-  #if (!$self->is_connected) {
-  #  $self->connect;
-  #}
-
   if (!$self->is_connected) {
     $self->logconfess("$self is not connected");
   }
@@ -442,9 +439,8 @@ sub AUTOLOAD {
                       join(", ", sort keys %lookup), "]");
   }
 
-
  SYMBOL_TABLE: {
-    no strict qw(refs);
+    no strict qw(refs); ## no critic (TestingAndDebugging::ProhibitNoStrict)
 
     *$AUTOLOAD = sub {
       my $self = shift;

@@ -14,6 +14,8 @@ use Cwd;
 use File::Basename;
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 sub getLinkThumbnail {
     # get thumbnail link HTML for given image path; optionally supply height & width in pixels
     # assumes linked file is in same directory as linking page

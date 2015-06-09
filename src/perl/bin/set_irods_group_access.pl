@@ -21,6 +21,8 @@ use WTSI::NPG::iRODS qw(find_collections_by_meta
                         set_group_access
 );
 
+our $VERSION = '';
+
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
 

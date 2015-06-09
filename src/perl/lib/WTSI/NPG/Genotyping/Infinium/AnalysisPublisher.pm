@@ -9,10 +9,12 @@ use Moose;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
-  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
+our $VERSION = '';
 
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/gen/infinium';
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',

@@ -28,6 +28,7 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $VERSION = '';
 our $DEFAULT_DAYS = 7;
 
 run() unless caller();
@@ -38,7 +39,6 @@ sub run {
   my $debug;
   my $depth;
   my $log4perl_config;
-  my $publish_dest;
   my $root;
   my $type;
   my $verbose;

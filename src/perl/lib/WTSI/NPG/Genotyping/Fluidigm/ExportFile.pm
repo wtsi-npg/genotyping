@@ -8,6 +8,8 @@ use Text::CSV;
 
 use WTSI::NPG::Utilities qw(trim);
 
+our $VERSION = '';
+
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
 
@@ -53,7 +55,7 @@ sub BUILD {
     $self->logdie("Fluidigm export file '", $self->file_name,
                   "' does not exist");
 
-  open my $in, '<:encoding(utf8)', $self->file_name
+  open my $in, '<:encoding(UTF-8)', $self->file_name
     or $self->logdie("Failed to open Fluidigm export file '",
                      $self->file_name, "': $!");
   my ($header, $column_names, $sample_data) = $self->_parse_fluidigm_table($in);
@@ -127,7 +129,7 @@ sub write_assay_result_data {
 
   $csv->column_names($self->column_names);
 
-  open my $out, '>:encoding(utf8)', $file_name
+  open my $out, '>:encoding(UTF-8)', $file_name
     or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
                        "for writing: $!");
 
@@ -189,7 +191,6 @@ sub fluidigm_fingerprint {
 
 sub _parse_fluidigm_table {
   my ($self, $fh) = @_;
-  binmode($fh, ':utf8');
 
   # True if we are in the header lines from 'Chip Run Info' to 'Allele
   # Axis Mapping' inclusive

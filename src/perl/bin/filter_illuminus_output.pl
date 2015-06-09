@@ -17,6 +17,8 @@ use WTSI::NPG::Utilities::DelimitedFiles qw(read_fon
 use WTSI::NPG::Genotyping::Illuminus qw(read_gt_column_names
                                         filter_gt_columns);
 
+our $VERSION = '';
+
 Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
