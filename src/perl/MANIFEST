@@ -354,6 +354,7 @@ t/gender/input_xhet.json
 t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
 t/gender_marker.t
+t/gender_marker_call.t
 t/gender_standalone.t
 t/genotyping_yml.t
 t/genotyping_yml/config.yml
@@ -647,6 +648,7 @@ t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/SubscriberTest.pm
+t/WTSI/NPG/Genotyping/GenderMarkerCallTest.pm
 t/WTSI/NPG/Genotyping/GenderMarkerTest.pm
 t/WTSI/NPG/Genotyping/IlluminusTest.pm
 t/WTSI/NPG/Genotyping/Infinium/AnalysisPublisherTest.pm
