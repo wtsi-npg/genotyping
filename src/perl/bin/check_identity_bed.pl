@@ -8,6 +8,7 @@ use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::Identity;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readThresholds);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 # Check identity of genotyped data against sequenom

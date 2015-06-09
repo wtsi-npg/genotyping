@@ -17,6 +17,7 @@ use WTSI::NPG::Genotyping::Infinium::SampleQuery;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Utilities qw(user_session_log);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $EXPECTED_IRODS_FILES = 3;
 our @DATA_SOURCE_NAMES = qw(LIMS_ IRODS SS_WH);

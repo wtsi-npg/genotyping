@@ -14,6 +14,8 @@ use FindBin qw($Bin);
 use POSIX qw(floor);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 my ($RScriptPath, $outDir, $title, $help);
 
 GetOptions("out_dir=s"  => \$outDir,

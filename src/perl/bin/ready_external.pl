@@ -15,6 +15,7 @@ use WTSI::DNAP::Utilities::IO qw(maybe_stdin maybe_stdout);
 use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
 

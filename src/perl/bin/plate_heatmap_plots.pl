@@ -16,6 +16,8 @@ use Getopt::Long;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(parseLabel getPlateLocationsFromPath);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 my ($dbPath, $iniPath, $mode, $RScriptPath, $outDir, $help);
 
 GetOptions("dbpath=s"  => \$dbPath,

@@ -35,6 +35,7 @@ use JSON;
 
 Log::Log4perl->easy_init($ERROR);
 
+our $VERSION = '';
 our $expected_fields = 9; # expected number of fields in .bpm.csv manifest
 
 sub byPositionName {

@@ -13,6 +13,7 @@ use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 
 use WTSI::NPG::Utilities qw(user_session_log);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my $uid = `whoami`;

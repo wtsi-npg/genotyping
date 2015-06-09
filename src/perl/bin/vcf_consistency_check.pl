@@ -15,6 +15,8 @@ use Pod::Usage;
 use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
 use WTSI::NPG::Utilities qw(user_session_log);
 
+our $VERSION = '';
+
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'vcf_consistency_check');

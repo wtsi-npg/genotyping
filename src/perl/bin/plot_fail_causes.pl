@@ -20,6 +20,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultPipelineDBConfig
                                                defaultJsonConfig);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
     $comboText, $causeText, $crHetFail,  $comboPdf, $causePdf, $comboPng, 
     $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng, $minCR, 

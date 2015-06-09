@@ -27,6 +27,8 @@ use WTSI::NPG::Expression::ChipLoadingManifestV2;
 use WTSI::NPG::Expression::Publisher;
 use WTSI::NPG::Utilities qw(collect_files trim user_session_log);
 
+our $VERSION = '';
+
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'publish_expression_analysis');

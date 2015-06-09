@@ -16,6 +16,7 @@ use YAML qw /DumpFile/;
 
 Log::Log4perl->easy_init($ERROR);
 
+our $VERSION = '';
 our $PERCOLATE_LOG_NAME = 'percolate.log';
 
 run() unless caller();

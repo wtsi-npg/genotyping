@@ -16,6 +16,8 @@ use Cwd;
 use Getopt::Long;
 use File::Temp;
 
+our $VERSION = '';
+
 # Perl wrapper for binary executable pairwise_concordance_bed
 # Runs a duplicate check on a set of genotypes in binary ped format.
 # Generates a *test set* of (at most) 400 SNPs, filtered by call rate, MAF and separation in genome
