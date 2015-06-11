@@ -41,8 +41,7 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $inputType, $vcfPath, $gtCheck,
-    $log, $logConfig, $use_irods, $debug, $quiet,
+my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods, $debug, $quiet,
     $snpset_path, $chromosome_json);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';

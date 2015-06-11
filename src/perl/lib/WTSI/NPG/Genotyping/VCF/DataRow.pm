@@ -8,11 +8,11 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-has 'qual'    =>
+has 'qscore'    =>
     (is       => 'ro',
-     isa      => 'Int',
-     default  => -1,
-     documentation => 'Phred quality score for alternate reference allele; -1 if missing. Not to be confused with quality scores of the calls for each sample.'
+     isa      => 'Maybe['.QualityScore.']',
+     default  => undef,
+     documentation => 'Phred quality score for alternate reference allele. Not to be confused with quality scores of the calls for each sample.'
  );
 
 has 'filter'  =>
@@ -58,6 +58,8 @@ has 'is_haploid' =>
 
 # NB this class does not have the sample names; they are stored in VCF header
 
+our $VERSION = '';
+
 # genotype sub-fields GT = genotype; GQ = genotype quality; DP = read depth
 our $GENOTYPE_FORMAT = 'GT:GQ:DP';
 our $DEPTH_PLACEHOLDER = 1;
@@ -72,37 +74,38 @@ sub BUILD {
 }
 
 
-=head2 to_string
+
+=head2 str
 
   Arg [1]    : None
-  Example    : my $row_string = $data_row->to_string();
+  Example    : my $row_string = $data_row->str();
   Description: Return a string for output in the body of a VCF file.
   Returntype : Str
 
 =cut
 
-sub to_string {
+sub str {
     my ($self,)= @_;
     my @fields = ();
     my $alt;
     if ($self->is_haploid) { $alt = '.'; }
     else { $alt = $self->snp->alt_allele; }
-    my $qual;
-    if ($self->qual == -1) { $qual = '.'; }
-    else {$qual = $self->qual; }
-    push(@fields, ($self->vcf_chromosome_name,
+    my $qscore;
+    if (!defined($self->qscore)) { $qscore = '.'; }
+    else {$qscore = $self->qscore; }
+    push @fields, ($self->vcf_chromosome_name,
                    $self->snp->position,
                    $self->snp->name,
                    $self->snp->ref_allele,
                    $alt,
-                   $qual,
+                   $qscore,
                    $self->filter,
                    $self->additional_info,
-                   $GENOTYPE_FORMAT));
+                   $GENOTYPE_FORMAT);
     foreach my $call (@{$self->calls}) {
-        push(@fields, $self->_call_to_vcf_field($call));
+        push @fields, $self->_call_to_vcf_field($call);
     }
-    return join("\t", @fields);
+    return join "\t", @fields;
 }
 
 sub _build_haploid_status {
@@ -136,7 +139,7 @@ sub _build_vcf_chromosome_name {
     if ($chr =~ /^Chr/) {
         $chr =~ s/Chr//; # strip off 'Chr' prefix, if any
     }
-    unless (is_HsapiensChromosomeVCF($chr)) {
+    unless (is_HsapiensChromosome($chr)) {
         $self->logcroak("Unknown chromosome string: '",
                         $self->snp->chromosome, "'");
     }
@@ -150,7 +153,7 @@ sub _call_to_vcf_field {
     if ($self->snp->strand eq '-') { # reverse strand, use complement of call
         $call = $call->complement();
     }
-    my @alleles = split(//, $call->genotype);
+    my @alleles = split //, $call->genotype;
     my $allele_total;
     if ($self->is_haploid()) { $allele_total = 1; }
     else { $allele_total = 2; }
@@ -158,24 +161,24 @@ sub _call_to_vcf_field {
     my @vcf_alleles;
     while ($i < $allele_total) {
         my $allele = $alleles[$i];
-        if ($allele eq $self->snp->ref_allele) { push(@vcf_alleles, '0'); }
-        elsif ($allele eq $self->snp->alt_allele) { push(@vcf_alleles, '1'); }
-        elsif ($allele eq $NULL_ALLELE) { push(@vcf_alleles, '.'); }
+        if ($allele eq $self->snp->ref_allele) { push @vcf_alleles, '0'; }
+        elsif ($allele eq $self->snp->alt_allele) { push @vcf_alleles, '1'; }
+        elsif ($allele eq $NULL_ALLELE) { push @vcf_alleles, '.'; }
         $i++;
     }
-    my $vcf_call = join('/', @vcf_alleles);
-    my $qual;
+    my $vcf_call = join '/', @vcf_alleles;
+    my $qscore;
     if (defined($call->qscore)) {
         if ($call->qscore == -1) {
-            $qual = $DEFAULT_QUALITY_STRING;
+            $qscore = $DEFAULT_QUALITY_STRING;
         } else {
-            $qual = $call->qscore;
+            $qscore = $call->qscore;
         }
     } else {
-        $qual = $DEFAULT_QUALITY_STRING;
+        $qscore = $DEFAULT_QUALITY_STRING;
     }
-    my @subfields = ($vcf_call, $qual, $DEPTH_PLACEHOLDER);
-    return join(':', @subfields);
+    my @subfields = ($vcf_call, $qscore, $DEPTH_PLACEHOLDER);
+    return join ':', @subfields;
 }
 
 no Moose;

@@ -38,10 +38,11 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $jsonOut, $log, $logConfig, $textOut, $verbose);
+my ($input, $debug, $jsonOut, $log, $logConfig, $textOut, $verbose);
 
 GetOptions('help'        => sub { pod2usage(-verbose => 2,
                                             -exitval => 0) },
+           'debug'     => \$debug,
            'input=s'     => \$input,
            'json=s'      => \$jsonOut,
            'logconf=s'   => \$logConfig,
@@ -51,10 +52,18 @@ GetOptions('help'        => sub { pod2usage(-verbose => 2,
 
 
 ### set up logging ###
-if ($logConfig) { Log::Log4perl::init($logConfig); }
-else { Log::Log4perl::init(\$embedded_conf); }
+if ($logConfig) {
+    Log::Log4perl::init($logConfig);
+} else {
+    Log::Log4perl::init(\$embedded_conf);
+}
 $log = Log::Log4perl->get_logger('npg.vcf.consistency');
-
+if ($verbose) {
+    $log->level($INFO);
+}
+elsif ($debug) {
+    $log->level($DEBUG);
+}
 
 ### read input and do consistency check
 

@@ -34,6 +34,8 @@ has 'sort_output' =>
     documentation => 'If true, output rows are sorted in (chromosome, position) order',
     );
 
+our $VERSION = '';
+
 our $X_CHROM_NAME = 'X';
 our $Y_CHROM_NAME = 'Y';
 
@@ -46,27 +48,27 @@ sub BUILD {
 }
 
 
-=head2 to_string
+=head2 str
 
   Arg [1]    : None
-  Example    : my $vcf_string = $vcf_data_set->to_string()
+  Example    : my $vcf_string = $vcf_data_set->str()
   Description: Return a string which can be output as a VCF file.
   Returntype : Str
 
 =cut
 
-sub to_string {
+sub str {
     my ($self) = @_;
     my @output;
     foreach my $row (@{$self->data}) {
-        push(@output, $row->to_string());
+        push @output, $row->str();
     }
     if ($self->sort_output) {
         @output = $self->_sort_output_lines(\@output);
     }
     # prepend header to output
-    unshift(@output, $self->header->to_string());
-    return join("\n", @output);
+    unshift @output, $self->header->str();
+    return join "\n", @output;
 }
 
 =head2 write_vcf
@@ -82,7 +84,7 @@ sub to_string {
 sub write_vcf {
     # convert to string and write to the path (or - for STDOUT)
     my ($self, $output) = @_;
-    my $outString = $self->to_string();
+    my $outString = $self->str();
     if ($output) {
         my $out;
         $self->logger->info("Printing VCF output to $output");
@@ -124,13 +126,13 @@ sub _sort_output_lines {
         if ($line =~ /^#/) {
             push @output, $line;
         } else {
-            push(@data, $line);
-            my @fields = split(/\s+/, $line);
-            my $chr = shift(@fields);
+            push @data, $line;
+            my @fields = split /\s+/, $line ;
+            my $chr = shift @fields;
             if ($chr eq $X_CHROM_NAME) { $chr = 23; }
             elsif ($chr eq $Y_CHROM_NAME) { $chr = 24; }
             $chrom{$line} = $chr;
-            $pos{$line} = shift(@fields);
+            $pos{$line} = shift @fields;
         }
     }
     @data = sort { $chrom{$a} <=> $chrom{$b} || $pos{$a} <=> $pos{$b} } @data;

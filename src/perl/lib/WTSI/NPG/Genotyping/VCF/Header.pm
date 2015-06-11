@@ -27,6 +27,8 @@ has 'source' => (
     documentation => 'Standard VCF field to identify the data source'
 );
 
+our $VERSION = '';
+
 our $VCF_VERSION = 'VCFv4.0'; # version of VCF format in use
 our $INFO = '<ID=ORIGINAL_STRAND,Number=1,Type=String,'.
             'Description="Direction of strand in input file">';
@@ -37,23 +39,23 @@ our @FORMAT = (
 );
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
-=head2 to_string
+=head2 str
 
   Arg [1]    : None
 
-  Example    : $data_row->to_string
+  Example    : $head_string = $header->str()
   Description: Return a string for output as the header of a VCF file.
   Returntype : Str
 
 =cut
 
-sub to_string {
+sub str {
     my ($self) = @_;
     my @header;
-    push(@header, '##fileformat='.$VCF_VERSION);
+    push @header, '##fileformat='.$VCF_VERSION;
     my $date = DateTime->now(time_zone=>'local')->ymd('');
-    push(@header, '##fileDate='.$date);
-    push(@header, '##source='.$self->source);
+    push @header, '##fileDate='.$date;
+    push @header, '##source='.$self->source;
     if (defined($self->chromosome_lengths)) {
         my @chromosomes = sort(keys(%{$self->chromosome_lengths}));
         foreach my $chr (@chromosomes) {
@@ -61,17 +63,17 @@ sub to_string {
             my $contig = '##contig=<ID='.$chr.
                 ',length='.$self->chromosome_lengths->{$chr}.
                 ',species="Homo sapiens">';
-            push(@header, $contig);
+            push @header, $contig;
         }
     }
-    push(@header, '##INFO='.$INFO);
+    push @header, '##INFO='.$INFO;
     foreach my $format_field (@FORMAT) {
-        push(@header, '##FORMAT='.$format_field);
+        push @header, '##FORMAT='.$format_field;
     }
     my @colHeads = @COLUMN_HEADS;
-    push(@colHeads, @{$self->sample_names});
-    push(@header, "#".join("\t", @colHeads));
-    return join("\n", @header);
+    push @colHeads, @{$self->sample_names};
+    push @header, "#".join "\t", @colHeads;
+    return join "\n", @header;
 }
 
 no Moose;

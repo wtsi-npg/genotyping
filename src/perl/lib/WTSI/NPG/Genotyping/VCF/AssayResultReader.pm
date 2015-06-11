@@ -23,6 +23,8 @@ use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
+our $VERSION = '';
+
 our $NULL_GENOTYPE = 'NN';
 our $SEQUENOM_TYPE = 'sequenom'; # TODO remove redundancy wrt vcf_from_plex.pl
 our $FLUIDIGM_TYPE = 'fluidigm';
@@ -99,18 +101,18 @@ sub get_vcf_dataset {
     foreach my $snp (@{$self->snpset->snps}) {
         my @sample_calls;
         foreach my $sample (@$samples) {
-            push(@sample_calls, $calls->{$snp->name}{$sample});
+            push @sample_calls, $calls->{$snp->name}{$sample};
         }
         if (is_GenderMarker($snp)) {
             my ($x_row, $y_row) = $self->_gender_rows($snp, \@sample_calls);
-            push(@rows, $x_row);
-            push(@rows, $y_row);
+            push @rows, $x_row;
+            push @rows, $y_row;
         } else {
             my $data_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
                 calls => \@sample_calls,
                 additional_info => "ORIGINAL_STRAND=".$snp->strand
             );
-            push(@rows, $data_row);
+            push @rows, $data_row;
         }
     }
     my $vcf_dataset = WTSI::NPG::Genotyping::VCF::VCFDataSet->new
@@ -142,7 +144,7 @@ sub _build_resultsets {
             } else {
                 $self->logcroak();
             }
-            push(@results, $resultSet);
+            push @results, $resultSet;
         }
     } else { # read input from local filesystem
          foreach my $input (@{$self->inputs}) {
@@ -158,7 +160,7 @@ sub _build_resultsets {
              } else {
                  $self->logcroak();
              }
-             push(@results, $resultSet);
+             push @results, $resultSet;
          }
     }
     return \@results;
@@ -189,6 +191,22 @@ sub _gender_rows {
         } elsif (!$call->is_call()) {
             push(@x_calls, $self->_generate_no_call($snp->x_marker));
             push(@y_calls, $self->_generate_no_call($snp->y_marker));
+            push @x_calls, WTSI::NPG::Genotyping::Call->new(
+                snp      => $snp->x_marker,
+                genotype => $call->genotype,
+                qscore   => $call->qscore,
+            );
+            push @y_calls, $self->_generate_no_call($snp->y_marker);
+        } elsif ($call->is_y_call()) {
+            push @x_calls, $self->_generate_no_call($snp->x_marker);
+            push @y_calls, WTSI::NPG::Genotyping::Call->new(
+                snp      => $snp->y_marker,
+                genotype => $call->genotype(),
+                qscore   => $call->qscore(),
+            );
+        } elsif (!$call->is_call()) {
+            push @x_calls, $self->_generate_no_call($snp->x_marker);
+            push @y_calls, $self->_generate_no_call($snp->y_marker);
         } else {
             $self->logcroak("Invalid genotype of '", $call->genotype,
                             "' for gender marker ", $snp->name,
@@ -241,16 +259,23 @@ sub _parse_assay_results {
             my $snp_id = $ar->snp_assayed();
             my $snp = $self->snpset->named_snp($snp_id);
             my $call;
+            my $qscore = $ar->qscore();
+            # * Using $ar->qscore() in place of $qscore in the
+            # constructor does not work!
+            # * The $ar->qscore() is not correctly interpolated into the
+            # argument list, and the constructor dies because the argument
+            # list has an odd number of elements
+            # * TODO try to reproduce this error in a simplified test case
             if (is_GenderMarker($snp)) {
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                     snp      => $snp,
-                    qscore   => $ar->quality_score(),
+                    qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             } else {
                 $call = WTSI::NPG::Genotyping::Call->new(
                     snp      => $snp,
-                    qscore   => $ar->quality_score(),
+                    qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             }
@@ -287,7 +312,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
