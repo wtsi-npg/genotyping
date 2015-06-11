@@ -5,31 +5,30 @@ package WTSI::NPG::Genotyping::Infinium::ResultSet;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::Types qw(InfiniumBeadchipBarcode
+                                    InfiniumBeadchipSection);
+
 our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
-has 'beadchip'         => (is => 'ro', isa => 'Str',  required => 1);
-has 'beadchip_section' => (is => 'ro', isa => 'Str',  required => 1);
-has 'beadchip_design'  => (is => 'ro', isa => 'Str',  required => 1);
+has 'beadchip'         => (
+    is => 'ro',
+    isa => InfiniumBeadchipBarcode,
+    required => 1);
+has 'beadchip_section' => (
+    is => 'ro',
+    isa => InfiniumBeadchipSection,
+    required => 1);
 
+has 'beadchip_design'  => (is => 'ro', isa => 'Str',  required => 1);
 has 'gtc_file'         => (is => 'ro', isa => 'Str',  required => 0);
 has 'red_idat_file'    => (is => 'ro', isa => 'Str',  required => 1);
 has 'grn_idat_file'    => (is => 'ro', isa => 'Str',  required => 1);
-
 has 'is_methylation'   => (is => 'ro', isa => 'Bool', required => 0);
 
 sub BUILD {
   my ($self) = @_;
-
-  unless ($self->beadchip =~ m{^\d{10,11}$}) {
-    $self->logconfess("Invalid beadchip number '", $self->beadchip, "'");
-  }
-
-  unless ($self->beadchip_section =~ m{^R\d+C\d+$}) {
-    $self->logconfess("Invalid beadchip section '", $self->beadchip_section,
-                      "'");
-  }
 
   if ($self->is_methylation && $self->gtc_file) {
     $self->logconfess("A methylation result set cannot contain a GTC file: '",
@@ -83,7 +82,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

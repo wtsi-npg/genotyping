@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 10;
+use Test::More tests => 12;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -25,7 +25,8 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Infinium::ResultSet');
 }
 
-sub constructor : Test(8) {
+sub constructor : Test(10) {
+
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
          [beadchip         => '0123456789',
           beadchip_section => 'R01C01',
@@ -53,15 +54,24 @@ sub constructor : Test(8) {
           red_idat_file    => $red_path],
          '11 digit beadchip barcode constructor');
 
+  new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
+         [beadchip         => '012345678901',
+          beadchip_section => 'R01C01',
+          beadchip_design  => 'design1',
+          gtc_file         => $gtc_path,
+          grn_idat_file    => $grn_path,
+          red_idat_file    => $red_path],
+         '12 digit beadchip barcode constructor');
+
   dies_ok{
       WTSI::NPG::Genotyping::Infinium::ResultSet->new
-         (beadchip         => '012345678901',
+         (beadchip         => '0123456789012',
           beadchip_section => 'R01C01',
           beadchip_design  => 'design1',
           gtc_file         => $gtc_path,
           grn_idat_file    => $grn_path,
           red_idat_file    => $red_path),
-     }, 'dies with incorrect beadchip number (12 digits)';
+     }, 'dies with incorrect beadchip number (13 digits)';
 
   dies_ok {
     WTSI::NPG::Genotyping::Infinium::ResultSet->new
