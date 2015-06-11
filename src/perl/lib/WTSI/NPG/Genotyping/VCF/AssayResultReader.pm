@@ -259,16 +259,23 @@ sub _parse_assay_results {
             my $snp_id = $ar->snp_assayed();
             my $snp = $self->snpset->named_snp($snp_id);
             my $call;
+            my $qscore = $ar->qscore();
+            # * Using $ar->qscore() in place of $qscore in the
+            # constructor does not work!
+            # * The $ar->qscore() is not correctly interpolated into the
+            # argument list, and the constructor dies because the argument
+            # list has an odd number of elements
+            # * TODO try to reproduce this error in a simplified test case
             if (is_GenderMarker($snp)) {
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                     snp      => $snp,
-                    qscore   => $ar->qscore(),
+                    qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             } else {
                 $call = WTSI::NPG::Genotyping::Call->new(
                     snp      => $snp,
-                    qscore   => $ar->qscore(),
+                    qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             }

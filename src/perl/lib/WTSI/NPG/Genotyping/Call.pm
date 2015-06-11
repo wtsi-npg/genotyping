@@ -21,14 +21,17 @@ has 'genotype' =>
    isa      => SNPGenotype,
    required => 1);
 
-has 'is_call' =>
-  (is       => 'rw',
-   isa      => 'Bool',
-   default  => 1); # used to represent 'no calls'
+has 'is_call'    =>
+  (is            => 'rw',
+   isa           => 'Bool',
+   default       => 1,
+   documentation => "used to represent 'no calls'");
 
-has 'qscore' =>
-  (is      => 'ro',
-   isa     => QualityScore);
+has 'qscore'     =>
+  (is            => 'ro',
+   isa           => 'Maybe['.QualityScore.']',
+   documentation => "May be a Phred quality score (positive integer),".
+       " or undef if the score is missing or not defined");
 
 sub BUILD {
   my ($self) = @_;

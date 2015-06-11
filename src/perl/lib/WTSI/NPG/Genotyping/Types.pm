@@ -90,8 +90,8 @@ subtype PositiveInt,
   message { "Int is not larger than 0" };
 
 subtype QualityScore,
-  as Maybe[PositiveInt],
-  message { "'$_' is not a valid quality score, must be Int > 0 or undef" };
+  as PositiveInt,
+  message { "'$_' is not a valid quality score, must be Int > 0" };
 
 class_type FluidigmResultSet, {
     class => 'WTSI::NPG::Genotyping::Fluidigm::AssayResultSet' };

@@ -10,7 +10,7 @@ with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'qscore'    =>
     (is       => 'ro',
-     isa      => QualityScore,
+     isa      => 'Maybe['.QualityScore.']',
      default  => undef,
      documentation => 'Phred quality score for alternate reference allele. Not to be confused with quality scores of the calls for each sample.'
  );
