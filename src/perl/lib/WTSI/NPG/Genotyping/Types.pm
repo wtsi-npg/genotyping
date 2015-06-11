@@ -3,10 +3,10 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Types;
 
+use MooseX::Types::Moose qw(ArrayRef Str Int Maybe);
 use strict;
 use warnings;
 
-use MooseX::Types::Moose qw(ArrayRef Str Int);
 use MooseX::Types -declare =>
   [
    qw(
@@ -25,6 +25,8 @@ use MooseX::Types -declare =>
       HsapiensX
       HsapiensY
       Platform
+      PositiveInt
+      QualityScore
       Reference
       ResultSet
       SequenomResultSet
@@ -82,6 +84,15 @@ subtype Platform,
   where { $_ eq 'fluidigm' || $_ eq 'sequenom' },
   message { "'$_' is not a valid genotyping platform" };
 
+subtype PositiveInt,
+  as Int,
+  where { $_ > 0 },
+  message { "Int is not larger than 0" };
+
+subtype QualityScore,
+  as Maybe[PositiveInt],
+  message { "'$_' is not a valid quality score, must be Int > 0 or undef" };
+
 class_type FluidigmResultSet, {
     class => 'WTSI::NPG::Genotyping::Fluidigm::AssayResultSet' };
 class_type SequenomResultSet, {
@@ -136,7 +147,11 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
+<<<<<<< HEAD
 Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
+=======
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
+>>>>>>> iainrb.vcf_read_write
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

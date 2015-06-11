@@ -93,22 +93,21 @@ sub canonical_sample_id {
 }
 
 
-=head2 quality_score
+=head2 qscore
 
   Arg [1]    : None
 
-  Example    : $boolean = $result->has_quality_score
+  Example    : $q = $result->qscore()
   Description: Placeholder. In the Fluidigm::AssayResult class, the function
                of this name returns a Phred-scaled quality score. This
-               function returns -1 to indicate 'no score' (since Phred
-               scores by definition are non-negative).
-  Returntype : Str
+               function always returns undef.
+  Returntype : QualityScore
 
 =cut
 
-sub quality_score {
+sub qscore {
     my ($self) = @_;
-    return -1;
+    return undef;
 }
 
 
@@ -201,11 +200,11 @@ one sample.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -26,6 +26,42 @@ our $UNKNOWN_GENDER = 0;
 our $FEMALE_GENDER = 1;
 our $MALE_GENDER = 2;
 
+sub BUILD {
+  my ($self) = @_;
+  if ($self->is_heterozygous()) {
+      $self->logcroak("Gender marker cannot have a heterozygous genotype!");
+  }
+}
+
+=head2 complement
+
+  Arg [1]    : None
+
+  Example    : my $new_gm_call = $gm_call->complement
+  Description: Return a new call object whose genotype is complemented
+               with respect to the original, retaining qscore (if any).
+               Overrides method in the parent class to return a
+               GenderMarkerCall.
+  Returntype : WTSI::NPG::Genotyping::GenderMarkerCall
+
+=cut
+
+sub complement {
+  my ($self) = @_;
+  my $complement_genotype = $self->_complement($self->genotype);
+  if (defined($self->qscore)) {
+      return WTSI::NPG::Genotyping::GenderMarkerCall->new
+          (snp      => $self->snp,
+           genotype => $self->_complement($self->genotype),
+           qscore   => $self->qscore,
+           is_call  => $self->is_call);
+  } else {
+      return WTSI::NPG::Genotyping::GenderMarkerCall->new
+          (snp      => $self->snp,
+           genotype => $self->_complement($self->genotype),
+           is_call  => $self->is_call);
+  }
+}
 
 =head2 is_x_call
 

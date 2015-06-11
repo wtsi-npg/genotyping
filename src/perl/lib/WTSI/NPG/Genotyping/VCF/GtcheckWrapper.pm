@@ -77,13 +77,13 @@ sub run {
              environment => $self->environment,
              logger      => $self->logger)->run->split_stdout;
     }
-    $self->logger->info("bcftools arguments: ".join(" ", @args));
-    $self->logger->debug("bcftools command output:\n".join("", @raw_results));
+    $self->logger->info("bcftools arguments: ".join " ", @args );
+    $self->logger->debug("bcftools command output:\n".join "", @raw_results);
     my %results;
     my $max = 0; # maximum pairwise discordance
     foreach my $line (@raw_results) {
         if ($line !~ /^CN/) { next; }
-        my @words = split(/\s+/, $line);
+        my @words = split /\s+/, $line;
         my $discordance = $words[1];
         my $sites = $words[2];
         my $sample_i = $words[4];
@@ -275,7 +275,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

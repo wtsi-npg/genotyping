@@ -239,28 +239,27 @@ sub sample_address {
   return $sample_address;
 }
 
-=head2 quality_score
+=head2 qscore
 
   Arg [1]    : None
 
-  Example    : $qscore = $result->quality_score
+  Example    : $q = $result->qscore()
   Description: Return the Phred-scaled quality score from the Fluidigm result.
                Fluidigm has a percentage quality score, eg. 99.99.
                Convert this to Phred: -10 * log10(Pr(error))
                Round to nearest integer
-  Returntype : Num
+
+  Returntype : QualityScore
 
 =cut
 
-sub quality_score {
+sub qscore {
     my ($self) = @_;
     my $pr_error = 1 - ($self->confidence / 100);
     my $qscore = -10 * log10($pr_error);
     $qscore = int($qscore + 0.5); # initial qscore is guaranteed non-negative
     return $qscore;
 }
-
-
 
 sub _parse_assay {
   # Parse the 'assay' field and return the assay identifier. Field
@@ -295,11 +294,11 @@ one sample.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
