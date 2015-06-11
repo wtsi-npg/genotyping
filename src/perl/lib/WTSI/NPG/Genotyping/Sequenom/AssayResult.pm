@@ -107,7 +107,7 @@ sub canonical_sample_id {
 
 sub qscore {
     my ($self) = @_;
-    return undef;
+    return;
 }
 
 

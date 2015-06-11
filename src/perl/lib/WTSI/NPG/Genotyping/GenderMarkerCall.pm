@@ -9,6 +9,12 @@ extends 'WTSI::NPG::Genotyping::Call';
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
+our $UNKNOWN_GENDER = 0;
+our $FEMALE_GENDER = 1;
+our $MALE_GENDER = 2;
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'snp' =>
@@ -21,10 +27,6 @@ has 'gender' =>
      isa     => 'Int',
      lazy    => 1,
      builder => '_build_gender');
-
-our $UNKNOWN_GENDER = 0;
-our $FEMALE_GENDER = 1;
-our $MALE_GENDER = 2;
 
 sub BUILD {
   my ($self) = @_;
@@ -131,6 +133,12 @@ sub _build_gender {
     return $gender;
 }
 
+
+__PACKAGE__->meta->make_immutable;
+
+no Moose;
+
+1;
 
 __END__
 

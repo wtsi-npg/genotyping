@@ -84,7 +84,7 @@ sub BUILD {
 
 =cut
 
-sub str() {
+sub str {
     my ($self,)= @_;
     my @fields = ();
     my $alt;
