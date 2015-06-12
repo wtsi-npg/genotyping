@@ -109,7 +109,7 @@ sub update_it_columns {
   while (my $line = <$in>) {
     chomp($line);
 
-    my @fields = split(/\t/, $line);
+    my @fields = split(/\t/msx, $line);
 
     for (my $i = 0; $i < scalar @annotation_columns; ++$i) {
       my $annot = shift @fields;
@@ -216,7 +216,7 @@ sub read_gt_column_names {
 
   Arg [1]    : input filehandle
   Arg [2]    : output filehandle
-  Arg [3]    : column separator
+  Arg [3]    : column separator (permitted are \s or \t)
   Arg [4]    : column offset (0-based)
   Arg [5]    : column group (number of data per column)
   Arg [6]    : arrayref of column indices
@@ -235,10 +235,25 @@ sub filter_gt_columns {
   my ($in, $out, $col_separator, $col_offset,
       $col_group, $indices, $op) = @_;
 
+  defined $col_separator or
+    confess 'A defined col_separator argument is required';
+
+  my $split_regex;
+  if ($col_separator eq ' ') {
+    $split_regex = qr{\s}msx;
+  }
+  elsif ($col_separator eq "\t") {
+    $split_regex = qr{\t}msx;
+  }
+  else {
+    confess "Invalid col_separator argument '$col_separator'. " .
+      "A single tab or space are permitted.";
+  }
+
   my $num_lines = 0;
   while (my $line = <$in>) {
     chomp($line);
-    my @fields = split(/$col_separator/, $line);
+    my @fields = split(/$split_regex/msx, $line);
 
     for (my $i = 0; $i < $col_offset; ++$i) {
       my $annotation_col = shift @fields;
@@ -297,9 +312,9 @@ sub write_gt_calls {
     chomp($probs_str);
 
     my ($call_name, $call_pos, $call_alleles, @calls) =
-      split(/\s+/, $calls_str);
+      split(/\s+/msx, $calls_str);
     my ($prob_name, $prob_pos, $prob_alleles, @probs) =
-      split(/\s+/, $probs_str);
+      split(/\s+/msx, $probs_str);
 
     unless ($call_name eq $prob_name &&
             $call_pos == $prob_pos &&
@@ -368,7 +383,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

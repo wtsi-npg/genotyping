@@ -55,13 +55,6 @@ file_lexical_variables = :no_restriction
 
 # BEGIN temporary reprieve
 
-[-RegularExpressions::RequireLineBoundaryMatching]
-[-RegularExpressions::RequireDotMatchAnything]
-[-RegularExpressions::RequireExtendedFormatting]
-[-RegularExpressions::ProhibitEscapedMetacharacters]
-[-RegularExpressions::ProhibitEnumeratedClasses]
-[-RegularExpressions::ProhibitFixedStringMatches]
-
 [-CodeLayout::ProhibitTrailingWhitespace]
 [-CodeLayout::ProhibitParensWithBuiltins]
 [-CodeLayout::ProhibitHardTabs]
@@ -83,9 +76,7 @@ file_lexical_variables = :no_restriction
 [-ValuesAndExpressions::ProhibitMixedBooleanOperators]
 [-ValuesAndExpressions::ProhibitLongChainsOfMethodCalls]
 [-ValuesAndExpressions::RequireNumberSeparators]
-[-ValuesAndExpressions::ProhibitMismatchedOperators]
 
-[-ErrorHandling::RequireCarping]
 [-ErrorHandling::RequireCheckingReturnValueOfEval]
 
 [-Modules::RequireExplicitPackage]

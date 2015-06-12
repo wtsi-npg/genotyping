@@ -115,7 +115,7 @@ sub _update_placeholder {
     my $n = 0;
     while (my $line = <$in>) {
 	chomp($line);
-	my ($family, $individual, $paternal, $maternal, $sex, $phenotype) = split /\s+/, $line;
+	my ($family, $individual, $paternal, $maternal, $sex, $phenotype) = split /\s+/msx, $line;
 	my $updated = 0;
 	my @output = ($family, $individual);
 	my @fields = ($paternal, $maternal, $sex, $phenotype);
@@ -156,7 +156,7 @@ sub _update_snp_locations {
   while (my $line = <$in>) {
     chomp($line);
     my ($chr, $snp_name, $genetic_pos, $physical_pos, $allele1, $allele2) =
-      split /\s+/, $line;
+      split /\s+/msx, $line;
 
     unless (exists $locations->{$snp_name}) {
       confess "Failed to update the location of SNP '$snp_name'; " .
@@ -189,7 +189,7 @@ sub _update_sample_genders {
     chomp($line);
 
     my ($family_id, $individual_id, $paternal_id,
-		$maternal_id, $gender, $phenotype) = split /\s+/, $line;
+		$maternal_id, $gender, $phenotype) = split /\s+/msx, $line;
 
     unless (exists $genders->{$family_id}) {
       confess "Failed to update the gender of '$family_id'; " .
@@ -215,7 +215,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

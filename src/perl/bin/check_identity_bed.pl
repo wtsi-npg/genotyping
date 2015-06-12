@@ -70,17 +70,19 @@ Options:
     exit(0);
 }
 
-if (!($plink)) {
-    croak "Must supply a Plink binary input prefix";
-} elsif (!(-e $plink.'.bed' && -e $plink.'.bim' && -e $plink.'.fam')) {
-    croak "Prefix '$plink' is not a valid Plink binary dataset; one or more files missing";
-} elsif ($outDir && !(-e $outDir && -d $outDir)) {
-    croak "Output '$outDir' does not exist or is not a directory";
-} elsif (!($dbPath)) {
-    croak "Must supply an SQLite pipeline database path";
-} elsif (!(-e $dbPath)) {
-    croak "Database path $dbPath does not exist"; 
+$plink or die "Must supply a Plink binary input prefix\n";
+foreach my $part (map { $plink . $_ } qw(.bed .bim .fam)) {
+  -e $part or die "Prefix '$plink' is not a valid Plink binary dataset; " .
+    "'$part' is missing\n";
 }
+
+if ($outDir) {
+  -e $outDir or die "Output '$outDir' does not exist\n";
+  -d $outDir or die "Output '$outDir' is not a directory\n";
+}
+
+$dbPath or die "Must supply an SQLite pipeline database path\n";
+-e $dbPath or die "Database path '$dbPath' does not exist\n";
 
 $outDir ||= getcwd();
 $minSNPs ||= 8;
@@ -89,14 +91,14 @@ if (!$minIdent) {
         my %thresholds = readThresholds($configPath);
         $minIdent = $thresholds{'identity'};
     } else {
-        croak("Must supply a value for either --min_ident or --config");
+        die "Must supply a value for either --min_ident or --config\n";
     }
 }
 if ($minIdent < 0 || $minIdent > 1) {
-    croak("Minimum identity value must be a number between 0 and 1");
+    die "Minimum identity value must be a number between 0 and 1\n";
 }
 if ($swap && ($swap < 0 || $swap > 1)) {
-    croak("Swap threshold must be a number between 0 and 1");
+    die "Swap threshold must be a number between 0 and 1\n";
 }
 $swap ||= $swapDefault;
 

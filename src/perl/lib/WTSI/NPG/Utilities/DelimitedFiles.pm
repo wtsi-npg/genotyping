@@ -31,8 +31,8 @@ sub read_fon {
   my @names;
   while (my $line = <$fh>) {
     chomp($line);
-    $line =~ s/^\s+//;
-    $line =~ s/\s+$//;
+    $line =~ s/^\s+//msx;
+    $line =~ s/\s+$//msx;
     next if $line eq '';
 
     push(@names, $line);
@@ -66,7 +66,10 @@ sub read_column_names {
 
   chomp($line);
 
-  my @names = split /$delimiter/, $line;
+  ## no critic (RegularExpressions::RequireExtendedFormatting)
+  my @names = split /$delimiter/ms, $line;
+  ## critic
+
   $start ||= 0;
   $end ||= scalar @names -1;
 
@@ -162,7 +165,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

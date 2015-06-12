@@ -333,9 +333,9 @@ sub _build_resultsets {
       my ($gtc, $red, $grn) = ('', '', '');
 
       foreach my $path (@fileset) {
-        if ($path =~ m{_Red\.idat$}msi)    { $red = $path }
-        elsif ($path =~ m{_Grn\.idat$}msi) { $grn = $path }
-        elsif ($path =~ m{\.gtc}msi)       { $gtc = $path }
+        if    ($path =~ m{_Red[.]idat$}msxi) { $red = $path }
+        elsif ($path =~ m{_Grn[.]idat$}msxi) { $grn = $path }
+        elsif ($path =~ m{[.]gtc}msxi)       { $gtc = $path }
         else {
           $self->warn("Failed to collate a resultset for beadchip ",
                       "'$beadchip' section '$section' because it ",
@@ -417,7 +417,7 @@ sub _build_filesets {
                      (\d{10,11})        # beadchip
                      _(R\d{2}C\d{2}) # beadchip section
                      _?(Red|Grn)?    # channel (idat only)
-                     \.(\S+)         # suffix
+                     [.](\S+)         # suffix
                      $}msxi;
 
     unless ($beadchip && $section && $suffix) {
@@ -447,7 +447,7 @@ sub _validate_file {
   my ($self, $file, $publish_dest) = @_;
   # gather information on source and destination files, if available
   my ($file_exists, $listing, $valid_meta, $file_md5, $irods_md5);
-  unless ($publish_dest =~ /\/$/) { $publish_dest .= '/'; }
+  unless ($publish_dest =~ m{\/$}msx) { $publish_dest .= '/'; }
   if (-e $file) {
       $file_exists = 1;
       $file_md5 = $self->irods->md5sum($file);

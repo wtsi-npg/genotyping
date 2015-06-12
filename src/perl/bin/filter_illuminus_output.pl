@@ -66,7 +66,7 @@ sub run {
   my $pr_offset = 3; # 3 leading columns in probability files
 
   my $gt_separator = "\t"; # Different column separators for genotype
-  my $pr_separator = " ";  # and probability files. Yes, really.
+  my $pr_separator = ' ';  # and probability files. Yes, really.
   my $gt_col_group = 1; # Genotype data has one column per sample
   my $pr_col_group = 4; # Probability data comes in groups of 4
                         # columns per sample
@@ -177,7 +177,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2011-2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2011, 2012, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

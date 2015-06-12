@@ -56,7 +56,7 @@ sub run {
   $access_level ||= 'read';
 
   my @valid_levels = ('null', 'read', 'write', 'own');
-  unless (grep { /^$access_level$/ } @valid_levels) {
+  unless (grep { /^$access_level$/msx } @valid_levels) {
     pod2usage(-msg => "Invalid --access argument '$access_level'. Must be one of [" .
               join(', ', @valid_levels) . "]" ,
               -exitval => 2);
@@ -87,8 +87,8 @@ sub run {
 
   while (my $study_id = <$in>) {
     chomp($study_id);
-    $study_id =~ s/^\s+//;
-    $study_id =~ s/\s+$//;
+    $study_id =~ s/^\s+//msx;
+    $study_id =~ s/\s+$//msx;
 
     next unless $study_id;
 
@@ -197,7 +197,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

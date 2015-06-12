@@ -3,6 +3,7 @@ package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Piperun;
 
 use strict;
 use warnings;
+use Carp;
 
 use base 'DBIx::Class::Core';
 
@@ -43,7 +44,7 @@ sub validate_snpset {
   my ($self, $snpset) = @_;
 
   my @snpsets = map { $_->snpset } $self->datasets;
-  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}i } @snpsets;
+  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}msxi } @snpsets;
 
   my $valid = 1;
   if (@infinium_snpsets) {
@@ -71,7 +72,7 @@ sub validate_datasets {
 
   my @snpsets = map { $_->snpset } $self->datasets;
 
-  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}i } @snpsets;
+  my @infinium_snpsets = grep { $_->name !~ m{sequenom|fluidigm}msxi } @snpsets;
   my @snpset_names = map { $_->name } @infinium_snpsets;
 
   my $valid = 1;
@@ -90,7 +91,7 @@ sub validate_datasets {
 
     if (@mismatched) {
       $valid = 0;
-      warn "Invalid piperun; datasets have mixed SNP sets: [",
+      carp "Invalid piperun; datasets have mixed SNP sets: [",
         join(", ", @mismatched), "]";
     }
   }

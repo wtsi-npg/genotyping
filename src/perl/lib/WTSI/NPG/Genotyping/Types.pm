@@ -38,17 +38,17 @@ our $VERSION = '';
 
 subtype HsapiensChromosome,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}s },
+  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
   message { "'$_' is not a valid H. sapiens chromosome name" };
 
 subtype HsapiensX,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?X$}s },
+  where { $_ =~ m{(^[Cc]hr)?X$}msx },
   message { "'$_' is not a valid H. sapiens X chromosome" };
 
 subtype HsapiensY,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?Y$}s },
+  where { $_ =~ m{(^[Cc]hr)?Y$}msx },
   message { "'$_' is not a valid H. sapiens Y chromosome" };
 
 subtype InfiniumBeadchipBarcode,
@@ -63,7 +63,7 @@ subtype InfiniumBeadchipSection,
 
 subtype DNABase,
   as Str,
-  where { $_ =~ m{^[ACGTNacgtn]$}s },
+  where { $_ =~ m{^[ACGTNacgtn]$}msx },
   message { "'$_' is not a valid DNA base" };
 
 subtype DNAStrand,
