@@ -8,7 +8,7 @@ use warnings;
 use strict;
 use Config::IniFiles;
 use Getopt::Long;
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(any uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -206,10 +206,10 @@ sub run {
                    join(", ", map { $_->name } $pipedb->snpset->all), "]");
   }
   if ($chip_design) {
-    unless (grep { /^$chip_design$/msx } @chip_designs) {
-        $log->logcroak("Invalid chip design '",
-                       $chip_design, "'. Valid designs are: [ ",
-                       join(", ", @chip_designs), "]");
+    unless (any { $chip_design eq $_ } @chip_designs) {
+      $log->logcroak("Invalid chip design '",
+                     $chip_design, "'. Valid designs are: [ ",
+                     join(", ", @chip_designs), "]");
     }
   }
   else {

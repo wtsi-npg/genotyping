@@ -7,6 +7,7 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
+use List::AllUtils qw(any);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -57,7 +58,7 @@ sub run {
   $access_level ||= 'read';
 
   my @valid_levels = ('null', 'read', 'write', 'own');
-  unless (grep { /^$access_level$/msx } @valid_levels) {
+  unless (any { $access_level eq $_ } @valid_levels) {
     pod2usage(-msg => "Invalid --access argument '$access_level'. Must be one of [" .
               join(', ', @valid_levels) . "]" ,
               -exitval => 2);

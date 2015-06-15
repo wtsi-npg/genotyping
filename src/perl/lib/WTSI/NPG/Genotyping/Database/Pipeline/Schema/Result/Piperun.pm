@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Piperun;
 use strict;
 use warnings;
 use Carp;
+use List::AllUtils qw(any);
 
 use base 'DBIx::Class::Core';
 
@@ -49,7 +50,7 @@ sub validate_snpset {
   my $valid = 1;
   if (@infinium_snpsets) {
     my $name = $snpset->name;
-    unless (grep { $_->name eq $name } @infinium_snpsets) {
+    unless (any { $_->name eq $name } @infinium_snpsets) {
       $valid = 0;
     }
   }

@@ -8,6 +8,7 @@ use warnings;
 use strict;
 use File::Basename;
 use Getopt::Long;
+use List::AllUtils qw(any);
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
@@ -82,7 +83,7 @@ sub run {
        on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my @valid_designs = map { $_->name } $pipedb->snpset->all;
-  unless (grep { $chip_design eq $_ } @valid_designs ) {
+  unless (any { $chip_design eq $_ } @valid_designs ) {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", @valid_designs) . "]\n";
   }
