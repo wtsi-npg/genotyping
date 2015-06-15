@@ -88,7 +88,6 @@ file_lexical_variables = :no_restriction
 [-ClassHierarchies::ProhibitAutoloading]
 
 [-BuiltinFunctions::ProhibitStringySplit]
-[-BuiltinFunctions::ProhibitReverseSortBlock]
 
 [-Objects::ProhibitIndirectSyntax]
 
