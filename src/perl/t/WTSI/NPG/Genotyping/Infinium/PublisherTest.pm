@@ -119,7 +119,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 260;
+use Test::More tests => 253;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -248,38 +248,6 @@ sub resultsets : Test(2) {
 
   cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 8,
 	 'Found only complete resultsets 2');
-}
-sub dryrun : Test(4) {
-
-  my $ifdb = WTSI::NPG::Genotyping::Database::InfiniumStub->new
-      (name    => 'infinium',
-       inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
-  my $publication_time = DateTime->now;
-  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (data_files       => [@data_files[0 .. 2]],
-     infinium_db      => $ifdb,
-     ss_warehouse_db  => $ssdb,
-     publication_time => $publication_time);
-
-  cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
-         'Number of resultsets prepared for dry run');
-
-  cmp_ok($publisher->dry_run($irods_tmp_coll), '==', 3,
-         'Number of files publishable in dry run');
-
-  # check files have not actually been published!
-  my $irods = WTSI::NPG::iRODS->new;
-  my @gtc_files = $irods->find_objects_by_meta($irods_tmp_coll,
-                                               [infinium_plate => 'plate1'],
-                                               [infinium_well  => 'A01'],
-                                               [type           => 'gtc']);
-  cmp_ok(scalar @gtc_files, '==', 0, 'GTC files not published in dry run');
-
-  my @idat_files = $irods->find_objects_by_meta($irods_tmp_coll,
-                                                [infinium_plate => 'plate1'],
-                                                [infinium_well  => 'A01'],
-                                                [type           => 'idat']);
-  cmp_ok(scalar @idat_files, '==', 0, 'IDAT files not published in dry run');
 }
 
 sub publish : Test(67) {
@@ -532,30 +500,6 @@ sub test_metadata {
     ok($data_object->find_in_metadata($attr, $value),
        "Found $attr => $value") or diag explain $data_object->metadata;
   }
-}
-
-sub validate : Test(3) {
-  my $ifdb = WTSI::NPG::Genotyping::Database::InfiniumStub->new
-    (name    => 'infinium',
-     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'));
-
-  my $publication_time = DateTime->now;
-
-  # First publish some data to iRODS to allow validation
-  my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (data_files       => [@data_files[0 .. 2]],
-     infinium_db      => $ifdb,
-     ss_warehouse_db  => $ssdb,
-     publication_time => $publication_time);
-
-  cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
-         'Number of resultsets prepared');
-
-  cmp_ok($publisher->publish($irods_tmp_coll), '==', 3,
-         'Number of files published');
-
-  cmp_ok($publisher->validate($irods_tmp_coll), '==', 3,
-         'Number of files validated');
 }
 
 1;

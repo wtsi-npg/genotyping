@@ -77,8 +77,6 @@ file_lexical_variables = :no_restriction
 [-ValuesAndExpressions::ProhibitLongChainsOfMethodCalls]
 [-ValuesAndExpressions::RequireNumberSeparators]
 
-[-ErrorHandling::RequireCheckingReturnValueOfEval]
-
 [-Modules::RequireExplicitPackage]
 
 [-Variables::ProhibitReusedNames]

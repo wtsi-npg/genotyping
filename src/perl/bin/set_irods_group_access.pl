@@ -10,6 +10,7 @@ use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::DNAP::Utilities::IO qw(maybe_stdin);
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
@@ -118,39 +119,34 @@ sub set_access {
 
   $log->debug("Searching for $plural in study '$study_id'");
 
-  my $item_count = scalar @items;
-  my $set_count = 0;
-  $log->debug("Found $item_count $plural in study '$study_id'");
+  my $total = scalar @items;
+  my $num_set = 0;
+  $log->debug("Found $total $plural in study '$study_id'");
 
-  if ($item_count > 0) {
-    my $group = make_group_name($study_id);
-    $log->info("Setting $access_level access for group '$group' ",
-               "for $item_count $plural in study '$study_id'");
+  my $group = make_group_name($study_id);
+  $log->info("Setting $access_level access for group '$group' ",
+             "for $total $plural in study '$study_id'");
 
-    foreach my $item (@items) {
-      my $zone = find_zone_name($item);
-      my $zoned_group = "$group#$zone";
+  foreach my $item (@items) {
+    my $zone = find_zone_name($item);
+    my $zoned_group = "$group#$zone";
 
-      eval {
-        unless ($dry_run) {
-          set_group_access($access_level, $zoned_group, $item);
-        }
-      };
-
-      if ($@) {
-        $log->error("Failed to set $access_level access for group ",
-                    "'$zoned_group' for $item_type '$item': ", $@);
+    try {
+      unless ($dry_run) {
+        set_group_access($access_level, $zoned_group, $item);
       }
-      else {
-        ++$set_count;
-        $log->debug("Set $access_level access for group '$zoned_group' for ",
-                    "$item_type '$item'");
-      }
-    }
 
-    $log->info("Done setting $access_level access for group '$group' ",
-               "for $set_count/$item_count $plural in study '$study_id'");
+      $num_set++;
+      $log->debug("Set $access_level access for group '$zoned_group' for ",
+                  "$item_type '$item'");
+    } catch {
+      $log->error("Failed to set $access_level access for group ",
+                  "'$zoned_group' for $item_type '$item': ", $_);
+    };
   }
+
+  $log->info("Done setting $access_level access for group '$group' ",
+             "for $num_set/$total $plural in study '$study_id'");
 }
 
 
