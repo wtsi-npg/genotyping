@@ -46,12 +46,12 @@ createTestDatabase(\@names, $dbMaster);
 
 foreach my $format (qw/plink json text/) {
     foreach my $jsonOut ((0,1)) {
-        my ($input, $outPath, $outType);
+      my ($input, $outPath, $outType);
 	my $dbfile = "$outDir/genotyping.db";
 	system("cp $dbMaster $dbfile");
         if ($format eq 'json') { $input = "$inputDir/input_xhet.json"; } 
         elsif ($format eq 'text') { $input = "$inputDir/input_xhet.txt"; } 
-        elsif ($format eq 'plink') { $input = $plink; } 
+        elsif ($format eq 'plink') { $input = $plink; }
         my $cmd = "perl $script --run=$runName --input=$input ".
             "--input-format=$format --output-dir=$outDir --dbfile=$dbfile";
         if ($jsonOut) { 
@@ -62,6 +62,7 @@ foreach my $format (qw/plink json text/) {
             $outPath = "$outDir/sample_xhet_gender.txt";
             $outType = 'text';
         }
+
         my $status = system($cmd);
         ## start tests
         is($status, 0, "check_xhet_gender.pl exit status, ".

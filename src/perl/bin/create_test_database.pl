@@ -106,7 +106,7 @@ sub createDummyCalls {
     my @calls;
     my @lines = read_file($plexPath);
     foreach my $line (@lines) {
-        if ($line =~ /^#SNP_NAME/) { next; }
+        if ($line =~ m{^#SNP_NAME}msx) { next; }
         $csv->parse($line);
         my @fields = $csv->fields();
         my ($snp_name, $ref, $alt, $chrom, $pos, $strand) = @fields;

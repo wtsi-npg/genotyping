@@ -171,7 +171,7 @@ sub make_type_metadata {
   }
 
   my ($basename, $dir, $suffix) = fileparse($file, @suffixes);
-  $suffix =~ s{^\.?}{}msxi;
+  $suffix =~ s{^[.]?}{}msxi;
 
   my @meta;
   if ($suffix) {

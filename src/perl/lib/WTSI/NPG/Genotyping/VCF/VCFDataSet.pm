@@ -123,11 +123,11 @@ sub _sort_output_lines {
     my @input = @{$inputRef};
     my (@output, %chrom, %pos, @data);
     foreach my $line (@input) {
-        if ($line =~ /^#/) {
+        if ($line =~ m/^[#]/msx) {
             push @output, $line;
         } else {
             push @data, $line;
-            my @fields = split /\s+/, $line ;
+            my @fields = split /\s+/msx, $line ;
             my $chr = shift @fields;
             if ($chr eq $X_CHROM_NAME) { $chr = 23; }
             elsif ($chr eq $Y_CHROM_NAME) { $chr = 24; }

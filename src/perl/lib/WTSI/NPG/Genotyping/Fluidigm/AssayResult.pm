@@ -151,7 +151,7 @@ sub compact_call {
   my ($self) = @_;
 
   my $compact = $self->converted_call;
-  $compact =~ s/://;
+  $compact =~ s/://msx;
 
   return $compact;
 }
@@ -298,7 +298,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping::Database::Pipeline::Schema::Result::Sample;
 use strict;
 use warnings;
 use Carp;
+use List::AllUtils qw(any);
 use URI;
 
 use base 'DBIx::Class::Core';
@@ -100,13 +101,13 @@ sub validate_states {
   my @states = $self->states;
   my $valid = 1;
   if (scalar @states > 1) {
-    if ((grep { $_->name eq 'pi_excluded' } @states) &&
-        (grep { $_->name eq 'pi_approved' } @states)) {
+    if ((any { $_->name eq 'pi_excluded' } @states) &&
+        (any { $_->name eq 'pi_approved' } @states)) {
       $valid = 0;
     }
 
-    if ((grep { $_->name eq 'autocall_pass' } @states) &&
-        (grep { $_->name eq 'autocall_fail' } @states)) {
+    if ((any { $_->name eq 'autocall_pass' } @states) &&
+        (any { $_->name eq 'autocall_fail' } @states)) {
       $valid = 0;
     }
   }
@@ -138,24 +139,24 @@ sub include_from_state {
   $self->include(0);
 
   # An autocall_pass flips the sample to included.
-  if    (grep { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
-  elsif (grep { $_->name eq 'autocall_fail' }  @states) { $self->include(0) };
+  if    (any { $_->name eq 'autocall_pass' }  @states) { $self->include(1) }
+  elsif (any { $_->name eq 'autocall_fail' }  @states) { $self->include(0) };
 
   # An explicit state of excluded flips the sample to excluded, even
   # if autocall_pass.
-  if (grep { $_->name eq 'excluded' }          @states) { $self->include(0) };
+  if (any { $_->name eq 'excluded' }          @states) { $self->include(0) };
 
   # If the sample has been superseded, it should be excluded.
-  if (grep { $_->name eq 'repicked' }          @states) { $self->include(0) };
+  if (any { $_->name eq 'repicked' }          @states) { $self->include(0) };
 
   # pi_approved / excluded overrides any of the above.
-  if    (grep { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
-  elsif (grep { $_->name eq 'pi_excluded' }    @states) { $self->include(0) };
+  if    (any { $_->name eq 'pi_approved' }    @states) { $self->include(1) }
+  elsif (any { $_->name eq 'pi_excluded' }    @states) { $self->include(0) };
 
   # Consent withdrawn overrides everything above.
-  if (grep { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) };
+  if (any { $_->name eq 'consent_withdrawn' } @states) { $self->include(0) };
   # Also, if the data are unavailable, we cannot analyse.
-  if (grep { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) };
+  if (any { $_->name eq 'gtc_unavailable' }   @states) { $self->include(0) };
 
   return $self->include;
 }
@@ -225,9 +226,9 @@ sub idat {
 
   my @files;
   if ($channel eq 'red') {
-    @files = grep { defined $_ and m{Red}msx } @values;
+    @files = any { defined $_ and m{Red}msx } @values;
   } else {
-    @files = grep { defined $_ and m{Grn}msx } @values;
+    @files = any { defined $_ and m{Grn}msx } @values;
   }
 
   return shift @files;

@@ -172,7 +172,7 @@ sub snp_assayed {
 sub _split_assay_id {
   my ($self) = @_;
 
-  my ($snpset_name, $snp_name) = split /-/, $self->assay_id;
+  my ($snpset_name, $snp_name) = split /-/msx, $self->assay_id;
   $snpset_name ||= '';
   $snp_name    ||= '';
 
@@ -204,7 +204,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

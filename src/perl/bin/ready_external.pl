@@ -8,6 +8,7 @@ use warnings;
 use strict;
 use File::Basename;
 use Getopt::Long;
+use List::AllUtils qw(any);
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
@@ -17,7 +18,7 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+our $ID_REGEX = qr{^[\w.-]{4,}$}msx;
 
 Log::Log4perl->easy_init($ERROR);
 
@@ -82,7 +83,7 @@ sub run {
        on_connect_do  => 'PRAGMA foreign_keys = ON');
 
   my @valid_designs = map { $_->name } $pipedb->snpset->all;
-  unless (grep { $chip_design eq $_ } @valid_designs ) {
+  unless (any { $chip_design eq $_ } @valid_designs ) {
     die "Invalid chip design '$chip_design'. Valid designs are: [" .
       join(", ", @valid_designs) . "]\n";
   }
@@ -167,7 +168,7 @@ sub parse_manifest {
     chomp($line);
     ++$i;
 
-    next if $line =~ m/^\s*$/msx;
+    next if $line =~ m{^\s*$}msx;
 
     # Fields:
     # Sample name
@@ -175,7 +176,7 @@ sub parse_manifest {
     # GTC file path
     # Green IDAT file path
     # Red IDAT file path
-    my @fields = split(/\t/, $line, -1);
+    my @fields = split /\t/msx, $line, -1;
     my $num_fields = scalar @fields;
 
     unless ($num_fields == 6) {
@@ -196,7 +197,7 @@ sub parse_manifest {
 
     unless ($sample->{beadchip}) {
       my $gtc = basename($sample->{gtc_path});
-      my ($beadchip_guess) = $gtc =~ m/^(\d{10})_/msx;
+      my ($beadchip_guess) = $gtc =~ m{^(\d{10})_}msx;
 
       if ($beadchip_guess) {
         $sample->{beadchip} = $beadchip_guess;
@@ -330,7 +331,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

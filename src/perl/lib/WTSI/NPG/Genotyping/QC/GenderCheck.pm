@@ -3,7 +3,7 @@
 # July 2012
 
 #
-# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+# Copyright (C) 2012, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -124,9 +124,9 @@ sub processOptions {
             croak "ERROR: Input format must be one of: ".
                 "$textFormat, $jsonFormat, $plinkFormat";
         }
-    } elsif ($input =~ /\.txt$/) { 
+    } elsif ($input =~ m{[.]txt$}msx) {
         $inputFormat = $textFormat; 
-    } elsif ($input =~ /\.json$/) {
+    } elsif ($input =~ m{[.]json$}msx) {
         $inputFormat = $jsonFormat;
     } else {
         $inputFormat = $plinkFormat; 
@@ -321,7 +321,7 @@ sub writeSampleXhetTemp {
     my @header = qw/sample xhet/;
     print $fh join("\t", @header)."\n";
     if ($total != @xhets) { 
-        die "Name and xhet list arguments of different length: $!";  
+        die "Name and xhet list arguments of different length: $!\n";
     }
     for (my $i=0;$i<$total;$i++) {
         print $fh "$names[$i]\t$xhets[$i]\n";
@@ -384,7 +384,7 @@ sub readGenderOutput {
     my $inPath = shift;
     open my $in, "<", $inPath;
     my %genders;
-    if ($inPath =~ /\.txt$/) {
+    if ($inPath =~ m{[.]txt$}msx) {
 	my $first = 1;
 	while (<$in>) {
 	    if ($first) { $first = 0; next; } # skip headers
@@ -392,7 +392,7 @@ sub readGenderOutput {
 	    my ($sample, $gender) = ($words[0], $words[2]); # fields are: name, xhet, inferred, supplied
 	    $genders{$sample} = $gender;
 	}
-    } elsif ($inPath =~ /\.json$/) {
+    } elsif ($inPath =~ m{[.]json$}msx) {
 	my @lines = ();
 	while (<$in>) {
 	    chomp;
