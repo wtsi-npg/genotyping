@@ -124,7 +124,7 @@ sub run {
   my $num_updated = 0;
 
   if ($stdio) {
-    $log->info("Updating metadata on $updated/$total data objects in ",
+    $log->info("Updating metadata on $num_updated/$total data objects in ",
                "file list");
   }
   else {
