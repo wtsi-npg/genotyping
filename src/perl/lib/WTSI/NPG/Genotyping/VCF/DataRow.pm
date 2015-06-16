@@ -136,8 +136,8 @@ sub _build_vcf_chromosome_name {
     # find a vcf-compatible chromosome name string
     my ($self) = @_;
     my $chr = $self->snp->chromosome;
-    if ($chr =~ /^Chr/) {
-        $chr =~ s/Chr//; # strip off 'Chr' prefix, if any
+    if ($chr =~ m/^Chr/msx) {
+        $chr =~ s/Chr//msx; # strip off 'Chr' prefix, if any
     }
     unless (is_HsapiensChromosome($chr)) {
         $self->logcroak("Unknown chromosome string: '",
@@ -153,7 +153,7 @@ sub _call_to_vcf_field {
     if ($self->snp->strand eq '-') { # reverse strand, use complement of call
         $call = $call->complement();
     }
-    my @alleles = split //, $call->genotype;
+    my @alleles = split //msx, $call->genotype;
     my $allele_total;
     if ($self->is_haploid()) { $allele_total = 1; }
     else { $allele_total = 2; }

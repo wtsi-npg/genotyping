@@ -48,11 +48,6 @@ subtype HsapiensChromosome,
   where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
   message { "'$_' is not a valid H. sapiens chromosome name" };
 
-subtype HsapiensChromosomeVCF,
-  as Str,
-  where { $_ =~ m{^([0-9]+|[MT|X|Y]{1})$} },
-  message { "'$_' is not a valid H. sapiens chromosome name for VCF" };
-
 subtype HsapiensX,
   as Str,
   where { $_ =~ m{(^[Cc]hr)?X$}msx },
@@ -65,12 +60,12 @@ subtype HsapiensY,
 
 subtype InfiniumBeadchipBarcode,
   as Str,
-  where { $_ =~ m{^\d{10,12}$}s },
+  where { $_ =~ m{^\d{10,12}$}msx },
   message { "'$_' is not a valid Infinium beadchip barcode" };
 
 subtype InfiniumBeadchipSection,
   as Str,
-  where { $_ =~ m{^R\d+C\d+$}s },
+  where { $_ =~ m{^R\d+C\d+$}msx },
   message { "'$_' is not a valid Infinium beadchip section" };
 
 subtype DNABase,
