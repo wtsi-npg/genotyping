@@ -24,6 +24,8 @@ use MooseX::Types -declare =>
       HsapiensMT
       HsapiensX
       HsapiensY
+      InfiniumBeadchipBarcode
+      InfiniumBeadchipSection
       Platform
       PositiveInt
       QualityScore
@@ -43,7 +45,7 @@ our $VERSION = '';
 
 subtype HsapiensChromosome,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$} },
+  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
   message { "'$_' is not a valid H. sapiens chromosome name" };
 
 subtype HsapiensChromosomeVCF,
@@ -53,17 +55,27 @@ subtype HsapiensChromosomeVCF,
 
 subtype HsapiensX,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?X$} },
+  where { $_ =~ m{(^[Cc]hr)?X$}msx },
   message { "'$_' is not a valid H. sapiens X chromosome" };
 
 subtype HsapiensY,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?Y$} },
+  where { $_ =~ m{(^[Cc]hr)?Y$}msx },
   message { "'$_' is not a valid H. sapiens Y chromosome" };
+
+subtype InfiniumBeadchipBarcode,
+  as Str,
+  where { $_ =~ m{^\d{10,12}$}s },
+  message { "'$_' is not a valid Infinium beadchip barcode" };
+
+subtype InfiniumBeadchipSection,
+  as Str,
+  where { $_ =~ m{^R\d+C\d+$}s },
+  message { "'$_' is not a valid Infinium beadchip section" };
 
 subtype DNABase,
   as Str,
-  where { $_ =~ m{^[ACGTNacgtn]$} },
+  where { $_ =~ m{^[ACGTNacgtn]$}msx },
   message { "'$_' is not a valid DNA base" };
 
 subtype DNAStrand,
@@ -147,11 +159,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-<<<<<<< HEAD
-Copyright (c) 2014-2015 Genome Research Limited. All Rights Reserved.
-=======
-Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
->>>>>>> iainrb.vcf_read_write
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

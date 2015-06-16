@@ -34,7 +34,7 @@ sub createTestDatabase {
 	@names = @$namesRef; 
 	if ($uriStrip) {
 	    for my $i (0..@names-1) {
-		my @fields = split(/:/, $names[$i]);
+		my @fields = split(/:/msx, $names[$i]);
 		my $name = pop(@fields);
 		if ($names{$name}) { croak "Error; sample name $name not unique after removing URI prefixes"; }
 		else { $names[$i] = $name; $names{$name}=1; }  

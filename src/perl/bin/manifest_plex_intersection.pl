@@ -52,9 +52,9 @@ sub getIntersectingSNPsManifest {
     my @manifest;
     open my $in, "<", $manifestPath || croak("Cannot open '$manifestPath'");
     while (<$in>) {
-	if (/^Index/) { next; } # skip header line
+	if (/^Index/msx) { next; } # skip header line
 	chomp;
-	my @words = split(/,/);
+	my @words = split /,/msx;
 	push(@manifest, $words[1]);
     }
     close $in || croak("Cannot close '$manifestPath'");
@@ -108,7 +108,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

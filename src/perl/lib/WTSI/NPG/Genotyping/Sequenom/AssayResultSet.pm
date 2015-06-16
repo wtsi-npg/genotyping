@@ -138,7 +138,7 @@ sub _parse_assay_results {
     }
 
     # Ignore empty lines
-    if ($str =~ m{^\s*$}) {
+    if ($str =~ m{^\s*$}msx) {
       next;
     }
 
@@ -194,7 +194,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

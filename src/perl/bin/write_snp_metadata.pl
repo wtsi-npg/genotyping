@@ -1,7 +1,7 @@
 #!/software/bin/perl
 
 #
-# Copyright (c) 2013 Genome Research Ltd. All rights reserved.
+# Copyright (C) 2013, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -78,18 +78,18 @@ sub readWriteManifest {
 	if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
 	chomp;
 	my %snp;
-        my @fields = split /,/;
+        my @fields = split /,/msx;
         foreach my $key (qw/name chromosome position norm_id/) {
             $snp{$key} = $fields[$indices{$key}];
         }
         my $alleles = $fields[$indices{'snp'}];
-        $alleles =~ s/\W//g; # remove nonword characters
+        $alleles =~ s/\W//msxg; # remove nonword characters
         my @alleles = split('', $alleles);
         if (@alleles!=2) { 
             $log->logcroak("Failed to find 2 alleles at manifest line ".$i."\n"); 
         }
         foreach my $allele (@alleles) {
-            if ($allele !~ /[A-Z]/) { # may include letters other than ACGT
+            if ($allele !~ /[[:upper:]]/msx) { # may include letters other than ACGT
                 $log->logcroak("Invalid allele character at manifest line ".$i."\n");
             }
         }
@@ -120,8 +120,8 @@ sub splitManifest {
         $i++;
         if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
 	if ($i == 1) { next; } # first line is header
-	$_ =~ s/\s+$//g; # remove whitespace (including \r) from end of line
-	my @fields = split /,/;
+	$_ =~ s/\s+$//msxg; # remove whitespace (including \r) from end of line
+	my @fields = split /,/msx;
 	my $fields_found = @fields;
 	if ($fields_found != $expected_fields) {
 	    my $msg = "Incorrect number of fields in $inPath line $i; ".
@@ -169,7 +169,7 @@ sub writeSortedByPosition {
     open my $in, "<", $inPath || $log->logcroak("Cannot read input path $inPath");
     while (<$in>) {
 	push @input, $_;
-	my @fields = split /,/;
+	my @fields = split /,/msx;
 	my %snp;
 	$snp{'name'} = $fields[$nameIndex];
 	$snp{'position'} = $fields[$posIndex];

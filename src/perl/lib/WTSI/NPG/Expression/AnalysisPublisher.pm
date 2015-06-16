@@ -281,7 +281,7 @@ sub is_text_file {
 
   $self->debug("Detected file '$filename' to be ", join(' ', @result));
 
-  return (@result && $result[0] =~ m{^text\/plain});
+  return (@result && $result[0] =~ m{^text\/plain}msx);
 }
 
 __PACKAGE__->meta->make_immutable;
@@ -298,7 +298,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify

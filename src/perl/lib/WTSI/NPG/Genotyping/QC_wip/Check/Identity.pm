@@ -384,7 +384,7 @@ sub _read_production_calls {
 sub _from_illumina_snp_name {
   my ($name) = @_;
 
-  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)};
+  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)}msx;
 
   return $body;
 }

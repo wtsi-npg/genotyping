@@ -93,7 +93,7 @@ if ($help) {
 }
 
 # generate hashes of chromosome and position for each SNP in .bim file
-open my $bim, "<", $bfile.".bim" or die qq(Unable to open $bfile.bim);
+open my $bim, "<", $bfile.".bim" or die "Unable to open $bfile.bim\n";
 while (<$bim>) {
     my ($chr, $snp, $pos) = (split)[0, 1, 3];
     $chr{$snp} = $chr;
@@ -103,7 +103,7 @@ close $bim;
 
 # open genotyping SNP results file (defaults to snp_cr_af.txt) and filter on MAF and CR
 # populate a hash %snps: Keys=chromosomes, values = lists of (snp_name, snp_position) pairs
-open my $snpfile, "<", $af or die "Cannot read SNP file '$af': $!";
+open my $snpfile, "<", $af or die "Cannot read SNP file '$af': $!\n";
 while (<$snpfile>) {
     my ($snp, $cr, $maf) = (split)[0, 1, 5];
     next unless $chr{$snp};
@@ -111,7 +111,7 @@ while (<$snpfile>) {
     next if $maf < $maf_min || $maf > $maf_max;
     push @{$snps{$chr{$snp}}}, [ $snp, $pos{$snp} ];
 }
-close $snpfile or die $!;
+close $snpfile or die "Failed to close $snpfile: $!\n";
 
 # filter to ensure minimum distance between SNPs; generates @use_snps array
 foreach my $chr (keys %snps) {
@@ -126,7 +126,7 @@ foreach my $chr (keys %snps) {
 	}
     }
 }
-open my $logfile, ">", $log or die $!;
+open my $logfile, ">", $log or die "Failed to open $log for writing: $!\n";
 print $logfile scalar(@use_snps), " available SNPs found for duplicate check\n";
 if (@use_snps > $max_snps) {
     @use_snps = @use_snps[0 .. $max_snps - 1]; # truncate @use_snps if too large
@@ -143,8 +143,8 @@ print $snp_file map { $_ . "\n" } @use_snps;
 my $full = $dir.'/duplicate_full.txt';
 my $summary = $dir.'/duplicate_summary.txt';
 my $cmd = "pairwise_concordance_bed -n $snp_file -f $full -m $summary $bfile";
-system($cmd) && die qq(Error running command "$cmd": $!);
+system($cmd) && die qq(Error running command "$cmd": $!\n);
 
 # gzip pairwise output file; can be quite large, >> 1 GB
 $cmd = "gzip -f $full";
-system($cmd) && die qq(Error running command "$cmd": $!);;
+system($cmd) && die qq(Error running command "$cmd": $!\n);;

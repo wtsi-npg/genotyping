@@ -111,7 +111,7 @@ sub run {
     (epoch => $end->epoch)->subtract(days => $days);
 
   my $dir_test = modified_between($begin->epoch, $end->epoch);
-  my $dir_regex = qr{^[0-9]{10}$}msxi;
+  my $dir_regex = qr{^\d{10}$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 
