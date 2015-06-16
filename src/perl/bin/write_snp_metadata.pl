@@ -36,7 +36,7 @@ use JSON;
 Log::Log4perl->easy_init($ERROR);
 
 our $VERSION = '';
-our $expected_fields = 9; # expected number of fields in .bpm.csv manifest
+our $EXPECTED_FIELDS = 9; # expected number of fields in .bpm.csv manifest
 
 sub byPositionName {
     # use to sort manifest into (position, name) order
@@ -123,9 +123,9 @@ sub splitManifest {
 	$_ =~ s/\s+$//msxg; # remove whitespace (including \r) from end of line
 	my @fields = split /,/msx;
 	my $fields_found = @fields;
-	if ($fields_found != $expected_fields) {
+	if ($fields_found != $EXPECTED_FIELDS) {
 	    my $msg = "Incorrect number of fields in $inPath line $i; ".
-		"expected ".$expected_fields.", found ".$fields_found;
+		"expected ".$EXPECTED_FIELDS.", found ".$fields_found;
 	    $log->logcroak($msg);
 	}
 	my $chrom = $fields[$cindex];

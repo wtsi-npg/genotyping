@@ -22,10 +22,10 @@ our @EXPORT_OK = qw/createReports qcNameFromPath/;
 
 our $VERSION = '';
 
-our @dbInfoHeaders = qw/run project data_supplier snpset
+our @DB_INFO_HEADERS = qw/run project data_supplier snpset
                         supplier_name rowcol beadchip_number/;
-our $allMetricsName = "ALL_METRICS";
-our $allPlatesName = "ALL_PLATES";
+our $ALL_METRICS_NAME = "ALL_METRICS";
+our $ALL_PLATES_NAME = "ALL_PLATES";
 our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity 
   magnitude/;
 
@@ -106,7 +106,7 @@ sub getPlateInfo {
             $passCounts{$plate}{$metric} += $pass;
         }
         if ($samplePass) { $passTotal += 1; }
-        $passCounts{$plate}{$allMetricsName} += $samplePass;
+        $passCounts{$plate}{$ALL_METRICS_NAME} += $samplePass;
         $sampleCounts{$plate}++;
     }
     return (\%passCounts, \%sampleCounts, $sampleTotal, $passTotal);
@@ -350,7 +350,7 @@ sub textForDatasets {
     # print as nested unordered lists (not table rows) to handle long names
     my $dbPath = shift;
     my $qcDir = shift;
-    my @headers = @dbInfoHeaders[0..3];
+    my @headers = @DB_INFO_HEADERS[0..3];
     if ($qcDir) { push(@headers, "directory"); }
     foreach my $header (@headers) { $header =~ s/_/\\_/msxg; }
     my @datasetInfo = dbDatasetInfo($dbPath);
@@ -436,7 +436,7 @@ sub textForPass {
     my @headers2 = qw/plate/;
     my @metricNames = ();
     foreach my $name (@METRIC_NAMES) { push(@metricNames, $name); }
-    push(@metricNames, $allMetricsName);
+    push(@metricNames, $ALL_METRICS_NAME);
     foreach my $metric (@metricNames) { 
         push @headers1, getMetricTableHeader($metric, \%shortNames);
         push @headers2, getMetricTableHeader($metric, \%shortNames);
@@ -463,7 +463,7 @@ sub textForPass {
         push(@text2, \@fields2);
         $i++;
     }
-    my $name =  "\\textbf{".lc($allPlatesName)."}"; 
+    my $name =  "\\textbf{".lc($ALL_PLATES_NAME)."}"; 
     $name =~ s/_/ /msxg;
     my @fields1 = ($name, $sampleTotal);
     my @fields2 = ($name, );

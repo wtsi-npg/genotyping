@@ -28,7 +28,7 @@ use strict;
 use Carp;
 use plink_binary; # from gftools package
 use Exporter;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/$ini_path/;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/$INI_PATH/;
 
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/checkPlinkBinaryInputs/;
@@ -54,7 +54,7 @@ sub countCallsHets {
         $parPath) = @_;
     my ($snpTotal, $snpFail, $snpPar) = (0,0,0);
     $includePar ||= 0; # remove SNPs from pseudoautosomal regions
-    $parPath ||= $ini_path."/x_pseudoautosomal.txt";
+    $parPath ||= $INI_PATH."/x_pseudoautosomal.txt";
     my @xpar = readXPAR($parPath);
     $log ||= 0;
     if ($log) { writeSnpLogHeader($log); }
