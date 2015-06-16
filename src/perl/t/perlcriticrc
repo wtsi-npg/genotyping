@@ -96,7 +96,6 @@ file_lexical_variables = :no_restriction
 [-Subroutines::RequireFinalReturn]
 [-Subroutines::ProhibitBuiltinHomonyms]
 [-Subroutines::ProhibitExcessComplexity]
-[-Subroutines::ProhibitReturnSort]
 
 [-Documentation::RequirePackageMatchesPodName]
 
