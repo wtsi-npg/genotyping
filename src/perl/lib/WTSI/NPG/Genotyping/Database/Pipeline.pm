@@ -40,7 +40,7 @@ has 'dbfile' =>
      my ($self) = @_;
 
      my $ds = $self->data_source;
-     my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+     my ($base, $file) = $ds =~ m{^(dbi:SQLite:dbname=)(.*)}msx;
      unless ($base && $file) {
        $self->logconfess("Failed to parse datasource string '$ds' in ",
                          $self->inifile);
@@ -64,7 +64,7 @@ sub BUILD {
   my ($self) = @_;
 
   my $ds = $self->data_source;
-  my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+  my ($base, $file) = $ds =~ m{^(dbi:SQLite:dbname=)(.*)}msx;
   unless ($base && $file) {
     $self->logconfess("Failed to parse datasource string '$ds' in ",
                       $self->inifile);
@@ -418,7 +418,7 @@ sub AUTOLOAD {
   my ($self) = @_;
   my $type = ref($self) or confess "$self is not an object";
 
-  return if $AUTOLOAD =~ /::DESTROY$/;
+  return if $AUTOLOAD =~ m{::DESTROY$}msx;
 
   if (!$self->is_connected) {
     $self->logconfess("$self is not connected");
@@ -432,7 +432,7 @@ sub AUTOLOAD {
   }
 
   my $method_name = $AUTOLOAD;
-  $method_name =~ s/.*://;
+  $method_name =~ s/.*://msx;
   unless (exists $lookup{$method_name} ) {
     $self->logconfess("An invalid method `$method_name' was called ",
                       "on an object of $type. Permitted methods are [",
@@ -471,7 +471,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

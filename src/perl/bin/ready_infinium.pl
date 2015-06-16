@@ -8,7 +8,7 @@ use warnings;
 use strict;
 use Config::IniFiles;
 use Getopt::Long;
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(any uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -29,7 +29,7 @@ our $AUTOCALL_PASS = 'Pass';
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $SNPSETS_INI = 'snpsets.ini';
-our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/;
+our $ID_REGEX = qr{^[\w.-]{4,}$}msx;
 
 our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
@@ -206,10 +206,10 @@ sub run {
                    join(", ", map { $_->name } $pipedb->snpset->all), "]");
   }
   if ($chip_design) {
-    unless (grep { /^$chip_design$/ } @chip_designs) {
-        $log->logcroak("Invalid chip design '",
-                       $chip_design, "'. Valid designs are: [ ",
-                       join(", ", @chip_designs), "]");
+    unless (any { $chip_design eq $_ } @chip_designs) {
+      $log->logcroak("Invalid chip design '",
+                     $chip_design, "'. Valid designs are: [ ",
+                     join(", ", @chip_designs), "]");
     }
   }
   else {
@@ -271,7 +271,6 @@ sub run {
        print_pre_report($supplier, $project_title, $namespace, $snpset)
          if $verbose;
 
-       # FIXME -- cache this in the database handle
        my %cache;
        my @samples;
 

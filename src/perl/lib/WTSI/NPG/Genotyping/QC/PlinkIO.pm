@@ -4,7 +4,7 @@
 # June 2012
 
 #
-# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+# Copyright (C) 2012, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -168,15 +168,18 @@ sub readXPAR {
     my @xpar;
     open my $in, "<", $inPath || croak "Cannot open input $inPath";
     while (<$in>) {
-        if (/^#/) { next; } # comments start with a #
+        if (m{^\#}msx) { next; } # comments start with a #
         chomp;
         my @words = split;
         if (@words!=2) { next; }
         my @coords = ($words[0], $words[1]);
-        if ($words[0] =~ /\D/ || $words[1] =~ /\D/) { next; }
+        if ($words[0] =~ m{\D}msx || $words[1] =~ m{\D}msx) { next; }
         push @xpar, \@coords;
     }
     close $in || croak "Cannot close input $inPath";
+    if (scalar @xpar != 2) {
+      croak "Did not find two pairs of PAR coordinates in $inPath";
+    }
     return @xpar;
 }
 
@@ -190,7 +193,7 @@ sub snpCallsHets {
     my @sampleNames = @$samplesRef;
     for (my $i=0;$i<$total;$i++) { # calls for each sample on current snp
         my $call = $genotypes->get($i);
-        if ($call =~ /[N]{2}/) { 
+        if ($call =~ m{[N]{2}}msx) {
             $noCalls++;
         } else {
             $calls{$sampleNames[$i]} = 1;

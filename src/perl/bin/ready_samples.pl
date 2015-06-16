@@ -7,6 +7,7 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
+use List::AllUtils qw(any);
 use Log::Log4perl qw(:easy);
 use Pod::Usage;
 
@@ -78,7 +79,7 @@ sub run {
         die "Failed to select sample state '$select': invalid state\n";
       }
 
-      if (grep { $state->name eq $_->name } $sample->states) {
+      if (any { $state->name eq $_->name } $sample->states) {
         print $out $sample->name, "\n";
         describe_sample($sample, \*STDERR) if $verbose;
       }
@@ -102,7 +103,7 @@ sub run {
                die "Failed to remove sample state '$remove': invalid state\n";
              }
 
-             if (grep { $state->name eq $_->name } $sample->states) {
+             if (any { $state->name eq $_->name } $sample->states) {
                $sample->remove_from_states($state);
              }
            }
@@ -113,7 +114,7 @@ sub run {
                die "Failed to add sample state '$add': invalid state\n";
              }
 
-             unless (grep { $state->name eq $_->name } $sample->states) {
+             unless (any { $state->name eq $_->name } $sample->states) {
                $sample->add_to_states($state);
              }
            }

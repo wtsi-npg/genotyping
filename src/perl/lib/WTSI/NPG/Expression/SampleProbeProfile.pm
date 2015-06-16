@@ -11,7 +11,6 @@ our $VERSION = '';
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
   'WTSI::NPG::iRODS::Storable';
 
-our $PLATFORM = 'Illumina Inc. GenomeStudio version 1.9.0';
 our $NORMALISATION_HEADER_PROPERTY = 'Normalization';
 
 has 'normalisation_method' =>
@@ -50,15 +49,16 @@ sub is_valid {
   while (my $line = <$fh>) {
     chomp $line;
 
-    if ($line_num == 0 and $line =~ m{^Illumina Inc.\sGenomeStudio\sversion}) {
+    if ($line_num == 0 and
+        $line =~ m{^Illumina\sInc.\sGenomeStudio\sversion}msx) {
       $version = 1;
     }
 
-    if ($line_num == 1 and $line =~ m{^Normalization =}) {
+    if ($line_num == 1 and $line =~ m{^Normalization\s=}msx) {
       $norm = 1;
     }
 
-    if ($line_num == 2 and $line =~ m{^Array Content =}) {
+    if ($line_num == 2 and $line =~ m{^Array\sContent\s=}msx) {
       $content = 1;
     }
 
@@ -83,14 +83,14 @@ sub _build_normalisation_method {
 
   my $platform = <$fh>;
   chomp $platform;
-  unless ($platform =~ m{^$PLATFORM}) {
+  unless ($platform =~ m{^Illumina\sInc.\sGenomeStudio\sversion\s1.9.0}msx) {
     $self->warn("The Illumina platform '$platform' differs from the expected ",
-                "value of '$PLATFORM'.");
+                "value of 'Illumina Inc. GenomeStudio version 1.9.0'.");
   }
 
   my $normalisation = <$fh>;
   chomp $normalisation;
-  my ($prop, $method) = map { trim($_) } split /=/, $normalisation;
+  my ($prop, $method) = map { trim($_) } split /=/msx, $normalisation;
 
   unless (defined $prop   &&
           defined $method &&
@@ -130,3 +130,25 @@ __PACKAGE__->meta->make_immutable;
 no Moose;
 
 1;
+
+__END__
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

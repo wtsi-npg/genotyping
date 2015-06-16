@@ -86,10 +86,10 @@ sub appendNull {
 sub bySampleName {
     # comparison function for sorting samples in getSampleInfo
     # if in plate_well_id format, sort by id; otherwise use standard sort
-    if ($a =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/ &&
-            $b =~ /[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+/) {
-        my @termsA = split(/_/, $a);
-        my @termsB = split(/_/, $b);
+    if ($a =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx &&
+        $b =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx) {
+        my @termsA = split /_/msx, $a;
+        my @termsB = split /_/msx, $b;
         return $termsA[-1] cmp $termsB[-1];
     } else {
         return $a cmp $b;

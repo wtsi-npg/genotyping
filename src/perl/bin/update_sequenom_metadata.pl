@@ -13,6 +13,7 @@ use List::MoreUtils qw(natatime);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
@@ -129,7 +130,7 @@ sub run {
   }
 
   my $total = scalar @sequenom_data;
-  my $updated = 0;
+  my $num_updated = 0;
 
   if ($stdio) {
     $log->info("Updating metadata on $updated/$total data objects in ",
@@ -140,27 +141,24 @@ sub run {
   }
 
   foreach my $data_object (@sequenom_data) {
-    eval {
+    try {
       my $sdo = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
         ($irods, $data_object);
       $sdo->update_secondary_metadata($snpdb, $ssdb);
-      ++$updated;
-    };
 
-    if ($@) {
+      $num_updated++;
+      $log->info("Updated metadata for '$data_object': $num_updated of $total");
+    } catch {
       $log->error("Failed to update metadata for '$data_object': ", $@);
-    }
-    else {
-      $log->info("Updated metadata for '$data_object': $updated of $total");
-    }
+    };
   }
 
   if ($stdio) {
-    $log->info("Updated metadata on $updated/$total data objects in ",
+    $log->info("Updated metadata on $num_updated/$total data objects in ",
                "file list");
   }
   else {
-    $log->info("Updated metadata on $updated/$total data objects in ",
+    $log->info("Updated metadata on $num_updated/$total data objects in ",
                "'$publish_dest'");
   }
 

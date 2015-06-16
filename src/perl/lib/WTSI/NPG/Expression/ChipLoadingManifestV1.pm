@@ -72,7 +72,7 @@ sub _parse_beadchip_table {
   while (my $line = <$fh>) {
     ++$n;
     chomp($line);
-    next if $line =~ m{^\s*$};
+    next if $line =~ m{^\s*$}msx;
 
     if ($in_sample_block) {
       my @row = map { trim($_) } split("\t", $line);
@@ -103,15 +103,15 @@ sub _parse_beadchip_table {
       }
     }
     else {
-      if ($line =~ m/BEADCHIP/) {
+      if ($line =~ m{BEADCHIP}msx) {
         $in_sample_block = 1;
         my @header = map { trim($_) } split("\t", $line);
         # Expected to be Sanger sample ID
-        $sample_id_col = firstidx { /SAMPLE ID/ } @header;
+        $sample_id_col = firstidx { m{SAMPLE\sID}msx } @header;
         # Expected to be chip number
-        $beadchip_col  = firstidx { /BEADCHIP/ } @header;
+        $beadchip_col  = firstidx { m{BEADCHIP}msx  } @header;
         # Expected to be chip section
-        $section_col = firstidx { /ARRAY/ } @header;
+        $section_col   = firstidx { m{ARRAY}msx     } @header;
       }
     }
   }
@@ -143,7 +143,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

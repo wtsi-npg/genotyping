@@ -953,9 +953,9 @@ sub _choose_from_scans {
                           "undated; unable to choose which to use");
       }
 
-      @scans = sort { $b->{image_iso_date}
-                       cmp
-                      $a->{image_iso_date} } @dated_scans;
+      @scans = reverse sort { $a->{image_iso_date}
+                              cmp
+                              $b->{image_iso_date} } @dated_scans;
 
       # If the latest scan didn't pass, disregard it and look for an
       # older one that did pass
