@@ -12,7 +12,7 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
@@ -38,10 +38,11 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $jsonOut, $log, $logConfig, $textOut, $verbose);
+my ($input, $debug, $jsonOut, $log, $logConfig, $textOut, $verbose);
 
 GetOptions('help'        => sub { pod2usage(-verbose => 2,
                                             -exitval => 0) },
+           'debug'     => \$debug,
            'input=s'     => \$input,
            'json=s'      => \$jsonOut,
            'logconf=s'   => \$logConfig,
@@ -51,10 +52,18 @@ GetOptions('help'        => sub { pod2usage(-verbose => 2,
 
 
 ### set up logging ###
-if ($logConfig) { Log::Log4perl::init($logConfig); }
-else { Log::Log4perl::init(\$embedded_conf); }
+if ($logConfig) {
+    Log::Log4perl::init($logConfig);
+} else {
+    Log::Log4perl::init(\$embedded_conf);
+}
 $log = Log::Log4perl->get_logger('npg.vcf.consistency');
-
+if ($verbose) {
+    $log->level($INFO);
+}
+elsif ($debug) {
+    $log->level($DEBUG);
+}
 
 ### read input and do consistency check
 
@@ -75,7 +84,7 @@ my $vcf = join('', @inputs);
 if ($input ne '-') {
     close $in || $log->logcroak("Cannot close input '$input'");
 }
-my $checker = WTSI::NPG::Genotyping::VCF::VCFGtcheck->new(
+my $checker = WTSI::NPG::Genotyping::VCF::GtcheckWrapper->new(
     verbose => $verbose);
 my ($resultRef, $maxDiscord) = $checker->run_with_string($vcf);
 my $msg = sprintf "VCF consistency check complete. Maximum pairwise difference %.4f", $maxDiscord;

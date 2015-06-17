@@ -2,6 +2,7 @@
 package WTSI::NPG::Genotyping::Fluidigm::AssayResult;
 
 use Moose;
+use POSIX qw/log10/;
 use WTSI::NPG::Genotyping::Types qw(SNPGenotype);
 
 our $VERSION = '';
@@ -238,6 +239,28 @@ sub sample_address {
   return $sample_address;
 }
 
+=head2 qscore
+
+  Arg [1]    : None
+
+  Example    : $q = $result->qscore()
+  Description: Return the Phred-scaled quality score from the Fluidigm result.
+               Fluidigm has a percentage quality score, eg. 99.99.
+               Convert this to Phred: -10 * log10(Pr(error))
+               Round to nearest integer
+
+  Returntype : QualityScore
+
+=cut
+
+sub qscore {
+    my ($self) = @_;
+    my $pr_error = 1 - ($self->confidence / 100);
+    my $qscore = -10 * log10($pr_error);
+    $qscore = int($qscore + 0.5); # initial qscore is guaranteed non-negative
+    return $qscore;
+}
+
 sub _parse_assay {
   # Parse the 'assay' field and return the assay identifier. Field
   # should be of the form [sample address]-[assay identifier], eg. S01-A96
@@ -271,7 +294,7 @@ one sample.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
