@@ -14,12 +14,12 @@ use FindBin qw /$Bin/;
 use POSIX qw/floor strftime/;
 use JSON;
 use XML::Parser;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/$ini_path/; 
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/$INI_PATH/; 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use Exporter;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames wrapCommand wrapPlotCommand $ini_path/;
+our @EXPORT_OK = qw/jsonPathOK pngPathOK xmlPathOK createTestDatabase createTestDatabasePlink readPlinkSampleNames wrapCommand wrapPlotCommand $INI_PATH/;
 
 our $VERSION = '';
 
@@ -46,7 +46,7 @@ sub createTestDatabase {
     $dbfile ||= tempdir(CLEANUP => 1).'/pipeline.db'; # remove database file on successful script exit
     my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
 	(name => 'pipeline',
-	 inifile => "$ini_path/pipeline.ini",
+	 inifile => "$INI_PATH/pipeline.ini",
 	 dbfile => $dbfile);
     my $schema = $db->connect(RaiseError => 1,
 			      on_connect_do => 'PRAGMA foreign_keys = ON')->schema;

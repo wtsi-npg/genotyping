@@ -35,16 +35,16 @@ use WTSI::NPG::Genotyping qw/read_sample_json/;
 use WTSI::NPG::Genotyping::QC::PlinkIO;
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/$ini_path $helpText $helpTextDB processOptions run
+our @EXPORT_OK = qw/$INI_PATH $HELP_TEXT $HELP_TEXT_DB processOptions run
   diffGenders readBenchmark readGenderOutput/;
 
 our $VERSION = '';
 
-use vars qw/$textFormat $jsonFormat $plinkFormat $nameKey $xhetKey $inferKey 
-  $supplyKey $ini_path $helpText $helpTextDB/;
-($textFormat, $jsonFormat, $plinkFormat) = qw(text json plink);
-($nameKey, $xhetKey, $inferKey, $supplyKey) = qw(sample xhet inferred supplied);
-$ini_path = "$Bin/../etc/";
+use vars qw/$TEXT_FORMAT $JSON_FORMAT $PLINK_FORMAT $NAME_KEY $XHET_KEY $INFER_KEY 
+  $SUPPLY_KEY $INI_PATH $HELP_TEXT $HELP_TEXT_DB/;
+($TEXT_FORMAT, $JSON_FORMAT, $PLINK_FORMAT) = qw(text json plink);
+($NAME_KEY, $XHET_KEY, $INFER_KEY, $SUPPLY_KEY) = qw(sample xhet inferred supplied);
+$INI_PATH = "$Bin/../etc/";
 
 my %defaultParams = ('m-max-default' => 0.02,
                      'm-max-minimum' => 0.005,
@@ -56,14 +56,14 @@ my %defaultParams = ('m-max-default' => 0.02,
                      'include-par' => 0,
     );
 
-$helpText =  "Usage: $0 [ options ] 
+$HELP_TEXT =  "Usage: $0 [ options ] 
 
 --help                 Print this help text and exit
 
 Input/output options:
 --input=PATH           Path to text/json input file, OR prefix for binary Plink 
                        files (without .bed, .bim, .fam extension).  Required.
---input-format=FORMAT  One of: $textFormat, $jsonFormat, $plinkFormat.  
+--input-format=FORMAT  One of: $TEXT_FORMAT, $JSON_FORMAT, $PLINK_FORMAT.  
                        Optional; if absent, will be deduced from input filename.
 --output-dir=PATH      Path to output directory.  Defaults to current directory.
 --include-par          Include SNPs from pseudoautosomal regions.  Plink input 
@@ -83,7 +83,7 @@ Gender model options:
                        Default: ".$defaultParams{'boundary'}."
 ";
 
-$helpTextDB = $helpText."
+$HELP_TEXT_DB = $HELP_TEXT."
 Options for WTSI genotyping pipeline internal database:
 --dbfile=PATH          Push results to given pipeline database file (in 
                        addition to writing text/json output). Optional.
@@ -105,8 +105,8 @@ sub processOptions {
     my %opts = %$optRef;
     my $input = $opts{'input'};
     if ($opts{'help'}) {
-        if ($dbopts) { print STDERR $helpTextDB; }
-        else { print STDERR $helpText; }
+        if ($dbopts) { print STDERR $HELP_TEXT_DB; }
+        else { print STDERR $HELP_TEXT; }
         exit(0);
     } elsif (!$input) {
         print STDERR "Input data must be specified!\n".
@@ -118,29 +118,29 @@ sub processOptions {
     my $inputFormat;
     if ($opts{'input-format'}) {
         $inputFormat = $opts{'input-format'};
-        if ($inputFormat ne $textFormat && 
-            $inputFormat ne $jsonFormat && 
-            $inputFormat ne $plinkFormat) {
+        if ($inputFormat ne $TEXT_FORMAT && 
+            $inputFormat ne $JSON_FORMAT && 
+            $inputFormat ne $PLINK_FORMAT) {
             croak "ERROR: Input format must be one of: ".
-                "$textFormat, $jsonFormat, $plinkFormat";
+                "$TEXT_FORMAT, $JSON_FORMAT, $PLINK_FORMAT";
         }
     } elsif ($input =~ m{[.]txt$}msx) {
-        $inputFormat = $textFormat; 
+        $inputFormat = $TEXT_FORMAT; 
     } elsif ($input =~ m{[.]json$}msx) {
-        $inputFormat = $jsonFormat;
+        $inputFormat = $JSON_FORMAT;
     } else {
-        $inputFormat = $plinkFormat; 
+        $inputFormat = $PLINK_FORMAT; 
     }
     $opts{'input-format'} = $inputFormat;
-    if ($inputFormat eq $plinkFormat) { 
+    if ($inputFormat eq $PLINK_FORMAT) { 
         if (not checkPlinkBinaryInputs($input)) { 
             croak "ERROR: Plink binary input files not available"; 
         }
     } elsif (not -r $input) {
         croak "ERROR: Cannot read input path $input";
     }
-    if ($opts{'json'}) { $opts{'output-format'} = $jsonFormat; }
-    else { $opts{'output-format'} = $textFormat; }
+    if ($opts{'json'}) { $opts{'output-format'} = $JSON_FORMAT; }
+    else { $opts{'output-format'} = $TEXT_FORMAT; }
     foreach my $key (keys(%defaultParams)) {
         if (!defined($opts{$key})) {
             $opts{$key} = $defaultParams{$key};
@@ -166,17 +166,17 @@ sub readModelGenders {
 
 sub readNamesXhetJson {
     # read sample names and xhet from .json file
-    # typically use module $nameKey, $xhetKey variables
+    # typically use module $NAME_KEY, $XHET_KEY variables
     my ($inPath) = @_;
-    $nameKey ||= "sample";
-    $xhetKey ||= "xhet";
+    $NAME_KEY ||= "sample";
+    $XHET_KEY ||= "xhet";
     my @records = read_sample_json($inPath);
     my @names = ();
     my @xhets = ();
     foreach my $recordRef (@records) {
 	my %record = %$recordRef;
-	push(@names, $record{$nameKey});
-	push(@xhets, $record{$xhetKey});
+	push(@names, $record{$NAME_KEY});
+	push(@xhets, $record{$XHET_KEY});
     }
     return (\@names, \@xhets);
 }
@@ -224,11 +224,11 @@ sub readSampleXhet {
     # also read supplied gender, for PLINK input only
     my ($input, $inputFormat, $includePar) = @_;
     my ($nameRef, $xhetRef, $suppliedRef);
-    if ($inputFormat eq $textFormat) {
+    if ($inputFormat eq $TEXT_FORMAT) {
         ($nameRef, $xhetRef) = readNamesXhetText($input);
-    } elsif ($inputFormat eq $jsonFormat) {
+    } elsif ($inputFormat eq $JSON_FORMAT) {
         ($nameRef, $xhetRef) = readNamesXhetJson($input);
-    } elsif ($inputFormat eq $plinkFormat) {
+    } elsif ($inputFormat eq $PLINK_FORMAT) {
         ($nameRef, $xhetRef, $suppliedRef) = readPlink($input, $includePar); 
     } else {
         croak "Illegal input format $inputFormat";
@@ -280,29 +280,29 @@ sub writeOutput {
     my @names = @$namesRef;
     my @xhet = @$xhetRef;
     my @inferred = @$inferredRef;
-    if ($format eq $textFormat) { 
+    if ($format eq $TEXT_FORMAT) { 
         $outputName ||= "sample_xhet_gender.txt"; 
-    } elsif ($format eq $jsonFormat) {  
+    } elsif ($format eq $JSON_FORMAT) {  
         $outputName ||= "sample_xhet_gender.json"; 
     } else { 
         croak "Illegal format argument: $format"; 
     }
     my $outPath = $outputDir."/".$outputName;
     open (my $out, ">", $outPath) || croak "Cannot open output file $outPath!";
-    if ($format eq $textFormat) {
+    if ($format eq $TEXT_FORMAT) {
         print $out join("\t", qw(sample xhet inferred supplied))."\n";
         for (my $i=0;$i<@names;$i++) {
             my $supplied = getSuppliedGenderOutput($suppliedRef, $i);
             printf $out "%s\t%6f\t%d\t%s\n", ($names[$i], $xhet[$i], $inferred[$i], $supplied);
         }
-    } elsif ($format eq $jsonFormat) {
+    } elsif ($format eq $JSON_FORMAT) {
         my @records = ();
         for (my $i=0;$i<@names;$i++) {
             my %record;
-            $record{$nameKey} = $names[$i];
-            $record{$xhetKey} = $names[$i];
-            $record{$inferKey} = $inferred[$i];
-            $record{$supplyKey} = getSuppliedGenderOutput($suppliedRef, $i);
+            $record{$NAME_KEY} = $names[$i];
+            $record{$XHET_KEY} = $names[$i];
+            $record{$INFER_KEY} = $inferred[$i];
+            $record{$SUPPLY_KEY} = getSuppliedGenderOutput($suppliedRef, $i);
             push(@records, \%record);
         }
         print $out encode_json(\@records);

@@ -12,14 +12,13 @@ our $VERSION = '';
 
 our $AUTOLOAD;
 
-our $default_sqlite   = 'sqlite3';
-our $default_ddl_file = 'pipeline_ddl.sql';
-our $pipeline_ini  = 'pipeline.ini';
-our $genders_ini   = 'genders.ini';
-our $methods_ini   = 'methods.ini';
-our $relations_ini = 'relations.ini';
-our $snpsets_ini   = 'snpsets.ini';
-our $states_ini    = 'states.ini';
+our $DEFAULT_SQLITE   = 'sqlite3';
+our $DEFAULT_DDL_FILE = 'pipeline_ddl.sql';
+our $GENDERS_INI      = 'genders.ini';
+our $METHODS_INI      = 'methods.ini';
+our $RELATIONS_INI    = 'relations.ini';
+our $SNPSETS_INI      = 'snpsets.ini';
+our $STATES_INI       = 'states.ini';
 
 extends 'WTSI::NPG::Database';
 
@@ -104,10 +103,10 @@ sub create {
   my ($self, $file, $ini) = @_;
 
   my $config_dir = $self->config_dir;
-  my $default_sql_path = "$config_dir/$default_ddl_file";
+  my $default_sql_path = "$config_dir/$DEFAULT_DDL_FILE";
 
   my $sql_path = $ini->val($self->name, 'sqlpath', $default_sql_path);
-  my $sqlite = $ini->val($self->name, 'sqlite', $default_sqlite);
+  my $sqlite = $ini->val($self->name, 'sqlite', $DEFAULT_SQLITE);
 
   unless (-e $sql_path) {
     $self->logconfess("Failed to create database: ",
@@ -151,11 +150,11 @@ sub populate {
   }
 
   $self->_populate_addresses;
-  $self->_populate_genders("$ini_path/$genders_ini");
-  $self->_populate_relations("$ini_path/$relations_ini");
-  $self->_populate_states("$ini_path/$states_ini");
-  $self->_populate_methods("$ini_path/$methods_ini");
-  $self->_populate_snpsets("$ini_path/$snpsets_ini");
+  $self->_populate_genders("$ini_path/$GENDERS_INI");
+  $self->_populate_relations("$ini_path/$RELATIONS_INI");
+  $self->_populate_states("$ini_path/$STATES_INI");
+  $self->_populate_methods("$ini_path/$METHODS_INI");
+  $self->_populate_snpsets("$ini_path/$SNPSETS_INI");
 
   return $self;
 }

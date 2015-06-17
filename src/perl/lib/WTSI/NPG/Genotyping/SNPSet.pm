@@ -94,8 +94,9 @@ sub snp_names {
   my ($self) = @_;
 
   my @snp_names = map { $_->name } @{$self->snps};
+  my @sorted = sort { $a cmp $b } @snp_names;
 
-  return sort { $a cmp $b } @snp_names;
+  return @sorted;
 }
 
 =head2 named_snp
