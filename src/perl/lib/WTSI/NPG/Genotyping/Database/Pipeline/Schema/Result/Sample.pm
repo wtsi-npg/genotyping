@@ -226,9 +226,9 @@ sub idat {
 
   my @files;
   if ($channel eq 'red') {
-    @files = any { defined $_ and m{Red}msx } @values;
+    @files = grep { defined $_ and m{Red}msx } @values;
   } else {
-    @files = any { defined $_ and m{Grn}msx } @values;
+    @files = grep { defined $_ and m{Grn}msx } @values;
   }
 
   return shift @files;
