@@ -80,7 +80,7 @@ sub readCrHet {
     my @coords = ();
     my ($hetMin, $hetMax) = (1, 0);
     while (<$input>) {
-	if (/^#/) { next; } # ignore comments
+	if (m{^\#}msx) { next; } # ignore comments
 	chomp;
 	my @words = split;
 	my $cr = $words[$crIndex];
@@ -123,7 +123,8 @@ sub run {
     my ($coordsRef, $hetMin, $hetMax) = readCrHet($input);
     my ($xmin, $xmax, $xsteps, $ysteps) = (0, 41, 40, 40);
     my @counts = getBinCounts($coordsRef, $xmin, $xmax, $xsteps, $hetMin, $hetMax, $ysteps);
-    open $output, ">", $heatText || die "Cannot open output path $heatText: $!";
+    open $output, ">", $heatText ||
+      die "Cannot open output path $heatText: $!\n";
     writeTable(\@counts, $output);
     close $output;
     @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax, $heatPdf);
@@ -131,7 +132,8 @@ sub run {
     my $plotsOK = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
     ### do scatterplot & histograms ###
     if ($plotsOK) {
-	open $output, ">", $scatterText || die "Cannot open output path $scatterText: $!";
+      open $output, ">", $scatterText ||
+        die "Cannot open output path $scatterText: $!\n";
 	writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
 	close $output;
 	my $scatterPlotScript = "plotCrHetDensity.R";

@@ -92,6 +92,25 @@ sub canonical_sample_id {
     return $self->sample_id;
 }
 
+
+=head2 qscore
+
+  Arg [1]    : None
+
+  Example    : $q = $result->qscore()
+  Description: Placeholder. In the Fluidigm::AssayResult class, the function
+               of this name returns a Phred-scaled quality score. This
+               function always returns undef.
+  Returntype : QualityScore
+
+=cut
+
+sub qscore {
+    my ($self) = @_;
+    return;
+}
+
+
 =head2 is_control
 
   Arg [1]    : None
@@ -106,6 +125,24 @@ sub canonical_sample_id {
 sub is_control {
     return 0;
 }
+
+
+=head2 is_empty
+
+  Arg [1]    : None
+
+  Example    : $result->is_control == 0
+  Description: Placeholder. In the Fluidigm::AssayResult class, the function
+               of this name checks for an 'empty' flag.
+  Returntype : Str
+
+=cut
+
+sub is_empty {
+    return 0;
+}
+
+
 
 sub snpset_name {
   my ($self) = @_;
@@ -135,12 +172,14 @@ sub snp_assayed {
 sub _split_assay_id {
   my ($self) = @_;
 
-  my ($snpset_name, $snp_name) = split /-/, $self->assay_id;
+  my ($snpset_name, $snp_name) = split /-/msx, $self->assay_id;
   $snpset_name ||= '';
   $snp_name    ||= '';
 
   return [$snpset_name, $snp_name];
 }
+
+
 
 __PACKAGE__->meta->make_immutable;
 
@@ -161,11 +200,11 @@ one sample.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

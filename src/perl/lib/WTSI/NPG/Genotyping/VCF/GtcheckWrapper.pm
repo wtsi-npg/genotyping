@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::VCFGtcheck;
+package WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 use JSON;
 use Log::Log4perl::Level;
@@ -77,13 +77,13 @@ sub run {
              environment => $self->environment,
              logger      => $self->logger)->run->split_stdout;
     }
-    $self->logger->info("bcftools arguments: ".join(" ", @args));
-    $self->logger->debug("bcftools command output:\n".join("", @raw_results));
+    $self->logger->info("bcftools arguments: ".join " ", @args );
+    $self->logger->debug("bcftools command output:\n".join "", @raw_results);
     my %results;
     my $max = 0; # maximum pairwise discordance
     foreach my $line (@raw_results) {
-        if ($line !~ /^CN/) { next; }
-        my @words = split(/\s+/, $line);
+        if ($line !~ m/^CN/msx) { next; }
+        my @words = split /\s+/msx, $line;
         my $discordance = $words[1];
         my $sites = $words[2];
         my $sample_i = $words[4];
@@ -237,8 +237,8 @@ sub _find_bcftools {
          logger      => $self->logger)->run->split_stdout;
     my $version_string = shift @raw_results;
     chomp $version_string;
-    if ($version_string =~ /^bcftools 0\.[01]\./ ||
-            $version_string =~ /^bcftools 0\.2\.0-rc[12345678]$/) {
+    if ($version_string =~ m/^bcftools 0[.][01][.]/msx ||
+            $version_string =~ m/^bcftools 0[.]2[.]0-rc[12345678]$/msx ) {
         $self->logger->logwarn("Must have bcftools version >= 0.2.0-rc9");
     }
     return $bcftools;
@@ -250,7 +250,7 @@ sub _valid_vcf_fileformat {
     # Intended as a simple sanity check; does not validate rest of VCF
     my $self = shift;
     my $input = shift;
-    my $valid = $input =~ /^##fileformat=VCFv[0-9]+\.[0-9]+/;
+    my $valid = $input =~ m/^[#]{2}fileformat=VCFv\d+[.]\d+/msx;
     return $valid;
 }
 
@@ -262,7 +262,7 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::VCF::VCFGtcheck
+WTSI::NPG::Genotyping::VCF::GtcheckWrapper
 
 =head1 DESCRIPTION
 
@@ -275,7 +275,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

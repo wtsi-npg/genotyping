@@ -34,10 +34,10 @@ sub getPlateName {
     # prefix may *not* contain _'s, plate may contain .'s and _'s)
     my $plotPath = shift;
     my $plotName = basename($plotPath);
-    my @items = split(/_/, $plotName);
+    my @items = split /_/msx, $plotName;
     my @tail = splice(@items, 2);
     my $tail = join('_', @tail);
-    @items = split(/\./, $tail);
+    @items = split /[.]/msx, $tail;
     my $name = shift(@items);
     return $name;
 }
@@ -66,7 +66,7 @@ my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/outpu
 if (@ARGV!=3) { 
     die "Usage: $0 experiment_name input/output_directory output_filename\n";
 } elsif (!(-e $plotDir && -d $plotDir)) {
-    die "Output path '$plotDir' does not exist or is not a directory";
+    die "Output path '$plotDir' does not exist or is not a directory\n";
 } 
 my @refs = getPlateInfo($plotDir);
 my @plates = @{shift(@refs)};
@@ -75,7 +75,7 @@ my %hetPlots = %{shift(@refs)};
 my %magPlots = %{shift(@refs)};
 # must write index to given plot directory -- otherwise links are broken
 my $outPath = $plotDir.'/'.$outFileName;
-open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
 print $out header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
     start_html(-title=>"$experiment: Plate heatmap index",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',

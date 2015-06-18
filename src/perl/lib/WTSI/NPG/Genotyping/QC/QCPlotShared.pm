@@ -20,7 +20,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $ini_path $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $INI_PATH $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 our $VERSION = '';
 
@@ -198,11 +198,11 @@ sub parseLabel {
     # silently return undefined values if name not in correct format
     my $label = shift;
     my ($x, $y);
-    if ($label =~ m/^[A-Z][0-9]+$/) { # check name format, eg H10
-        my @chars = split //, $label;
+    if ($label =~ m{^[[:upper:]]\d+$}msx) { # check name format, eg H10
+        my @chars = split //msx, $label;
         $x = ord(uc(shift(@chars))) - 64; # letter -> position in alphabet 
         $y = join('', @chars);
-        $y =~ s/^0+//; # remove leading zeroes from $y
+        $y =~ s/^0+//msx; # remove leading zeroes from $y
     }
     return ($x, $y);
 }
@@ -230,9 +230,9 @@ sub plateLabel {
     my ($plate, $i, $maxLen, $addPrefix) = @_;
     $maxLen ||= 20;
     $addPrefix ||= 1;
-    $plate =~ s/\W+/_/g; # get rid of nonword characters, for LaTeX
+    $plate =~ s/\W+/_/msxg; # get rid of nonword characters, for LaTeX
     my $label;
-    my @chars = split(//, $plate);
+    my @chars = split //msx, $plate;
     my @head = splice(@chars, 0, $maxLen);
     my $name = join('', @head);
     if ($addPrefix) {
@@ -343,7 +343,7 @@ sub readSampleData {
     my $line = 0;
     while (<$in>) {
 	$line++;
-	if (/^#/ || $line <= $startLine) { next; } # comments start with a #
+	if (m{^\#}msx || $line <= $startLine) { next; } # comments start with a #
 	elsif ($stopLine && $line+1 == $stopLine) { last; }
 	my @fields = split;
 	push(@data, \@fields);

@@ -21,10 +21,10 @@ sub convertFromIlluminaExomeSNP {
     my $id = shift;
     my $pattern = '^exm-';
     my $newID;
-    if ($id =~ /$pattern/) {
-        my @items = split(/$pattern/, $id);
+    if ($id =~ m{$pattern}msx) {
+        my @items = split /$pattern/msx, $id;
         $newID = pop(@items);
-    } else {
+      } else {
         $newID = $id;
     }
     return $newID;
@@ -35,7 +35,7 @@ sub convertToIlluminaExomeSNP {
     my $id = shift;
     my $prefix = 'exm-';
     my $newID;
-    if ($id =~ /^$prefix/) {
+    if ($id =~ m{^$prefix}msx) {
         $newID = $id;
     } else {
         $newID = $prefix.$id;

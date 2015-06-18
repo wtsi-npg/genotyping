@@ -50,9 +50,15 @@ Unspecified options will receive default values, with output written to: ./plate
 $mode ||= "cr";
 $outDir ||= 'platePlots';
 
-if ((!$dbPath) && (!$iniPath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
-if ($dbPath && !(-r $dbPath)) { croak "Cannot read pipeline database path $dbPath"; }
-if ($iniPath && !(-r $iniPath)) { croak "Cannot read .ini path $iniPath"; }
+if ((!$dbPath) && (!$iniPath)) {
+  die "Must supply at least one of pipeline database path and .ini path!\n";
+}
+if ($dbPath && !(-r $dbPath)) {
+  die "Cannot read pipeline database path $dbPath\n";
+}
+if ($iniPath && !(-r $iniPath)) {
+  die "Cannot read .ini path $iniPath\n";
+}
 
 sub getXYdiffMinMax {
     # get min/max for plot range
@@ -83,7 +89,7 @@ sub makePlots {
 	    print STDERR "WARNING: Cannot read plate name from $path. Skipping.\n";
 	    next;
 	}
-	$plate =~ s/\s+/_/; # get rid of spaces in plate name (if any)
+	$plate =~ s/\s+/_/msx; # get rid of spaces in plate name (if any)
 	my $outPath = $inputDir.'/'.$prefix.$plate.'.png';
 	my @args = ($plotScript, $path, $plate);
 	if ($minMaxArgs) { push(@args, ($comments{'PLOT_MIN'}, $comments{'PLOT_MAX'})); }
@@ -102,8 +108,8 @@ sub parseSampleName {
     # OBSOLETE as of 2012-07-24; get plate/well info from pipeline DB instead
     my $name = shift;
     my ($plate, $well, $id, $x, $y);
-    if ($name =~ m/^[^_]+_[A-Z][0-9]+_\w+/) { # check name format, eg some-plate_H10_sample-id
-	($plate, $well, $id) = split /_/, $name;
+    if ($name =~ m{^[^_]+_[[:upper:]]\d+_\w+}msx) { # check name format, eg some-plate_H10_sample-id
+	($plate, $well, $id) = split /_/msx, $name;
 	($x, $y) = parseLabel($well);
     }
     return ($plate, $x, $y);
@@ -118,7 +124,7 @@ sub readData {
     my $dataOK = 1;
     my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
     while (<$inputRef>) {
-        if (/^#/) { next; } # ignore comments
+        if (m{^\#}msx) { next; } # ignore comments
         chomp;
         my @words = split;
         if (!defined($plateLocs{$words[0]})) { next; }
@@ -128,7 +134,7 @@ sub readData {
         # clean up plate name by removing illegal characters
         if (not $plateNames{$plate}) {
             $name = $plate;
-            $name =~ s/[-\W]/_/g;
+            $name =~ s/[-\W]/_/msxg;
             if ($names{$name}) {  # plate name not unique after cleanup
                 # fix is *not* guaranteed unique, but should be ok 
                 $duplicates++;
@@ -161,11 +167,11 @@ sub readComments {
     # header lines of the form '# KEY VALUE' ; VALUE may contain spaces!
     my $inPath = shift;
     my %comments = ();
-    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!";
+    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!\n";
     while (<$in>) {
 	chomp;
-	unless (/^#/) { next; }
-	my @words = split(/ /);
+	unless (m{^\#}msx) { next; }
+	my @words = split /\s/msx;
 	$comments{$words[1]} = join(' ', @words[2..$#words]); # value may contain spaces!
     }
     close $in;
@@ -178,11 +184,11 @@ sub writeGrid {
     my %results = %$resultsRef;
     my %comments = %$commentRef; # comments to put in header
     my $plate = $comments{'PLATE_NAME'};
-    $plate =~ s/\s+/_/; # get rid of spaces in plate name (if any)
+    $plate =~ s/\s+/_/msx; # get rid of spaces in plate name (if any)
     my $outPath = $outDir."/".$outPrefix.$plate.".txt";
     my @keyList = keys(%comments);
     @keyList = sort(@keyList);
-    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
     foreach my $key (@keyList) { print $out "# $key $comments{$key}\n"; }
     for (my $y=1; $y<=$yMax; $y++) { # x, y counts start at 1
         my @row = ();
@@ -203,9 +209,11 @@ sub writePlateData {
     # also supply plate name and min/max range for plot across all plates as comments
     my ($dataRef, $prefix, $xMax, $yMax, $outDir, $min, $max) = @_; # will append plate name to prefix
     my %data = %$dataRef;
-    if (not -e $outDir) { mkdir($outDir) || die "Failed to create output directory $outDir : $!"; }
-    elsif (not -d $outDir) { die "$outDir is not a directory: $!"; }
-    elsif (not -w $outDir) { die "Directory $outDir is not writable: $!"; }
+    if (not -e $outDir) {
+      mkdir($outDir) || die "Failed to create output directory $outDir : $!\n";
+    }
+    elsif (not -d $outDir) { die "$outDir is not a directory: $!\n"; }
+    elsif (not -w $outDir) { die "Directory $outDir is not writable: $!\n"; }
     foreach my $plate (keys(%data)) { 
 	my %comments = (
 	    PLATE_NAME => $plate,

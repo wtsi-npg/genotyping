@@ -55,13 +55,6 @@ file_lexical_variables = :no_restriction
 
 # BEGIN temporary reprieve
 
-[-RegularExpressions::RequireLineBoundaryMatching]
-[-RegularExpressions::RequireDotMatchAnything]
-[-RegularExpressions::RequireExtendedFormatting]
-[-RegularExpressions::ProhibitEscapedMetacharacters]
-[-RegularExpressions::ProhibitEnumeratedClasses]
-[-RegularExpressions::ProhibitFixedStringMatches]
-
 [-CodeLayout::ProhibitTrailingWhitespace]
 [-CodeLayout::ProhibitParensWithBuiltins]
 [-CodeLayout::ProhibitHardTabs]
@@ -83,24 +76,17 @@ file_lexical_variables = :no_restriction
 [-ValuesAndExpressions::ProhibitMixedBooleanOperators]
 [-ValuesAndExpressions::ProhibitLongChainsOfMethodCalls]
 [-ValuesAndExpressions::RequireNumberSeparators]
-[-ValuesAndExpressions::ProhibitMismatchedOperators]
-
-[-ErrorHandling::RequireCarping]
-[-ErrorHandling::RequireCheckingReturnValueOfEval]
 
 [-Modules::RequireExplicitPackage]
 
 [-Variables::ProhibitReusedNames]
-[-Variables::ProhibitPackageVars]
 [-Variables::ProhibitAugmentedAssignmentInDeclaration]
 [-Variables::RequireLocalizedPunctuationVars]
 
 [-ClassHierarchies::ProhibitExplicitISA]
 [-ClassHierarchies::ProhibitAutoloading]
 
-[-BuiltinFunctions::ProhibitBooleanGrep]
 [-BuiltinFunctions::ProhibitStringySplit]
-[-BuiltinFunctions::ProhibitReverseSortBlock]
 
 [-Objects::ProhibitIndirectSyntax]
 
@@ -109,7 +95,6 @@ file_lexical_variables = :no_restriction
 [-Subroutines::RequireFinalReturn]
 [-Subroutines::ProhibitBuiltinHomonyms]
 [-Subroutines::ProhibitExcessComplexity]
-[-Subroutines::ProhibitReturnSort]
 
 [-Documentation::RequirePackageMatchesPodName]
 

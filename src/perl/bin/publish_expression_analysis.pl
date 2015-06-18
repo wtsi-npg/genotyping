@@ -246,7 +246,7 @@ sub find_data_files {
   my $beadchips_patt = join('|', @beadchips);
   my $sections_patt = join('|', @sections);
   my $filename_regex =
-    qr{($beadchips_patt)_($sections_patt)_$channel.(idat|xml)$}mi;
+    qr{($beadchips_patt)_($sections_patt)_$channel.(idat|xml)$}msxi;
 
   $log->debug("Finding sample data files matching regex '$filename_regex'");
 
@@ -298,7 +298,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

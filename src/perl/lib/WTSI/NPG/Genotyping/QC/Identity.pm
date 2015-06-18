@@ -3,7 +3,7 @@
 # March 2014
 
 #
-# Copyright (c) 2014 Genome Research Ltd. All rights reserved.
+# Copyright (C) 2014, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -191,7 +191,7 @@ sub equivalent {
     # allow no-call genotypes (represented by NN or 0)
     my $inputOK = 1;
     foreach my $gt ($gt0, $gt1) {
-	if ($gt && $gt ne 'NN' && (length($gt)!=2 || $gt =~ /[^ACGT]/)) { 
+	if ($gt && $gt ne 'NN' && (length($gt)!=2 || $gt =~ m{[^ACGT]}msx)) {
 	    $inputOK = 0;
 	}
     }
@@ -278,7 +278,7 @@ sub getSampleNamesIDs {
     my (%samples, @sampleNames);
     for my $i (0..$self->plink->{"individuals"}->size() - 1) {
         my $longName = $self->plink->{"individuals"}->get($i)->{"name"};
-        my ($plate, $well, $id) = split /_/, $longName, 3;
+        my ($plate, $well, $id) = split /_/msx, $longName, 3;
         if ($id) {
             $samples{$longName} = $id;
         } else {
@@ -356,7 +356,7 @@ sub readPlinkCalls {
             if (!$snps{$snp_id}) { next; }
             for my $i (0..$genotypes->size() - 1) {
                 my $call = $genotypes->get($i);
-		if ($call =~ /[N]{2}/) { $call = 0; } 
+		if ($call =~ m{[N]{2}}msx) { $call = 0; }
                 $plinkCalls{$sampleNames[$i]}{$snp_id} = $call;
             }
         }
@@ -405,7 +405,8 @@ sub writeGenotypes {
     my @snps = @{ shift() }; # list of SNPs to output
     my @samples = sort(keys(%genotypes));
     my $outPath = $self->output_dir.'/'.$self->output_names->{'genotypes'};
-    open my $gt, ">", $outPath or die $!;
+    open my $gt, ">", $outPath or
+      die "Failed to open $outPath for writing: $!\n";
     my @heads = qw/SNP sample illumina_call qc_plex_call/;
     print $gt '#'.join("\t", @heads)."\n";
     foreach my $snp (@snps) {
@@ -416,7 +417,7 @@ sub writeGenotypes {
 	    print $gt join("\t", $snp, $sample, $pCall, $sCall), "\n";
 	}
     }
-    close $gt or die $!;
+    close $gt or die "Failed to close $outPath: $!\n";
 }
 
 sub writeIdentity {
@@ -430,7 +431,8 @@ sub writeIdentity {
     my $snpTotal = shift;
     my $minIdent = shift;
     my $outPath = $self->output_dir.'/'.$self->output_names->{'results'};
-    open my $results, ">", $outPath or die $!;
+    open my $results, ">", $outPath or
+      die "Failed to open $outPath for writing: $!\n";
     my $header = join("\t", "#Identity comparison",
 		      "MIN_IDENTITY:$minIdent", 
                       "AVAILABLE_PLEX_SNPS:$snpTotal")."\n";
