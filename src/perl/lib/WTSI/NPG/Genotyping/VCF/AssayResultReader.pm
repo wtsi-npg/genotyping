@@ -30,11 +30,13 @@ our $SEQUENOM_TYPE = 'sequenom'; # TODO remove redundancy wrt vcf_from_plex.pl
 our $FLUIDIGM_TYPE = 'fluidigm';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
-has 'chromosome_lengths' => # must be compatible with given snpset
+has 'contig_lengths' => # must be compatible with given snpset
    (is            => 'ro',
     isa           => 'HashRef[Int]',
     required      => 1,
-    documentation => 'Used to generate contig tags required by bcftools',
+    documentation => 'Used to generate contig tags required by bcftools. '.
+                     'In typical usage, each contig corresponds to a '.
+                     'homo sapiens chromosome.',
    );
 
 has 'inputs'      =>
@@ -95,7 +97,7 @@ sub get_vcf_dataset {
     my ($calls, $samples) = $self->_parse_assay_results();
     my $header = WTSI::NPG::Genotyping::VCF::Header->new(
         sample_names => $samples,
-        chromosome_lengths => $self->chromosome_lengths,
+        contig_lengths => $self->contig_lengths,
     );
     my @rows;
     foreach my $snp (@{$self->snpset->snps}) {

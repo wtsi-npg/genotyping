@@ -128,7 +128,7 @@ if ($input ne '-') {
 my %readerArgs = (inputs => \@inputs,
                   input_type => $inputType,
                   snpset => $snpset,
-                  chromosome_lengths => $chromosome_lengths);
+                  contig_lengths => $chromosome_lengths);
 if ($use_irods) { $readerArgs{irods} = $irods; }
 
 my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
