@@ -30,6 +30,15 @@ has 'source' => (
     documentation => 'Standard VCF field to identify the data source'
 );
 
+our $DEFAULT_SPECIES = 'Homo sapiens';
+
+has 'species' => (
+    is            => 'ro',
+    isa           => 'Str',
+    default       => $DEFAULT_SPECIES,
+    documentation => 'Species identifier for use in contigs'
+);
+
 our $VERSION = '';
 
 our $VCF_VERSION = 'VCFv4.2'; # version of VCF format in use
@@ -63,7 +72,9 @@ around BUILDARGS => sub {
                 $class->logcroak("Values of contig_strings ArrayRef ",
                                  "must be strings");
             }
-            my ($contig, $length) = $class->string_to_contig($str);
+            # cannot access $self->species before object creation
+            my $species = $init_args{'species'} || $DEFAULT_SPECIES;
+            my ($contig, $length) = $class->string_to_contig($str, $species);
             $contig_lengths{$contig} = $length;
         }
         $new_args{'contig_lengths'} = \%contig_lengths;
@@ -100,7 +111,7 @@ sub contig_to_string {
         $self->logcroak("Contig length must be an integer > 0");
     }
     my $contig_str = '##contig=<ID='.$name.',length='.$length.
-        ',species="Homo sapiens">';
+        ',species="'.$self->species.'">';
     return $contig_str;
 }
 
@@ -124,11 +135,13 @@ sub contig_to_string {
 sub string_to_contig {
     # Deals defensively with awkward VCF contig tag format, by requiring
     # a strict match with the output of contig_to_string
-    my ($self, $input) = @_;
+    my ($self, $input, $species) = @_;
     chomp $input;
+    $species ||= $self->species;
     my ($name, $length);
+    my $species_quoted = quotemeta($species); # escapes all metacharacters
     my $pattern = '^[#]{2}contig=[<]ID=(X|Y|\d{1,2}),length=\d+,'.
-        'species=\"Homo[ ]sapiens\"[>]$';
+        'species=\"'.$species_quoted.'\"[>]$';
     if ($input =~ qr/$pattern/msx) {
         my @terms = split /[<>,]/msx, $input;
         foreach my $term (@terms) {
@@ -219,6 +232,8 @@ is contained in DataRow objects.
 =back
 
 =item * Data source: Optional. A value for the 'source' field in the header output.
+
+=item * Species: Optional. Species identifier for contig lines in VCF input or output. Defaults to 'Homo sapiens'.
 
 =head1 AUTHOR
 
