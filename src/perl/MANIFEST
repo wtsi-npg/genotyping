@@ -154,6 +154,7 @@ lib/WTSI/NPG/Genotyping/VCF/DataRow.pm
 lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
 lib/WTSI/NPG/Genotyping/VCF/Header.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
+lib/WTSI/NPG/Genotyping/VCF/VCFParser.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/Publisher.pm

@@ -47,6 +47,28 @@ sub BUILD {
     $self->info($msg);
 }
 
+=head2 calls_by_sample
+
+  Arg [1]    : None
+  Example    : my $calls_hashref = $vcf_data_set->calls_by_sample()
+  Description: Return a hashref containing Call objects for each sample.
+               Transposes the variant-major format of VCF to sample-major.
+  Returntype : HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]
+
+=cut
+
+sub calls_by_sample {
+    my ($self) = @_;
+    my %calls_by_sample;
+    my @sample_names = @{$self->header->sample_names};
+    foreach my $row (@{$self->data}) {
+        my @calls = @{$row->calls};
+        for (my $i=0;$i<@calls;$i++) {
+            push @{$calls_by_sample{$sample_names[$i]}}, $calls[$i];
+        }
+    }
+    return \%calls_by_sample;
+}
 
 =head2 str
 
@@ -139,6 +161,8 @@ sub _sort_output_lines {
     push @output, @data;
     return @output;
 }
+
+__PACKAGE__->meta->make_immutable;
 
 no Moose;
 
