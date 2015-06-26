@@ -4,7 +4,6 @@ package WTSI::NPG::Genotyping::VCF::VCFParser;
 
 use Moose;
 
-use Fcntl qw /:seek/;
 use File::Temp qw /tempdir/;
 use MooseX::Types::Moose qw(Int);
 use Text::CSV;
@@ -50,20 +49,27 @@ has 'csv'         =>
     documentation => 'Object to parse tab-delimited input lines'
    );
 
+has 'species'     =>
+    (is            => 'ro',
+     isa           => 'Str',
+     documentation => 'Species identifier for contig lines in VCF header'
+    );
+
 # attributes built from inputs
 
+# header is non-lazy so it will be built at object creation time, when
+# input_filehandle is (required to be) at the start of the input
 has 'header'      =>
    (is            => 'ro',
     isa           => 'WTSI::NPG::Genotyping::VCF::Header',
-    lazy          => 1,
     builder       => '_build_header',
    );
 
-has 'input_file'  =>
+has 'input_filehandle'  =>
    (is            => 'ro',
     isa           => 'FileHandle',
     lazy          => 1,
-    builder       => '_build_input_file',
+    builder       => '_build_input_filehandle',
     documentation => 'Filehandle for input of VCF data',
    );
 
@@ -83,14 +89,6 @@ our $SAMPLE_START_INDEX = 9;
 # attribute for path to a snpset for creating call objects?
 # have a get_next_datarow method to read a file in piecemeal
 
-sub BUILD {
-    # want initial position ready to read the first data row after header
-    my ($self) = @_;
-    my $status = $self->_seek_data_start();
-    if (!$status) {
-        $self->logcroak("Unable to seek to start of VCF data body");
-    }
-}
 
 =head2 get_next_data_row
 
@@ -106,7 +104,7 @@ sub BUILD {
 sub get_next_data_row {
     my ($self) = @_;
     my $dataRow;
-    my $line = readline $self->input_file;
+    my $line = readline $self->input_filehandle;
     if ($line) {
         $dataRow = $self->_parse_data_row($line);
     }
@@ -145,12 +143,9 @@ sub to_vcf_dataset {
 }
 
 sub _build_header {
-    # read file position, seek to beginning of file, parse header,
-    # and return to original position
     # need to find sample names and contig lengths
+    # requires input filehandle to be at start of header
     my ($self) = @_;
-    my $start_pos = tell $self->input_file;
-    seek $self->input_file, 0, SEEK_SET;
     my $in_header = 1;
     # code to parse contig strings in in Header.pm instead of VCFParser.pm
     # (ensures definition of contig string format is all in the same class)
@@ -158,37 +153,43 @@ sub _build_header {
     # to Header constructor
     my (@contig_lines, $sample_names);
     while ($in_header) {
-        my $line = readline $self->input_file;
-        if (eof $self->input_file) {
+        my $line = readline $self->input_filehandle;
+        if (eof $self->input_filehandle) {
             $self->logcroak("Unexpected EOF while reading header");
         } elsif ($line =~ /^[#]{2}contig/msx ) {
             push @contig_lines, $line;
         } elsif ($line =~ /^[#]CHROM/msx ) {
+            # last line of header starts with #CHROM
             $sample_names = $self->_parse_sample_names($line);
-        } elsif ($line !~ /^[#]/msx) {
             $in_header = 0;
         }
     }
-    seek $self->input_file, $start_pos, SEEK_SET;
     return WTSI::NPG::Genotyping::VCF::Header->new
         (sample_names   => $sample_names,
          contig_strings => \@contig_lines);
 }
 
-sub _build_input_file {
+sub _build_input_filehandle {
+    # allows input from STDIN, iRODS or local file
     my ($self) = @_;
-    my $localInputPath;
-    if ($self->irods) {
-      my $tmpdir = tempdir('vcf_parser_irods_XXXXXX', CLEANUP => 1);
-      $localInputPath = "$tmpdir/input.vcf";
-      $self->irods->get_object($self->input_path, $localInputPath);
+    my $filehandle;
+    if ($self->input_path eq '-') {
+        # Moose FileHandle requires a reference, not a typeglob
+        $filehandle = \*STDIN;
     } else {
-        $localInputPath = $self->input_path;
+        my $localInputPath;
+        if ($self->irods) {
+            my $tmpdir = tempdir('vcf_parser_irods_XXXXXX', CLEANUP => 1);
+            $localInputPath = "$tmpdir/input.vcf";
+            $self->irods->get_object($self->input_path, $localInputPath);
+        } else {
+            $localInputPath = $self->input_path;
+        }
+        open $filehandle, "<", $localInputPath ||
+            $self->logcroak("Cannot open input path '",
+                            $localInputPath, "'");
     }
-    open my $file, "<", $localInputPath ||
-        $self->logcroak("Cannot open input path '",
-			$localInputPath, "'");
-    return $file;
+    return $filehandle;
 }
 
 sub _parse_data_row {
@@ -297,22 +298,6 @@ sub _call_from_vcf_string {
          is_call  => $is_call,
          qscore   => $qscore
      );
-}
-
-sub _seek_data_start {
-    my ($self) = @_;
-    # Position the filehandle ready to read the first row of data
-    # after the header. Returns True if start successfully found,
-    # False otherwise.
-    my $success = 0;
-    # do not check return value of seek
-    # seek returns false if filehandle is already at target position
-    seek $self->input_file, 0, SEEK_SET;
-    while (!$success) {
-        my $line = readline $self->input_file;
-	if ($line =~ /^[#]CHROM/msx ) { $success = 1; }
-    }
-    return $success;
 }
 
 sub _split_tab_delimited_string {

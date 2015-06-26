@@ -118,6 +118,7 @@ sub contig_to_string {
 =head2 string_to_contig
 
   Arg [1]    : Contig string
+  Arg [2]    : Species (optional, defaults to 'species' attribute)
 
   Example    : my ($name, $length) = $string_to_contig($contig_str)
   Description: Parse a contig string from the VCF header. The input string

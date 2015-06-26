@@ -9,7 +9,7 @@ use File::Slurp qw /read_file/;
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 165;
+use Test::More tests => 167;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -249,7 +249,7 @@ sub script_pipe_test : Test(4) {
     _compare_json($discordance_sequenom, $tmpJson);
 }
 
-sub vcf_parser_test : Test(6) {
+sub vcf_parser_test : Test(8) {
     # read input into a parser
     # generate VCF output and see if it matches the original input
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
@@ -279,6 +279,23 @@ sub vcf_parser_test : Test(6) {
     my $igotLines = _remove_filedate(\@gotRaw);
     is_deeply($igotLines, $expectedLines,
               "VCF string matches input file, iRODS input");
+    # test parser with input from STDIN
+    # open a filehandle to read input, and assign to localized STDIN typeglob
+    # see http://worrbase.com/2011/05/11/stdin-testing.html
+    open my $fh, '<', $input ||
+        logcroak("Cannot open temporary filehandle for STDIN");
+    local *STDIN;
+    *STDIN = $fh;
+    my $stdinParser = WTSI::NPG::Genotyping::VCF::VCFParser->new(
+        input_path => '-', snpset => $snpset);
+    my $stdinDataset = $stdinParser->to_vcf_dataset();
+    isa_ok($stdinDataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
+    close $fh || logcroak("Cannot close temporary filehandle for STDIN");
+    my @stdinGotRaw = split /[\n]/, $stdinDataset->str();
+    my $stdinGotLines = _remove_filedate(\@stdinGotRaw);
+    is_deeply($stdinGotLines, $expectedLines,
+              "VCF string matches input file, STDIN input");
+
 }
 
 sub _read_without_filedate {
