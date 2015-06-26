@@ -162,6 +162,8 @@ sub _sort_output_lines {
     return @output;
 }
 
+__PACKAGE__->meta->make_immutable;
+
 no Moose;
 
 1;

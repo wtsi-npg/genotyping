@@ -293,6 +293,8 @@ sub _parse_assay_results {
     return (\%calls, \@sortedSamples);
 }
 
+__PACKAGE__->meta->make_immutable;
+
 no Moose;
 
 1;

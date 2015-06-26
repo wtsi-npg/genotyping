@@ -102,6 +102,7 @@ our $SAMPLE_START_INDEX = 9;
 
 =cut
 
+
 sub get_next_data_row {
     my ($self) = @_;
     my $dataRow;
@@ -311,6 +312,7 @@ sub _split_tab_delimited_string {
     return $self->csv->fields();
 }
 
+__PACKAGE__->meta->make_immutable;
 
 no Moose;
 

@@ -200,6 +200,8 @@ sub str {
     return join "\n", @header;
 }
 
+__PACKAGE__->meta->make_immutable;
+
 no Moose;
 
 1;

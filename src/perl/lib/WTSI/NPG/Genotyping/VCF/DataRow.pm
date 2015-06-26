@@ -181,6 +181,8 @@ sub _call_to_vcf_field {
     return join ':', @subfields;
 }
 
+__PACKAGE__->meta->make_immutable;
+
 no Moose;
 
 1;
