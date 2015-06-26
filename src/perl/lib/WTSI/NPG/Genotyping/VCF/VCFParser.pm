@@ -24,7 +24,8 @@ has 'input_path'  =>
    (is            => 'ro',
     isa           => 'Str',
     required      => 1,
-    documentation => 'Input path in iRODS or local filesystem',
+    documentation => "Input path in iRODS or local filesystem,".
+                     " or '-' for STDIN.",
    );
 
 has 'irods'       =>
