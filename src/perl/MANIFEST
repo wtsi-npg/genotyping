@@ -151,10 +151,13 @@ lib/WTSI/NPG/Genotyping/SNPSetPublisher.pm
 lib/WTSI/NPG/Genotyping/Types.pm
 lib/WTSI/NPG/Genotyping/VCF/AssayResultReader.pm
 lib/WTSI/NPG/Genotyping/VCF/DataRow.pm
+lib/WTSI/NPG/Genotyping/VCF/DataRowParser.pm
 lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
 lib/WTSI/NPG/Genotyping/VCF/Header.pm
+lib/WTSI/NPG/Genotyping/VCF/HeaderParser.pm
+lib/WTSI/NPG/Genotyping/VCF/Parser.pm
+lib/WTSI/NPG/Genotyping/VCF/Slurper.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
-lib/WTSI/NPG/Genotyping/VCF/VCFParser.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/Publisher.pm
@@ -616,6 +619,8 @@ t/vcf/fluidigm_001.csv
 t/vcf/fluidigm_002.csv
 t/vcf/fluidigm_003.csv
 t/vcf/fluidigm_004.csv
+t/vcf/fluidigm_header_1.txt
+t/vcf/fluidigm_header_2.txt
 t/vcf/fluidigm_inputs.txt
 t/vcf/pairwise_discordance_fluidigm.json
 t/vcf/pairwise_discordance_sequenom.json

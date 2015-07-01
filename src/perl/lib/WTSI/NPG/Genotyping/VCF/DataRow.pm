@@ -73,8 +73,6 @@ sub BUILD {
     }
 }
 
-
-
 =head2 str
 
   Arg [1]    : None

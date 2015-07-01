@@ -9,7 +9,7 @@ use File::Slurp qw /read_file/;
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 167;
+use Test::More tests => 180;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -30,16 +30,18 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 BEGIN {
     use_ok('WTSI::NPG::Genotyping::VCF::AssayResultReader');
     use_ok('WTSI::NPG::Genotyping::VCF::DataRow');
+    use_ok('WTSI::NPG::Genotyping::VCF::DataRowParser');
     use_ok('WTSI::NPG::Genotyping::VCF::Header');
+    use_ok('WTSI::NPG::Genotyping::VCF::HeaderParser');
     use_ok('WTSI::NPG::Genotyping::VCF::GtcheckWrapper');
+    use_ok('WTSI::NPG::Genotyping::VCF::Parser');
+    use_ok('WTSI::NPG::Genotyping::VCF::Slurper');
     use_ok('WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    use_ok('WTSI::NPG::Genotyping::VCF::VCFParser');
 }
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::VCF::AssayResultReader;
 use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
-use WTSI::NPG::Genotyping::VCF::VCFParser;
 
 my $data_path = './t/vcf';
 my $sequenom_snpset_name = 'W30467_snp_set_info_GRCh37.tsv';
@@ -50,6 +52,8 @@ my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
 my $discordance_fluidigm = $data_path."/pairwise_discordance_fluidigm.json";
 my $discordance_sequenom = $data_path."/pairwise_discordance_sequenom.json";
 my $vcf_fluidigm = $data_path."/fluidigm.vcf";
+my $vcf_fluidigm_header_1 = $data_path."/fluidigm_header_1.txt";
+my $vcf_fluidigm_header_2 = $data_path."/fluidigm_header_2.txt";
 my $vcf_sequenom = $data_path."/sequenom.vcf";
 
 my $irods;
@@ -71,6 +75,31 @@ sub setup: Test(setup) {
 sub teardown : Test(teardown) {
     my $irods = WTSI::NPG::iRODS->new;
     $irods->remove_collection($irods_tmp_coll);
+}
+
+sub data_row_parser_test : Test(5) {
+    my $fh;
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    new_ok('WTSI::NPG::Genotyping::VCF::DataRowParser',
+           [input_filehandle => $fh, snpset => $snpset] );
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    my $parser = WTSI::NPG::Genotyping::VCF::DataRowParser->new(
+        input_filehandle => $fh, snpset => $snpset );
+    isa_ok($parser, 'WTSI::NPG::Genotyping::VCF::DataRowParser');
+    my $first_row = $parser->get_next_data_row();
+    isa_ok($first_row, 'WTSI::NPG::Genotyping::VCF::DataRow');
+    my @fields = qw(1	74941293	rs649058	G	A	.
+                    .	ORIGINAL_STRAND=+	GT:GQ:DP	0/1:40:1
+                    0/1:40:1	0/1:40:1	0/1:40:1);
+    my $expected_first_row = join "\t", @fields;
+    is($first_row->str, $expected_first_row,
+       'First row string matches expected value');
+    my $other_rows = $parser->get_all_remaining_rows();
+    is(scalar @{$other_rows}, 25, 'Found expected number of other rows');
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+
 }
 
 sub fluidigm_file_test : Test(116) {
@@ -151,11 +180,45 @@ sub header_test : Test(5) {
     is($parsed_length, $length, "Parsed contig length matches original");
 }
 
+sub header_parser_test : Test(6) {
+    my $fh;
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    new_ok('WTSI::NPG::Genotyping::VCF::HeaderParser',
+           [input_filehandle => $fh] );
+    my $parser1 = WTSI::NPG::Genotyping::VCF::HeaderParser->new(
+        input_filehandle => $fh);
+    my $header1 = $parser1->header;
+    isa_ok($header1, 'WTSI::NPG::Genotyping::VCF::Header');
+    my $header1_expected = _read_without_filedate($vcf_fluidigm_header_1);
+    is_deeply(_remove_filedate($header1->str), $header1_expected,
+       'Parsed header string matches expected value');
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    my @samples = qw(north south east west);
+    my $parser2 = WTSI::NPG::Genotyping::VCF::HeaderParser->new(
+        input_filehandle => $fh, sample_names => \@samples);
+    my $header2 = $parser2->header;
+    isa_ok($header2, 'WTSI::NPG::Genotyping::VCF::Header');
+    my $header2_expected = _read_without_filedate($vcf_fluidigm_header_2);
+    is_deeply(_remove_filedate($header2->str), $header2_expected,
+        'Parsed header string matches expected value, alternate samples');
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    my @wrong_samples = qw(north south east west up down);
+    dies_ok {
+        my $hp = WTSI::NPG::Genotyping::VCF::HeaderParser->new(
+            input_filehandle => $fh, 'sample_names' => \@wrong_samples,
+        );
+        my $header = $hp->header;
+     } 'Dies with incorrect number of sample names';
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+}
+
 sub sequenom_file_test : Test(7) {
     # sequenom test with input from local filesystem
     my @inputs;
     foreach my $name (@sequenom_csv) {
-        push(@inputs, abs_path($data_path."/".$name));
+        push @inputs, abs_path($data_path."/".$name);
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
@@ -249,36 +312,33 @@ sub script_pipe_test : Test(4) {
     _compare_json($discordance_sequenom, $tmpJson);
 }
 
-sub vcf_parser_test : Test(8) {
-    # read input into a parser
-    # generate VCF output and see if it matches the original input
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
+sub slurp_test : Test(7) {
     my $vcfName = "fluidigm.vcf";
     my $input = "$data_path/$vcfName";
-    my $expectedLines = _read_without_filedate($input);
-    new_ok('WTSI::NPG::Genotyping::VCF::VCFParser' =>
-               [input_path => $input, snpset => $snpset]);
-    my $parser = WTSI::NPG::Genotyping::VCF::VCFParser->new(
-        input_path => $input, snpset => $snpset);
-    my $dataset = $parser->to_vcf_dataset();
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
+    new_ok('WTSI::NPG::Genotyping::VCF::Slurper',
+           [ input_path=> $input, snpset => $snpset ] );
+    my $slurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
+        input_path=> $vcf_fluidigm, snpset => $snpset
+    );
+    my $dataset = $slurper->read_dataset();
     isa_ok($dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    my @gotRaw = split /[\n]/, $dataset->str();
-    my $gotLines = _remove_filedate(\@gotRaw);
-    is_deeply($gotLines, $expectedLines,
-              "VCF string matches input file, local input");
-    my $irods = WTSI::NPG::iRODS->new();
+    my $got_vcf = _remove_filedate($dataset->str());
+    my $expected_vcf = _read_without_filedate($vcf_fluidigm);
+    is_deeply($got_vcf, $expected_vcf, 'Parsed output matches input');
+    my $irods = WTSI::NPG::iRODS->new;
     my $ipath = "$irods_tmp_coll/$vcfName";
     $irods->add_object($input, $ipath);
-    new_ok('WTSI::NPG::Genotyping::VCF::VCFParser' =>
-               [input_path => $ipath, irods => $irods, snpset => $snpset]);
-    my $iparser = WTSI::NPG::Genotyping::VCF::VCFParser->new(
-        input_path => $ipath, irods => $irods, snpset => $snpset);
-    my $idataset = $iparser->to_vcf_dataset();
+    my $islurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
+        input_path=> $ipath, irods => $irods, snpset => $snpset
+    );
+    my $idataset = $islurper->read_dataset();
     isa_ok($idataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    my @igotRaw = split /[\n]/, $dataset->str();
-    my $igotLines = _remove_filedate(\@gotRaw);
-    is_deeply($igotLines, $expectedLines,
-              "VCF string matches input file, iRODS input");
+    my $igot_vcf = _remove_filedate($idataset->str());
+    is_deeply($igot_vcf, $expected_vcf, 'Parsed output matches iRODS input');
+    my $stdin_slurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
+        input_path=> '-', snpset => $snpset
+    );
     # test parser with input from STDIN
     # open a filehandle to read input, and assign to localized STDIN typeglob
     # see http://worrbase.com/2011/05/11/stdin-testing.html
@@ -286,29 +346,25 @@ sub vcf_parser_test : Test(8) {
         logcroak("Cannot open temporary filehandle for STDIN");
     local *STDIN;
     *STDIN = $fh;
-    my $stdinParser = WTSI::NPG::Genotyping::VCF::VCFParser->new(
-        input_path => '-', snpset => $snpset);
-    my $stdinDataset = $stdinParser->to_vcf_dataset();
-    isa_ok($stdinDataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    close $fh || logcroak("Cannot close temporary filehandle for STDIN");
-    my @stdinGotRaw = split /[\n]/, $stdinDataset->str();
-    my $stdinGotLines = _remove_filedate(\@stdinGotRaw);
-    is_deeply($stdinGotLines, $expectedLines,
-              "VCF string matches input file, STDIN input");
-
+    my $stdin_dataset = $stdin_slurper->read_dataset();
+    isa_ok($stdin_dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
+    my $stdin_got_vcf = _remove_filedate($stdin_dataset->str());
+    is_deeply($stdin_got_vcf, $expected_vcf,
+              'Parsed output matches STDIN input');
 }
 
 sub _read_without_filedate {
     # read a VCF file, omitting the fileDate line
     my ($inPath) = @_;
-    my @lines_raw = read_file($inPath);
-    return _remove_filedate(\@lines_raw);
+    my $lines = read_file($inPath);
+    return _remove_filedate($lines);
 }
 
 sub _remove_filedate {
-    # remove the fileDate from an arrayref of VCF lines, for testing
-    my ($linesRef) = @_;
-    my @lines_in = @{$linesRef};
+    # remove the fileDate from a string containing VCF, for testing
+    # return an ArrayRef[Str] contianing data
+    my ($vcf_str) = @_;
+    my @lines_in = split m/\n/msx, $vcf_str;
     my @lines_out;
     foreach my $line (@lines_in) {
         if ( $line =~ /^[#]{2}fileDate/msx ) { next; }
