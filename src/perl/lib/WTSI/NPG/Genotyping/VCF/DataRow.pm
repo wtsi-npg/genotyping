@@ -53,7 +53,7 @@ has 'is_haploid' =>
      isa      => 'Bool',
      builder  => '_build_haploid_status',
      lazy     => 1,
-     documentation => 'True for human Y chromosome, false otherwise'
+     documentation => 'True for human X or Y chromosome, false otherwise'
     );
 
 # NB this class does not have the sample names; they are stored in VCF header
@@ -107,10 +107,10 @@ sub str {
 }
 
 sub _build_haploid_status {
-    # set haploid status to true or false
-    # for now, the only haploid variants supported are human Y chromosome
+    # Set haploid status to true or false
+    # For now, the only haploid variants supported are human X or Y chromosome. X is diploid for human females and haploid for males, but the VCF specification does not support identical reference/alternate alleles, so for VCF output we treat the X marker as haploid.
     my ($self) = @_;
-    if (is_YMarker($self->snp)) { return 1; }
+    if (is_XMarker($self->snp) || is_YMarker($self->snp)) { return 1; }
     else { return 0; }
 }
 

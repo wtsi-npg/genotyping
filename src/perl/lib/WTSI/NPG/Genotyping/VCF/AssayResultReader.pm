@@ -60,6 +60,16 @@ has 'irods'       =>
                      'local filesystem.',
    );
 
+has 'reference'   =>
+   (is            => 'ro',
+    isa           => 'Str',
+    lazy          => 1,
+    builder       => '_build_reference',
+    documentation => 'String to populate the ##reference field in '.
+                     'a VCF header. Defaults to a comma-separated '.
+                     'list of reference names from the snpset argument.'
+   );
+
 has 'resultsets' =>
    (is       => 'ro',
     isa      => ArrayRefOfResultSet,
@@ -67,7 +77,7 @@ has 'resultsets' =>
     builder  => '_build_resultsets',
    );
 
-has 'snpset' => 
+has 'snpset' =>
    (is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',
     required => 1,
@@ -98,6 +108,7 @@ sub get_vcf_dataset {
     my $header = WTSI::NPG::Genotyping::VCF::Header->new(
         sample_names => $samples,
         contig_lengths => $self->contig_lengths,
+	reference => $self->reference,
     );
     my @rows;
     foreach my $snp (@{$self->snpset->snps}) {
@@ -121,6 +132,19 @@ sub get_vcf_dataset {
         (header => $header,
          data   => \@rows);
     return $vcf_dataset;
+}
+
+sub _build_reference {
+  my ($self) = @_;
+  my $snpset_refs = $self->snpset->references;
+  my @ref_names;
+  foreach my $ref (@{$snpset_refs}) {
+    push @ref_names, $ref->name;
+  }
+  if (scalar @ref_names == 0) {
+    $self->logcroak("No reference names found in SNPSet initarg. Need to specify a reference initarg?");
+  }
+  return join ',', @ref_names;
 }
 
 sub _build_resultsets {

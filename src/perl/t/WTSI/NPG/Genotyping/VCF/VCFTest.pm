@@ -51,6 +51,8 @@ my $chromosome_json_name = 'chromosome_lengths_GRCh37.json';
 my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
 my $discordance_fluidigm = $data_path."/pairwise_discordance_fluidigm.json";
 my $discordance_sequenom = $data_path."/pairwise_discordance_sequenom.json";
+my $reference_fluidigm = 'irods:///seq/fluidigm/multiplexes/qc_fluidigm_snp_info_GRCh37.tsv';
+my $reference_sequenom = 'irods:///seq/sequenom/multiplexes/W30467_snp_set_info_GRCh37.tsv';
 my $vcf_fluidigm = $data_path."/fluidigm.vcf";
 my $vcf_fluidigm_header_1 = $data_path."/fluidigm_header_1.txt";
 my $vcf_fluidigm_header_2 = $data_path."/fluidigm_header_2.txt";
@@ -112,7 +114,8 @@ sub fluidigm_file_test : Test(116) {
         (inputs => \@inputs,
          input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
-         contig_lengths => $chromosome_lengths);
+         contig_lengths => $chromosome_lengths,
+	 reference => $reference_fluidigm);
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
@@ -141,6 +144,7 @@ sub fluidigm_irods_test : Test(7) {
          input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
+	 reference => $reference_fluidigm,
          );
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
@@ -160,16 +164,20 @@ sub header_test : Test(5) {
         '##contig=<ID=2,length=243199373,species="Homo sapiens">',
     );
     new_ok('WTSI::NPG::Genotyping::VCF::Header',
-           ['sample_names' => $samples]);
+           ['sample_names' => $samples,
+	    'reference'    => $reference_fluidigm]);
     dies_ok {
          WTSI::NPG::Genotyping::VCF::Header->new(
              'sample_names'   => $samples,
              'contig_strings' => \@contig_strings,
-             'contig_lengths' => \%contigs
+             'contig_lengths' => \%contigs,
+	     'reference'      => $reference_fluidigm,
          );
     } 'Cannot supply both contig_strings and contig_lengths';
     my $header = WTSI::NPG::Genotyping::VCF::Header->new(
-        'sample_names' => $samples);
+        'sample_names' => $samples,
+	'reference'    => $reference_fluidigm,
+        );
     my $contig = 2;
     my $length = 243199373;
     my $str = $header->contig_to_string($contig, $length);
@@ -225,7 +233,8 @@ sub sequenom_file_test : Test(7) {
         (inputs => \@inputs,
          input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
-         contig_lengths => $chromosome_lengths);
+         contig_lengths => $chromosome_lengths,
+	 reference => $reference_sequenom);
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
@@ -244,6 +253,7 @@ sub sequenom_irods_test : Test(7) {
          input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
+	 reference => $reference_sequenom,
          );
     my $vcf_dataset = $reader->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
@@ -270,7 +280,7 @@ sub script_conversion_test : Test(3) {
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
         "--snpset $snpset_ipath --irods --plex_type $SEQUENOM_TYPE ".
-        "< $sequenomList";
+        "--reference $reference_sequenom < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $vcfOutput, "VCF output written");
     # read VCF output (omitting date) and compare to reference file
@@ -302,8 +312,9 @@ sub script_pipe_test : Test(4) {
     my @cmds = (
         "cat $sequenomList",
         "$converter --input - --vcf - --snpset $sequenom_snpset_path ".
-            "--quiet --chromosomes $chromosome_json_path --plex_type sequenom",
-        "$checker --input - --text $tmpText --json $tmpJson"
+            "--quiet --chromosomes $chromosome_json_path ".
+	    "--plex_type sequenom --reference $reference_sequenom ",
+	"$checker --input - --text $tmpText --json $tmpJson"
     );
     my $cmd = join(' | ', @cmds);
     is(system($cmd), 0, "$cmd exits successfully");

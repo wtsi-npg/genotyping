@@ -30,6 +30,14 @@ has 'source' => (
     documentation => 'Standard VCF field to identify the data source'
 );
 
+has 'reference' => (
+    is            => 'ro',
+    isa           => 'Str',
+    required      => 1,
+    documentation => 'Reference identifier (eg. a filename or URL) to '.
+		     'populate the ##reference field in VCF header output'
+);
+
 our $DEFAULT_SPECIES = 'Homo sapiens';
 
 has 'species' => (
@@ -181,7 +189,9 @@ sub str {
     my $date = DateTime->now(time_zone=>'local')->ymd('');
     push @header, '##fileDate='.$date;
     push @header, '##source='.$self->source;
-    if (scalar keys $self->contig_lengths > 0) {
+    push @header, '##reference='.$self->reference;
+    if (defined $self->contig_lengths
+	&& scalar keys %{$self->contig_lengths} > 0) {
         my @contigs = sort(keys(%{$self->contig_lengths}));
         foreach my $contig (@contigs) {
             my $contig_string = $self->contig_to_string(

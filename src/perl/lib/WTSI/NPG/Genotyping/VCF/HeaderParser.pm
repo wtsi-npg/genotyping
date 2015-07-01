@@ -34,7 +34,7 @@ sub _build_header {
     # (ensures definition of contig string format is all in the same class)
     # so, read the contig lines as strings and supply as alternative argument
     # to Header constructor
-    my (@contig_lines, $sample_names);
+    my (@contig_lines, $sample_names, $reference);
     my $in_header = 1;
     my $first = 1;
     while ($in_header) {
@@ -50,7 +50,9 @@ sub _build_header {
             $self->logcroak("Unexpected EOF while reading header");
         } elsif ($line =~ /^[#]{2}contig/msx ) {
             push @contig_lines, $line;
-        } elsif ($line =~ /^[#]CHROM/msx ) {
+	} elsif ($line =~ /^[#]{2}reference=/msx) {
+	    $reference = _parse_reference($line);
+	} elsif ($line =~ /^[#]CHROM/msx ) {
             # last line of header contains sample names
             my $vcf_sample_names = $self->_parse_sample_names($line);
             if ($self->sample_names) {
@@ -71,7 +73,19 @@ sub _build_header {
     }
     return WTSI::NPG::Genotyping::VCF::Header->new
         (sample_names   => $sample_names,
-         contig_strings => \@contig_lines);
+         contig_strings => \@contig_lines,
+	 reference      => $reference,
+	 );
+}
+
+sub _parse_reference {
+  # parse the ##reference line of a VCF file
+  my ($line) = @_;
+  chomp $line;
+  my @terms = split /=/msx, $line;
+  shift @terms; # remove the '##reference' string
+  my $reference = join '=', @terms; # allows '=' characters in reference name
+  return $reference;
 }
 
 sub _parse_sample_names {

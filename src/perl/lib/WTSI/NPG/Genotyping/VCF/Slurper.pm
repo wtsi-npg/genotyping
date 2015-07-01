@@ -28,19 +28,20 @@ has 'irods'       =>
                      'path on the local filesystem.',
    );
 
-has 'input_filehandle' =>
-   (is            => 'ro',
-    isa           => 'FileHandle',
-    lazy          => 1,
-    builder       => '_build_input_filehandle',
-    documentation => 'Filehandle for input of VCF data',
-   );
-
 has 'snpset'  =>
    (is            => 'ro',
     isa           => 'WTSI::NPG::Genotyping::SNPSet',
     required      => 1,
     documentation => 'SNPSet containing the variants in the VCF input',
+   );
+
+has '_input_filehandle' =>
+   (is            => 'ro',
+    isa           => 'FileHandle',
+    lazy          => 1,
+    builder       => '_build_input_filehandle',
+    documentation => 'Private filehandle for input of VCF data.',
+    init_arg      => undef, # cannot set at creation time
    );
 
 our $VERSION = '';
@@ -49,7 +50,7 @@ sub DEMOLISH {
     # ensure filehandle is closed when VCFReader object goes out of scope
     my ($self) = @_;
     if ($self->input_path ne '-') {
-        close $self->input_filehandle ||
+        close $self->_input_filehandle ||
             $self->logcroak("Failed to close VCF input filehandle");
     }
 }
@@ -69,11 +70,11 @@ sub read_dataset {
     # TODO if iRODS is defined, read sample names from iRODS metadata and supply as argument to header parser
     my ($self) = @_;
     my $headerParser = WTSI::NPG::Genotyping::VCF::HeaderParser->new(
-        input_filehandle => $self->input_filehandle,
+        input_filehandle => $self->_input_filehandle,
     );
     my $header = $headerParser->header();
     my $rowParser = WTSI::NPG::Genotyping::VCF::DataRowParser->new(
-        input_filehandle => $self->input_filehandle,
+        input_filehandle => $self->_input_filehandle,
         snpset => $self->snpset,
     );
     my $rows = $rowParser->get_all_remaining_rows();

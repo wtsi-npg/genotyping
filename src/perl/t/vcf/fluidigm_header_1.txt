@@ -1,6 +1,7 @@
 ##fileformat=VCFv4.0
 ##fileDate=20140908
 ##source=WTSI_NPG_genotyping_pipeline
+##reference=irods:///seq/fluidigm/multiplexes/qc_fluidigm_snp_info_GRCh37.tsv
 ##contig=<ID=1,length=249250621,species="Homo sapiens">
 ##contig=<ID=10,length=135534747,species="Homo sapiens">
 ##contig=<ID=11,length=135006516,species="Homo sapiens">
