@@ -9,6 +9,12 @@ use utf8;
 
   extends 'WTSI::NPG::Database';
 
+  has 'test_sanger_sample_id' =>
+    (is       => 'rw',
+     isa      => 'Str | Undef',
+     required => 0,
+     default  => sub { '0123456789' });
+
   has 'test_consent_withdrawn' =>
     (is       => 'rw',
      isa      => 'Int',
@@ -22,7 +28,7 @@ use utf8;
        confess "WarehouseStub expected map argument 'A10' but got '$map'";
 
     return {internal_id        => 123456789,
-            sanger_sample_id   => '0123456789',
+            sanger_sample_id   => $self->test_sanger_sample_id,
             consent_withdrawn  => $self->test_consent_withdrawn,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
@@ -55,7 +61,7 @@ use warnings;
 use base qw(Test::Class);
 use File::Spec;
 use List::AllUtils qw(none);
-use Test::More tests => 13;
+use Test::More tests => 15;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -152,7 +158,8 @@ sub update_secondary_metadata : Test(4) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'gtc'}];
 
-  my $meta = $data_object->metadata;
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 
@@ -161,6 +168,48 @@ sub update_secondary_metadata : Test(4) {
 
   is_deeply(\@groups_after, $expected_groups_after, 'Groups after update')
     or diag explain \@groups_after;
+}
+
+sub update_secondary_metadata_missing_value : Test(2) {
+  my $irods = WTSI::NPG::iRODS->new;
+
+  my $gtc_irods_path = "$irods_tmp_coll/$gtc_file";
+  my $data_object = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
+    ($irods, $gtc_irods_path);
+
+  my $ssdb = WTSI::NPG::Database::WarehouseStub->new
+    (name    => 'sequencescape_warehouse',
+     inifile => File::Spec->catfile($ENV{HOME}, '.npg/genotyping.ini'),
+     test_sanger_sample_id => q{});
+
+  ok($data_object->update_secondary_metadata($ssdb));
+
+  # The (empty) sanger_sample_id gets mapped to dcterms:identifier in
+  # the metadata. The attributes are superseded in lexical sort order,
+  # so this one is done first. The test ensures that an invalid AVU
+  # value only causes that AVU to be skipped - all subsequent ones are
+  # applied.
+  my $expected_meta =
+    [# {attribute => 'dcterms:identifier',      value => '0123456789'},
+     {attribute => 'infinium_plate',          value => 'plate1'},
+     {attribute => 'infinium_well',           value => 'A10'},
+     {attribute => 'sample',                  value => 'sample1' },
+     {attribute => 'sample_accession_number', value => 'A0123456789'},
+     {attribute => 'sample_cohort',           value => 'AAA111222333'},
+     {attribute => 'sample_common_name',      value => 'Homo sapiens'},
+     {attribute => 'sample_consent',          value => '1'},
+     {attribute => 'sample_control',          value => 'XXXYYYZZZ'},
+     {attribute => 'sample_donor_id',         value => 'D999'},
+     {attribute => 'sample_id',               value => '123456789'},
+     {attribute => 'sample_supplier_name',    value => 'aaaaaaaaaa'},
+     {attribute => 'study_id',                value => '0'},
+     {attribute => 'type',                    value => 'gtc'}];
+
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
+  is_deeply($meta, $expected_meta,
+            'Secondary metadata addition skips bad value')
+    or diag explain $meta;
 }
 
 sub update_consent_withdrawn : Test(4) {
@@ -198,7 +247,8 @@ sub update_consent_withdrawn : Test(4) {
      {attribute => 'study_id',                value => '0'},
      {attribute => 'type',                    value => 'gtc'}];
 
-  my $meta = $data_object->metadata;
+  my $meta = [grep { $_->{attribute} !~ m{_history$} }
+              @{$data_object->metadata}];
   is_deeply($meta, $expected_meta, 'Secondary metadata superseded')
     or diag explain $meta;
 

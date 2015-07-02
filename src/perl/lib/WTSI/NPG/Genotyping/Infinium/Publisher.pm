@@ -364,6 +364,7 @@ sub _build_resultsets {
           $self->logconfess("Failed to find the chip design of beadchip '",
                             $beadchip, "' section '$section'");
         }
+        push @initargs, beadchip_design => $chip_design;
 
         my $is_methylation = $self->infinium_db->is_methylation_chip_design
           ($chip_design);
@@ -514,7 +515,8 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013-2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

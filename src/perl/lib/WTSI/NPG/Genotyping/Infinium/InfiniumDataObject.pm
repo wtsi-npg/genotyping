@@ -1,9 +1,9 @@
 
-use utf8;
-
 package WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 
+use Data::Dump qw(dump);
 use Moose;
+use Try::Tiny;
 
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
@@ -12,10 +12,29 @@ extends 'WTSI::NPG::iRODS::DataObject';
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
 
+  my $infinium_barcode;
+  my $well;
+
   my $infinium_barcode_avu = $self->get_avu($self->infinium_plate_name_attr);
-  my $infinium_barcode = $infinium_barcode_avu->{value};
+  if ($infinium_barcode_avu) {
+    $infinium_barcode = $infinium_barcode_avu->{value};
+  }
+
   my $well_avu = $self->get_avu($self->infinium_plate_well_attr);
-  my $well = $well_avu->{value};
+  if ($well_avu) {
+    $well = $well_avu->{value};
+  }
+
+  unless ($infinium_barcode) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find an Infinium barcode in the existing ",
+                   "metadata");
+  }
+  unless ($well) {
+    $self->logcarp("Failed updata metadata for '", $self->str,
+                   "': failed to find an Infinium well address ",
+                   "existing metadata");
+  }
 
   $self->debug("Found plate well '$infinium_barcode': '$well' in ",
                "current metadata of '", $self->str, "'");
@@ -29,9 +48,16 @@ sub update_secondary_metadata {
 
     # Supersede all the secondary metadata with new values
     my @meta = $self->make_sample_metadata($ss_sample);
+    # Sorting by attribute to allow repeated updates to be in
+    # deterministic order
+    @meta = sort { $a->[0] cmp $b->[0] } @meta;
+
     foreach my $avu (@meta) {
-      $self->debug("Superseding [", join(', ', @$avu, "]"));
-      $self->supersede_avus(@$avu);
+      try {
+        $self->supersede_avus(@$avu);
+      } catch {
+        $self->error("Failed to supersede with AVU ", dump($avu), ": ", $_);
+      };
     }
 
     $self->update_group_permissions;
@@ -59,7 +85,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

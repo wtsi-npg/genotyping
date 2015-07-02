@@ -7,6 +7,7 @@ use File::Temp qw(tempdir);
 use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
+use Try::Tiny;
 use URI;
 
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
@@ -107,11 +108,18 @@ sub publish_samples {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $current_file;
 
-  my $plate = $self->sequenom_db->find_plate_results($self->plate_name);
+  my $plate;
+  try {
+    my $result = $self->sequenom_db->find_plate_results($self->plate_name);
+    $plate = $result;
 
-  unless (@addresses) {
-    @addresses = sort keys %$plate;
-  }
+    unless (@addresses) {
+      @addresses = sort keys %$result;
+    }
+  } catch {
+    $self->error("Failed to find any results for plate '",
+                 $self->plate_name, "': ", $_);
+  };
 
   my $publisher =
     WTSI::NPG::Publisher->new(irods         => $self->irods,
@@ -126,7 +134,7 @@ sub publish_samples {
                "from a possible $possible");
 
   foreach my $address (@addresses) {
-    eval {
+    try {
       my @records = @{$plate->{$address}};
       my $first = $records[0];
       my @keys = sort keys %$first;
@@ -164,15 +172,12 @@ sub publish_samples {
 
       unlink $file;
       ++$num_published;
-    };
 
-    if ($@) {
-      $self->error("Failed to publish '$current_file' to ",
-                   "'$publish_dest': ", $@);
-    }
-    else {
       $self->debug("Published '$current_file': $num_published of $total");
-    }
+    } catch {
+      $self->error("Failed to publish '$current_file' to ",
+                   "'$publish_dest': ", $_);
+    };
   }
 
   $self->info("Published $num_published/$total CSV files for '$plate_name' ",
@@ -250,7 +255,6 @@ sub _find_resultset_snpset {
   return shift @snpset_names;
 }
 
-
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -270,7 +274,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

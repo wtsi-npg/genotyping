@@ -86,10 +86,8 @@ sub run {
 	    $log->logcroak("Must specify --manifest for workflow!");
 	} elsif (! -e $manifest) {
 	    $log->logwarn("Warning: Manifest '$manifest' does not exist, must be created before running workflow.");
-	} elsif ($workflow eq 'illuminus') { 
-	    write_illuminus(@params); 
-	} elsif ($workflow eq 'genosnp') {
-	    write_genosnp(@params);  
+	} elsif ($workflow eq 'illuminus') {
+	    write_illuminus(@params);
 	} elsif ($workflow eq 'zcall') {
 	    if (!$egt) {
 		$log->logcroak("Must specify --egt for zcall workflow");
@@ -102,18 +100,6 @@ sub run {
 	    $log->logcroak("Invalid workflow argument $workflow; must be one of illuminus, genosnp, zcall");
 	}
     }
-}
-
-sub write_genosnp {
-    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @_;
-    my %genosnp_args = (
-	'chunk_size' => $chunk_size,
-	'memory' => $memory,
-	'manifest' => $manifest,
-	);
-    my $workflow_name = 'Genotyping::Workflows::GenotypeGenoSNP';
-    write_workflow($dbpath, $run, $workdir, $workflow_name, \%genosnp_args,
-		   $outdir.'genotype_genosnp.yml');
 }
 
 sub write_illuminus {

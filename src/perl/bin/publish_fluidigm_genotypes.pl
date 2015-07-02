@@ -1,6 +1,4 @@
-#!/software/bin/perl
-
-use utf8;
+#!/usr/bin/env perl
 
 package main;
 
@@ -12,8 +10,9 @@ use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
-use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
@@ -91,13 +90,13 @@ sub run {
     }
   }
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
-    (name    => 'sequencescape_warehouse',
+  my $whdb = WTSI::NPG::Database::MLWarehouse->new
+    (name    => 'multi_lims_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $now = DateTime->now();
+  my $now = DateTime->now;
   my $end;
   if ($days_ago > 0) {
     $end = DateTime->from_epoch
@@ -127,7 +126,7 @@ sub run {
   $log->debug("Publishing $total Fluidigm data directories in '$source_dir'");
 
   foreach my $dir (@dirs) {
-    eval {
+    try {
       my $resultset = WTSI::NPG::Genotyping::Fluidigm::ResultSet->new
         (directory => $dir);
 
@@ -135,20 +134,17 @@ sub run {
         (publication_time => $now,
          resultset        => $resultset,
          reference_path   => $reference_path,
-         ss_warehouse_db  => $ssdb,
+         warehouse_db     => $whdb,
          logger           => $log);
       $publisher->irods->logger($log);
 
       $publisher->publish($publish_dest);
       $num_published++;
+    } catch {
+      $log->error("Failed to publish '$dir': ", $_);
     };
 
-    if ($@) {
-      $log->error("Failed to publish '$dir': ", $@);
-    }
-    else {
-      $log->debug("Published '$dir': $num_published of $total");
-    }
+    $log->debug("Published '$dir': $num_published of $total");
   }
 }
 
@@ -163,17 +159,20 @@ publish_fluidigm_genotypes
 
 Options:
 
-  --days-ago    The number of days ago that the publication window ends.
-                Optional, defaults to zero (the current day).
-  --days        The number of days in the publication window, ending at
-                the day given by the --days-ago argument. Any sample data
-                modified during this period will be considered
-                for publication. Optional, defaults to 7 days.
-  --dest        The data destination root collection in iRODS.
-  --help        Display help.
-  --logconf     A log4perl configuration file. Optional.
-  --source      The root directory to search for sample data.
-  --verbose     Print messages while processing. Optional.
+  --days-ago        The number of days ago that the publication window
+                    ends. Optional, defaults to zero (the current day).
+  --days            The number of days in the publication window, ending
+                    at the day given by the --days-ago argument. Any sample
+                    data modified during this period will be considered
+                    for publication. Optional, defaults to 7 days.
+  --dest            The data destination root collection in iRODS.
+  --help            Display help.
+  --logconf         A log4perl configuration file. Optional.
+  --reference-path  Provides an iRODS path (and therfore zone hint) as
+                    to where to look for SNP set manifests. Optional,
+                    defaults to 'seq'.
+  --source          The root directory to search for sample data.
+  --verbose         Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
@@ -182,6 +181,10 @@ have been modified within the n days prior to a specific time.
 (N.B. limits search to 1 level of directories.) Any files identified
 are published to iRODS with metadata obtained from the exported CSV
 file contained in each directory.
+
+The SNPs reported in the Fluidigm data files are matched against
+reference manifests of SNPs stored in iRODS in order to tell which set
+of SNPs has been analysed.
 
 =head1 METHODS
 
@@ -193,7 +196,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
