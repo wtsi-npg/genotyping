@@ -4,9 +4,6 @@ package WTSI::NPG::Genotyping::VCF::Slurper;
 
 use Moose;
 
-use File::Temp qw /tempdir/;
-use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Genotyping::VCF::DataRowParser;
 use WTSI::NPG::Genotyping::VCF::HeaderParser;
 
