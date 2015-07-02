@@ -9,7 +9,7 @@ use File::Slurp qw /read_file/;
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 180;
+use Test::More tests => 177;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -323,45 +323,34 @@ sub script_pipe_test : Test(4) {
     _compare_json($discordance_sequenom, $tmpJson);
 }
 
-sub slurp_test : Test(7) {
+sub slurp_test : Test(4) {
     my $vcfName = "fluidigm.vcf";
-    my $input = "$data_path/$vcfName";
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
+    my $fh;
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
     new_ok('WTSI::NPG::Genotyping::VCF::Slurper',
-           [ input_path=> $input, snpset => $snpset ] );
+           [ input_filehandle=> $fh, snpset => $snpset ] );
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
     my $slurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
-        input_path=> $vcf_fluidigm, snpset => $snpset
+        input_filehandle=> $fh, snpset => $snpset
     );
     my $dataset = $slurper->read_dataset();
     isa_ok($dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
     my $got_vcf = _remove_filedate($dataset->str());
     my $expected_vcf = _read_without_filedate($vcf_fluidigm);
     is_deeply($got_vcf, $expected_vcf, 'Parsed output matches input');
-    my $irods = WTSI::NPG::iRODS->new;
-    my $ipath = "$irods_tmp_coll/$vcfName";
-    $irods->add_object($input, $ipath);
-    my $islurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
-        input_path=> $ipath, irods => $irods, snpset => $snpset
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
+    my @sample_names = qw(north south east west);
+    open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
+    my $slurper_alt_names = WTSI::NPG::Genotyping::VCF::Slurper->new(
+        input_filehandle=> $fh,
+        snpset => $snpset,
+        sample_names => \@sample_names,
     );
-    my $idataset = $islurper->read_dataset();
-    isa_ok($idataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    my $igot_vcf = _remove_filedate($idataset->str());
-    is_deeply($igot_vcf, $expected_vcf, 'Parsed output matches iRODS input');
-    my $stdin_slurper = WTSI::NPG::Genotyping::VCF::Slurper->new(
-        input_path=> '-', snpset => $snpset
-    );
-    # test parser with input from STDIN
-    # open a filehandle to read input, and assign to localized STDIN typeglob
-    # see http://worrbase.com/2011/05/11/stdin-testing.html
-    open my $fh, '<', $input ||
-        logcroak("Cannot open temporary filehandle for STDIN");
-    local *STDIN;
-    *STDIN = $fh;
-    my $stdin_dataset = $stdin_slurper->read_dataset();
-    isa_ok($stdin_dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    my $stdin_got_vcf = _remove_filedate($stdin_dataset->str());
-    is_deeply($stdin_got_vcf, $expected_vcf,
-              'Parsed output matches STDIN input');
+    my $dataset_alt_names = $slurper_alt_names->read_dataset();
+    isa_ok($dataset_alt_names, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
+    close $fh || die "Cannot close VCF $vcf_fluidigm";
 }
 
 sub _read_without_filedate {
