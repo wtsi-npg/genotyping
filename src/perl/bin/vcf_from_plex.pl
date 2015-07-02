@@ -41,8 +41,8 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods, $debug, $quiet,
-    $snpset_path, $chromosome_json);
+my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
+    $debug, $quiet, $reference, $snpset_path, $chromosome_json);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $SEQUENOM_TYPE = 'sequenom'; # TODO redundant wrt AssayResultReader
@@ -59,6 +59,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'irods'             => \$use_irods,
            'logconf=s'         => \$logConfig,
            'plex_type=s'       => \$inputType,
+	   'reference=s'       => \$reference,
            'vcf=s'             => \$vcfPath,
            'quiet'             => \$quiet,
        );
@@ -128,7 +129,8 @@ if ($input ne '-') {
 my %readerArgs = (inputs => \@inputs,
                   input_type => $inputType,
                   snpset => $snpset,
-                  contig_lengths => $chromosome_lengths);
+                  contig_lengths => $chromosome_lengths,
+		  reference => $reference);
 if ($use_irods) { $readerArgs{irods} = $irods; }
 
 my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
