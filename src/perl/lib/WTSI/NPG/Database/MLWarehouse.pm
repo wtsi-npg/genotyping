@@ -5,6 +5,8 @@ use Moose;
 
 use WTSI::DNAP::Warehouse::Schema;
 
+our $VERSION = '';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBIx';
@@ -18,6 +20,34 @@ sub connect {
                                                        \%args));
   return $self;
 }
+
+=head2 find_fluidigm_plate
+
+  Arg [1]    : string
+  Example    : $db->find_fluidigm_plate('Fluidigm plate barcode')
+  Description: Return plate details for an Infinium LIMS plate barcode
+               as a hashref with plate addresses as keys and values being
+               a further hashref for each sample having the following keys
+               and values:
+               { id_lims           => <Identifier of originating LIMS>,
+                 id_sample_lims    => <Sample identifier in LIMS>
+                 sanger_sample_id  => <WTSI sample name string>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 donor_id          => <SequenceScape donor id>,
+                 uuid              => <Sample UUID in LIMS,
+                 name              => <Sample name in LIMS>,
+                 common_name       => <Sample common name in LIMS>,
+                 supplier_name     => <Supplier provided name, may be undef>,
+                 gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
+                 barcode           => <Plate barcode in LIMS>,
+                 map               => <Sample well address in LIMS> }
+  Returntype : hashref
+  Caller     : general
+
+=cut
 
 sub find_fluidigm_plate {
   my ($self, $fluidigm_barcode) = @_;
@@ -45,6 +75,36 @@ sub find_fluidigm_plate {
 
   return \%plate;
 }
+
+
+=head2 find_fluidigm_sample_by_plate
+
+  Arg [1]    : string plate barcode
+  Arg [2]    : string well address
+  Example    : $db->find_sample_by_fluidigm_plate('Fluidigm plate barcode', )
+  Description: Return plate details for an Infinium LIMS plate barcode
+               as a hashref with plate addresses as keys and values being
+               a further hashref for each sample having the following keys
+               and values:
+               { id_lims           => <Identifier of originating LIMS>,
+                 id_sample_lims    => <Sample identifier in LIMS>
+                 sanger_sample_id  => <WTSI sample name string>,
+                 consent_withdrawn => <boolean, true if now unconsented>,
+                 donor_id          => <SequenceScape donor id>,
+                 uuid              => <Sample UUID in LIMS,
+                 name              => <Sample name in LIMS>,
+                 common_name       => <Sample common name in LIMS>,
+                 supplier_name     => <Supplier provided name, may be undef>,
+                 gender            => <Supplier gender string>,
+                 cohort            => <Supplier cohort string>,
+                 control           => <Supplier control flag>,
+                 study_id          => <SequenceScape study id>,
+                 barcode           => <Plate barcode in LIMS>,
+                 map               => <Sample well address in LIMS> }
+  Returntype : hashref
+  Caller     : general
+
+=cut
 
 sub find_fluidigm_sample_by_plate {
   my ($self, $fluidigm_barcode, $well_address) = @_;
@@ -110,3 +170,31 @@ __PACKAGE__->meta->make_immutable;
 
 __END__
 
+=head1 NAME
+
+WTSI::NPG::Database::MLWarehouse
+
+=head1 DESCRIPTION
+
+A class for querying the WTSI multi-LIMS warehouse database to
+retrieve details of samples for genotyping analysis.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2015 Genome Research Limited. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

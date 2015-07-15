@@ -13,6 +13,8 @@ use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'plink_path' =>
@@ -382,7 +384,7 @@ sub _read_production_calls {
 sub _from_illumina_snp_name {
   my ($name) = @_;
 
-  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)};
+  my ($prefix, $body) = $name =~ m{^(exm-)?(.*)}msx;
 
   return $body;
 }

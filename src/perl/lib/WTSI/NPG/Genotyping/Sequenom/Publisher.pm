@@ -15,6 +15,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
@@ -194,8 +196,8 @@ sub _write_sequenom_csv_file {
   # Transform to the required output headers
   my $fn = sub {
     my $x = shift;
-    $x =~ '^WELL$'                    && return 'WELL_POSITION';
-    $x =~ /^(ASSAY|GENOTYPE|SAMPLE)$/ && return $x . '_ID';
+    $x =~ m{^WELL$}msx                    && return 'WELL_POSITION';
+    $x =~ m{^(ASSAY|GENOTYPE|SAMPLE)$}msx && return $x . '_ID';
     return $x;
   };
 

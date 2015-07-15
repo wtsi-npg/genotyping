@@ -16,8 +16,10 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultConfigDir/;
 use WTSI::NPG::Genotyping::SNP;
 
+our $VERSION = '';
+
 my ($sampleGenderPath, $dbPath, $plexManifest, $iniPath, $plateSize,
-    $plateTotal, $qcPlexMethod, $qcPlexName, $flip, $excl, $help);
+    $plateTotal, $qcPlexMethod, $qcPlexName, $excl, $help);
 
 GetOptions("sample-gender=s"   => \$sampleGenderPath,
            "qc-plex=s"     => \$plexManifest,
@@ -104,7 +106,7 @@ sub createDummyCalls {
     my @calls;
     my @lines = read_file($plexPath);
     foreach my $line (@lines) {
-        if ($line =~ /^#SNP_NAME/) { next; }
+        if ($line =~ m{^#SNP_NAME}msx) { next; }
         $csv->parse($line);
         my @fields = $csv->fields();
         my ($snp_name, $ref, $alt, $chrom, $pos, $strand) = @fields;

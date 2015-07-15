@@ -37,6 +37,7 @@ my $embedded_conf = "
    log4perl.appender.A2.syswrite  = 1
 ";
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 our $EXIT_CLI_ARG = 3;

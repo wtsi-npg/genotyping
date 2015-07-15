@@ -13,6 +13,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig
                                                defaultTexIntroPath);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports qcNameFromPath);
 
+our $VERSION = '';
+
 my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";
 my $defaultPrefix = "pipeline_summary";

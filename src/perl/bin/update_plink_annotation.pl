@@ -15,6 +15,8 @@ use WTSI::NPG::Genotyping::Plink qw(update_placeholder
                                     update_snp_locations
                                     update_sample_genders);
 
+our $VERSION = '';
+
 Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();

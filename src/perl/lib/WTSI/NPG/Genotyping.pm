@@ -15,6 +15,8 @@ our @EXPORT_OK = qw(base_dir
                     read_sample_json
                     read_snp_json);
 
+our $VERSION = '';
+
 =head2 base_dir
 
   Arg [1]    : None.
@@ -29,7 +31,7 @@ sub base_dir {
   my ($vol, $dirs, $file) =
     File::Spec->splitpath($INC{"WTSI/NPG/Genotyping.pm"});
 
-  my ($base) = $dirs =~ m{^(.+)\blib};
+  my ($base) = $dirs =~ m{^(.+)\blib}msx;
 
   unless (defined $base) {
     my $cwd = getcwd();
@@ -119,7 +121,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
@@ -130,9 +132,5 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
-=head1 VERSION
-
-  0.2.0
 
 =cut

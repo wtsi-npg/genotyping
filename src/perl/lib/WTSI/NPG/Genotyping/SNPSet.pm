@@ -14,10 +14,12 @@ use WTSI::NPG::Genotyping::SNP;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
-  'WTSI::NPG::Annotation';
+our $VERSION = '';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
+  'WTSI::NPG::Annotation';
 
 has 'name' =>
   (is       => 'ro',
@@ -92,8 +94,9 @@ sub snp_names {
   my ($self) = @_;
 
   my @snp_names = map { $_->name } @{$self->snps};
+  my @sorted = sort { $a cmp $b } @snp_names;
 
-  return sort { $a cmp $b } @snp_names;
+  return @sorted;
 }
 
 =head2 named_snp
@@ -243,13 +246,13 @@ sub _parse_snps {
   my $header = $csv->getline($fh);
 
   if ($header and @$header) {
-    unless ($header->[0] =~ m{SNP_NAME}) {
+    unless ($header->[0] =~ m{SNP_NAME}msx) {
       $self->logconfess("SNPSet data file '", $self->str,
                         "' is missing its header");
     }
 
     # Remove comment character from header
-    $header->[0] =~ s/^#(.*)/$1/;
+    $header->[0] =~ s/^\#//msx;
 
     $self->_write_column_names($header);
 
@@ -384,7 +387,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

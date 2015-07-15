@@ -5,14 +5,17 @@ package WTSI::NPG::Genotyping::Infinium::AnalysisPublisher;
 
 use File::Spec;
 use Moose;
+use Try::Tiny;
 
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
-  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
+our $VERSION = '';
 
 our $DEFAULT_SAMPLE_ARCHIVE = '/archive/GAPI/gen/infinium';
+
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 has 'irods' =>
   (is       => 'ro',
@@ -118,7 +121,7 @@ sub publish {
   my $num_samples = 0;
   my $num_objects = 0;
 
-  eval {
+  try {
     my @analysis_meta;
     push(@analysis_meta, $self->make_analysis_metadata(\@project_titles));
     push(@analysis_meta, $self->make_creation_metadata($self->affiliation_uri,
@@ -219,18 +222,15 @@ sub publish {
 
     my @groups = $analysis_coll->expected_groups;
     $analysis_coll->set_content_permissions('read', @groups);
-  };
 
-  if ($@) {
-    $self->error("Failed to publish: ", $@);
-    undef $analysis_uuid;
-  }
-  else {
     $self->info("Published '", $self->analysis_directory, "' to '",
                 $analysis_coll->str, "' and cross-referenced $num_objects ",
                 "data objects for $num_samples samples in ",
                 "$num_projects projects");
-  }
+  } catch {
+    $self->error("Failed to publish: ", $@);
+    undef $analysis_uuid;
+  };
 
   return $analysis_uuid;
 }

@@ -119,6 +119,7 @@ lib/WTSI/NPG/Genotyping/Fluidigm/Publisher.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/ResultSet.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/Subscriber.pm
 lib/WTSI/NPG/Genotyping/GenderMarker.pm
+lib/WTSI/NPG/Genotyping/GenderMarkerCall.pm
 lib/WTSI/NPG/Genotyping/Illuminus.pm
 lib/WTSI/NPG/Genotyping/Infinium/AnalysisPublisher.pm
 lib/WTSI/NPG/Genotyping/Infinium/InfiniumDataObject.pm
@@ -148,8 +149,15 @@ lib/WTSI/NPG/Genotyping/SNP.pm
 lib/WTSI/NPG/Genotyping/SNPSet.pm
 lib/WTSI/NPG/Genotyping/SNPSetPublisher.pm
 lib/WTSI/NPG/Genotyping/Types.pm
-lib/WTSI/NPG/Genotyping/VCF/VCFConverter.pm
-lib/WTSI/NPG/Genotyping/VCF/VCFGtcheck.pm
+lib/WTSI/NPG/Genotyping/VCF/AssayResultReader.pm
+lib/WTSI/NPG/Genotyping/VCF/DataRow.pm
+lib/WTSI/NPG/Genotyping/VCF/DataRowParser.pm
+lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
+lib/WTSI/NPG/Genotyping/VCF/Header.pm
+lib/WTSI/NPG/Genotyping/VCF/HeaderParser.pm
+lib/WTSI/NPG/Genotyping/VCF/Parser.pm
+lib/WTSI/NPG/Genotyping/VCF/Slurper.pm
+lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
 lib/WTSI/NPG/Genotyping/Version.pm
 lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/Publisher.pm
@@ -160,7 +168,6 @@ MANIFEST			This list of files
 README
 t/call.t
 t/collation.t
-t/critic.ignore
 t/database_infinium.t
 t/database_ml_warehouse.t
 t/database_pipeline.t
@@ -354,6 +361,7 @@ t/gender/input_xhet.json
 t/gender/input_xhet.txt
 t/gender/input_xhet_large.txt
 t/gender_marker.t
+t/gender_marker_call.t
 t/gender_standalone.t
 t/genotyping_yml.t
 t/genotyping_yml/config.yml
@@ -610,6 +618,8 @@ t/vcf/fluidigm_001.csv
 t/vcf/fluidigm_002.csv
 t/vcf/fluidigm_003.csv
 t/vcf/fluidigm_004.csv
+t/vcf/fluidigm_header_1.txt
+t/vcf/fluidigm_header_2.txt
 t/vcf/fluidigm_inputs.txt
 t/vcf/pairwise_discordance_fluidigm.json
 t/vcf/pairwise_discordance_sequenom.json
@@ -647,6 +657,7 @@ t/WTSI/NPG/Genotyping/Fluidigm/ExportFileTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/SubscriberTest.pm
+t/WTSI/NPG/Genotyping/GenderMarkerCallTest.pm
 t/WTSI/NPG/Genotyping/GenderMarkerTest.pm
 t/WTSI/NPG/Genotyping/IlluminusTest.pm
 t/WTSI/NPG/Genotyping/Infinium/AnalysisPublisherTest.pm
