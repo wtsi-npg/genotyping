@@ -3,24 +3,35 @@ use utf8;
 
 package WTSI::NPG::Genotyping::Types;
 
-use MooseX::Types::Moose qw(ArrayRef Str Int);
+use MooseX::Types::Moose qw(ArrayRef Str Int Maybe);
+use strict;
+use warnings;
 
 use MooseX::Types -declare =>
   [
    qw(
       ArrayRefOfReference
+      ArrayRefOfResultSet
       ArrayRefOfVariant
       DNABase
       DNAStrand
+      FluidigmResultSet
       GenderMarker
       HsapiensAutosome
       HsapiensChromosome
+      HsapiensChromosomeVCF
       HsapiensHeterosome
       HsapiensMT
       HsapiensX
       HsapiensY
+      InfiniumBeadchipBarcode
+      InfiniumBeadchipSection
       Platform
+      PositiveInt
+      QualityScore
       Reference
+      ResultSet
+      SequenomResultSet
       SNP
       SNPGenotype
       SNPSet
@@ -30,24 +41,36 @@ use MooseX::Types -declare =>
     )
   ];
 
+our $VERSION = '';
+
 subtype HsapiensChromosome,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$} },
+  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
   message { "'$_' is not a valid H. sapiens chromosome name" };
 
 subtype HsapiensX,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?X$} },
+  where { $_ =~ m{(^[Cc]hr)?X$}msx },
   message { "'$_' is not a valid H. sapiens X chromosome" };
 
 subtype HsapiensY,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?Y$} },
+  where { $_ =~ m{(^[Cc]hr)?Y$}msx },
   message { "'$_' is not a valid H. sapiens Y chromosome" };
+
+subtype InfiniumBeadchipBarcode,
+  as Str,
+  where { $_ =~ m{^\d{10,12}$}msx },
+  message { "'$_' is not a valid Infinium beadchip barcode" };
+
+subtype InfiniumBeadchipSection,
+  as Str,
+  where { $_ =~ m{^R\d+C\d+$}msx },
+  message { "'$_' is not a valid Infinium beadchip section" };
 
 subtype DNABase,
   as Str,
-  where { $_ =~ m{^[ACGTNacgtn]$} },
+  where { $_ =~ m{^[ACGTNacgtn]$}msx },
   message { "'$_' is not a valid DNA base" };
 
 subtype DNAStrand,
@@ -67,6 +90,22 @@ subtype Platform,
   as Str,
   where { $_ eq 'fluidigm' || $_ eq 'sequenom' },
   message { "'$_' is not a valid genotyping platform" };
+
+subtype PositiveInt,
+  as Int,
+  where { $_ > 0 },
+  message { "Int is not larger than 0" };
+
+subtype QualityScore,
+  as PositiveInt,
+  message { "'$_' is not a valid quality score, must be Int > 0" };
+
+class_type FluidigmResultSet, {
+    class => 'WTSI::NPG::Genotyping::Fluidigm::AssayResultSet' };
+class_type SequenomResultSet, {
+    class => 'WTSI::NPG::Genotyping::Sequenom::AssayResultSet' };
+subtype ResultSet,
+  as FluidigmResultSet | SequenomResultSet;
 
 class_type GenderMarker, { class => 'WTSI::NPG::Genotyping::GenderMarker' };
 class_type Reference,    { class => 'WTSI::NPG::Genotyping::Reference' };
@@ -91,6 +130,9 @@ subtype YMarker,
 subtype ArrayRefOfReference,
   as ArrayRef[Reference];
 
+subtype ArrayRefOfResultSet,
+  as ArrayRef[ResultSet];
+
 subtype ArrayRefOfVariant,
   as ArrayRef[Variant];
 
@@ -108,11 +150,11 @@ The non-core Moose types for genotyping are all defined here.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

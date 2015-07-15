@@ -1,7 +1,7 @@
 
 package WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
-use English;
+use English qw(-no_match_vars);
 use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
@@ -9,6 +9,8 @@ use Text::CSV;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
+
+our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 

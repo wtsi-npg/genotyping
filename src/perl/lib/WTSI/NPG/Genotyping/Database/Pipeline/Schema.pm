@@ -9,6 +9,8 @@ use Config::IniFiles;
 
 use base 'DBIx::Class::Schema';
 
+our $VERSION = '';
+
 __PACKAGE__->load_namespaces;
 
 1;

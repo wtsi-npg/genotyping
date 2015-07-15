@@ -7,9 +7,11 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
+use List::AllUtils qw(any);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::DNAP::Utilities::IO qw(maybe_stdin);
 use WTSI::NPG::Metadata qw($STUDY_ID_META_KEY);
@@ -20,6 +22,8 @@ use WTSI::NPG::iRODS qw(find_collections_by_meta
                         make_group_name
                         set_group_access
 );
+
+our $VERSION = '';
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -54,7 +58,7 @@ sub run {
   $access_level ||= 'read';
 
   my @valid_levels = ('null', 'read', 'write', 'own');
-  unless (grep { /^$access_level$/ } @valid_levels) {
+  unless (any { $access_level eq $_ } @valid_levels) {
     pod2usage(-msg => "Invalid --access argument '$access_level'. Must be one of [" .
               join(', ', @valid_levels) . "]" ,
               -exitval => 2);
@@ -85,8 +89,8 @@ sub run {
 
   while (my $study_id = <$in>) {
     chomp($study_id);
-    $study_id =~ s/^\s+//;
-    $study_id =~ s/\s+$//;
+    $study_id =~ s/^\s+//msx;
+    $study_id =~ s/\s+$//msx;
 
     next unless $study_id;
 
@@ -116,39 +120,34 @@ sub set_access {
 
   $log->debug("Searching for $plural in study '$study_id'");
 
-  my $item_count = scalar @items;
-  my $set_count = 0;
-  $log->debug("Found $item_count $plural in study '$study_id'");
+  my $total = scalar @items;
+  my $num_set = 0;
+  $log->debug("Found $total $plural in study '$study_id'");
 
-  if ($item_count > 0) {
-    my $group = make_group_name($study_id);
-    $log->info("Setting $access_level access for group '$group' ",
-               "for $item_count $plural in study '$study_id'");
+  my $group = make_group_name($study_id);
+  $log->info("Setting $access_level access for group '$group' ",
+             "for $total $plural in study '$study_id'");
 
-    foreach my $item (@items) {
-      my $zone = find_zone_name($item);
-      my $zoned_group = "$group#$zone";
+  foreach my $item (@items) {
+    my $zone = find_zone_name($item);
+    my $zoned_group = "$group#$zone";
 
-      eval {
-        unless ($dry_run) {
-          set_group_access($access_level, $zoned_group, $item);
-        }
-      };
-
-      if ($@) {
-        $log->error("Failed to set $access_level access for group ",
-                    "'$zoned_group' for $item_type '$item': ", $@);
+    try {
+      unless ($dry_run) {
+        set_group_access($access_level, $zoned_group, $item);
       }
-      else {
-        ++$set_count;
-        $log->debug("Set $access_level access for group '$zoned_group' for ",
-                    "$item_type '$item'");
-      }
-    }
 
-    $log->info("Done setting $access_level access for group '$group' ",
-               "for $set_count/$item_count $plural in study '$study_id'");
+      $num_set++;
+      $log->debug("Set $access_level access for group '$zoned_group' for ",
+                  "$item_type '$item'");
+    } catch {
+      $log->error("Failed to set $access_level access for group ",
+                  "'$zoned_group' for $item_type '$item': ", $_);
+    };
   }
+
+  $log->info("Done setting $access_level access for group '$group' ",
+             "for $num_set/$total $plural in study '$study_id'");
 }
 
 
@@ -195,7 +194,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

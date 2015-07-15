@@ -6,6 +6,8 @@ package WTSI::NPG::Genotyping::Database::Sequenom;
 use Carp;
 use Moose;
 
+our $VERSION = '';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBI';

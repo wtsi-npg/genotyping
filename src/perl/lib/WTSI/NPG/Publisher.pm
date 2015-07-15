@@ -8,6 +8,8 @@ use Moose;
 use WTSI::NPG::iRODS::Collection;
 use WTSI::NPG::iRODS::DataObject;
 
+our $VERSION = '';
+
 has 'irods' =>
   (is       => 'ro',
    isa      => 'WTSI::NPG::iRODS',

@@ -21,10 +21,12 @@ use Log::Log4perl qw(:easy);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getPlateLocationsFromPath);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger("genotyping");
 
-my ($mode, $type, $outDir, $title, $help, $test, $dbpath, $inipath);
+my ($mode, $type, $outDir, $title, $help, $dbpath, $inipath);
 
 GetOptions("mode=s"     => \$mode,
 	   "type=s"     => \$type,
@@ -61,11 +63,21 @@ $type = 'both';
 $outDir ||= '.';
 $title ||= "UNTITLED";
 
-unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") { die "Illegal mode argument: $mode: $!"; }
-unless ($type eq "box" || $type eq "bean" || $type eq "both") { die "Illegal type argument: $type: $!"; }
-if ((!$dbpath) && (!$inipath)) { croak "Must supply at least one of pipeline database path and .ini path!"; }
-if ($dbpath && !(-r $dbpath)) { croak "Cannot read pipeline database path $dbpath"; }
-if ($inipath && !(-r $inipath)) { croak "Cannot read .ini path $inipath"; }
+unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") {
+  die "Illegal mode argument: $mode: $!\n";
+}
+unless ($type eq "box" || $type eq "bean" || $type eq "both") {
+  die "Illegal type argument: $type: $!\n";
+}
+if ((!$dbpath) && (!$inipath)) {
+  die "Must supply at least one of pipeline database path and .ini path!\n";
+}
+if ($dbpath && !(-r $dbpath)) {
+  die "Cannot read pipeline database path $dbpath\n";
+}
+if ($inipath && !(-r $inipath)) {
+  die "Cannot read .ini path $inipath\n";
+}
 
 sub writeBoxplotInput {
     # read given input filehandle; write plate name and data to given output filehandle
@@ -74,10 +86,12 @@ sub writeBoxplotInput {
     my $inputOK = 0;
     my %plateLocs = getPlateLocationsFromPath($dbpath, $inipath);
     while (<$input>) {
-	if (/^#/) { next; } # ignore comments
+	if (m{^\#}msx) { next; } # ignore comments
 	chomp;
 	my @words = split;
-	unless ($plateLocs{$words[0]}) { croak "No plate location for sample '$words[0]'; exiting"; }
+	unless ($plateLocs{$words[0]}) {
+      die "No plate location for sample '$words[0]'; exiting\n";
+    }
 	my ($plate, $addressLabel) = @{$plateLocs{$words[0]}};
 	if ($plate) {
 	    $inputOK = 1; # require at least one sample with a valid plate!

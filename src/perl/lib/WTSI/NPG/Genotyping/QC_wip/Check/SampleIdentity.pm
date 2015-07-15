@@ -9,6 +9,11 @@ use List::Util qw(max);
 
 use WTSI::NPG::Genotyping::Call;
 
+our $VERSION = '';
+
+our $QC_KEY = 'qc';
+our $PROD_KEY = 'production';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 # arguments: unpaired (sample, qc) calls
@@ -67,9 +72,6 @@ has 'identity' =>
      required => 1,
      builder  => '_fraction_of_pairs_matching',
      lazy     => 1);
-
-our $QC_KEY = 'qc';
-our $PROD_KEY = 'production';
 
 =head2 assayed
 

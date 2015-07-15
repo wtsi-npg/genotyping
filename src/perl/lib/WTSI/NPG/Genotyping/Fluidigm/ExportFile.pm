@@ -8,6 +8,8 @@ use Text::CSV;
 
 use WTSI::NPG::Utilities qw(trim);
 
+our $VERSION = '';
+
 our $HEADER_BARCODE_ROW = 0;
 our $HEADER_BARCODE_COL = 2;
 
@@ -53,7 +55,7 @@ sub BUILD {
     $self->logdie("Fluidigm export file '", $self->file_name,
                   "' does not exist");
 
-  open my $in, '<:encoding(utf8)', $self->file_name
+  open my $in, '<:encoding(UTF-8)', $self->file_name
     or $self->logdie("Failed to open Fluidigm export file '",
                      $self->file_name, "': $!");
   my ($header, $column_names, $sample_data) = $self->_parse_fluidigm_table($in);
@@ -127,7 +129,7 @@ sub write_assay_result_data {
 
   $csv->column_names($self->column_names);
 
-  open my $out, '>:encoding(utf8)', $file_name
+  open my $out, '>:encoding(UTF-8)', $file_name
     or $self->logcroak("Failed to open Fluidigm CSV file '$file_name' ",
                        "for writing: $!");
 
@@ -189,7 +191,6 @@ sub fluidigm_fingerprint {
 
 sub _parse_fluidigm_table {
   my ($self, $fh) = @_;
-  binmode($fh, ':utf8');
 
   # True if we are in the header lines from 'Chip Run Info' to 'Allele
   # Axis Mapping' inclusive
@@ -214,12 +215,12 @@ sub _parse_fluidigm_table {
   while (my $line = <$fh>) {
     ++$line_num;
     chomp($line);
-    next if $line =~ m/^\s*$/;
+    next if $line =~ m{^\s*$}msx;
 
-    if ($line =~ /^Chip Run Info/) { $in_header = 1 }
-    if ($line =~ /^Experiment/)    { $in_header = 0 }
-    if ($line =~ /^ID/)            { $in_column_names = 1 }
-    if ($line =~ /^S[0-9]+\-[A-Z][0-9]+/) {
+    if ($line =~ m{^Chip\sRun\sInfo}msx) { $in_header = 1 }
+    if ($line =~ m{^Experiment}msx)    { $in_header = 0 }
+    if ($line =~ m{^ID}msx)            { $in_column_names = 1 }
+    if ($line =~ m{^S\d+\-[[:upper:]]\d+}msx) {
       $in_column_names = 0;
       $in_sample_block = 1;
     }
@@ -331,7 +332,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

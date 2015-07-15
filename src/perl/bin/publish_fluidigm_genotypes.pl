@@ -29,6 +29,7 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
 our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
@@ -110,7 +111,7 @@ sub run {
     (epoch => $end->epoch)->subtract(days => $days);
 
   my $dir_test = modified_between($begin->epoch, $end->epoch);
-  my $dir_regex = qr{^[0-9]{10}$}msxi;
+  my $dir_regex = qr{^\d{10}$}msxi;
   my $source_dir = abs_path($source);
   my $relative_depth = 2;
 

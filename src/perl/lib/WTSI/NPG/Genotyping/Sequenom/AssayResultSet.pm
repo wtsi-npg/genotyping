@@ -11,6 +11,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResult;
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
   'WTSI::NPG::Genotyping::Annotation';
 
+our $VERSION = '';
+
 our $HEADER = "ALLELE\tASSAY_ID\tCHIP\tCUSTOMER\tEXPERIMENT\tGENOTYPE_ID\tHEIGHT\tMASS\tPLATE\tPROJECT\tSAMPLE_ID\tSTATUS\tWELL_POSITION";
 
 has '+data_object' =>
@@ -136,7 +138,7 @@ sub _parse_assay_results {
     }
 
     # Ignore empty lines
-    if ($str =~ m{^\s*$}) {
+    if ($str =~ m{^\s*$}msx) {
       next;
     }
 
@@ -192,7 +194,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

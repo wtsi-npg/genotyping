@@ -6,6 +6,8 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 
+our $VERSION = '';
+
 __PACKAGE__->table('pipemeta');
 __PACKAGE__->add_columns
   ('schema_version',   { data_type => 'text',

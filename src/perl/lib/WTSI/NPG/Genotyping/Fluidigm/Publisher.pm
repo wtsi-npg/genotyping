@@ -15,6 +15,8 @@ use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 

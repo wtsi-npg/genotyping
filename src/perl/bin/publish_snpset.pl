@@ -15,6 +15,8 @@ use Pod::Usage;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Genotyping::SNPSetPublisher;
 
+our $VERSION = '';
+
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
 

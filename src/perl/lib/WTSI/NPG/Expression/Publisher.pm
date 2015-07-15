@@ -12,6 +12,8 @@ use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
   'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
@@ -186,8 +188,8 @@ sub _build_resultsets {
     my ($idat, $xml) = ('', '');
 
     foreach my $path (@fileset) {
-      if ($path =~ m{\.idat$}msi)   { $idat = $path }
-      elsif ($path =~ m{\.xml$}msi) { $xml = $path }
+      if    ($path =~ m{[.]idat$}msxi) { $idat = $path }
+      elsif ($path =~ m{[.]xml$}msxi)  { $xml  = $path }
       else {
         $self->warn("Failed to collate a resultset for beadchip ",
                     "'$beadchip' section '$section' because it ",
@@ -229,9 +231,9 @@ sub _build_filesets {
     my ($beadchip, $section, $suffix) =
       $filename =~ m{^
                      (\d{10})        # beadchip
-                     _([A-Z])        # beadchip section
+                     _([[:upper:]])  # beadchip section
                      _Grn            # channel, always Grn
-                     \.(\S+)         # suffix
+                     [.](\S+)         # suffix
                      $}msxi;
 
     unless ($beadchip && $section && $suffix) {
@@ -264,7 +266,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013, 2014, 2015 Genome Research Limited. All Rights
+Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify

@@ -10,6 +10,7 @@ use Getopt::Long;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
@@ -24,6 +25,7 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 4;
 
@@ -119,10 +121,10 @@ sub run {
   }
 
   my $total = scalar @infinium_data;
-  my $updated = 0;
+  my $num_updated = 0;
 
   if ($stdio) {
-    $log->info("Updating metadata on $updated/$total data objects in ",
+    $log->info("Updating metadata on $num_updated/$total data objects in ",
                "file list");
   }
   else {
@@ -130,27 +132,24 @@ sub run {
   }
 
   foreach my $data_object (@infinium_data) {
-    eval {
+    try {
       my $ido = WTSI::NPG::Genotyping::Infinium::InfiniumDataObject->new
         ($irods, $data_object);
       $ido->update_secondary_metadata($ssdb);
-      ++$updated;
-    };
 
-    if ($@) {
-      $log->error("Failed to update metadata for '$data_object': ", $@);
-    }
-    else {
-      $log->info("Updated metadata for '$data_object': $updated of $total");
-    }
+      $num_updated++;
+      $log->info("Updated metadata for '$data_object': $num_updated of $total");
+    } catch {
+      $log->error("Failed to update metadata for '$data_object': ", $_);
+    };
   }
 
   if ($stdio) {
-    $log->info("Updated metadata on $updated/$total data objects in ",
+    $log->info("Updated metadata on $num_updated/$total data objects in ",
                "file list");
   }
   else {
-    $log->info("Updated metadata on $updated/$total data objects in ",
+    $log->info("Updated metadata on $num_updated/$total data objects in ",
                "'$publish_dest'");
   }
 

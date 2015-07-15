@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Reference;
 
 use Moose;
 
+our $VERSION = '';
+
 has 'canonical_name' => (is => 'ro', isa => 'Str', required => 0);
 has 'name'           => (is => 'ro', isa => 'Str', required => 1);
 

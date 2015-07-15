@@ -6,6 +6,8 @@ use Data::Dump qw(dump);
 use Moose;
 use Try::Tiny;
 
+our $VERSION = '';
+
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';

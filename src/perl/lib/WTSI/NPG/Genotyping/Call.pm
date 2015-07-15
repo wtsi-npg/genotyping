@@ -7,6 +7,8 @@ use Moose;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'snp' =>
@@ -19,10 +21,17 @@ has 'genotype' =>
    isa      => SNPGenotype,
    required => 1);
 
-has 'is_call' =>
-  (is       => 'rw',
-   isa      => 'Bool',
-   default  => 1); # used to represent 'no calls'
+has 'is_call'    =>
+  (is            => 'rw',
+   isa           => 'Bool',
+   default       => 1,
+   documentation => "used to represent 'no calls'");
+
+has 'qscore'     =>
+  (is            => 'ro',
+   isa           => 'Maybe['.QualityScore.']',
+   documentation => "May be a Phred quality score (positive integer),".
+       " or undef if the score is missing or not defined");
 
 sub BUILD {
   my ($self) = @_;
@@ -124,7 +133,7 @@ sub is_homozygous_complement {
 
   my $rr = $r . $r;
   my $aa = $a . $a;
-  my $cgt = _complement($self->genotype);
+  my $cgt = $self->_complement($self->genotype);
 
   return $cgt eq $rr || $cgt eq $aa;
 }
@@ -149,7 +158,7 @@ sub is_heterozygous_complement {
 
   my $ra = $r . $a;
   my $ar = $a . $r;
-  my $cgt = _complement($self->genotype);
+  my $cgt = $self->_complement($self->genotype);
 
   return $cgt eq $ra || $cgt eq $ar;
 }
@@ -175,7 +184,7 @@ sub is_complement {
   my $aa = $a . $a; # Homozygous alt
   my $ra = $r . $a; # Heterozygous
   my $ar = $a . $r; # Heterozygous
-  my $cgt = _complement($self->genotype);
+  my $cgt = $self->_complement($self->genotype);
 
   return $cgt eq $rr || $cgt eq $aa || $cgt eq $ra || $cgt eq $ar;
 }
@@ -186,18 +195,25 @@ sub is_complement {
 
   Example    : my $new_call = $call->complement
   Description: Return a new call object whose genotype is complemented
-               with respect to the original.
+               with respect to the original, retaining qscore (if any).
   Returntype : WTSI::NPG::Genotyping::Call
 
 =cut
 
 sub complement {
   my ($self) = @_;
-
-  return WTSI::NPG::Genotyping::Call->new
-    (snp      => $self->snp,
-     genotype => _complement($self->genotype),
-     is_call  => $self->is_call);
+  if (defined($self->qscore)) {
+      return WTSI::NPG::Genotyping::Call->new
+          (snp      => $self->snp,
+           genotype => $self->_complement($self->genotype),
+           qscore   => $self->qscore,
+           is_call  => $self->is_call);
+  } else {
+      return WTSI::NPG::Genotyping::Call->new
+          (snp      => $self->snp,
+           genotype => $self->_complement($self->genotype),
+           is_call  => $self->is_call);
+  }
 }
 
 =head2 merge
@@ -262,6 +278,9 @@ sub equivalent {
   $self->snp->equals($other->snp) or
     $self->logconfess("Attempted to compare calls for non-identical SNPs: ",
                       $self->snp->name, " and ", $other->snp->name);
+  # If $self is a GenderMarkerCall, $self->snp->equals will use the equals()
+  # method of the GenderMarker class. So two GenderMarkerCalls are equal
+  # iff their GenderMarker attributes are equal.
 
   my $equivalent = 0;
 
@@ -317,7 +336,7 @@ sub str {
 }
 
 sub _complement {
-  my ($genotype) = @_;
+  my ($self, $genotype) = @_;
 
   $genotype =~ tr/ACGTNacgtn/TGCANtgcan/;
   return $genotype;
