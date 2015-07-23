@@ -12,6 +12,10 @@ our $NO_TEMPLATE_CONTROL = 'NTC';
 our $NO_CALL             = 'No Call';
 our $INVALID_NAME        = 'Invalid';
 
+# Fluidigm 'score' of 100 is interpreted to mean '> 99.995'
+# Equivalent to Phred score of 43
+our $QUALITY_CEILING     = 43;
+
 # TODO Remove duplication of $NO_CALL_GENOTYPE in Subscriber.pm
 our $NO_CALL_GENOTYPE    = 'NN';
 
@@ -249,15 +253,31 @@ sub sample_address {
                Convert this to Phred: -10 * log10(Pr(error))
                Round to nearest integer
 
+               Fluidigm sometimes has a percentage score of 0 (for no-calls)
+               or 100. Parse these respectively as 'undef' and a Phred score
+               of 50 (indicating accuracy of 99.999%, assuming the Fluidigm
+               score is accurate only to 2 decimal places).
+
+               (Note that a quality score of zero is meaningless, as you
+               cannot do worse than random guessing.)
+
   Returntype : QualityScore
 
 =cut
 
 sub qscore {
     my ($self) = @_;
-    my $pr_error = 1 - ($self->confidence / 100);
-    my $qscore = -10 * log10($pr_error);
-    $qscore = int($qscore + 0.5); # initial qscore is guaranteed non-negative
+    my $qscore;
+    if ($self->confidence > 100) {
+        $self->logcroak("Illegal confidence score of > 100%");
+    } elsif ($self->confidence == 100) {
+        $qscore = $QUALITY_CEILING;
+    } elsif ($self->confidence > 0) {
+        my $pr_error = 1 - ($self->confidence / 100);
+        $qscore = -10 * log10($pr_error);
+        $qscore = int($qscore + 0.5); # initial qscore always non-negative
+    }
+    # $qscore is undefined if confidence == 0
     return $qscore;
 }
 

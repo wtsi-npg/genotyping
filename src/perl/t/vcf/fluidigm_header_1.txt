@@ -1,4 +1,4 @@
-##fileformat=VCFv4.0
+##fileformat=VCFv4.2
 ##fileDate=20140908
 ##source=WTSI_NPG_genotyping_pipeline
 ##reference=irods:///seq/fluidigm/multiplexes/qc_fluidigm_snp_info_GRCh37.tsv

@@ -28,7 +28,7 @@ our $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 our $FLUIDIGM_TYPE = 'fluidigm';
 
 BEGIN {
-    use_ok('WTSI::NPG::Genotyping::VCF::AssayResultReader');
+    use_ok('WTSI::NPG::Genotyping::VCF::AssayResultParser');
     use_ok('WTSI::NPG::Genotyping::VCF::DataRow');
     use_ok('WTSI::NPG::Genotyping::VCF::DataRowParser');
     use_ok('WTSI::NPG::Genotyping::VCF::Header');
@@ -40,7 +40,7 @@ BEGIN {
 }
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::VCF::AssayResultReader;
+use WTSI::NPG::Genotyping::VCF::AssayResultParser;
 use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 
 my $data_path = './t/vcf';
@@ -110,17 +110,23 @@ sub fluidigm_file_test : Test(116) {
         push(@inputs, abs_path($data_path."/".$name));
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
-    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
-        (inputs => \@inputs,
+    my @resultsets;
+    foreach my $input (@inputs) {
+        my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+            $input);
+        push @resultsets, $result;
+    }
+    my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
+        (resultsets => \@resultsets,
          input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
 	 reference => $reference_fluidigm);
-    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_dataset = $parser->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Fluidigm results to VCF with input from file");
-    _test_vcf_output($vcf_fluidigm, $vcf_file);
+    _test_vcf_output($vcf_fluidigm, $vcf_file, 'fluidigm_file_test');
     _test_fluidigm_gtcheck($vcf_file);
     # test the calls_by_sample method of VCFDataSet
     my $calls_by_sample = $vcf_dataset->calls_by_sample();
@@ -137,20 +143,28 @@ sub fluidigm_file_test : Test(116) {
 sub fluidigm_irods_test : Test(7) {
     # upload test data to temporary irods collection
     my @inputs = _upload_fluidigm();
+    my @resultsets;
+    foreach my $input (@inputs) {
+        my $data_obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new(
+            $irods, $input);
+        my $result = WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+            $data_obj);
+        push @resultsets, $result;
+    }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
-    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
-        (inputs => \@inputs,
+    my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
+        (resultsets => \@resultsets,
          irods => $irods,
          input_type => $FLUIDIGM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
 	 reference => $reference_fluidigm,
          );
-    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_dataset = $parser->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_fluidigm.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Fluidigm results to VCF with input from iRODS");
-    _test_vcf_output($vcf_fluidigm, $vcf_file);
+    _test_vcf_output($vcf_fluidigm, $vcf_file, 'fluidigm_irods_test');
     _test_fluidigm_gtcheck($vcf_file);
 }
 
@@ -228,38 +242,52 @@ sub sequenom_file_test : Test(7) {
     foreach my $name (@sequenom_csv) {
         push @inputs, abs_path($data_path."/".$name);
     }
+    my @resultsets;
+    foreach my $input (@inputs) {
+        my $result = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+            $input);
+        push @resultsets, $result;
+    }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
-    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
-        (inputs => \@inputs,
+    my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
+        (resultsets => \@resultsets,
          input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
 	 reference => $reference_sequenom);
-    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_dataset = $parser->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Sequenom results to VCF with input from file");
-    _test_vcf_output($vcf_sequenom, $vcf_file);
+    _test_vcf_output($vcf_sequenom, $vcf_file, 'sequenom_file_test');
     _test_sequenom_gtcheck($vcf_file);
 }
 
 sub sequenom_irods_test : Test(7) {
     # upload test data to temporary irods collection
     my @inputs = _upload_sequenom();
+    my @resultsets;
+    foreach my $input (@inputs) {
+        my $data_obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
+            $irods, $input);
+        my $result = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+            $data_obj);
+        push @resultsets, $result;
+    }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
-    my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
-        (inputs => \@inputs,
+    my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
+        (resultsets => \@resultsets,
          irods => $irods,
          input_type => $SEQUENOM_TYPE,
          snpset => $snpset,
          contig_lengths => $chromosome_lengths,
 	 reference => $reference_sequenom,
          );
-    my $vcf_dataset = $reader->get_vcf_dataset();
+    my $vcf_dataset = $parser->get_vcf_dataset();
     my $vcf_file = $tmp.'/conversion_test_sequenom.vcf';
     ok($vcf_dataset->write_vcf($vcf_file),
        "Converted Sequenom results to VCF with input from iRODS");
-    _test_vcf_output($vcf_sequenom, $vcf_file);
+    _test_vcf_output($vcf_sequenom, $vcf_file, 'sequenom_irods_test');
     _test_sequenom_gtcheck($vcf_file);
 }
 
@@ -285,7 +313,7 @@ sub script_conversion_test : Test(3) {
     ok(-e $vcfOutput, "VCF output written");
     # read VCF output (omitting date) and compare to reference file
     my @buffer = ();
-    _test_vcf_output($vcf_sequenom, $vcfOutput);
+    _test_vcf_output($vcf_sequenom, $vcfOutput, 'script_conversion_test');
 }
 
 sub script_gtcheck_test : Test(4) {
@@ -368,7 +396,7 @@ sub _remove_filedate {
     my @lines_out;
     foreach my $line (@lines_in) {
         if ( $line =~ /^[#]{2}fileDate/msx ) { next; }
-        else { push(@lines_out, $_); }
+        else { push(@lines_out, $line); }
     }
     return \@lines_out;
 }
@@ -429,11 +457,11 @@ sub _test_sequenom_gtcheck {
 }
 
 sub _test_vcf_output {
-    my ($outPath, $refPath) = @_;
+    my ($outPath, $refPath, $name) = @_;
     # read VCF output (omitting date) and compare to reference file
     my $gotVCF = _read_without_filedate($outPath);
     my $expectedVCF = _read_without_filedate($refPath);
-    is_deeply($gotVCF, $expectedVCF, "VCF outputs match");
+    is_deeply($gotVCF, $expectedVCF, "VCF outputs match for test $name");
 }
 
 sub _upload_fluidigm {
