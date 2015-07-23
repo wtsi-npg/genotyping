@@ -9,6 +9,7 @@ extends 'WTSI::NPG::Genotyping::VCF::Parser';
 use MooseX::Types::Moose qw(Int);
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
 
 with 'WTSI::DNAP::Utilities::Loggable';
@@ -94,18 +95,24 @@ sub _call_from_vcf_string {
     }
     my ($gt, $gq, $dp) = @terms;
     my ($genotype, $is_call);
-    if ($gt eq '.') {
-        $genotype = 'NN';
-        $is_call = 0;
-    } else {
-        my $pattern = '[/]|[|]';
-        my @gt = split qr/$pattern/msx, $gt;
-        if (scalar @gt != 2) {
-            $self->logcroak("Found (", join(', ', @gt),
-                            "); expected exactly two alleles separated ",
-                            "by '/' or '|'");
+    my $pattern = '[/]|[|]';
+    my @gt = split qr/$pattern/msx, $gt;
+    # members of @gt are one of (0, 1, .)
+    my $gt_total = scalar @gt;
+    if ($gt_total == 0) {
+        $self->logcroak("Expected at least one genotype, found none");
+    } elsif ($gt_total == 1) { # haploid variant
+        if ($gt[0] eq '.') {
+            $genotype = 'NN';
+            $is_call = 0;
+        } elsif ($gt[0] eq '0') {
+            $genotype = $ref.$ref;
+            $is_call = 1;
+        } elsif ($gt[0] eq '1') {
+            $genotype = $alt.$alt;
+            $is_call = 1;
         }
-        # members of @gt are one of (0, 1, .)
+    } elsif ($gt_total == 2) { # diploid variant
         if ($gt[0] eq '.' && $gt[1] eq '.') {
             $genotype = 'NN';
             $is_call = 0;
@@ -117,19 +124,25 @@ sub _call_from_vcf_string {
             if ($gt[1] eq '0') { push @gt_alleles, $ref; }
             elsif ($gt[1] eq '1') { push @gt_alleles, $alt; }
             elsif ($gt[1] eq '.') { push @gt_alleles, $gt[0]; } # homozygote
-            else { $self->logcroak("Illegal allele code: '", $gt[0], "'"); }
+            else { $self->logcroak("Illegal allele code: '", $gt[1], "'"); }
             $genotype = join '', @gt_alleles;
             $is_call = 1;
         }
+    } else {
+        $self->logcroak("More than two variant alleles not supported");
     }
     my $qscore;
     if (is_Int($gq)) { $qscore = $gq; }
-    return WTSI::NPG::Genotyping::Call->new
+    my $call = WTSI::NPG::Genotyping::Call->new
         (snp      => $snp,
          genotype => $genotype,
          is_call  => $is_call,
          qscore   => $qscore
      );
+    if ($snp->strand eq '-') {
+        $call = $call->complement();
+    }
+    return $call;
 }
 
 sub _parse_data_row {
@@ -151,19 +164,33 @@ sub _parse_data_row {
     my @calls;
     my $i = $self->_field_index('SAMPLE_START');
     while ($i < scalar @fields) {
-      push(@calls, $self->_call_from_vcf_string(
-          $fields[$i],
-          $fields[$self->_field_index('REF_ALLELE')],
-          $fields[$self->_field_index('ALT_ALLELE')],
-          $snp)
-       );
-      $i++;
+        my $variant;
+        if (is_GenderMarker($snp)) {
+            my $chromosome = $fields[$self->_field_index('CHROMOSOME')];
+            if (is_HsapiensX($chromosome)) {
+                $variant = $snp->x_marker;
+            } elsif (is_HsapiensY($chromosome)) {
+                $variant = $snp->y_marker;
+            } else {
+                $self->logcroak("Expected Homo Sapiens X or Y chromosome ",
+                                "for gender marker; got '", $chromosome, "'");
+            }
+        } else {
+            $variant = $snp;
+        }
+        push(@calls, $self->_call_from_vcf_string(
+            $fields[$i],
+            $fields[$self->_field_index('REF_ALLELE')],
+            $fields[$self->_field_index('ALT_ALLELE')],
+            $variant)
+         );
+        $i++;
     }
     return WTSI::NPG::Genotyping::VCF::DataRow->new
-      (qscore          => $qscore,
-       filter          => $fields[$self->_field_index('FILTER')],
-       additional_info => $fields[$self->_field_index('INFO')],
-       calls           => \@calls);
+        (qscore          => $qscore,
+         filter          => $fields[$self->_field_index('FILTER')],
+         additional_info => $fields[$self->_field_index('INFO')],
+         calls           => \@calls);
 }
 
 

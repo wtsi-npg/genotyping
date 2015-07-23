@@ -2,6 +2,7 @@
 package WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 
 use Moose;
+use JSON;
 use List::AllUtils qw(all natatime reduce uniq);
 use Try::Tiny;
 
@@ -17,72 +18,25 @@ our $VERSION = '';
 # TODO Remove duplication of $NO_CALL_GENOTYPE in AssayResult.pm
 our $NO_CALL_GENOTYPE = 'NN';
 
+our $CHROMOSOME_JSON_ATTR = 'chromosome_json';
+
 # The largest number of bind variables iRODS supports for 'IN'
 # queries.
 our $BATCH_QUERY_CHUNK_SIZE = 100;
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation',
-  'WTSI::NPG::Genotyping::Annotation';
+  'WTSI::NPG::Genotyping::Annotation', 'WTSI::NPG::Genotyping::Subscription';
 
-has 'data_path' =>
+has '_plex_name_attr' =>
   (is            => 'ro',
    isa           => 'Str',
-   required      => 1,
-   default       => sub { return '/' },
-   writer        => '_set_data_path',
-   documentation => 'The iRODS path under which the raw data are found');
-
-has 'irods'      =>
-  (is            => 'ro',
-   isa           => 'WTSI::NPG::iRODS',
-   required      => 1,
-   default       => sub { return WTSI::NPG::iRODS->new },
-   documentation => 'An iRODS handle');
-
-has 'reference_path' =>
-  (is            => 'ro',
-   isa           => 'Str',
-   required      => 1,
-   default       => sub { return '/' },
-   writer        => '_set_reference_path',
-   documentation => 'The iRODS path under which the reference and ' .
-                    'SNP set data are found');
-
-has 'reference_name' =>
-  (is            => 'ro',
-   isa           => 'Str',
-   required      => 1,
-   documentation => 'The name of the reference on which the SNP set ' .
-                    ' is defined e.g. "Homo sapiens (1000 Genomes)"');
-
-has 'snpset_name' =>
-  (is            => 'ro',
-   isa           => 'Str',
-   required      => 1,
-   documentation => 'The name of the SNP set e.g. "qc"');
-
-has '_snpset' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::SNPSet',
-   required => 1,
-   builder  => '_build_snpset',
-   lazy     => 1,
-   init_arg => undef);
-
-sub BUILD {
-  my ($self) = @_;
-
-  # Make our irods handle use our logger by default
-  $self->irods->logger($self->logger);
-
-  # Ensure that the iRODS path is absolute so that its zone can be
-  # determined.
-  my $abs_ref_path = $self->irods->absolute_path($self->reference_path);
-  $self->_set_reference_path($abs_ref_path);
-
-  my $abs_data_path = $self->irods->absolute_path($self->data_path);
-  $self->_set_data_path($abs_data_path);
-}
+   init_arg      => undef,
+   default       => sub {
+       my ($self) = @_;
+       return $self->fluidigm_plex_name_attr;
+   },
+   lazy          => 1,
+   documentation => 'iRODS attribute for QC plex name');
 
 =head2 get_assay_resultset
 
@@ -156,7 +110,7 @@ sub get_assay_resultsets {
   while (my @ids = $iter->()) {
     my @id_obj_paths = $self->irods->find_objects_by_meta
       ($self->data_path,
-       [$self->fluidigm_plex_name_attr => $self->snpset_name],
+       [$self->_plex_name_attr => $self->snpset_name],
        [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
     push @obj_paths, @id_obj_paths;
   }
@@ -283,32 +237,6 @@ sub get_calls {
   return \@calls;
 }
 
-sub _build_snpset {
-   my ($self) = @_;
-
-   my $snpset_name = $self->snpset_name;
-   my $reference_name = $self->reference_name;
-
-   my @obj_paths = $self->irods->find_objects_by_meta
-     ($self->reference_path,
-      [$self->fluidigm_plex_name_attr    => $snpset_name],
-      [$self->reference_genome_name_attr => $reference_name]);
-
-   my $num_snpsets = scalar @obj_paths;
-   if ($num_snpsets > 1) {
-     $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
-                       "and reference '$reference_name' ",
-                       "under reference path '", $self->reference_path,
-                       "' was not specific enough; $num_snpsets SNP sets ",
-                       "were returned: [", join(', ',  @obj_paths), "]");
-   }
-
-   my $path = shift @obj_paths;
-   my $obj = WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
-
-   return WTSI::NPG::Genotyping::SNPSet->new($obj);
-}
-
 sub _build_calls_at {
   my ($self, $assay_address, $resultsets) = @_;
 
@@ -338,11 +266,6 @@ sub _build_calls_at {
   return \@calls;
 }
 
-sub _are_unique {
-  my ($args) = @_;
-
-  return scalar @$args == uniq @$args;
-}
 
 __PACKAGE__->meta->make_immutable;
 

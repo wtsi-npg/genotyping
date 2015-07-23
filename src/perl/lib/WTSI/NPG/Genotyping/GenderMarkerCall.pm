@@ -11,6 +11,7 @@ use WTSI::NPG::Genotyping::Types qw(:all);
 
 our $VERSION = '';
 
+our $NULL_GENOTYPE = 'NN';
 our $UNKNOWN_GENDER = 0;
 our $FEMALE_GENDER = 1;
 our $MALE_GENDER = 2;
@@ -22,18 +23,12 @@ has 'snp' =>
    isa      => GenderMarker,
    required => 1);
 
-has 'gender' =>
+has '_gender' =>
     (is      => 'ro',
      isa     => 'Int',
      lazy    => 1,
-     builder => '_build_gender');
-
-sub BUILD {
-  my ($self) = @_;
-  if ($self->is_heterozygous()) {
-      $self->logcroak("Gender marker cannot have a heterozygous genotype!");
-  }
-}
+     builder => '_build_gender',
+     init_arg => undef);
 
 =head2 complement
 
@@ -65,14 +60,13 @@ sub complement {
   }
 }
 
-=head2 is_x_call
+=head2 is_female
 
   Arg [1]    : None
 
-  Example    : $is_x = $gender_marker_call->is_x_call()
-  Description: Determine whether the called genotype is an X chromosome call
-               for this gender marker. Returns true for a call on the X
-               chromosome, false for a call on the Y chromosome or no call.
+  Example    : $is_f = $gender_marker_call->is_female()
+  Description: Determine whether the called genotype is an X homozygote,
+               corresponding to a female sample.
                IMPORTANT: This only evaluates a single gender marker. It is
                not to be confused with evaluating the gender status of a
                given sample (which typically uses multiple markers).
@@ -80,20 +74,19 @@ sub complement {
 
 =cut
 
-sub is_x_call {
+sub is_female {
     my ($self) = @_;
-    if ($self->gender == $FEMALE_GENDER) { return 1; }
+    if ($self->_gender == $FEMALE_GENDER) { return 1; }
     else { return 0; }
 }
 
-=head2 is_y_call
+=head2 is_male
 
   Arg [1]    : None
 
-  Example    : $is_y = $gender_marker_call->is_y_call()
-  Description: Determine whether the called genotype is a Y chromosome call
-               for this gender marker. Returns true for a call on the Y
-               chromosome, false for a call on the X chromosome or no call.
+  Example    : $is_m = $gender_marker_call->is_male()
+  Description: Determine whether the called genotype is an X/Y heterozygote,
+               corresponding to a male sample.
                IMPORTANT: This only evaluates a single gender marker. It is
                not to be confused with evaluating the gender status of a
                given sample (which typically uses multiple markers).
@@ -101,33 +94,90 @@ sub is_x_call {
 
 =cut
 
-sub is_y_call {
+sub is_male {
     my ($self) = @_;
-    if ($self->gender == $MALE_GENDER) { return 1; }
+    if ($self->_gender == $MALE_GENDER) { return 1; }
     else { return 0; }
 }
+
+
+=head2 xy_call_pair
+
+  Arg [1]    : None
+
+  Example    : $call_pair = $gender_marker_call->xy_call_pair()
+  Description: Return Call objects for the X and Y markers belonging to
+               this GenderMarker. A male sample will have calls for both
+               X and Y; a female will have a call for X and no-call for Y.
+               A sample of unknown gender will return two no-calls.
+  Returntype : ArrayRef[WTSI::NPG::Genotyping::Call]
+
+=cut
+
+sub xy_call_pair {
+    my ($self) = @_;
+    my @calls;
+    my $x_base = $self->snp->x_allele();
+    my $y_base = $self->snp->y_allele();
+    if ($self->is_female()) {
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->x_marker,
+            genotype => $x_base.$x_base,
+            qscore   => $self->qscore,
+        ));
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->y_marker,
+            genotype => $NULL_GENOTYPE,
+            is_call  => 0,
+        ));
+    } elsif ($self->is_male()) {
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->x_marker,
+            genotype => $x_base.$x_base,
+            qscore   => $self->qscore,
+        ));
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->y_marker,
+            genotype => $y_base.$y_base,
+            qscore   => $self->qscore,
+        ));
+    } else {
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->x_marker,
+            genotype => $NULL_GENOTYPE,
+            is_call  => 0,
+        ));
+        push(@calls, WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->y_marker,
+            genotype => $NULL_GENOTYPE,
+            is_call  => 0,
+        ));
+    }
+    if ($self->snp->strand eq '-') {
+        my @complemented_calls;
+        foreach my $call (@calls) {
+            push @complemented_calls, $call->complement();
+        }
+        return \@complemented_calls;
+    } else {
+        return \@calls;
+    }
+}
+
 
 sub _build_gender {
     # find the gender, taking into account forward/reverse strand
     my ($self) = @_;
-    my $gt;
-    if ($self->snp->strand() eq '-') { # marker is on the reverse strand
-        $gt = $self->complement()->genotype();
-    } else {
-        $gt = $self->genotype();
-    }
-    my $base = substr($gt, 0, 1);
     my $gender;
-    if ($base eq $self->snp->x_marker->ref_allele) {
-        $gender = $FEMALE_GENDER;
-    } elsif ($base eq $self->snp->y_marker->ref_allele) {
-        $gender = $MALE_GENDER;
-    } elsif (!$self->is_call()) {
+    if (!$self->is_call()) {
         $gender = $UNKNOWN_GENDER;
+    } elsif ($self->is_homozygous() || $self->is_homozygous_complement) {
+        $gender = $FEMALE_GENDER;
+    } elsif ($self->is_heterozygous() || $self->is_heterozygous_complement) {
+        $gender = $MALE_GENDER;
     } else {
         $self->logcroak("Called genotype '", $self->genotype() ,
-                        "' is inconsistent with strand ",
-                        "and X/Y alleles of gender marker '",
+                        "' is inconsistent with gender marker '",
                         $self->snp->name(), "'");
     }
     return $gender;
