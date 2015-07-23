@@ -20,6 +20,7 @@ from iRODS and write as VCF (not yet in use for identity check in workflow)
 
 Fixed:
 - Bug (typo) in update_sequenom_metadata.pl
+- Corrected evaluation of gender marker status
 
 Modulefile:
 - perl-irods-wrap/1.7.0
