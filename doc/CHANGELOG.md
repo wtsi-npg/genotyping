@@ -9,10 +9,21 @@ Unreleased
 
 Added:
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
-- Obtain Sequenom calls from iRODS instead of SNP-DB
-- New script ready_qc_calls.pl to retrieve Fluidigm/Sequenom results
-from iRODS and write as VCF
 - QC check modified to read from VCF instead of database
+
+Release 1.11.0: 2015-07-23
+--------------------------
+
+Added:
+- New script ready_qc_calls.pl to retrieve Fluidigm/Sequenom results
+from iRODS and write as VCF (not yet in use for identity check in workflow)
+
+Fixed:
+- Bug (typo) in update_sequenom_metadata.pl
+
+Modulefile:
+- perl-irods-wrap/1.7.0
+- baton/1.15.0
 
 
 Release 1.10.0: 2015-07-15
