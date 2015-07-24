@@ -1,5 +1,5 @@
-sample00-A000	GS34251	T	T	sample004	Unknown	Unknown	99.99	Unknown	T:T	0.5	0.5
-sample00-A001	GS35220	C	C	sample004	Unknown	Unknown	99.99	Unknown	C:C	0.5	0.5
+sample00-A000	GS34251	C	T	sample004	Unknown	Unknown	99.99	Unknown	C:T	0.5	0.5
+sample00-A001	GS35220	C	T	sample004	Unknown	Unknown	99.99	Unknown	C:T	0.5	0.5
 sample00-A002	rs11096957	A	C	sample004	Unknown	Unknown	99.99	Unknown	A:C	0.5	0.5
 sample00-A003	rs12828016	G	T	sample004	Unknown	Unknown	99.99	Unknown	G:T	0.5	0.5
 sample00-A004	rs156697	T	C	sample004	Unknown	Unknown	99.99	Unknown	T:C	0.5	0.5

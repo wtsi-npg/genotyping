@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::AssayResultReader;
+package WTSI::NPG::Genotyping::VCF::AssayResultParser;
 
 use JSON;
 use List::AllUtils qw(uniq);
@@ -24,11 +24,8 @@ use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 with 'WTSI::DNAP::Utilities::Loggable';
 
 our $VERSION = '';
-
-our $NULL_GENOTYPE = 'NN';
 our $SEQUENOM_TYPE = 'sequenom'; # TODO remove redundancy wrt vcf_from_plex.pl
 our $FLUIDIGM_TYPE = 'fluidigm';
-our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
 has 'contig_lengths' => # must be compatible with given snpset
    (is            => 'ro',
@@ -37,27 +34,6 @@ has 'contig_lengths' => # must be compatible with given snpset
     documentation => 'Used to generate contig tags required by bcftools. '.
                      'In typical usage, each contig corresponds to a '.
                      'homo sapiens chromosome.',
-   );
-
-has 'inputs'      =>
-   (is            => 'ro',
-    isa           => 'ArrayRef[Str]',
-    required      => 1,
-    documentation => 'Input paths in iRODS or local filesystem',
-   );
-
-has 'input_type'  =>
-   (is            => 'ro',
-    isa           => Platform,
-    required      => 1,
-   );
-
-has 'irods'       =>
-   (is            => 'ro',
-    isa           => 'WTSI::NPG::iRODS',
-    documentation => '(Optional) iRODS instance from which to read data. '.
-                     'If not given, inputs are assumed to be paths on the '.
-                     'local filesystem.',
    );
 
 has 'reference'   =>
@@ -71,10 +47,11 @@ has 'reference'   =>
    );
 
 has 'resultsets' =>
-   (is       => 'ro',
-    isa      => ArrayRefOfResultSet,
-    lazy     => 1,
-    builder  => '_build_resultsets',
+   (is            => 'ro',
+    isa           => ArrayRefOfResultSet,
+    required      => 1,
+    documentation => 'Array of AssayResultSets used to find sample '.
+                     'names and calls.',
    );
 
 has 'snpset' =>
@@ -83,11 +60,11 @@ has 'snpset' =>
     required => 1,
    );
 
+
 sub BUILD {
     my ($self) = @_;
-    if (scalar @{$self->inputs} == 0) {
-        $self->logcroak("Must have at least one input path",
-                        " or iRODS location!");
+    if (scalar @{$self->resultsets} == 0) {
+        $self->logcroak("Must have at least one AssayResultSet input!");
     }
 }
 
@@ -96,8 +73,7 @@ sub BUILD {
   Arg [1]    : None
 
   Example    : my $vcf_data = $reader->get_vcf_dataset();
-  Description: Create a VCFDataSet object using the AssayResultSets which
-               have been read.
+  Description: Create a VCFDataSet object using the given AssayResultSets.
   Returntype : WTSI::NPG::Genotyping::VCF::VCFDataSet
 
 =cut
@@ -147,119 +123,32 @@ sub _build_reference {
   return join ',', @ref_names;
 }
 
-sub _build_resultsets {
-    my ($self) = @_;
-    my @results;
-    if (defined($self->irods)) { # read input from iRODS
-        foreach my $input (@{$self->inputs}) {
-            my $resultSet;
-            if ($self->input_type eq $SEQUENOM_TYPE) {
-                my $data_obj =
-                    WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
-                        $self->irods, $input);
-                $resultSet =
-                    WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
-                        data_object => $data_obj);
-            } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
-                my $data_obj =
-                    WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new(
-                        $self->irods, $input);
-                $resultSet =
-                    WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
-                        data_object => $data_obj);
-            } else {
-                $self->logcroak();
-            }
-            push @results, $resultSet;
-        }
-    } else { # read input from local filesystem
-         foreach my $input (@{$self->inputs}) {
-             my $resultSet;
-             if ($self->input_type eq $SEQUENOM_TYPE) {
-                 $resultSet =
-                     WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
-                         $input);
-             } elsif ($self->input_type eq $FLUIDIGM_TYPE) {
-                 $resultSet =
-                     WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
-                         $input);
-             } else {
-                 $self->logcroak();
-             }
-             push @results, $resultSet;
-         }
-    }
-    return \@results;
-}
-
 sub _gender_rows {
     # create X and Y DataRow objects for the given gender marker and calls
+    # we may have:
+    # - X call, Y no-call (female sample)
+    # - X call, Y call (male sample)
+    # - X no-call, Y no-call (unknown gender)
     my ($self, $snp, $calls) = @_;
     my (@x_calls, @y_calls);
     foreach my $call (@{$calls}) {
         # output two data rows, for X and Y respectively
-        # (at least) one of the two outputs is a no-call
-        my $base = substr($call->genotype, 0, 1);
-        if ($call->is_x_call()) {
-            push(@x_calls, WTSI::NPG::Genotyping::Call->new(
-                snp      => $snp->x_marker,
-                genotype => $call->genotype,
-                qscore   => $call->qscore,
-            ));
-            push(@y_calls, $self->_generate_no_call($snp->y_marker));
-        } elsif ($call->is_y_call()) {
-            push(@x_calls, $self->_generate_no_call($snp->x_marker));
-            push(@y_calls, WTSI::NPG::Genotyping::Call->new(
-                snp      => $snp->y_marker,
-                genotype => $call->genotype(),
-                qscore   => $call->qscore(),
-            ));
-        } elsif (!$call->is_call()) {
-            push(@x_calls, $self->_generate_no_call($snp->x_marker));
-            push(@y_calls, $self->_generate_no_call($snp->y_marker));
-            push @x_calls, WTSI::NPG::Genotyping::Call->new(
-                snp      => $snp->x_marker,
-                genotype => $call->genotype,
-                qscore   => $call->qscore,
-            );
-            push @y_calls, $self->_generate_no_call($snp->y_marker);
-        } elsif ($call->is_y_call()) {
-            push @x_calls, $self->_generate_no_call($snp->x_marker);
-            push @y_calls, WTSI::NPG::Genotyping::Call->new(
-                snp      => $snp->y_marker,
-                genotype => $call->genotype(),
-                qscore   => $call->qscore(),
-            );
-        } elsif (!$call->is_call()) {
-            push @x_calls, $self->_generate_no_call($snp->x_marker);
-            push @y_calls, $self->_generate_no_call($snp->y_marker);
-        } else {
-            $self->logcroak("Invalid genotype of '", $call->genotype,
-                            "' for gender marker ", $snp->name,
-                            "; valid non-null alleles are ",
-                            $snp->ref_allele, " or ",
-                            $snp->alt_allele);
-        }
+        # each row requires a list of calls
+        my ($x_call, $y_call) = @{$call->xy_call_pair()};
+        push @x_calls, $x_call;
+        push @y_calls, $y_call;
     }
     my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-        calls => \@x_calls,
+        snp             => $snp->x_marker,
+        calls           => \@x_calls,
         additional_info => "ORIGINAL_STRAND=".$snp->strand
     );
     my $y_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
-        calls => \@y_calls,
+        snp             => $snp->y_marker,
+        calls           => \@y_calls,
         additional_info => "ORIGINAL_STRAND=".$snp->strand
     );
     return ($x_row, $y_row);
-}
-
-sub _generate_no_call {
-    # convenience method to generate a no-call on the given variant
-    my ($self, $snp) = @_;
-    return WTSI::NPG::Genotyping::Call->new(
-        snp      => $snp,
-        genotype => $NULL_GENOTYPE,
-        is_call  => 0,
-    );
 }
 
 sub _parse_assay_results {
@@ -317,6 +206,7 @@ sub _parse_assay_results {
     return (\%calls, \@sortedSamples);
 }
 
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -327,12 +217,12 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::VCF::VCFConverter
+WTSI::NPG::Genotyping::VCF::AssayResultParser
 
 =head1 DESCRIPTION
 
-A class for conversion of output files from the Fluidigm/Sequenom genotyping
-platforms to VCF format.
+A class for conversion of AssayResultSet objects from the Fluidigm/Sequenom
+genotyping platforms to VCF format.
 
 =head1 AUTHOR
 
@@ -340,7 +230,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

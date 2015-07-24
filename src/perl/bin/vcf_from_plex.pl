@@ -7,6 +7,7 @@ package main;
 use strict;
 use warnings;
 use Carp;
+use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
 use Log::Log4perl;
@@ -15,7 +16,7 @@ use Pod::Usage;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Utilities qw(user_session_log);
-use WTSI::NPG::Genotyping::VCF::AssayResultReader;
+use WTSI::NPG::Genotyping::VCF::AssayResultParser;
 use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 our $VERSION = '';
@@ -45,7 +46,7 @@ my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
     $debug, $quiet, $reference, $snpset_path, $chromosome_json);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
-our $SEQUENOM_TYPE = 'sequenom'; # TODO redundant wrt AssayResultReader
+our $SEQUENOM_TYPE = 'sequenom';
 our $FLUIDIGM_TYPE = 'fluidigm';
 
 my $irods;
@@ -90,7 +91,7 @@ if ($use_irods) {
         ($irods, $snpset_path);
     $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
     if ($chromosome_json) {
-        $chromosome_lengths = _read_json($chromosome_json);
+        $chromosome_lengths = decode_json(read_file($chromosome_json));
     } else {
         $chromosome_lengths = _chromosome_lengths_irods($irods, $snpset_obj);
     }
@@ -101,7 +102,7 @@ if ($use_irods) {
     } elsif (!(-e $chromosome_json)) {
         $log->logcroak("Chromosome path '$chromosome_json' does not exist");
     }
-    $chromosome_lengths = _read_json($chromosome_json);
+    $chromosome_lengths = decode_json(read_file($chromosome_json));
 }
 
 ### read inputs ###
@@ -126,17 +127,65 @@ if ($input ne '-') {
 
 ### process inputs and write VCF output ###
 
-my %readerArgs = (inputs => \@inputs,
+my $resultsets = _build_resultsets(\@inputs, $inputType, $irods);
+
+my %parserArgs = (resultsets => $resultsets,
                   input_type => $inputType,
                   snpset => $snpset,
                   contig_lengths => $chromosome_lengths,
 		  reference => $reference);
-if ($use_irods) { $readerArgs{irods} = $irods; }
+if ($use_irods) { $parserArgs{irods} = $irods; }
 
-my $reader = WTSI::NPG::Genotyping::VCF::AssayResultReader->new
-    (\%readerArgs);
-my $vcf_dataset = $reader->get_vcf_dataset();
+my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
+    (\%parserArgs);
+my $vcf_dataset = $parser->get_vcf_dataset();
 $vcf_dataset->write_vcf($vcfPath);
+
+
+sub _build_resultsets {
+    my ($inputs, $input_type, $irods) = @_;
+    my @results;
+    if (defined($irods)) { # read input from iRODS
+        foreach my $input (@{$inputs}) {
+            my $resultSet;
+            if ($input_type eq $SEQUENOM_TYPE) {
+                my $data_obj =
+                    WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new(
+                        $irods, $input);
+                $resultSet =
+                    WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                        data_object => $data_obj);
+            } elsif ($input_type eq $FLUIDIGM_TYPE) {
+                my $data_obj =
+                    WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new(
+                        $irods, $input);
+                $resultSet =
+                    WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                        data_object => $data_obj);
+            } else {
+                $log->logcroak();
+            }
+            push @results, $resultSet;
+        }
+    } else { # read input from local filesystem
+         foreach my $input (@{$inputs}) {
+             my $resultSet;
+             if ($input_type eq $SEQUENOM_TYPE) {
+                 $resultSet =
+                     WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new(
+                         $input);
+             } elsif ($input_type eq $FLUIDIGM_TYPE) {
+                 $resultSet =
+                     WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new(
+                         $input);
+             } else {
+                 $log->logcroak();
+             }
+             push @results, $resultSet;
+         }
+    }
+    return \@results;
+}
 
 sub _chromosome_lengths_irods {
     # get reference to a hash of chromosome lengths
@@ -152,16 +201,6 @@ sub _chromosome_lengths_irods {
     my $data_object = WTSI::NPG::iRODS::DataObject->new
         ($irods, $chromosome_json);
     return decode_json($data_object->slurp());
-}
-
-sub _read_json {
-    # read given path into a string and decode as JSON
-    my $input = shift;
-    open my $in, '<:encoding(utf8)', $input ||
-        log->logcroak("Cannot open input '$input'");
-    my $data = decode_json(join("", <$in>));
-    close $in || $log->logcroak("Cannot close input '$input'");
-    return $data;
 }
 
 

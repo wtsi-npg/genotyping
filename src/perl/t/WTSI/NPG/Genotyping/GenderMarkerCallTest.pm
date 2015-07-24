@@ -34,11 +34,9 @@ sub constructor : Test(4) {
   new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
          [genotype => 'NN',
           snp      => $snp]);
-  dies_ok {
-      WTSI::NPG::Genotyping::GenderMarkerCall->new(
-          {genotype => 'CT',
-           snp      => $snp});
-  } "Cannot construct gender marker from heterozygous genotype";
+  new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
+         [genotype => 'CT',
+          snp      => $snp]); # can have a het call for a male sample
 }
 
 sub equivalent : Test(8) {
@@ -81,21 +79,21 @@ sub gender_attribute : Test(6) {
         genotype => 'TT',
         snp      => $snp
     );
-    ok($x_call->is_x_call(), "Female gender marker call is an X call");
-    ok(!$x_call->is_y_call(), "Female gender marker call is not a Y call");
+    ok($x_call->is_female(), "Female gender marker call is an X call");
+    ok(!$x_call->is_male(), "Female gender marker call is not a Y call");
     my $y_call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
-        genotype => 'CC',
+        genotype => 'CT',
         snp      => $snp
     );
-    ok(!$y_call->is_x_call(), "Male gender marker call is not an X call");
-    ok($y_call->is_y_call(), "Male gender marker call is a Y call");
+    ok(!$y_call->is_female(), "Male gender marker call is not an X call");
+    ok($y_call->is_male(), "Male gender marker call is a Y call");
     my $no_call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
         genotype => 'NN',
         snp      => $snp,
         is_call  => 0
     );
-    ok(!$no_call->is_x_call(), "Null gender marker call is not an X call");
-    ok(!$no_call->is_y_call(), "Null gender marker call is not a Y call");
+    ok(!$no_call->is_female(), "Null gender marker call is not an X call");
+    ok(!$no_call->is_male(), "Null gender marker call is not a Y call");
 }
 
 sub complement : Test(4) {

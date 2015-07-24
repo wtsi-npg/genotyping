@@ -1,0 +1,7 @@
+{
+    "irods_data_path": "/seq/sequenom",
+    "platform": "sequenom",
+    "reference_name": "Homo_sapiens (1000Genomes)",
+    "reference_path": "/seq/sequenom/multiplexes",
+    "snpset_name": "W30467"
+}

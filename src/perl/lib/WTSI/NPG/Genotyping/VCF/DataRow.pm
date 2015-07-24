@@ -53,7 +53,10 @@ has 'is_haploid' =>
      isa      => 'Bool',
      builder  => '_build_haploid_status',
      lazy     => 1,
-     documentation => 'True for human X or Y chromosome, false otherwise'
+     documentation => 'Defaults to true for human X or Y chromosome,'.
+                      'false otherwise. May be appropriate to override '.
+                      'the default with an initarg, eg. for a diploid '.
+                      'X variant.'
     );
 
 # NB this class does not have the sample names; they are stored in VCF header
@@ -146,7 +149,7 @@ sub _build_vcf_chromosome_name {
 
 sub _call_to_vcf_field {
     # convert Call object to string of colon-separated sub-fields
-    # sub-fields are genotype in VCf format, quality score, read depth
+    # sub-fields are genotype in VCF format, quality score, read depth
     my ($self, $call) = @_;
     if ($self->snp->strand eq '-') { # reverse strand, use complement of call
         $call = $call->complement();
@@ -162,6 +165,12 @@ sub _call_to_vcf_field {
         if ($allele eq $self->snp->ref_allele) { push @vcf_alleles, '0'; }
         elsif ($allele eq $self->snp->alt_allele) { push @vcf_alleles, '1'; }
         elsif ($allele eq $NULL_ALLELE) { push @vcf_alleles, '.'; }
+        else {
+            $self->logcroak("Allele ", $allele, " does not match reference ",
+                            $self->snp->ref_allele, " or alternate ",
+                            $self->snp->alt_allele, " values for variant ",
+                            $self->snp->name, ", genotype ", $call->genotype);
+        }
         $i++;
     }
     my $vcf_call = join '/', @vcf_alleles;
