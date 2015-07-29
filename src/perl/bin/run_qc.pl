@@ -19,6 +19,7 @@ use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
 
+our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 our $MAF_HET_EXECUTABLE = "het_by_maf.py";
@@ -101,7 +102,9 @@ $dbPath = verifyAbsPath($dbPath);
 $outDir ||= "./qc";
 $mafHet ||= 0;
 if (not -e $outDir) { mkdir($outDir); }
-elsif (not -w $outDir) { croak "Cannot write to output directory ".$outDir; }
+elsif (not -w $outDir) {
+ die "Cannot write to output directory $outDir\n";
+}
 $outDir = abs_path($outDir);
 $title ||= getDefaultTitle($outDir); 
 my $texIntroPath = defaultTexIntroPath($iniPath);
@@ -144,7 +147,7 @@ sub getDefaultTitle {
     # default title made up of last 2 non-empty items in path
     my $outDir = shift;
     $outDir = abs_path($outDir);
-    my @terms = split(/\//, $outDir);
+    my @terms = split /\//msx, $outDir;
     my $total = @terms;
     my $title = $terms[$total-2]."/".$terms[$total-1];
     return $title;
@@ -214,7 +217,9 @@ sub processPlinkPrefix {
 	$plinkPrefix = getcwd()."/".$plinkPrefix;
     }
     my $ok = checkPlinkBinaryInputs($plinkPrefix);
-    unless ($ok) { die "Cannot read plink binary inputs for prefix $plinkPrefix"; }
+    unless ($ok) {
+      die "Cannot read plink binary inputs for prefix $plinkPrefix\n";
+    }
     return $plinkPrefix;
 }
 
@@ -222,8 +227,7 @@ sub verifyAbsPath {
     my $path = shift;
     my $cwd = getcwd();
     unless (-e $path) { 
-	croak "Path '$path' does not exist relative to current ".
-	    "directory '$cwd'"; 
+      die "Path '$path' does not exist relative to current directory '$cwd'\n";
     }
     $path = abs_path($path);
     return $path;
@@ -246,7 +250,7 @@ sub run_qc_wip {
   my $cmd = $script." ".join(" ", @args);
   my $result = system($cmd);
   if ($result!=0) {
-    croak "Command finished with non-zero exit status: \"$cmd\"";
+    die qq(Command finished with non-zero exit status: "$cmd"\n);
   }
 
 }
@@ -264,7 +268,7 @@ sub run {
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
     if (!defined($runName)) {
-	croak "Must supply pipeline run name for database gender update";
+      die "Must supply pipeline run name for database gender update\n";
     }
     $genderCmd.=" --dbfile=".$dbPath." --run=".$runName; 
     push(@cmds, $genderCmd);
@@ -288,7 +292,7 @@ sub run {
     foreach my $cmd (@cmds) {
         my $result = system($cmd); 
         if ($result!=0) {
-            croak "Command finished with non-zero exit status: \"$cmd\""; 
+          die qq("Command finished with non-zero exit status: "$cmd"\n);
         }
     }
     ### run identity check ###
@@ -299,7 +303,9 @@ sub run {
         plink_path => $plinkPrefix,
     )->run_identity_check();
     my $idJson = $outDir.'/'.$fileNames{'id_json'};
-    if (!(-e $idJson)) { croak "Identity JSON file '$idJson' does not exist!"; }
+    if (!(-e $idJson)) {
+      die "Identity JSON file '$idJson' does not exist!\n";
+    }
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
     my $statusJson = $outDir."/qc_results.json";
@@ -332,8 +338,8 @@ sub run {
     foreach my $cmd (@cmds) { 
         my $result = system($cmd); 
         if ($result!=0) { 
-            croak "Command finished with non-zero exit status: \"$cmd\""; 
-        } 
+           die qq("Command finished with non-zero exit status: "$cmd"\n);
+        }
     }
     ### create PDF report
     my $texPath = $outDir."/pipeline_summary.tex";

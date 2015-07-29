@@ -20,10 +20,12 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultPipelineDBConfig
                                                defaultJsonConfig);
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
 
+our $VERSION = '';
+
 my ($configPath, $inPath,  $crHetPath, $outputDir, $help, $failText, 
     $comboText, $causeText, $crHetFail,  $comboPdf, $causePdf, $comboPng, 
-    $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng, $minCR, 
-    $maxHetSd, $title, $iniPath);
+    $causePng, $scatterPdf, $detailPdf, $scatterPng, $detailPng,
+    $title, $iniPath);
 
 GetOptions("config=s"      => \$configPath,
            "input=s"       => \$inPath,
@@ -68,7 +70,7 @@ Unspecified options will receive default values.
 
 my @outputPaths;
 my @outNames = ($failText, $comboText, $causeText, $comboPdf, $causePdf, $comboPng, $causePng, $crHetFail, $scatterPdf, $detailPdf, $scatterPng, $detailPng);
-if ($outputDir !~ /\/$/) { $outputDir .= '/'; }
+if ($outputDir !~ m{\/$}msx) { $outputDir .= '/'; }
 foreach my $name (@outNames) { push(@outputPaths, $outputDir.$name); }
 
 sub containsFailedSample {
@@ -162,14 +164,16 @@ sub writeFailCounts {
             $combinedFails{$combo}++;
         };
     }
-    open my $out, ">", $failText || die "Cannot open output file $failText: $!";
+    open my $out, ">", $failText ||
+      die "Cannot open output file $failText: $!\n";
     my @metrics = sort(keys(%singleFails));
     foreach my $metric (@metrics) {
         print $out $metric."\t".$singleFails{$metric}."\n";
     }
     close $out;
     my @failCombos = sort(keys(%combinedFails));
-    open $out, ">", $comboText || die "Cannot open output file $failText: $!"; 
+    open $out, ">", $comboText ||
+      die "Cannot open output file $failText: $!\n";
     foreach my $combo (@failCombos) {
         print $out $combo."\t".$combinedFails{$combo}."\n";
     }
@@ -187,7 +191,7 @@ sub writeFailedCrHet {
     my @header = qw(sample cr het);
     my @keys = qw(duplicate gender identity magnitude);
     push(@header, @keys);
-    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!";
+    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
     print $out join("\t", @header)."\n";
     foreach my $fieldsRef (@data) {
         my @fields = splice(@$fieldsRef, 0, 3);

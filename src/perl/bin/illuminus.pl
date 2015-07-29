@@ -24,6 +24,7 @@ use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
                                         update_it_columns
                                         write_gt_calls
                                         write_it_header);
+our $VERSION = '';
 
 Log::Log4perl->easy_init($ERROR);
 
@@ -89,7 +90,7 @@ if ($start && $end) {
   push(@command, '-s', $start, $end);
 }
 
-if ($chromosome eq 'X' || $chromosome eq 'Y' || $chromosome =~ /^M/) {
+if ($chromosome eq 'X' || $chromosome eq 'Y' || $chromosome =~ m{^M}msx) {
   write_gender_codes($gender_file, $chromosome, \@samples);
   push(@command, '-x', $gender_file);
 }
@@ -215,7 +216,7 @@ sub write_gender_codes {
     or die "Failed to open '$file' for writing: $!\n";
   foreach my $sample (@$samples) {
     my $code = 0;
-    if ($chromosome =~ /^M/) {
+    if ($chromosome =~ m{^M}msx) {
       $code = 1;
     } else {
       $code = $sample->{'gender_code'};
@@ -289,7 +290,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

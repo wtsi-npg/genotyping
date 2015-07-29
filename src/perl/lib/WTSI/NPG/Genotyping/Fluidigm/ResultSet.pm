@@ -5,6 +5,8 @@ use Moose;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
+our $VERSION = '';
+
 our $DATA_DIRECTORY_NAME = 'Data';
 our $EXPECTED_TIF_TOTAL = 3;
 
@@ -47,7 +49,7 @@ sub BUILD {
   }
 
   # find barcode (identical to directory name, by definition)
-  my @terms = split(/\//, $self->directory);
+  my @terms = split(/\//msx, $self->directory);
   if ($terms[-1] eq '') { pop @terms; } # in case of trailing / in path
   $self->_fluidigm_barcode(pop(@terms));
   # validate data subdirectory
@@ -92,7 +94,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -1,7 +1,7 @@
 
 package WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
-use English;
+use English qw(-no_match_vars);
 use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
@@ -9,6 +9,8 @@ use Text::CSV;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Fluidigm::AssayResult;
+
+our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
@@ -52,11 +54,13 @@ sub size {
   Example    : $result->sample_name
   Description: Return the name of the sample analysed. Since Fluidigm
                results are split into files per sample, there should be
-               only sample name perl file. This method raises an error
+               only one sample name per file. This method raises an error
                if it encounters multiple sample names.
   Returntype : Str
 
 =cut
+
+# TODO change this to canonical_sample_id for consistency with sequenom?
 
 sub sample_name {
   my ($self) = @_;

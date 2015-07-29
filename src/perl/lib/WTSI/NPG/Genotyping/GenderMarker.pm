@@ -7,6 +7,8 @@ use Moose;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+our $VERSION = '';
+
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'name' => (is => 'ro', isa => 'Str', required => 1);
@@ -61,10 +63,22 @@ sub position {
 sub ref_allele {
   my ($self) = @_;
 
-  return $self->x_marker->ref_allele;
+  return $self->x_allele;
 }
 
 sub alt_allele {
+  my ($self) = @_;
+
+  return $self->y_allele;
+}
+
+sub x_allele {
+  my ($self) = @_;
+
+  return $self->x_marker->ref_allele;
+}
+
+sub y_allele {
   my ($self) = @_;
 
   return $self->y_marker->ref_allele;

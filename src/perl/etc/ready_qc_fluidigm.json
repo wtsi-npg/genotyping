@@ -1,0 +1,7 @@
+{
+    "irods_data_path": "/seq/fluidigm",
+    "platform": "fluidigm",
+    "reference_name": "Homo_sapiens (1000Genomes)",
+    "reference_path": "/seq/fluidigm/multiplexes",
+    "snpset_name": "qc"
+}

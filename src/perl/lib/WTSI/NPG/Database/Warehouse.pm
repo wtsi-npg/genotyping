@@ -8,12 +8,14 @@ use Moose;
 
 use WTSI::NPG::Utilities qw(depad_well);
 
-extends 'WTSI::NPG::Database';
-
-with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
+our $VERSION = '';
 
 # Method names for MOP operations
 our $FIND_SAMPLE_BY_PLATE = 'find_sample_by_plate';
+
+extends 'WTSI::NPG::Database';
+
+with 'WTSI::NPG::Database::DBI', 'WTSI::DNAP::Utilities::Cacheable';
 
 my $meta = __PACKAGE__->meta;
 
@@ -334,7 +336,7 @@ sub find_infinium_gex_sample {
   $map or $self->logconfess('The map argument was empty');
 
   my ($barcode_prefix, $barcode) =
-    $plate_barcode =~ /^([A-Z]{2})([0-9]+)[A-Z]$/;
+    $plate_barcode =~ m{^([[:upper:]]{2})(\d+)[[:upper:]]$}msx;
 
   defined $barcode_prefix or
      $self->logconfess("Invalid plate barcode '$plate_barcode': ",
@@ -673,7 +675,7 @@ __END__
 
 =head1 NAME
 
-WTSI::NPG::Genotyping::Database::Warehouse
+WTSI::NPG::Database::Warehouse
 
 =head1 DESCRIPTION
 
@@ -686,7 +688,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2013, 2014 Genome Research Limited. All Rights
+Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

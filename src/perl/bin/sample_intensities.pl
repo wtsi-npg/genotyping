@@ -14,9 +14,10 @@ use Pod::Usage;
 use WTSI::DNAP::Utilities::IO qw(maybe_stdout);
 use WTSI::NPG::Genotyping::Database::Pipeline;
 
+our $VERSION = '';
 our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-our $ID_REGEX = qr/^[A-Za-z0-9-._]{4,}$/msx;
+our $ID_REGEX = qr/^[\w.-]{4,}$/msx;
 
 Log::Log4perl->easy_init($ERROR);
 
@@ -158,7 +159,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

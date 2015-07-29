@@ -11,6 +11,8 @@ use WTSI::NPG::Genotyping::Sequenom::AssayResult;
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
   'WTSI::NPG::Genotyping::Annotation';
 
+our $VERSION = '';
+
 our $HEADER = "ALLELE\tASSAY_ID\tCHIP\tCUSTOMER\tEXPERIMENT\tGENOTYPE_ID\tHEIGHT\tMASS\tPLATE\tPROJECT\tSAMPLE_ID\tSTATUS\tWELL_POSITION";
 
 has '+data_object' =>
@@ -45,6 +47,34 @@ sub size {
 
   return scalar @{$self->assay_results};
 }
+
+
+=head2 canonical_sample_id
+
+  Arg [1]    : None
+
+  Example    : $result->canonical_sample_id
+  Description: Return the canonical identifier of the sample analysed.
+               This method raises an error if it encounters multiple
+               sample identifiers.
+  Returntype : Str
+
+=cut
+
+sub canonical_sample_id {
+  my ($self) = @_;
+
+  my @names = uniq map { $_->canonical_sample_id }
+    grep { ! $_->is_empty } @{$self->assay_results};
+
+  if (scalar @names > 1) {
+    $self->logconfess("Assay result set '", $self->str, "' contains data for ",
+                      ">1 sample: [", join(', ', @names), "]");
+  }
+
+  return shift @names;
+}
+
 
 sub snpset_name {
   my ($self) = @_;
@@ -136,7 +166,7 @@ sub _parse_assay_results {
     }
 
     # Ignore empty lines
-    if ($str =~ m{^\s*$}) {
+    if ($str =~ m{^\s*$}msx) {
       next;
     }
 
@@ -192,7 +222,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

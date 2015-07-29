@@ -8,6 +8,8 @@ use Moose;
 
 use WTSI::NPG::Utilities qw(trim);
 
+our $VERSION = '';
+
 extends 'WTSI::NPG::Expression::ChipLoadingManifest';
 
 sub BUILD {
@@ -17,7 +19,7 @@ sub BUILD {
     $self->logdie("Manifest file '", $self->file_name,
                   "' does not exist");
 
-  open my $in, '<:encoding(utf8)', $self->file_name
+  open my $in, '<:encoding(UTF-8)', $self->file_name
     or $self->logdie("Failed to open Manifest file '",
                      $self->file_name, "': $!");
 
@@ -49,7 +51,6 @@ sub BUILD {
 # Any whitespace-only lines are ignored.
 sub _parse_beadchip_table {
   my ($self, $fh) = @_;
-  binmode($fh, ':utf8');
 
   # Channel is always Grn (Cy3)
   my $channel = 'Grn';
@@ -74,12 +75,12 @@ sub _parse_beadchip_table {
   while (my $line = <$fh>) {
     ++$n;
     chomp($line);
-    next if $line =~ m/^\s*$/;
+    next if $line =~ m{^\s*$}msx;
 
     if ($in_sample_block) {
       my @row = map { trim($_) } split("\t", $line);
 
-      if ($row[$end_of_data_col] =~ /^Kit Control$/i) {
+      if ($row[$end_of_data_col] =~ m{^Kit\sControl$}msxi) {
         last;
       }
       else {
@@ -97,19 +98,24 @@ sub _parse_beadchip_table {
       }
     }
     else {
-      if ($line =~ m/BEADCHIP/i) {
+      if ($line =~ m{BEADCHIP}msxi) {
         $in_sample_block = 1;
         my @header = map { trim($_) } split("\t", $line);
         # Expected to be Sanger sample ID
-        $sample_id_col = firstidx { /SAMPLE ID/i } @header;
+        $sample_id_col =
+          firstidx { m{SAMPLE\sID}msxi } @header;
         # Expected to be Sequencescape plate ID
-        $supplier_plate_id_col = firstidx { /SUPPLIER PLATE ID/i } @header;
+        $supplier_plate_id_col =
+          firstidx { m{SUPPLIER\sPLATE\sID}msxi } @header;
         # Expected to be Sequencescape welll map
-        $supplier_well_id_col = firstidx { /SUPPLIER WELL ID/i } @header;
+        $supplier_well_id_col =
+          firstidx { m{SUPPLIER\sWELL\sID}msxi } @header;
         # Expected to be chip number
-        $beadchip_col  = firstidx { /BEADCHIP/i } @header;
+        $beadchip_col  =
+          firstidx { m{BEADCHIP}msxi } @header;
         # Expected to be chip section
-        $section_col = firstidx { /ARRAY/i } @header;
+        $section_col =
+          firstidx { m{ARRAY}msxi } @header;
       }
     }
   }
@@ -141,7 +147,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -7,6 +7,8 @@ use Try::Tiny;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
+our $VERSION = '';
+
 with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 extends 'WTSI::NPG::iRODS::DataObject';

@@ -21,6 +21,8 @@ our @EXPORT_OK = qw(collect_dirs
                     depad_well
                     user_session_log);
 
+our $VERSION = '';
+
 our $MD5SUM = 'md5sum';
 our $USER_SESSION_LOG_DIR = '/nfs/srpipe_data/logs/user_session_logs/';
 
@@ -78,8 +80,8 @@ sub trim {
   my ($str) = @_;
 
   my $copy = $str;
-  $copy =~ s/^\s*//;
-  $copy =~ s/\s*$//;
+  $copy =~ s/^\s*//msx;
+  $copy =~ s/\s*$//msx;
 
   return $copy;
 }
@@ -101,15 +103,15 @@ sub depad_well {
   if(! defined $str) {
     croak "The str argument was undefined";
   }
-  if ($str !~ m{^[A-Z]\d\d?$}) {
+  if ($str !~ m{^[[:upper:]]\d\d?$}msx) {
     croak "Unexpected well address '$str'. Cannot depad this.";
   }
-  if ($str =~ m{^[A-Z]00$}) {
+  if ($str =~ m{^[[:upper:]]00$}msx) {
     croak "Unexpected well address '$str'. Cannot depad this.";
   }
 
   my $depadded = $str;
-  $depadded =~ s/^([A-Z])0?(\d)$/$1$2/;
+  $depadded =~ s/^([[:upper:]])0?(\d)$/$1$2/msx;
 
   return $depadded;
 }
@@ -134,10 +136,10 @@ sub user_session_log {
   unless (defined $session_name) {
     croak "A defined session_name argument is required\n";
   }
-  unless ($uid =~ /[A-Za-z0-9]+/) {
+  unless ($uid =~ m{[[:alnum:]]+}msx) {
     croak "The uid argument must match [A-Za-z0-9]+\n";
   }
-  unless ($session_name =~ /[A-Za-z0-9]+/) {
+  unless ($session_name =~ m{[[:alnum:]]+}msx) {
     croak "The session_name argument must match [A-Za-z0-9]+\n";
   }
 
@@ -184,7 +186,7 @@ sub collect_files {
           my @elts;
           if (!defined $stop_depth || $current_depth < $stop_depth) {
             # Remove any dirs except . and ..
-            @elts = grep { ! /^\.+$/ } @_;
+            @elts = grep { ! /^[.]+$/msx } @_;
           }
 
           return @elts;
@@ -244,7 +246,7 @@ sub collect_dirs {
 
           my @dirs;
           if (!defined $stop_depth || $current_depth < $stop_depth) {
-            @dirs = grep { -d && ! /^\.+$/ } @_;
+            @dirs = grep { -d && ! /^[.]+$/msx } @_;
           }
 
           return @dirs;
@@ -361,7 +363,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

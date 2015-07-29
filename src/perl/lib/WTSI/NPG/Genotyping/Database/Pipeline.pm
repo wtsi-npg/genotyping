@@ -8,6 +8,18 @@ use Moose;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline::Schema;
 
+our $VERSION = '';
+
+our $AUTOLOAD;
+
+our $DEFAULT_SQLITE   = 'sqlite3';
+our $DEFAULT_DDL_FILE = 'pipeline_ddl.sql';
+our $GENDERS_INI      = 'genders.ini';
+our $METHODS_INI      = 'methods.ini';
+our $RELATIONS_INI    = 'relations.ini';
+our $SNPSETS_INI      = 'snpsets.ini';
+our $STATES_INI       = 'states.ini';
+
 extends 'WTSI::NPG::Database';
 
 with 'WTSI::NPG::Database::DBIx';
@@ -27,7 +39,7 @@ has 'dbfile' =>
      my ($self) = @_;
 
      my $ds = $self->data_source;
-     my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+     my ($base, $file) = $ds =~ m{^(dbi:SQLite:dbname=)(.*)}msx;
      unless ($base && $file) {
        $self->logconfess("Failed to parse datasource string '$ds' in ",
                          $self->inifile);
@@ -47,23 +59,11 @@ has 'schema' =>
    isa      => 'WTSI::NPG::Genotyping::Database::Pipeline::Schema',
    required => 0);
 
-our $AUTOLOAD;
-
-our $default_sqlite   = 'sqlite3';
-our $default_ddl_file = 'pipeline_ddl.sql';
-
-our $pipeline_ini  = 'pipeline.ini';
-our $genders_ini   = 'genders.ini';
-our $methods_ini   = 'methods.ini';
-our $relations_ini = 'relations.ini';
-our $snpsets_ini   = 'snpsets.ini';
-our $states_ini    = 'states.ini';
-
 sub BUILD {
   my ($self) = @_;
 
   my $ds = $self->data_source;
-  my ($base, $file) = $ds =~ m/^(dbi:SQLite:dbname=)(.*)/;
+  my ($base, $file) = $ds =~ m{^(dbi:SQLite:dbname=)(.*)}msx;
   unless ($base && $file) {
     $self->logconfess("Failed to parse datasource string '$ds' in ",
                       $self->inifile);
@@ -103,10 +103,10 @@ sub create {
   my ($self, $file, $ini) = @_;
 
   my $config_dir = $self->config_dir;
-  my $default_sql_path = "$config_dir/$default_ddl_file";
+  my $default_sql_path = "$config_dir/$DEFAULT_DDL_FILE";
 
   my $sql_path = $ini->val($self->name, 'sqlpath', $default_sql_path);
-  my $sqlite = $ini->val($self->name, 'sqlite', $default_sqlite);
+  my $sqlite = $ini->val($self->name, 'sqlite', $DEFAULT_SQLITE);
 
   unless (-e $sql_path) {
     $self->logconfess("Failed to create database: ",
@@ -150,11 +150,11 @@ sub populate {
   }
 
   $self->_populate_addresses;
-  $self->_populate_genders("$ini_path/$genders_ini");
-  $self->_populate_relations("$ini_path/$relations_ini");
-  $self->_populate_states("$ini_path/$states_ini");
-  $self->_populate_methods("$ini_path/$methods_ini");
-  $self->_populate_snpsets("$ini_path/$snpsets_ini");
+  $self->_populate_genders("$ini_path/$GENDERS_INI");
+  $self->_populate_relations("$ini_path/$RELATIONS_INI");
+  $self->_populate_states("$ini_path/$STATES_INI");
+  $self->_populate_methods("$ini_path/$METHODS_INI");
+  $self->_populate_snpsets("$ini_path/$SNPSETS_INI");
 
   return $self;
 }
@@ -417,11 +417,7 @@ sub AUTOLOAD {
   my ($self) = @_;
   my $type = ref($self) or confess "$self is not an object";
 
-  return if $AUTOLOAD =~ /::DESTROY$/;
-
-  #if (!$self->is_connected) {
-  #  $self->connect;
-  #}
+  return if $AUTOLOAD =~ m{::DESTROY$}msx;
 
   if (!$self->is_connected) {
     $self->logconfess("$self is not connected");
@@ -435,16 +431,15 @@ sub AUTOLOAD {
   }
 
   my $method_name = $AUTOLOAD;
-  $method_name =~ s/.*://;
+  $method_name =~ s/.*://msx;
   unless (exists $lookup{$method_name} ) {
     $self->logconfess("An invalid method `$method_name' was called ",
                       "on an object of $type. Permitted methods are [",
                       join(", ", sort keys %lookup), "]");
   }
 
-
  SYMBOL_TABLE: {
-    no strict qw(refs);
+    no strict qw(refs); ## no critic (TestingAndDebugging::ProhibitNoStrict)
 
     *$AUTOLOAD = sub {
       my $self = shift;
@@ -475,7 +470,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
