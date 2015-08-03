@@ -6,6 +6,7 @@ use Moose;
 
 use WTSI::NPG::Genotyping::VCF::DataRowParser;
 use WTSI::NPG::Genotyping::VCF::HeaderParser;
+use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 

@@ -9,7 +9,7 @@ use File::Slurp qw /read_file/;
 use File::Spec;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 177;
+use Test::More tests => 180;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -350,6 +350,24 @@ sub script_pipe_test : Test(4) {
     ok(-e $tmpJson, "JSON output written");
     _compare_json($discordance_sequenom, $tmpJson);
 }
+
+sub script_plink_test : Test(3) {
+    my $script = "bin/vcf_from_plink.pl";
+    my $contig = "$data_path/chromosome_lengths_GRCh37.json";
+    my $manifest = "$data_path/W30467_snp_set_info_GRCh37.tsv";
+    my $plink = "$data_path/fake_qc_genotypes";
+    my $vcf = "$tmp/plink_converted.vcf";
+    my $cmd = "$script --contigs $contig --manifest $manifest ".
+        "--plink $plink --vcf $vcf";
+    is(system($cmd), 0, "$cmd exits successfully");
+    ok(-e $vcf, "VCF output written");
+    my $expected_vcf = "$data_path/calls_from_plink.vcf";
+    my $expected_lines = _read_without_filedate($expected_vcf);
+    my $got_lines = _read_without_filedate($vcf);
+    is_deeply($got_lines, $expected_lines,
+              "VCF output matches expected values");
+}
+
 
 sub slurp_test : Test(4) {
     my $vcfName = "fluidigm.vcf";
