@@ -119,7 +119,7 @@ use Cwd qw(abs_path);
 use DateTime;
 
 use base qw(Test::Class);
-use Test::More tests => 253;
+use Test::More tests => 338;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -161,6 +161,11 @@ my @data_files = ("$data_path/gtc/0123456789/0123456789_R01C01.gtc",
                   "$data_path/gtc/01234567999/01234567999_R01C01.gtc",
                   "$data_path/idat/01234567999/01234567999_R01C01_Grn.idat",
                   "$data_path/idat/01234567999/01234567999_R01C01_Red.idat",
+
+                  # 12-digit barcode number
+                  "$data_path/gtc/012345679999/012345679999_R01C01.gtc",
+                  "$data_path/idat/012345679999/012345679999_R01C01_Grn.idat",
+                  "$data_path/idat/012345679999/012345679999_R01C01_Red.idat",
 
                   "$data_path/gtc/0123456799/0123456799_R01C03.gtc",
                   # Missing Grn idat file
@@ -232,7 +237,7 @@ sub resultsets : Test(2) {
      ss_warehouse_db  => $ssdb,
      publication_time => $publication_time);
 
-  cmp_ok(scalar @{$publisher->resultsets}, '==', 7,
+  cmp_ok(scalar @{$publisher->resultsets}, '==', 8,
          'Found only complete resultsets 1');
 
   my $ifdb_mod = WTSI::NPG::Genotyping::Database::InfiniumStub->new
@@ -246,7 +251,7 @@ sub resultsets : Test(2) {
     ss_warehouse_db  => $ssdb,
     publication_time => $publication_time);
 
-  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 8,
+  cmp_ok(scalar @{$methyl_publisher->resultsets}, '==', 9,
 	 'Found only complete resultsets 2');
 }
 
@@ -303,36 +308,36 @@ sub publish : Test(67) {
   }
 }
 
-sub publish_longer_barcode : Test(67) {
-  # 11 digits instead of 10 in barcode
+sub publish_longer_barcodes : Test(130) {
+  # 11 or 12 digits instead of 10 in barcode
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (data_files       => [@data_files[15 .. 17]],
+    (data_files       => [@data_files[15 .. 20]],
      infinium_db      => $ifdb,
      ss_warehouse_db  => $ssdb,
      publication_time => $publication_time);
 
-  cmp_ok(scalar @{$publisher->resultsets}, '==', 1,
-         'Number of resultsets prepared for 11-digit barcode');
+  cmp_ok(scalar @{$publisher->resultsets}, '==', 2,
+         'Number of resultsets prepared for long barcodes');
 
-  cmp_ok($publisher->publish($irods_tmp_coll), '==', 3,
-         'Number of files published for 11-digit barcode');
+  cmp_ok($publisher->publish($irods_tmp_coll), '==', 6,
+         'Number of files published for long barcodes');
 
   my $irods = WTSI::NPG::iRODS->new;
   my @gtc_files = $irods->find_objects_by_meta($irods_tmp_coll,
                                                [infinium_plate => 'plate1'],
                                                [infinium_well  => 'A10'],
                                                [type           => 'gtc']);
-  cmp_ok(scalar @gtc_files, '==', 1,
-         'Number of GTC files published for 11-digit barcode');
+  cmp_ok(scalar @gtc_files, '==', 2,
+         'Number of GTC files published for long barcode');
 
   my @idat_files = $irods->find_objects_by_meta($irods_tmp_coll,
                                                 [infinium_plate => 'plate1'],
                                                 [infinium_well  => 'A10'],
                                                 [type           => 'idat']);
-  cmp_ok(scalar @idat_files, '==', 2,
-         'Number of idat files published for 11-digit barcode');
+  cmp_ok(scalar @idat_files, '==', 4,
+         'Number of idat files published for long barcode');
 
   my $expected_meta =
     [{attribute => 'beadchip',                value => '111345689'},
@@ -412,7 +417,7 @@ sub publish_methylation : Test(45) {
   }
 }
 
-sub publish_overwrite : Test(69) {
+sub publish_overwrite : Test(91) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new

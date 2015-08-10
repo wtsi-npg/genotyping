@@ -6,10 +6,14 @@ package WTSI::NPG::Genotyping::Infinium::Publisher;
 use File::Basename;
 use List::AllUtils qw(sum);
 use Moose;
+use MooseX::Types::Moose;
 use Try::Tiny;
+
+#use Data::Dumper; # TODO temporary for development
 
 use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 use WTSI::NPG::Genotyping::Infinium::ResultSet;
+use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
@@ -278,29 +282,26 @@ sub _build_filesets {
   my %filesets;
 
   foreach my $path (sort  @{$self->data_files}) {
-    my ($volume, $dirs, $filename) = File::Spec->splitpath($path);
 
-    $self->trace("Preparing to collate '$filename' into a resultset");
+    my ($filename, $dirs, $suffix) = fileparse($path, qr/[.][^.]*/msx);
+    $self->trace("Preparing to collate '$filename.$suffix' into a resultset");
+    my @terms = split(/_/msx, $filename);
+    my $barcode = $terms[0];
+    my $section = $terms[1];
 
-    my ($beadchip, $section, $channel, $suffix) =
-      $filename =~ m{^
-                     (\d{10,11})        # beadchip
-                     _(R\d{2}C\d{2}) # beadchip section
-                     _?(Red|Grn)?    # channel (idat only)
-                     [.](\S+)         # suffix
-                     $}msxi;
-
-    unless ($beadchip && $section && $suffix) {
-      $self->warn("Failed to parse Infinium results filename '$filename'; ",
-                  "ignoring it");
+    unless ($barcode && $section) {
+      # additional typechecking occurs in Infinium::ResultSet construction
+      $self->warn("Unable to parse Infinium beadchip code and section ",
+                  "from file '", $filename, ".", $suffix, "', skipping."
+              );
       next;
     }
 
-    unless (exists $filesets{$beadchip}{$section}) {
-      $filesets{$beadchip}{$section} = [];
+    unless (exists $filesets{$barcode}{$section}) {
+      $filesets{$barcode}{$section} = [];
     }
 
-    push @{$filesets{$beadchip}{$section}}, $path;
+    push @{$filesets{$barcode}{$section}}, $path;
   }
 
   return \%filesets;
