@@ -157,6 +157,14 @@ my @data_files = ("$data_path/gtc/0123456789/0123456789_R01C01.gtc",
                   "$data_path/idat/0123456799/0123456799_R01C02_Grn.idat",
                   "$data_path/idat/0123456799/0123456799_R01C02_Red.idat",
 
+                  # "junk" files, should not be published
+                  "$data_path/idat/0123456799/0123456799_R01C02_Red.idat.wrong",
+                  "$data_path/idat/0123456799/0123456799_R01C02_RedStar.idat",
+                  "$data_path/idat/0123456799/0123456799_R01C02_Red_Blue.idat",
+                  "$data_path/idat/0123456799/0123456799_R01C05_Red.idat",
+                  "$data_path/idat/0123456799/0123456999_R01C02_Red.idat",
+                  "$data_path/idat/0123456799/012345678_R01C02_Red.idat",
+
                   # 11-digit barcode number
                   "$data_path/gtc/01234567999/01234567999_R01C01.gtc",
                   "$data_path/idat/01234567999/01234567999_R01C01_Grn.idat",
@@ -313,7 +321,7 @@ sub publish_longer_barcodes : Test(130) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
-    (data_files       => [@data_files[15 .. 20]],
+    (data_files       => [@data_files[21 .. 26]],
      infinium_db      => $ifdb,
      ss_warehouse_db  => $ssdb,
      publication_time => $publication_time);
