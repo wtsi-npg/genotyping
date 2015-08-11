@@ -299,7 +299,7 @@ sub _build_filesets {
     }
 
     unless (exists $filesets{$barcode}{$section}) {
-        $filesets{$barcode}{$section} = [];
+      $filesets{$barcode}{$section} = [];
     }
 
     push @{$filesets{$barcode}{$section}}, $path;
