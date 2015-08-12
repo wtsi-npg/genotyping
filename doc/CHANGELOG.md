@@ -11,6 +11,15 @@ Added:
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
 - QC check modified to read from VCF instead of database
 
+
+Release 1.11.1: 2015-08-12
+--------------------------
+
+Fixed:
+- Bug in ready_infinium.pl which failed to support 12 digit Infinium
+barcodes. Parsing of Infinium filenames is now more robust.
+
+
 Release 1.11.0: 2015-07-23
 --------------------------
 
