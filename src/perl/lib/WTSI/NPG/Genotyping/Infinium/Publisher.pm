@@ -10,6 +10,7 @@ use Try::Tiny;
 
 use WTSI::NPG::Genotyping::Infinium::InfiniumDataObject;
 use WTSI::NPG::Genotyping::Infinium::ResultSet;
+use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Publisher;
 
@@ -209,7 +210,7 @@ sub _build_resultsets {
         else {
           $self->warn("Failed to collate a resultset for beadchip ",
                       "'$beadchip' section '$section' because it ",
-                      "contained an expected file '$path'");
+                      "contained an unexpected file '$path'");
           next SECTION;
         }
       }
@@ -278,29 +279,30 @@ sub _build_filesets {
   my %filesets;
 
   foreach my $path (sort  @{$self->data_files}) {
+
     my ($volume, $dirs, $filename) = File::Spec->splitpath($path);
 
     $self->trace("Preparing to collate '$filename' into a resultset");
 
-    my ($beadchip, $section, $channel, $suffix) =
+    my ($barcode, $section, $channel, $suffix) =
       $filename =~ m{^
-                     (\d{10,11})        # beadchip
-                     _(R\d{2}C\d{2}) # beadchip section
-                     _?(Red|Grn)?    # channel (idat only)
-                     [.](\S+)         # suffix
+                     (\d{10,})        # barcode
+                     _(R\d{2}C\d{2})  # beadchip section
+                     _?(Red|Grn)?     # channel (idat only)
+                     [.](idat|gtc)    # suffix
                      $}msxi;
 
-    unless ($beadchip && $section && $suffix) {
+    unless ($barcode && $section && $suffix) {
       $self->warn("Failed to parse Infinium results filename '$filename'; ",
                   "ignoring it");
       next;
     }
 
-    unless (exists $filesets{$beadchip}{$section}) {
-      $filesets{$beadchip}{$section} = [];
+    unless (exists $filesets{$barcode}{$section}) {
+      $filesets{$barcode}{$section} = [];
     }
 
-    push @{$filesets{$beadchip}{$section}}, $path;
+    push @{$filesets{$barcode}{$section}}, $path;
   }
 
   return \%filesets;
