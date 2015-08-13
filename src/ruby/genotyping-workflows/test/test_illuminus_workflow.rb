@@ -54,12 +54,20 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
 
       FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
+      vcf = File.join(external_data, 'sequenom_abvc.vcf')
+      plex_manifest = File.join(external_data,
+                                'W30467_snp_set_info_GRCh37.tsv')
+
       args_hash = {:manifest => manifest,
                    :config => pipe_ini,
                    :filterconfig => fconfig,
                    :gender_method => 'Supplied',
                    :chunk_size => 10000,
-                   :memory => 2048}
+                   :memory => 2048,
+                   :queue => 'yesterday',
+                   :vcf => vcf,
+                   :plex_manifest => plex_manifest
+      }
       args = [dbfile, run_name, work_dir, args_hash]
       timeout = 1400
       log = 'percolate.log'

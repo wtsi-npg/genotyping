@@ -476,9 +476,11 @@ t/qc_test_data/small_test.bim
 t/qc_test_data/small_test.db
 t/qc_test_data/small_test.fam
 t/qc_test_data/small_test.sim
+t/qc_test_data/small_test_fake_manifest.tsv
 t/qc_test_data/small_test_no_exclusion.bed
 t/qc_test_data/small_test_no_exclusion.bim
 t/qc_test_data/small_test_no_exclusion.fam
+t/qc_test_data/small_test_plex.vcf
 t/qc_test_data/W30467_snp_set_info_1000Genomes.tsv
 t/qc_test_data/zcall_prefilter_test.json
 t/query_project_samples.t

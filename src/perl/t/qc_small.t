@@ -13,24 +13,27 @@ use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use JSON;
 
-use Test::More tests => 48;
+use Test::More tests => 49;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readFileToString readSampleInclusion/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';
 my $start = time();
 my $bin = "$Bin/../bin/"; # assume we are running from perl/t
-my $plink = "$Bin/qc_test_data/$testName";
-my $sim = "$Bin/qc_test_data/$testName.sim";
+my $data_dir = $Bin."/qc_test_data/";
+my $plink = $data_dir.$testName;
+my $sim = $data_dir.$testName.".sim";
 my $outDir = "$Bin/qc/$testName/";
 my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbname = "small_test.db";
-my $dbfileMasterA = "$Bin/qc_test_data/$dbname";
-my $inclusionMaster = "$Bin/qc_test_data/sample_inclusion.json";
-my $mafhet = "$Bin/qc_test_data/output_examples/small_test_maf_het.json";
+my $dbfileMasterA = $data_dir.$dbname;
+my $inclusionMaster = $data_dir."sample_inclusion.json";
+my $mafhet = $data_dir."output_examples/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
-my $filterConfig = "$Bin/qc_test_data/zcall_prefilter_test.json";
+my $filterConfig = $data_dir."zcall_prefilter_test.json";
+my $vcf = $data_dir."small_test_plex.vcf";
+my $plexManifest = $data_dir."small_test_fake_manifest.tsv";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -46,7 +49,7 @@ if (-e $outDir) {
     if (-d $outDir) {
 	system("rm -Rf $outDir/*"); # remove previous output
     } else {
-	croak "Output path $outDir exists and is not a directory!"; 
+	croak "Output path $outDir exists and is not a directory!";
     }
 } else {
     mkdir($outDir);
@@ -59,6 +62,8 @@ print "Testing dataset $testName.\n";
 ## test identity check
 $status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config  --plink $plink --db $dbfile");
 is($status, 0, "check_identity_bed.pl exit status");
+
+## WIP identity check script is tested in WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";
@@ -139,7 +144,8 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
-$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config"; 
+$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config --vcf=$vcf --plex-manifest $plexManifest";
+
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check work-in-progress output files
@@ -158,7 +164,7 @@ my $heatMapsOK = 1;
 @modes = qw/cr het magnitude/;
 foreach my $mode (@modes) {
     for (my $i=0;$i<2;$i++) {
-        my $png = $outDir."/plate_heatmaps/plot_".$mode."_ssbc0000$i.png";   
+        my $png = $outDir."/plate_heatmaps/plot_".$mode."_ssbc0000$i.png";
         unless (pngPathOK($png)) {$heatMapsOK = 0; last; }
     }
     unless (xmlPathOK($outDir.'/plate_heatmaps/index.html')) { $heatMapsOK = 0; }
@@ -168,6 +174,14 @@ ok($heatMapsOK, "Plate heatmap outputs OK");
 # check summary outputs
 ok(-r $outDir.'/pipeline_summary.csv', "CSV summary found");
 ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
+
+## run_qc.pl again, without the arguments for alternate identity check
+system("rm -Rf $outDir/*"); # remove output from previous tests
+system("cp $dbfileMasterA $tempdir");
+$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
+
+is(system($cmd), 0,
+   "run_qc.pl bootstrap script exit status, no alternate identity check");
 
 ## test standalone report script
 print "\tTesting standalone report generation script.\n";

@@ -229,7 +229,7 @@ Options:
                          as expected by vcf_from_plex.pl.
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
-  --manifest=PATH   Path to .csv SNP manifest. The manifest must
+  --manifest=PATH        Path to .csv SNP manifest. The manifest must
                          contain all SNPs present in the Plink .map file.
                          Required.
   --plink=STEM           Plink text dataset stem (path omitting the .ped,
