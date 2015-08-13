@@ -404,6 +404,7 @@ t/infinium_publisher/gtc/0123456799/0123456799_R01C02.gtc
 t/infinium_publisher/gtc/0123456799/0123456799_R01C03.gtc
 t/infinium_publisher/gtc/0123456799/0123456799_R02C02.gtc
 t/infinium_publisher/gtc/01234567999/01234567999_R01C01.gtc
+t/infinium_publisher/gtc/012345679999/012345679999_R01C01.gtc
 t/infinium_publisher/idat/0123456789/0123456789_R01C01_Grn.idat
 t/infinium_publisher/idat/0123456789/0123456789_R01C01_Red.idat
 t/infinium_publisher/idat/0123456789/0123456789_R01C02_Grn.idat
@@ -418,8 +419,16 @@ t/infinium_publisher/idat/0123456799/0123456799_R02C02_Grn.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C02_Red.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C04_Grn.idat
 t/infinium_publisher/idat/0123456799/0123456799_R02C04_Red.idat
+t/infinium_publisher/idat/0123456799/012345678_R01C02_Red.idat
+t/infinium_publisher/idat/0123456799/0123456799_R01C02_Red.idat.wrong
+t/infinium_publisher/idat/0123456799/0123456799_R01C02_RedStar.idat
+t/infinium_publisher/idat/0123456799/0123456799_R01C02_Red_Blue.idat
+t/infinium_publisher/idat/0123456799/0123456799_R01C05_Red.idat
+t/infinium_publisher/idat/0123456799/0123456999_R01C02_Red.idat
 t/infinium_publisher/idat/01234567999/01234567999_R01C01_Grn.idat
 t/infinium_publisher/idat/01234567999/01234567999_R01C01_Red.idat
+t/infinium_publisher/idat/012345679999/012345679999_R01C01_Grn.idat
+t/infinium_publisher/idat/012345679999/012345679999_R01C01_Red.idat
 t/infinium_publisher/repub/gtc/0123456789/0123456789_R01C01.gtc
 t/infinium_publisher/repub/idat/0123456789/0123456789_R01C01_Grn.idat
 t/infinium_publisher/repub/idat/0123456789/0123456789_R01C01_Red.idat
