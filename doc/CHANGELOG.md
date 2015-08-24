@@ -12,6 +12,25 @@ Added:
 - QC check modified to read from VCF instead of database
 
 
+Release 1.11.2: 2015-08-24
+--------------------------
+
+Fixed:
+- Bug (typo) in update_sequenom_qc_metadata.pl
+
+Added:
+- Tests to compile all scripts in ./bin
+- Test dependency on Test::Compile
+
+Removed:
+- export_sequenom_genotypes.pl
+- make_irods_study_group.pl
+- populate_wtsi_irods_groups.pl
+- print_simfile_header.pl
+- set_irods_group_access.pl
+- xydiff.pl
+
+
 Release 1.11.1: 2015-08-12
 --------------------------
 

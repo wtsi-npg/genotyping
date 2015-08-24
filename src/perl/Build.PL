@@ -26,6 +26,7 @@ my $build = Build->new
                           'Test::Class'     => '>= 0.41',
                           'Test::More'      => '>= 0.98',
                           'Test::Exception' => '>= 0.32',
+                          'Test::Compile'   => 0
                          },
    requires          => {
                          'Config::IniFiles'              => '>= 2.8.6',
