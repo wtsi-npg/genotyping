@@ -4,13 +4,11 @@ bin/check_identity_bed_wip.pl
 bin/check_xhet_gender.pl
 bin/collate_qc_results.pl
 bin/create_test_database.pl
-bin/export_sequenom_genotypes.pl
 bin/filter_illuminus_output.pl
 bin/find_modified_files.pl
 bin/gendermix_standalone.pl
 bin/genotyping_yml.pl
 bin/illuminus.pl
-bin/make_irods_study_group.pl
 bin/manifest_plex_intersection.pl
 bin/plate_heatmap_index.pl
 bin/plate_heatmap_plots.pl
@@ -18,8 +16,6 @@ bin/plot_box_bean.pl
 bin/plot_cr_het_density.pl
 bin/plot_fail_causes.pl
 bin/plot_metric_scatter.pl
-bin/populate_wtsi_irods_groups.pl
-bin/print_simfile_header.pl
 bin/publish_expression_analysis.pl
 bin/publish_fluidigm_genotypes.pl
 bin/publish_infinium_analysis.pl
@@ -34,7 +30,6 @@ bin/ready_pipe.pl
 bin/ready_samples.pl
 bin/run_qc.pl
 bin/sample_intensities.pl
-bin/set_irods_group_access.pl
 bin/update_expression_metadata.pl
 bin/update_fluidigm_metadata.pl
 bin/update_infinium_metadata.pl
@@ -46,7 +41,6 @@ bin/vcf_from_plex.pl
 bin/write_identity_csv.pl
 bin/write_qc_reports.pl
 bin/write_snp_metadata.pl
-bin/xydiff.pl
 Build.PL
 Build.pm
 etc/gendermix_manifest.txt
