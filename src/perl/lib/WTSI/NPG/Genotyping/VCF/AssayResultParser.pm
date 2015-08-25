@@ -90,6 +90,10 @@ sub get_vcf_dataset {
     foreach my $snp (@{$self->snpset->snps}) {
         my @sample_calls;
         foreach my $sample (@$samples) {
+            unless (defined($calls->{$snp->name}{$sample})) {
+                $self->logcroak("No call found for SNP '", $snp->name,
+                                "' sample '", $sample, "'");
+            }
             push @sample_calls, $calls->{$snp->name}{$sample};
         }
         if (is_GenderMarker($snp)) {

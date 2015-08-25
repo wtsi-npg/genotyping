@@ -10,14 +10,13 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
 use WTSI::NPG::Genotyping::SNPSet;
+use WTSI::NPG::Genotyping::VCF::Slurper;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
-our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
 my $uid = `whoami`;
 chomp($uid);
@@ -45,9 +44,7 @@ run() unless caller();
 
 sub run {
 
-    my $config;
     my $debug;
-    my $dbfile;
     my $log4perl_config;
     my $min_shared_snps;
     my $outPath;
@@ -55,11 +52,10 @@ sub run {
     my $plex_manifest;
     my $plink;
     my $swap_threshold;
+    my $vcf;
     my $verbose;
 
     GetOptions(
-        'config=s'          => \$config,
-        'dbfile=s'          => \$dbfile,
         'debug'             => \$debug,
         'help'              => sub { pod2usage(-verbose => 2,
                                                -exitval => 0) },
@@ -70,6 +66,7 @@ sub run {
         'plex_manifest=s'   => \$plex_manifest,
         'plink=s'           => \$plink,
         'swap_threshold=f'  => \$swap_threshold,
+        'vcf=s'             => \$vcf,
         'verbose'           => \$verbose);
 
     if ($log4perl_config) {
@@ -87,40 +84,29 @@ sub run {
         }
     }
 
-    my @file_args = ($dbfile, $plex_manifest);
-    my @file_arg_names = qw/dbfile plex_manifest/;
-    for (my $i=0; $i<@file_args; $i++) {
-        if (!defined($file_args[$i])) {
-            $log->logcroak("Must supply a --", $file_arg_names[$i],
-                           " argument");
-        } elsif (! -e $file_args[$i]) {
-            $log->logcroak("Given --", $file_arg_names[$i], " argument '",
-                           $file_args[$i], "' does not exist");
-        }
+    ### read SNPSet object from manifest ###
+    if (!defined($plex_manifest)) {
+        $log->logcroak("Must supply a --plex-manifest argument");
+    } elsif (! -e $plex_manifest) {
+        $log->logcroak("Given plex-manifest argument '", $plex_manifest,
+                       "' does not exist.");
     }
-
-    if (!defined($plink)) {
-        $log->logcroak("Must supply a --plink argument");
-    }
-    my @plink_files = ($plink.'.bed', $plink.'.bim', $plink.'.fam');
-    foreach my $plink_file (@plink_files) {
-        if (! -e $plink_file) {
-            $log->logcroak("Plink binary input file '", $plink_file,
-                           "' does not exist");
-        }
-    }
-    $config ||= $DEFAULT_INI;
-    if (! -e $config) {
-        $log->logcroak("Config .ini file '", $config, "' does not exist");
-    }
-
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
     $log->debug("Read QC plex snpset from ", $plex_manifest);
 
-    my $qc_calls = read_qc_calls($dbfile, $config, $snpset);
+    ### check existence of plink dataset ###
+    if (!defined($plink)) {
+        $log->logcroak("Must supply a --plink argument");
+    }
+    my @plink_suffixes = qw(.bed .bim .fam);
+    foreach my $suffix (@plink_suffixes) {
+        if (! -e $plink.$suffix) {
+            $log->logcroak("Plink binary input file '", $plink.$suffix,
+                           "' does not exist");
+        }
+    }
 
-    # $min_shared_snps, $swap_threshold, $pass_threshold may be null
-    # if so, Identity.pm uses internal defaults
+    ### create identity check object ###
     my %args = (plink_path         => $plink,
                 snpset             => $snpset,
                 logger             => $log);
@@ -129,10 +115,32 @@ sub run {
     }
     if (defined($swap_threshold)) {$args{'swap_threshold'} = $swap_threshold;}
     if (defined($pass_threshold)) {$args{'pass_threshold'} = $pass_threshold;}
-
+    # Identity.pm has defaults for min_shared_snps, and swap/pass thresholds
     $log->debug("Creating identity check object");
     my $checker = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new(%args);
 
+    ### read QC plex calls from VCF ###
+    my $vcf_fh;
+    if (!defined($vcf)) {
+        $log->logcroak("A --vcf argument is required");
+    } elsif ($vcf eq '-') {
+        $vcf_fh = \*STDIN;
+    } elsif (! -e $vcf) {
+        $log->logcroak("File argument to --vcf does not exist");
+    } else {
+        open $vcf_fh, "<", $vcf || $log->logcroak("Cannot open VCF input '",
+                                                  $vcf, "'");
+    }
+    my $vcf_data = WTSI::NPG::Genotyping::VCF::Slurper->new(
+        snpset           => $snpset,
+        input_filehandle => $vcf_fh)->read_dataset();
+    if ($vcf_fh ne '-') {
+        close $vcf_fh || $log->logcroak("Cannot close VCF input '",
+                                        $vcf, "'");
+    }
+    my $qc_calls = $vcf_data->calls_by_sample();
+
+    ### run identity check and write output ###
     my $result = $checker->run_identity_checks_json_spec($qc_calls);
 
     my $out;
@@ -150,58 +158,6 @@ sub run {
 
 }
 
-# For now, read QC calls from the pipeline SQLITE database
-# TODO options to read calls directly from Sequenom/Fluidigm subscribers
-# cf. 'insert calls' methods in ready_infinium.pl
-
-sub read_qc_calls {
-    # required output: $sample => [ [$snp_name_1, $call_1], ... ]
-    my ($dbfile, $inifile, $snpset) = @_;
-    my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-	(name => 'pipeline',
-	 inifile => $inifile,
-	 dbfile => $dbfile);
-    $pipedb->connect(RaiseError => 1,
-                 on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @samples = $pipedb->sample->all;
-    $log->debug("Read ", scalar(@samples), " samples from pipeline DB");
-    my @snps = $pipedb->snp->all;
-    my $snpTotal = @snps;
-    $log->debug("Read $snpTotal SNPs from pipeline DB");
-    my %snpNames;
-    foreach my $snp (@snps) { $snpNames{$snp->id_snp} = $snp->name; }
-    # read QC calls for each sample and SNP
-    my $snpResultTotal = 0;
-    my %results;
-    my $i = 0;
-    foreach my $sample (@samples) {
-        if ($sample->include == 0) { next; }
-        my $sampleURI = $sample->uri;
-        my @results = $sample->results->all;
-        $i++;
-        if ($i % 100 == 0) {
-            $log->debug("Read ", scalar(@results),
-                        " results for sample ", $i, " of ",
-                        scalar(@samples));
-        }
-        my @snp_calls;
-        foreach my $result (@results) {
-            my @snpResults = $result->snp_results->all;
-            $snpResultTotal += @snpResults;
-            foreach my $snpResult (@snpResults) {
-                my $snpName = $snpNames{$snpResult->id_snp};
-                my $call = WTSI::NPG::Genotyping::Call->new
-                    (snp      => $snpset->named_snp($snpName),
-                     genotype => $snpResult->value);
-                push(@snp_calls, $call);
-            }
-        }
-        $results{$sampleURI} = \@snp_calls;
-    }
-    $log->debug("Read ", $snpResultTotal, " QC SNP results from pipeline DB");
-    return \%results;
-}
-
 
 
 __END__
@@ -212,13 +168,10 @@ check_identity_bed_wip
 
 =head1 SYNOPSIS
 
-check_identity_bed_wip [--config <database .ini file>] --dbfile <SQLite file> [-- min-shared-snps <n>] [--pass-threshold <f>] --plex-manifest <path> [--out <path>] --plink <path stem> [--swap_threshold <f>] [--help] [--verbose]
+check_identity_bed_wip [--config <database .ini file>] --vcf <VCF file> [-- min-shared-snps <n>] [--pass-threshold <f>] --plex-manifest <path> [--out <path>] --plink <path stem> [--swap_threshold <f>] [--help] [--verbose]
 
 Options:
 
-  --config=PATH          Load database configuration from a user-defined .ini
-                         file. Optional, defaults to $HOME/.npg/genotyping.ini
-  --dbfile=PATH          Path to pipeline SQLITE database file. Required.
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
   --min_shared_snps=NUM  Minimum number of shared SNPs between production and
@@ -230,6 +183,8 @@ Options:
                          suffix) for production data.
   --swap_threshold=NUM   Minimum cross-similarity to warn of sample swap.
                          Optional.
+  --vcf=PATH             Path to VCF input file, or - to read from STDIN.
+                         Required.
   --verbose              Print messages while processing. Optional.
 
 =head1 DESCRIPTION

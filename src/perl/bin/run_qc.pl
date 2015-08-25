@@ -26,7 +26,7 @@ our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title,
     $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter,
-    $illuminusFilter, $include, $plexManifest);
+    $illuminusFilter, $include, $plexManifest, $vcf);
 
 GetOptions("help"              => \$help,
            "output-dir=s"      => \$outDir,
@@ -36,12 +36,13 @@ GetOptions("help"              => \$help,
            "inipath=s"         => \$iniPath,
            "title=s"           => \$title,
            "run=s"             => \$runName,
+           "vcf=s"             => \$vcf,
            "mafhet"            => \$mafHet,
 	   "filter=s"          => \$filterConfig,
 	   "zcall-filter"      => \$zcallFilter,
 	   "illuminus-filter"  => \$illuminusFilter,
 	   "include"           => \$include,
-           "plex-manifest"     => \$plexManifest,
+           "plex-manifest=s"   => \$plexManifest,
     );
 
 if ($help) {
@@ -50,22 +51,28 @@ if ($help) {
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension). May include directory names, eg. /home/foo/project where plink files are /home/foo/project.bed, etc.
 
 Options:
---output-dir=PATH   Directory for QC output
---sim=PATH          Path to SIM file for intensity metrics. See note [1] below.
---dbpath=PATH       Path to pipeline database .db file. Required.
---inipath=PATH      Path to .ini file containing general pipeline and database
-                    configuration; local default is $DEFAULT_INI
---run=NAME          Name of run in pipeline database (needed for database
-                    update from gender check)
---config=PATH       Path to JSON config file; default is taken from inipath
---mafhet            Find heterozygosity separately for SNP populations with
-                    minor allele frequency greater than 1%, and less than 1%.
---title             Title for this analysis; will appear in plots
---zcall-filter      Apply default zcall filter; see note [2] below.
---illuminus-filter  Apply default illuminus filter; see note [2] below.
---filter=PATH       Read custom filter criteria from PATH. See note [2] below.
---include           Do not exclude failed samples from the pipeline DB.
-                    See note [2] below.
+--output-dir=PATH     Directory for QC output
+--sim=PATH            Path to SIM file for intensity metrics.
+                      See note [1] below.
+--dbpath=PATH         Path to pipeline database .db file. Required.
+--inipath=PATH        Path to .ini file containing general pipeline and
+                      database configuration; local default is $DEFAULT_INI
+--vcf=PATH            Path to .vcf file containing QC plex calls for alternate
+                      identity check.
+--plex-manifest=PATH
+--run=NAME            Name of run in pipeline database (needed for database
+                      update from gender check)
+--config=PATH         Path to JSON config file; default is taken from inipath
+--mafhet              Find heterozygosity separately for SNP populations with
+                      minor allele frequency greater than 1%, and less than
+                      1%.
+--title               Title for this analysis; will appear in plots
+--zcall-filter        Apply default zcall filter; see note [2] below.
+--illuminus-filter    Apply default illuminus filter; see note [2] below.
+--filter=PATH         Read custom filter criteria from PATH. See note [2]
+                      below.
+--include             Do not exclude failed samples from the pipeline DB.
+                      See note [2] below.
 
 [1] If --sim is not specified, but the intensity files magnitude.txt and
 xydiff.txt are present in the pipeline output directory, intensity metrics
@@ -86,6 +93,10 @@ once when multiple callers are used on the same dataset.
       prefilter results.
     * If the --include option is in effect, filter summary files will be
       written but samples will not be excluded from the SQLite DB.
+
+[3] The --plex-manifest and --vcf options, with appropriate arguments, are
+required to run the alternate identity check. If both these options are not
+specified, the check will be omitted.
 ";
     exit(0);
 }
@@ -117,7 +128,7 @@ my $exclude = !($include);
 ### run QC
 run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
 $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude,
-$plexManifest);
+$plexManifest, $vcf);
 
 sub cleanup {
     # create a 'supplementary' subdirectory of the output directory
@@ -235,17 +246,16 @@ sub verifyAbsPath {
 
 sub run_qc_wip {
   # run the work-in-progess refactored QC in parallel with the old one
-  my ($plinkPrefix, $dbPath, $iniPath, $outDir, $plexManifest) = @_;
+  my ($plinkPrefix, $outDir, $plexManifest, $vcf) = @_;
   $plexManifest ||= "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
   my $outPath = $outDir."/identity_wip.json";
-  my @args = ("--config=$iniPath",
-	      "--dbfile=$dbPath",
-	      "--out=$outPath",
+  my @args = ("--out=$outPath",
 	      "--plink=$plinkPrefix",
-	      "--plex_manifest=$plexManifest"
+	      "--plex_manifest=$plexManifest",
+              "--vcf=$vcf"
 	     );
   my $cmd = $script." ".join(" ", @args);
   my $result = system($cmd);
@@ -258,8 +268,10 @@ sub run_qc_wip {
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
         $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
-        $exclude, $plexManifest) = @_;
-    run_qc_wip($plinkPrefix, $dbPath, $iniPath, $outDir, $plexManifest);
+        $exclude, $plexManifest, $vcf) = @_;
+    if ($plexManifest && $vcf) {
+        run_qc_wip($plinkPrefix, $outDir, $plexManifest, $vcf);
+    }
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);
     ### input file generation ###

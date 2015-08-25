@@ -236,8 +236,10 @@ sub sample_swap_evaluation : Test(2) {
 
 
 sub script : Test(2) {
-    # test of the new identity command-line script
-    # TODO maybe move this into Scripts.pm (which is very slow to run)
+    # test of command-line script
+    # Could move this into Scripts.pm (which is slow to run, ~10 minutes)
+
+    # want this to work with VCF input
 
     my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
     my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
@@ -247,10 +249,10 @@ sub script : Test(2) {
     my $refPath = "$data_path/identity_script_output.json";
 
     ok(system(join q{ }, "$identity_script_wip",
-              "--dbfile $data_path/fake_genotyping.db",
               "--plink $data_path/fake_qc_genotypes",
               "--out $outPath",
               "--plex_manifest $plexFile",
+              "--vcf $data_path/qc_plex_calls.vcf"
           ) == 0, 'Completed identity check');
 
     my $outData = from_json(read_file($outPath));

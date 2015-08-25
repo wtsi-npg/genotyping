@@ -7,6 +7,7 @@ package main;
 use strict;
 use warnings;
 use Carp;
+use File::Basename qw(fileparse);
 use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
@@ -43,7 +44,7 @@ my $embedded_conf = "
 
 
 my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
-    $debug, $quiet, $reference, $snpset_path, $chromosome_json);
+    $debug, $quiet, $refString, $snpset_path, $chromosome_json);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $SEQUENOM_TYPE = 'sequenom';
@@ -60,7 +61,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'irods'             => \$use_irods,
            'logconf=s'         => \$logConfig,
            'plex_type=s'       => \$inputType,
-	   'reference=s'       => \$reference,
+	   'ref_string=s'      => \$refString,
            'vcf=s'             => \$vcfPath,
            'quiet'             => \$quiet,
        );
@@ -81,6 +82,9 @@ unless ($inputType eq $SEQUENOM_TYPE || $inputType eq $FLUIDIGM_TYPE) {
 unless ($snpset_path) {
     $log->logcroak("Must specify a snpset path in iRODS or local filesystem");
 }
+
+my $snpsetFile = fileparse($snpset_path);
+$refString ||= $snpsetFile;
 
 ### read snpset and chromosome data
 my ($snpset, $chromosome_lengths);
@@ -132,8 +136,8 @@ my $resultsets = _build_resultsets(\@inputs, $inputType, $irods);
 my %parserArgs = (resultsets => $resultsets,
                   input_type => $inputType,
                   snpset => $snpset,
-                  contig_lengths => $chromosome_lengths,
-		  reference => $reference);
+                  contig_lengths => $chromosome_lengths);
+if ($refString) { $parserArgs{'reference'} = $refString; }
 if ($use_irods) { $parserArgs{irods} = $irods; }
 
 my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
@@ -234,10 +238,12 @@ Options:
                       are assumed to be in the local filesystem, and the
                       --snpset and --chromosomes options are required.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
+  --ref_string=STR    String to occupy the 'reference' field in the VCF output
+                      header. Optional, defaults to the snpset filename.
   --snpset            Path to a tab-separated manifest file with information
                       on the SNPs in the QC plex. Path must be in iRODS if the
                       --irods option is in effect, or on the local filesystem
-                      otherwise.
+                      otherwise. Required.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.

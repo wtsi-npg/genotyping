@@ -38,6 +38,7 @@ bin/update_sequenom_metadata.pl
 bin/update_sequenom_qc_metadata.pl
 bin/vcf_consistency_check.pl
 bin/vcf_from_plex.pl
+bin/vcf_from_plink.pl
 bin/write_identity_csv.pl
 bin/write_qc_reports.pl
 bin/write_snp_metadata.pl
@@ -446,6 +447,7 @@ t/qc/check/identity/fake_swap_genotypes.bim
 t/qc/check/identity/fake_swap_genotypes.fam
 t/qc/check/identity/fake_swap_genotypes.map
 t/qc/check/identity/fake_swap_genotypes.ped
+t/qc/check/identity/qc_plex_calls.vcf
 t/qc/check/identity/W30467_snp_set_info_1000Genomes.tsv
 t/qc/check/identity/W30467_snp_set_info_1000Genomes_BROKEN.tsv
 t/qc_small.t
@@ -468,9 +470,11 @@ t/qc_test_data/small_test.bim
 t/qc_test_data/small_test.db
 t/qc_test_data/small_test.fam
 t/qc_test_data/small_test.sim
+t/qc_test_data/small_test_fake_manifest.tsv
 t/qc_test_data/small_test_no_exclusion.bed
 t/qc_test_data/small_test_no_exclusion.bim
 t/qc_test_data/small_test_no_exclusion.fam
+t/qc_test_data/small_test_plex.vcf
 t/qc_test_data/W30467_snp_set_info_1000Genomes.tsv
 t/qc_test_data/zcall_prefilter_test.json
 t/query_project_samples.t
@@ -618,7 +622,10 @@ t/utilities/collect_files/c/30.txt
 t/utilities/collect_files/c/z/3.txt
 t/utilities/lorem.txt
 t/vcf.t
+t/vcf/calls_from_plink.vcf
 t/vcf/chromosome_lengths_GRCh37.json
+t/vcf/fake_qc_genotypes.map
+t/vcf/fake_qc_genotypes.ped
 t/vcf/fluidigm.vcf
 t/vcf/fluidigm_001.csv
 t/vcf/fluidigm_002.csv
