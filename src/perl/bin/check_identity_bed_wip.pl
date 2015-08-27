@@ -4,6 +4,7 @@ use warnings;
 use strict;
 use Carp;
 use Config::IniFiles;
+use File::Slurp qw (read_file);
 use Getopt::Long;
 use JSON;
 use Log::Log4perl;
