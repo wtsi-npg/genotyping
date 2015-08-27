@@ -51,6 +51,7 @@ sub run {
     my $pass_threshold;
     my $plex_manifest;
     my $plink;
+    my $snpset_irods_json;
     my $swap_threshold;
     my $vcf;
     my $verbose;
@@ -65,6 +66,7 @@ sub run {
         'pass_threshold=f'  => \$pass_threshold,
         'plex_manifest=s'   => \$plex_manifest,
         'plink=s'           => \$plink,
+        'snpset_paths=s'    => \$snpset_irods_json,
         'swap_threshold=f'  => \$swap_threshold,
         'vcf=s'             => \$vcf,
         'verbose'           => \$verbose);
@@ -84,15 +86,16 @@ sub run {
         }
     }
 
-    ### read SNPSet object from manifest ###
-    if (!defined($plex_manifest)) {
-        $log->logcroak("Must supply a --plex-manifest argument");
-    } elsif (! -e $plex_manifest) {
-        $log->logcroak("Given plex-manifest argument '", $plex_manifest,
-                       "' does not exist.");
+    ### read SNPSet object from manifest, or snpset_paths from JSON ###
+    my ($snpset, $snpset_paths);
+    if (defined($plex_manifest)) {
+        $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
+    } elsif (defined($snpset_irods_json)) {
+        $snpset_paths = decode_json(read_file($snpset_irods_json));
+    } else {
+        $log->logcroak("Must supply either a --plex-manifest or a ",
+                       "--snpset-paths argument");
     }
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
-    $log->debug("Read QC plex snpset from ", $plex_manifest);
 
     ### check existence of plink dataset ###
     if (!defined($plink)) {
@@ -100,7 +103,8 @@ sub run {
     }
     my @plink_suffixes = qw(.bed .bim .fam);
     foreach my $suffix (@plink_suffixes) {
-        if (! -e $plink.$suffix) {
+        my $plink_path = $plink.$suffix; # needed to mollify perlcritic
+        if (!(-e $plink_path)) {
             $log->logcroak("Plink binary input file '", $plink.$suffix,
                            "' does not exist");
         }
@@ -131,9 +135,16 @@ sub run {
         open $vcf_fh, "<", $vcf || $log->logcroak("Cannot open VCF input '",
                                                   $vcf, "'");
     }
+    my %slurp_args = (input_filehandle => $vcf_fh);
+    if (defined($snpset)) {
+        $slurp_args{'snpset'} = $snpset;
+    } elsif (defined($snpset_paths)) {
+        $slurp_args{'snpset_irods_paths'} = $snpset_paths;
+    } else {
+        $log->logcroak("Missing snpset object or paths");
+    }
     my $vcf_data = WTSI::NPG::Genotyping::VCF::Slurper->new(
-        snpset           => $snpset,
-        input_filehandle => $vcf_fh)->read_dataset();
+        %slurp_args)->read_dataset();
     if ($vcf_fh ne '-') {
         close $vcf_fh || $log->logcroak("Cannot close VCF input '",
                                         $vcf, "'");

@@ -18,24 +18,20 @@ has 'sample_names' => (
 has 'contig_lengths' => (
     is            => 'ro',
     isa           => 'HashRef[Int]',
-    documentation => 'Used to create contig tags as required by bcftools. '.
+    documentation => 'Used to create contig metadata required by bcftools. '.
                      'In typical usage, each contig corresponds to a homo '.
-                     'sapiens chromosome.'
+                     'sapiens chromosome.',
 );
 
-has 'source' => (
+has 'metadata' => (
     is            => 'ro',
-    isa           => 'Str',
-    default       => 'WTSI_NPG_genotyping_pipeline',
-    documentation => 'Standard VCF field to identify the data source'
-);
-
-has 'reference' => (
-    is            => 'ro',
-    isa           => 'Str',
-    required      => 1,
-    documentation => 'Reference identifier (eg. a filename or URL) to '.
-		     'populate the ##reference field in VCF header output'
+    isa           => 'HashRef[ArrayRef[Str]]',
+    documentation => 'Metadata contained in the VCF header, represented '.
+                     'as key/value pairs. Each value is an array of one or '.
+                     'more strings. At a minimum, metadata should include '.
+                     'source, reference, INFO and FORMAT entries. '.
+                     '(Defaults will be assigned if not given.) '.
+                     'See the VCF specification for other reserved keys.',
 );
 
 our $DEFAULT_SPECIES = 'Homo sapiens';
@@ -50,52 +46,64 @@ has 'species' => (
 our $VERSION = '';
 
 our $VCF_VERSION = 'VCFv4.2'; # version of VCF format in use
-our $INFO = '<ID=ORIGINAL_STRAND,Number=1,Type=String,'.
-            'Description="Direction of strand in input file">';
-our @FORMAT = (
-    '<ID=GT,Number=1,Type=String,Description="Genotype">',
-    '<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">',
-    '<ID=DP,Number=1,Type=Integer,Description="Read Depth">',
-);
+
+our $FF_KEY = 'fileformat';
+our $DATE_KEY ='fileDate';
+our $CONTIG_KEY = 'contig';
+our $SOURCE_KEY = 'source';
+our $REFERENCE_KEY = 'reference';
+our @RESERVED_KEYS = ($FF_KEY, $DATE_KEY, $SOURCE_KEY, $REFERENCE_KEY,
+                      $CONTIG_KEY);
+push @RESERVED_KEYS, qw/INFO FILTER FORMAT ALT SAMPLE PEDIGREE assembly/;
+our $SOURCE_DEFAULT = 'WTSI_NPG_genotyping_pipeline';
 our @COLUMN_HEADS = qw/CHROM POS ID REF ALT QUAL FILTER INFO FORMAT/;
 
-around BUILDARGS => sub {
-    # optionally, populate contig_lengths attribute using an ArrayRef[Str]
-    # with the key 'contig_strings'. Not compatible with supplying a value
-    # for contig_lengths.
-    my ($orig, $class, @args) = @_;
-    my %init_args = @args;
-    my %new_args;
-    if (defined($init_args{'contig_strings'})) {
-        if (!is_ArrayRef($init_args{'contig_strings'})) {
-            $class->logcroak("'contig_strings' argument to Header ",
-                             "must be an ArrayRef[Str]");
-        } elsif (defined($init_args{'contig_lengths'})) {
-            $class->logcroak("Cannot supply both contig_lengths and ",
-                             "contig_strings arguments");
+sub BUILD {
+    # check for required fields in metadata, add defaults if needed
+    my ($self) = @_;
+    my %defaults = (
+        $FF_KEY => [
+            $VCF_VERSION,
+        ],
+        $DATE_KEY => [
+            DateTime->now(time_zone=>'local')->ymd(''),
+        ],
+        INFO => [
+            '<ID=ORIGINAL_STRAND,Number=1,Type=String,'.
+                'Description="Direction of strand in input file">',
+        ],
+        FORMAT => [
+            '<ID=GT,Number=1,Type=String,Description="Genotype">',
+            '<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">',
+            '<ID=DP,Number=1,Type=Integer,Description="Read Depth">',
+        ],
+        $SOURCE_KEY => [
+            $SOURCE_DEFAULT,
+        ],
+        $REFERENCE_KEY => [
+            'unknown',
+        ]
+    );
+    # if contig lengths are available, add to defaults
+    if (defined $self->contig_lengths
+	&& scalar keys %{$self->contig_lengths} > 0) {
+        my @contig_values;
+        my @contigs = sort(keys(%{$self->contig_lengths}));
+        foreach my $contig (@contigs) {
+            my $contig_value = $self->contig_to_string(
+                $contig,
+                $self->contig_lengths->{$contig});
+            push @contig_values, $contig_value;
         }
-        my %contig_lengths = ();
-        foreach my $str (@{$init_args{'contig_strings'}}) {
-            if (!is_Str($str)) {
-                $class->logcroak("Values of contig_strings ArrayRef ",
-                                 "must be strings");
-            }
-            # cannot access $self->species before object creation
-            my $species = $init_args{'species'} || $DEFAULT_SPECIES;
-            my ($contig, $length) = $class->string_to_contig($str, $species);
-            $contig_lengths{$contig} = $length;
-        }
-        $new_args{'contig_lengths'} = \%contig_lengths;
-        foreach my $key (keys %init_args) {
-            if ($key ne 'contig_strings') {
-                $new_args{$key} = $init_args{$key};
-            }
-        }
-        return \%new_args;
-    } else {
-        return $class->$orig(@_);
+        $defaults{'contig'} = \@contig_values;
     }
-};
+    # merge defaults into given metadata where required
+    foreach my $key (keys %defaults) {
+        if (!defined($self->metadata->{$key})) {
+            $self->metadata->{$key} = $defaults{$key};
+        }
+    }
+}
 
 =head2 contig_to_string
 
@@ -105,6 +113,7 @@ around BUILDARGS => sub {
   Example    : my $contig_string = $contig_to_string($name, $length)
   Description: Generate a contig string for the VCF header. For now,
                this package requires contigs to be human chromosomes.
+               String does not include the key prefix '##contig='.
   Returntype : Str
 
 =cut
@@ -118,30 +127,31 @@ sub contig_to_string {
     } elsif (!is_PositiveInt($length)) {
         $self->logcroak("Contig length must be an integer > 0");
     }
-    my $contig_str = '##contig=<ID='.$name.',length='.$length.
+    my $contig_str = '<ID='.$name.',length='.$length.
         ',species="'.$self->species.'">';
     return $contig_str;
 }
 
-=head2 string_to_contig
+=head2 parse_contig_line
 
-  Arg [1]    : Contig string
+  Arg [1]    : Contig line
   Arg [2]    : Species (optional, defaults to 'species' attribute)
 
-  Example    : my ($name, $length) = $string_to_contig($contig_str)
-  Description: Parse a contig string from the VCF header. The input string
-               must be strictly in the format output by contig_to_string.
+  Example    : my ($name, $length) = $parse_contig_line($contig_str)
+  Description: Parse a contig line from the VCF header. The input string is
+               of the form ##contig=$VALUE', where $VALUE must be strictly
+               in the format output by contig_to_string.
                For now, this package requires contigs to be human
                chromosomes.
 
                It was decided to keep all definitions for the format of
-               contig lines in the Header class. Therefore, string_to_contig
+               contig lines in the Header class. Therefore, parse_contig_line
                is in Header.pm instead of VCFParser.pm.
   Returntype : ArrayRef[Str]
 
 =cut
 
-sub string_to_contig {
+sub parse_contig_line {
     # Deals defensively with awkward VCF contig tag format, by requiring
     # a strict match with the output of contig_to_string
     my ($self, $input, $species) = @_;
@@ -185,30 +195,33 @@ sub string_to_contig {
 sub str {
     my ($self) = @_;
     my @header;
-    push @header, '##fileformat='.$VCF_VERSION;
-    my $date = DateTime->now(time_zone=>'local')->ymd('');
-    push @header, '##fileDate='.$date;
-    push @header, '##source='.$self->source;
-    push @header, '##reference='.$self->reference;
-    if (defined $self->contig_lengths
-	&& scalar keys %{$self->contig_lengths} > 0) {
-        my @contigs = sort(keys(%{$self->contig_lengths}));
-        foreach my $contig (@contigs) {
-            my $contig_string = $self->contig_to_string(
-                $contig,
-                $self->contig_lengths->{$contig});
-            push @header, $contig_string;
+    # metadata
+    my %res_key_hash;
+    foreach my $key (@RESERVED_KEYS) {
+        $res_key_hash{$key} = 1;
+        my $valuesRef = $self->metadata->{$key};
+        unless (defined($valuesRef)) { next; }
+        foreach my $value (@{$valuesRef}) {
+            push @header, '##'.$key.'='.$value;
         }
     }
-    push @header, '##INFO='.$INFO;
-    foreach my $format_field (@FORMAT) {
-        push @header, '##FORMAT='.$format_field;
+    my @all_keys = sort(keys %{$self->metadata});
+    foreach my $key (@all_keys) {
+        # append non-reserved key/value pairs (if any)
+        if ($res_key_hash{$key}) {
+            next;
+        }
+        foreach my $value (@{$self->metadata->{$key}}) {
+            push @header, '##'.$key.'='.$value;
+        }
     }
+    # column headers
     my @colHeads = @COLUMN_HEADS;
     push @colHeads, @{$self->sample_names};
     push @header, "#".join "\t", @colHeads;
     return join "\n", @header;
 }
+
 
 __PACKAGE__->meta->make_immutable;
 
@@ -244,7 +257,7 @@ is contained in DataRow objects.
 
 =back
 
-=item * Data source: Optional. A value for the 'source' field in the header output.
+=item * Metadata: Optional. A HashRef[ArrayRef[Str]] of metadata fields for the VCF header. Any required fields not supplied receive default values.
 
 =item * Species: Optional. Species identifier for contig lines in VCF input or output. Defaults to 'Homo sapiens'.
 

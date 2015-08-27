@@ -125,11 +125,16 @@ sub run {
     }
 
     # create VCF::Header
+    my %metadata = (
+        reference => [ $manifest, ],
+    );
+
+
     my $contig_lengths = decode_json(read_file($contigs));
     my $header = WTSI::NPG::Genotyping::VCF::Header->new(
         sample_names   => $sample_names,
         contig_lengths => $contig_lengths,
-        reference      => $manifest,
+        metadata       => \%metadata,
     );
 
     # create VCF::VCFDataSet and write object
@@ -187,7 +192,7 @@ sub read_plink_snp_names {
     my @names;
     my $names_raw = read_column($mapPath, 1);
     foreach my $name_raw (@{$names_raw}) {
-        my @id = split /-/, $name_raw;
+        my @id = split /-/msx, $name_raw;
         my $name = pop @id;
         push @names, $name;
     }

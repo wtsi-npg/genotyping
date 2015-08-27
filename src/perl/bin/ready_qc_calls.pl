@@ -24,8 +24,6 @@ use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Utilities qw(user_session_log);
 
-use Data::Dumper; # TODO temporary, for development
-
 our $VERSION = '';
 
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -98,7 +96,7 @@ sub run {
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.vcf.qc');
+         $log = Log::Log4perl->get_logger('npg.vcf.qc');
         if ($verbose) {
             $log->level($INFO);
         }
@@ -155,31 +153,8 @@ sub run {
     }
 
     ### read data from iRODS ###
-    my ($resultsets, $snpset, $chromosome_lengths);
-    if ($params{$PLATFORM_KEY} eq 'fluidigm') {
-        ($resultsets, $snpset, $chromosome_lengths) =
-            _get_fluidigm_irods_data(
-                $irods,
-                $params{$IRODS_DATA_PATH_KEY},
-                \@sample_ids,
-                $params{$REFERENCE_NAME_KEY},
-                $params{$REFERENCE_PATH_KEY},
-                $params{$SNPSET_NAME_KEY},
-                $log);
-    } elsif ($params{$PLATFORM_KEY} eq 'sequenom') {
-        ($resultsets, $snpset, $chromosome_lengths) =
-            _get_sequenom_irods_data(
-                $irods,
-                $params{$IRODS_DATA_PATH_KEY},
-                \@sample_ids,
-                $params{$REFERENCE_NAME_KEY},
-                $params{$REFERENCE_PATH_KEY},
-                $params{$SNPSET_NAME_KEY},
-                $log);
-    } else {
-        $log->logcroak("Unknown QC platform: '", $params{$PLATFORM_KEY}, "'");
-    }
-
+    my ($resultsets, $snpset, $chromosome_lengths, $vcf_meta) =
+        _query_irods($irods, \@sample_ids, \%params, $log);
     if (scalar @{$resultsets} == 0) {
         $log->logcroak("No assay result sets found for QC plex '",
                        $params{$SNPSET_NAME_KEY}, "'");
@@ -188,44 +163,47 @@ sub run {
     ### call VCF parser on resultsets and write to file ###
     my $vcfData = WTSI::NPG::Genotyping::VCF::AssayResultParser->new(
         resultsets     => $resultsets,
-        reference      => $params{$REFERENCE_PATH_KEY},
         contig_lengths => $chromosome_lengths,
         snpset         => $snpset,
         logger         => $log,
+        metadata       => $vcf_meta,
     )->get_vcf_dataset();
     open my $out, ">", $output_path ||
         $log->logcroak("Cannot open VCF output: '", $output_path, "'");
     print $out $vcfData->str()."\n";
     close $out ||
         $log->logcroak("Cannot close VCF output: '", $output_path, "'");
-
 }
 
-sub _get_fluidigm_irods_data {
-    # get Fluidigm AssayResultSets, SNPSet, and contig lengths from iRODS
-    my ($irods, $data_path, $sample_ids, $reference_name, $reference_path,
-        $snpset_name, $log) = @_;
-
-    my %params = (irods          => $irods,
-                  data_path      => $data_path,
-                  reference_path => $reference_path,
-                  reference_name => $reference_name,
-                  snpset_name    => $snpset_name,
-                  logger         => $log);
-
-    my $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-        (irods          => $irods,
-         data_path      => $data_path,
-         reference_path => $reference_path,
-         reference_name => $reference_name,
-         snpset_name    => $snpset_name,
-         logger         => $log);
-
-    my $resultset_hashref = $subscriber->get_assay_resultsets($sample_ids);
+sub _query_irods {
+    # get AssayResultSets, SNPSet, and contig lengths from iRODS
+    # works for Fluidigm or Sequenom
+    my ($irods, $sample_ids, $params, $log) = @_;
+    my $subscriber;
+    if ($params->{$PLATFORM_KEY} eq $FLUIDIGM) {
+        $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+            (irods          => $irods,
+             data_path      => $params->{$IRODS_DATA_PATH_KEY},
+             reference_path => $params->{$REFERENCE_PATH_KEY},
+             reference_name => $params->{$REFERENCE_NAME_KEY},
+             snpset_name    => $params->{$SNPSET_NAME_KEY},
+             logger         => $log);
+    } elsif ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
+        $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
+            (irods          => $irods,
+             data_path      => $params->{$IRODS_DATA_PATH_KEY},
+             reference_path => $params->{$REFERENCE_PATH_KEY},
+             reference_name => $params->{$REFERENCE_NAME_KEY},
+             snpset_name    => $params->{$SNPSET_NAME_KEY},
+             logger         => $log);
+    } else {
+        $log->logcroak("Unknown plex type: '", $params->{$PLATFORM_KEY}, "'");
+    }
+    my ($resultset_hashref, $vcf_metadata) =
+      $subscriber->get_assay_resultsets_and_vcf_metadata($sample_ids);
 
     # unpack the resultset hashref from Subscriber.pm
     # TODO exploit ability of Subscriber.pm to find multiple resultsets for each sample
-
     my @resultsets;
     foreach my $sample (keys %{$resultset_hashref}) {
         my @sample_resultsets = @{$resultset_hashref->{$sample}};
@@ -235,45 +213,11 @@ sub _get_fluidigm_irods_data {
     $log->info("Found $total Fluidigm resultsets.");
     return (\@resultsets,
             $subscriber->get_snpset(),
-            $subscriber->get_chromosome_lengths());
+            $subscriber->get_chromosome_lengths(),
+            $vcf_metadata,
+        );
 }
 
-sub _get_sequenom_irods_data {
-    # get Sequenom AssayResultSets, SNPSet, and contig lengths from iRODS
-    my ($irods, $data_path, $sample_ids, $reference_name, $reference_path,
-        $snpset_name, $log) = @_;
-
-    my %params = (irods          => $irods,
-                  data_path      => $data_path,
-                  reference_path => $reference_path,
-                  reference_name => $reference_name,
-                  snpset_name    => $snpset_name,
-                  logger         => $log);
-
-    my $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
-        (irods          => $irods,
-         data_path      => $data_path,
-         reference_path => $reference_path,
-         reference_name => $reference_name,
-         snpset_name    => $snpset_name,
-         logger         => $log);
-
-    my $resultset_hashref = $subscriber->get_assay_resultsets($sample_ids);
-
-    # unpack the resultset hashref from Subscriber.pm
-    # TODO exploit ability of Subscriber.pm to find multiple resultsets for each sample
-
-    my @resultsets;
-    foreach my $sample (keys %{$resultset_hashref}) {
-        my @sample_resultsets = @{$resultset_hashref->{$sample}};
-        push @resultsets, @sample_resultsets;
-    }
-    my $total = scalar @resultsets;
-    $log->info("Found $total Sequenom resultsets.");
-    return (\@resultsets,
-            $subscriber->get_snpset(),
-            $subscriber->get_chromosome_lengths());
-}
 
 ## TODO Retrieve results for multiple plex types / experiments and record in the same VCF file
 
@@ -305,7 +249,8 @@ Options:
 =head1 DESCRIPTION
 
 Read sample names from a pipeline SQLite database file; retrieve QC plex
-calls; and write to a VCF file for use by the pipeline identity check.
+calls and metadata from iRODS; and write to a VCF file for use by the
+pipeline identity check.
 
 =head1 METHODS
 

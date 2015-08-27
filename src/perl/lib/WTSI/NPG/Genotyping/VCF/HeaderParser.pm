@@ -34,7 +34,7 @@ sub _build_header {
     # (ensures definition of contig string format is all in the same class)
     # so, read the contig lines as strings and supply as alternative argument
     # to Header constructor
-    my (@contig_lines, $sample_names, $reference);
+    my (@meta_lines, $sample_names, $reference);
     my $in_header = 1;
     my $first = 1;
     while ($in_header) {
@@ -48,10 +48,8 @@ sub _build_header {
         }
         if (eof $self->input_filehandle) {
             $self->logcroak("Unexpected EOF while reading header");
-        } elsif ($line =~ /^[#]{2}contig/msx ) {
-            push @contig_lines, $line;
-	} elsif ($line =~ /^[#]{2}reference=/msx) {
-	    $reference = _parse_reference($line);
+        } elsif ($line =~ /^[#]{2}\w+=/msx) {
+	    push @meta_lines, $line;
 	} elsif ($line =~ /^[#]CHROM/msx ) {
             # last line of header contains sample names
             my $vcf_sample_names = $self->_parse_sample_names($line);
@@ -69,14 +67,34 @@ sub _build_header {
                 $sample_names = $vcf_sample_names;
             }
             $in_header = 0;
+        } else {
+            $self->logcroak("Line found in VCF header without ",
+                            "## or #CHROM prefix");
         }
     }
     return WTSI::NPG::Genotyping::VCF::Header->new
         (sample_names   => $sample_names,
-         contig_strings => \@contig_lines,
-	 reference      => $reference,
-	 );
+	 metadata       => $self->_parse_meta_lines(\@meta_lines),
+     );
 }
+
+sub _parse_meta_lines {
+    my ($self, $lines) = @_;
+    my %metadata;
+    foreach my $line (@{$lines}) {
+        chomp $line;
+        my @terms = split /=/msx, $line;
+        my $key = shift @terms;
+        my $value = join '=', @terms; # allows '=' in value string
+        if ($key !~ /^[#]{2}/msx) {
+            $self->logcroak("Metadata key '$key' does not start with ##");
+        }
+        $key = substr $key, 2; # remove initial ##
+        push @{ $metadata{$key} }, $value; # append to array (or create new)
+    }
+    return \%metadata;
+}
+
 
 sub _parse_reference {
   # parse the ##reference line of a VCF file
