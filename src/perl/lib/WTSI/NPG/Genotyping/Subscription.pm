@@ -4,7 +4,7 @@ package WTSI::NPG::Genotyping::Subscription;
 
 use Moose::Role;
 use JSON;
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(all natatime uniq);
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::iRODS;
@@ -12,6 +12,10 @@ use WTSI::NPG::iRODS;
 our $VERSION = '';
 
 our $CHROMOSOME_JSON_ATTR = 'chromosome_json';
+
+# The largest number of bind variables iRODS supports for 'IN'
+# queries.
+our $BATCH_QUERY_CHUNK_SIZE = 100;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -139,6 +143,132 @@ sub get_snpset {
 }
 
 
+=head2 find_object_paths
+
+  Arg [1]    : ArrayRef[Str] of sample identifiers
+  Arg [2..]  : Optional specs for iRODS metadata query
+  Example    : my @object_paths = $sub->find_object_paths();
+  Description: Find paths for data objects in iRODS corresponding to the
+               given sample identifiers.
+  Returntype : Array[Str]
+
+=cut
+
+sub find_object_paths {
+    my ($self, $sample_identifiers, @query_specs) = @_;
+
+    defined $sample_identifiers or
+        $self->logconfess('A defined sample_identifiers ',
+                          'argument is required');
+    ref $sample_identifiers eq 'ARRAY' or
+        $self->logconfess('The sample_identifiers argument ',
+                          'must be an ArrayRef');
+    _are_unique($sample_identifiers) or
+        $self->logconfess('The sample_identifiers argument contained ',
+                          'duplicate values: [',
+                          join(q{, }, @$sample_identifiers), ']');
+
+    my $num_samples = scalar @$sample_identifiers;
+    my $chunk_size = $BATCH_QUERY_CHUNK_SIZE;
+
+    $self->debug("Getting results for $num_samples samples in chunks of ",
+                 $chunk_size);
+
+    my @obj_paths;
+    my $iter = natatime $chunk_size, @$sample_identifiers;
+    while (my @ids = $iter->()) {
+        my @id_obj_paths = $self->irods->find_objects_by_meta
+            ($self->data_path,
+             [$self->_plex_name_attr => $self->snpset_name],
+             [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
+        push @obj_paths, @id_obj_paths;
+    }
+    return @obj_paths;
+}
+
+
+=head2 find_resultsets_index
+
+  Arg [1]    : ArrayRef[AssayResultSet] of QC plex AssayResultSets
+  Arg [2]    : ArrayRef[Str] of sample identifiers
+  Example    : my @object_paths = $sub->find_object_paths();
+  Description: Index the results by sample identifier. The identifier is
+               guaranteed to be present in the metadata because it was in the
+               search criteria. No assumptions can be made about the order in
+               which iRODS has returned the results, with respect to the
+               arguments of the 'IN' clause.
+  Returntype : HashRef[ArrayRef[AssayResultSet]]
+
+=cut
+
+sub find_resultsets_index {
+    my ($self, $resultsets, $sample_identifiers) = @_;
+    my %resultsets_index;
+    foreach my $sample_identifier (@$sample_identifiers) {
+        unless (exists $resultsets_index{$sample_identifier}) {
+            $resultsets_index{$sample_identifier} = [];
+        }
+        my @sample_resultsets = grep {
+            $_->data_object->get_avu($self->dcterms_identifier_attr,
+                                     $sample_identifier) } @{$resultsets};
+        $self->debug("Found ", scalar @sample_resultsets, " resultsets for ",
+                     "sample '$sample_identifier'");
+        # Sanity check that the contents are consistent
+        my @sample_names = map { $_->canonical_sample_id } @sample_resultsets;
+        unless (all { $_ eq $sample_names[0] } @sample_names) {
+            $self->logconfess("The resultsets found for sample AVU value ",
+                              "'$sample_identifier'",
+                              ": did not all have the same ",
+                              "sample name in their data: [",
+                              join(q{, }, @sample_names), "]");
+        }
+        push @{$resultsets_index{$sample_identifier}}, @sample_resultsets;
+    }
+    return \%resultsets_index;
+}
+
+
+=head2 vcf_metadata_from_irods
+
+  Arg [1]    : ArrayRef[DataObject] of iRODS DataObjects
+  Example    : my $vcf_meta = $sub->vcf_metadata_from_irods($objects);
+  Description: Retrieve iRODS metadata for the given DataObjects and use to
+               construct VCF metadata.
+  Returntype : HashRef[ArrayRef[Str]]
+
+=cut
+
+sub vcf_metadata_from_irods {
+    my ($self, $data_objects) = @_;
+        my %vcf_meta;
+    my @meta_keys = qw/fluidigm_plex sequenom_plex reference/;
+    my %meta_hash;
+    foreach my $key (@meta_keys) { $meta_hash{$key} = 1; }
+    foreach my $obj (@{$data_objects}) { # check iRODS metadata
+        my @obj_meta = @{$obj->metadata};
+        foreach my $pair (@obj_meta) {
+            my $key = $pair->{'attribute'};
+            my $val = $pair->{'value'};
+            if ($key eq 'fluidigm_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'fluidigm';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            } elsif ($key eq 'sequenom_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'sequenom';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            }
+            elsif ($meta_hash{$key}) {
+                push @{ $vcf_meta{$key} }, $val;
+            }
+        }
+    }
+    foreach my $key (keys %vcf_meta) {
+        my @values = @{$vcf_meta{$key}};
+        $vcf_meta{$key} = [ uniq @values ];
+    }
+    return \%vcf_meta;
+}
+
+
 sub _are_unique {
   my ($args) = @_;
 
@@ -199,6 +329,7 @@ sub _build_snpset_data_object {
    my $path = shift @obj_paths;
    return WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
 }
+
 
 no Moose;
 

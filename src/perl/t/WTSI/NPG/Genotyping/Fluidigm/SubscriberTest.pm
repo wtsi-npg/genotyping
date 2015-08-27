@@ -9,7 +9,7 @@ use DateTime;
 use List::AllUtils qw(uniq);
 
 use base qw(Test::Class);
-use Test::More tests => 41;
+use Test::More tests => 42;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -81,15 +81,21 @@ sub constructor : Test(1) {
           snpset_name    => $snpset_name]);
 }
 
-sub get_assay_resultsets : Test(5) {
+sub get_assay_resultsets_and_vcf_metadata : Test(6) {
   my $irods = WTSI::NPG::iRODS->new;
-  my $resultsets1 = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+  my ($resultsets1, $meta1) = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
     (irods          => $irods,
      data_path      => $irods_tmp_coll,
      reference_path => $irods_tmp_coll,
      reference_name => $reference_name,
-     snpset_name    => $snpset_name)->get_assay_resultsets
+     snpset_name    => $snpset_name)->get_assay_resultsets_and_vcf_metadata
        ([uniq @sample_identifiers]);
+
+  my $expected_meta = {
+      'plex_type' => [ 'fluidigm' ],
+      'plex_name' => [ 'qc' ]
+  };
+  is_deeply($meta1, $expected_meta, "VCF metadata matches expected values");
 
   cmp_ok(scalar keys %$resultsets1, '==', 2, 'Assay resultsets for 2 samples');
   cmp_ok(scalar @{$resultsets1->{ABC0123456789}}, '==', 2,
@@ -99,21 +105,22 @@ sub get_assay_resultsets : Test(5) {
 
   dies_ok {
     WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-        (irods          => $irods,
-         data_path      => $irods_tmp_coll,
-         reference_path => $irods_tmp_coll,
-         reference_name => $reference_name,
-         snpset_name    => $snpset_name)->get_assay_resultsets
+      (irods          => $irods,
+       data_path      => $irods_tmp_coll,
+       reference_path => $irods_tmp_coll,
+       reference_name => $reference_name,
+       snpset_name    => $snpset_name)->get_assay_resultsets_and_vcf_metadata
            ([$non_unique_identifier]);
   } 'Fails when query finds results for >1 sample';
 
-  ok(defined WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+  my ($resultsets2, $meta2) = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
      (irods          => $irods,
       data_path      => $irods_tmp_coll,
       reference_path => $irods_tmp_coll,
       reference_name => $reference_name,
-      snpset_name    => $snpset_name)->get_assay_resultsets
-     ([map { 'X' . $_ } 1 .. 100]), "'IN' query of 100 args");
+      snpset_name    => $snpset_name)->get_assay_resultsets_and_vcf_metadata
+          ([map { 'X' . $_ } 1 .. 100]);
+  ok(defined $resultsets2, "'IN' query of 100 args");
 }
 
 sub get_assay_resultset : Test(2) {
@@ -261,7 +268,8 @@ sub _get_observed_calls {
      reference_path => $irods_coll,
      reference_name => $rname,
      snpset_name    => $sname);
-  my $assay_resultsets = $subscriber->get_assay_resultsets([$sample_id]);
+  my ($assay_resultsets, $vcf_meta) =
+      $subscriber->get_assay_resultsets_and_vcf_metadata([$sample_id]);
   my $calls = $subscriber->get_calls($assay_resultsets->{$sample_id});
 
   my @calls_observed;

@@ -10,6 +10,8 @@ Unreleased
 Added:
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
 - QC check modified to read from VCF instead of database
+- Find Fluidigm/Sequenom results in iRODS and write as VCF, using iRODS
+metadata to construct the VCF header
 
 
 Release 1.11.2: 2015-08-24

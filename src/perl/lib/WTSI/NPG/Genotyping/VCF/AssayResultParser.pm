@@ -8,7 +8,6 @@ use List::AllUtils qw(uniq);
 use Log::Log4perl::Level;
 use Moose;
 
-use WTSI::NPG::iRODS;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::GenderMarkerCall;
@@ -36,17 +35,7 @@ has 'contig_lengths' => # must be compatible with given snpset
                      'homo sapiens chromosome.',
    );
 
-has 'reference'   =>
-   (is            => 'ro',
-    isa           => 'Str',
-    lazy          => 1,
-    builder       => '_build_reference',
-    documentation => 'String to populate the ##reference field in '.
-                     'a VCF header. Defaults to a comma-separated '.
-                     'list of reference names from the snpset argument.'
-   );
-
-has 'resultsets' =>
+has 'resultsets'  =>
    (is            => 'ro',
     isa           => ArrayRefOfResultSet,
     required      => 1,
@@ -54,10 +43,17 @@ has 'resultsets' =>
                      'names and calls.',
    );
 
-has 'snpset' =>
+has 'snpset'     =>
    (is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',
-    required => 1,
+    required     => 1,
+   );
+
+has 'metadata' =>
+   (is            => 'ro',
+    isa           => 'HashRef[ArrayRef[Str]]',
+    documentation => 'Additional metadata fields to populate the VCF header',
+    default       => sub { {} },
    );
 
 
@@ -84,7 +80,7 @@ sub get_vcf_dataset {
     my $header = WTSI::NPG::Genotyping::VCF::Header->new(
         sample_names => $samples,
         contig_lengths => $self->contig_lengths,
-	reference => $self->reference,
+	metadata => $self->metadata,
     );
     my @rows;
     foreach my $snp (@{$self->snpset->snps}) {
