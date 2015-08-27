@@ -89,7 +89,7 @@ sub get_assay_resultsets_and_vcf_metadata {
   my ($self, $sample_identifiers, @query_specs) = @_;
 
   my @obj_paths =
-      $self->_find_object_paths($sample_identifiers, @query_specs);
+      $self->find_object_paths($sample_identifiers, @query_specs);
 
   # generate array of AssayDataObjects
   # use to construct indexed AssayResultSets *and* find metadata
@@ -101,8 +101,8 @@ sub get_assay_resultsets_and_vcf_metadata {
       WTSI::NPG::Genotyping::Fluidigm::AssayResultSet->new($_);
   } @data_objects;
   my $resultsets_index =
-      $self->_find_resultsets_index(\@resultsets, $sample_identifiers);
-  my $vcf_meta = $self->_vcf_metadata_from_irods(\@data_objects);
+      $self->find_resultsets_index(\@resultsets, $sample_identifiers);
+  my $vcf_meta = $self->vcf_metadata_from_irods(\@data_objects);
   return ($resultsets_index, $vcf_meta);
 }
 
