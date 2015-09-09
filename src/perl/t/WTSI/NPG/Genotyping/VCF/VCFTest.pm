@@ -5,8 +5,9 @@ use warnings;
 
 use base qw(Test::Class);
 use Cwd qw(abs_path);
+use File::Path qw/make_path/;
 use File::Slurp qw /read_file/;
-use File::Spec;
+use File::Spec::Functions qw/catfile/;
 use File::Temp qw(tempdir);
 use JSON;
 use Test::More tests => 182;
@@ -15,6 +16,8 @@ use Test::Exception;
 use WTSI::NPG::iRODS;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
+
+our $log = Log::Log4perl->get_logger();
 
 our $tmp;
 our @fluidigm_csv = qw/fluidigm_001.csv fluidigm_002.csv
@@ -26,6 +29,8 @@ our $chromosome_lengths;
 
 our $SEQUENOM_TYPE = 'sequenom'; # TODO avoid repeating these across modules
 our $FLUIDIGM_TYPE = 'fluidigm';
+
+our $REFERENCE_NAME = 'Homo_sapiens (GRCh37_53)';
 
 BEGIN {
     use_ok('WTSI::NPG::Genotyping::VCF::AssayResultParser');
@@ -52,8 +57,6 @@ my $chromosome_json_name = 'chromosome_lengths_GRCh37.json';
 my $chromosome_json_path = $data_path.'/'.$chromosome_json_name;
 my $discordance_fluidigm = $data_path."/pairwise_discordance_fluidigm.json";
 my $discordance_sequenom = $data_path."/pairwise_discordance_sequenom.json";
-my $reference_fluidigm = 'irods:///seq/fluidigm/multiplexes/qc_fluidigm_snp_info_GRCh37.tsv';
-my $reference_sequenom = 'irods:///seq/sequenom/multiplexes/W30467_snp_set_info_GRCh37.tsv';
 my $vcf_fluidigm = $data_path."/fluidigm.vcf";
 my $vcf_fluidigm_header_1 = $data_path."/fluidigm_header_1.txt";
 my $vcf_fluidigm_header_2 = $data_path."/fluidigm_header_2.txt";
@@ -64,8 +67,13 @@ my $irods_tmp_coll;
 my $pid = $$;
 my $testnum = 0; # use to create distinct temporary irods collections
 
+my $reference_vcf_meta;
+
 sub setup: Test(setup) {
     $tmp = tempdir("vcftest_XXXXXX", CLEANUP => 1);
+    $reference_vcf_meta = 'file://'.abs_path($tmp).'/references/'.
+        'Homo_sapiens/GRCh37_53/all/'.
+        'fasta/Homo_sapiens.GRCh37.dna.all.fa';
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = "VCFTest.$pid.$testnum";
     $testnum++;
@@ -73,6 +81,17 @@ sub setup: Test(setup) {
     $irods_tmp_coll = $irods->absolute_path($irods_tmp_coll);
     # read chromosome lengths
     $chromosome_lengths = _read_json($chromosome_json_path);
+    # set up dummy fasta reference
+    $ENV{NPG_REPOSITORY_ROOT} = $tmp;
+    my $fastadir = catfile($tmp, 'references', 'Homo_sapiens',
+                           'GRCh37_53', 'all', 'fasta');
+    make_path($fastadir);
+    my $reference_file_path = catfile($fastadir,
+                                      'Homo_sapiens.GRCh37.dna.all.fa');
+    open my $fh, '>>', $reference_file_path || $log->logcroak(
+        "Cannot open reference file path '", $reference_file_path, "'");
+    close $fh || $log->logcroak(
+        "Cannot close reference file path '", $reference_file_path, "'");
 }
 
 sub teardown : Test(teardown) {
@@ -112,7 +131,7 @@ sub fluidigm_file_test : Test(116) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my %metadata = (
-        reference => [ $reference_fluidigm ],
+        reference => [ $reference_vcf_meta ],
         plex_type => [ $FLUIDIGM_TYPE ],
         plex_name => [ 'qc' ],
     );
@@ -158,7 +177,7 @@ sub fluidigm_irods_test : Test(7) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my %metadata = (
-        reference => [ $reference_fluidigm ],
+        reference => [ $reference_vcf_meta ],
         plex_type => [ $FLUIDIGM_TYPE ],
         plex_name => [ 'qc' ],
 
@@ -186,7 +205,7 @@ sub header_test : Test(4) {
         '<ID=1,length=249250621,species="Homo sapiens">',
         '<ID=2,length=243199373,species="Homo sapiens">',
     );
-    my %metadata = (reference => [ $reference_fluidigm, ],
+    my %metadata = (reference => [ $reference_vcf_meta, ],
                     source    => [ 'WTSI_NPG_genotyping_pipeline', ],
                     contig    => \@contig_strings,
                 );
@@ -218,7 +237,7 @@ sub header_parser_test : Test(6) {
     my $header1 = $parser1->header;
     isa_ok($header1, 'WTSI::NPG::Genotyping::VCF::Header');
     my $header1_expected = _read_without_filedate($vcf_fluidigm_header_1);
-    is_deeply(_remove_filedate($header1->str), $header1_expected,
+    is_deeply(_remove_filedate_reference($header1->str), $header1_expected,
        'Parsed header string matches expected value');
     close $fh || die "Cannot close VCF $vcf_fluidigm";
     open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
@@ -228,7 +247,7 @@ sub header_parser_test : Test(6) {
     my $header2 = $parser2->header;
     isa_ok($header2, 'WTSI::NPG::Genotyping::VCF::Header');
     my $header2_expected = _read_without_filedate($vcf_fluidigm_header_2);
-    is_deeply(_remove_filedate($header2->str), $header2_expected,
+    is_deeply(_remove_filedate_reference($header2->str), $header2_expected,
         'Parsed header string matches expected value, alternate samples');
     close $fh || die "Cannot close VCF $vcf_fluidigm";
     open $fh, '<', $vcf_fluidigm || die "Cannot open VCF $vcf_fluidigm";
@@ -256,7 +275,7 @@ sub sequenom_file_test : Test(7) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my %metadata = (
-        reference => [ $reference_sequenom ],
+        reference => [ $reference_vcf_meta ],
         plex_type => [ $SEQUENOM_TYPE ],
         plex_name => [ 'W30467' ],
     );
@@ -286,7 +305,7 @@ sub sequenom_irods_test : Test(7) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my %metadata = (
-        reference => [ $reference_sequenom ],
+        reference => [ $reference_vcf_meta ],
         plex_type => [ $SEQUENOM_TYPE ],
         plex_name => [ 'W30467' ],
     );
@@ -320,7 +339,7 @@ sub script_conversion_test : Test(3) {
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
         "--snpset $snpset_ipath --irods --plex_type $SEQUENOM_TYPE ".
-        "--ref_string $reference_sequenom < $sequenomList";
+        "--repository $tmp < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $vcfOutput, "VCF output written");
     # read VCF output (omitting date) and compare to reference file
@@ -353,7 +372,7 @@ sub script_pipe_test : Test(4) {
         "cat $sequenomList",
         "$converter --input - --vcf - --snpset $sequenom_snpset_path ".
             "--quiet --chromosomes $chromosome_json_path ".
-	    "--plex_type sequenom --ref_string $reference_sequenom ",
+	    "--plex_type sequenom --repository $tmp ",
 	"$checker --input - --text $tmpText --json $tmpJson"
     );
     my $cmd = join(' | ', @cmds);
@@ -407,7 +426,7 @@ sub slurp_test : Test(7) {
     );
     $dataset = $slurper->read_dataset();
     isa_ok($dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    $got_vcf = _remove_filedate($dataset->str());
+    $got_vcf = _remove_filedate_reference($dataset->str());
     is_deeply($got_vcf, $expected_vcf, 'Parsed output matches input');
     close $fh || die "Cannot close VCF $vcf_fluidigm";
     # reading dataset with snpset path hash
@@ -417,7 +436,7 @@ sub slurp_test : Test(7) {
     );
     $dataset = $slurper->read_dataset();
     isa_ok($dataset, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
-    $got_vcf = _remove_filedate($dataset->str());
+    $got_vcf = _remove_filedate_reference($dataset->str());
     is_deeply($got_vcf, $expected_vcf, 'Parsed output matches input');
     close $fh || die "Cannot close VCF $vcf_fluidigm";
     # test with different sample names
@@ -434,20 +453,20 @@ sub slurp_test : Test(7) {
 }
 
 sub _read_without_filedate {
-    # read a VCF file, omitting the fileDate line
+    # read a VCF file, omitting the ##fileDate and ##reference lines
     my ($inPath) = @_;
     my $lines = read_file($inPath);
-    return _remove_filedate($lines);
+    return _remove_filedate_reference($lines);
 }
 
-sub _remove_filedate {
-    # remove the fileDate from a string containing VCF, for testing
-    # return an ArrayRef[Str] contianing data
+sub _remove_filedate_reference {
+    # remove the fileDate and reference from a string containing VCF
+    # return an ArrayRef[Str] containing data
     my ($vcf_str) = @_;
     my @lines_in = split m/\n/msx, $vcf_str;
     my @lines_out;
     foreach my $line (@lines_in) {
-        if ( $line =~ /^[#]{2}fileDate/msx ) { next; }
+        if ( $line =~ /^[#]{2}(fileDate|reference)/msx ) { next; }
         else { push(@lines_out, $line); }
     }
     return \@lines_out;
@@ -547,10 +566,7 @@ sub _upload_plex_files {
         $irods->add_object("$data_path/$csv", $ipath);
         my $obj =  WTSI::NPG::iRODS::DataObject->new($irods, $ipath);
         $obj->add_avu($data_type.'_plex', $manifest_value);
-        ## FIXME replace w/ human genome reference
-        my $reference = 'irods:///seq/sequenom/multiplexes/'.
-            'W30467_snp_set_info_GRCh37.tsv';
-        $obj->add_avu('reference', $reference);
+        $obj->add_avu('reference', $REFERENCE_NAME);
         push(@inputs, $ipath);
     }
     my $manifest_path = "$data_path/$manifest";

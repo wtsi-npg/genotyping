@@ -10,9 +10,12 @@ Unreleased
 Added:
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
 - QC check modified to read from VCF instead of database
-- Find Fluidigm/Sequenom results in iRODS and write as VCF, using iRODS
-metadata to construct the VCF header
+- Find Fluidigm/Sequenom results in iRODS and write as VCF
+- Find genome reference path from iRODS metadata for VCF header; adds
+dependency on wtsi-npg/npg_tracking
 
+Changed:
+- bcftools version upgraded to 1.2
 
 Release 1.11.2: 2015-08-24
 --------------------------
