@@ -7,6 +7,7 @@ use JSON;
 use List::AllUtils qw(all natatime uniq);
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
+use WTSI::NPG::Genotyping::VCF::ReferenceFinder;
 use WTSI::NPG::iRODS;
 
 our $VERSION = '';
@@ -49,6 +50,13 @@ has 'reference_name' =>
    required      => 1,
    documentation => 'The name of the reference on which the SNP set ' .
                     ' is defined e.g. "Homo sapiens (1000 Genomes)"');
+
+has 'repository' =>
+  (is             => 'ro',
+   isa            => 'Maybe[Str]',
+   default        => $ENV{NPG_REPOSITORY_ROOT},
+   documentation  => 'Root directory containing NPG genome references',
+);
 
 has 'snpset_name' =>
   (is            => 'ro',
@@ -109,6 +117,20 @@ sub BUILD {
   } elsif (!$self->reference_name) {
       $self->logcroak("Must have a non-null reference_name argument");
   }
+
+  # test repository directory
+  # Moose does not appear to assign default until after BUILD is run
+  my $test_repository;
+  if (defined($self->repository)) {
+      $test_repository = $self->repository;
+  } else {
+      $test_repository = $ENV{'NPG_REPOSITORY_ROOT'};
+  }
+  unless (-d $test_repository) {
+      $self->logcroak("Repository '", $test_repository,
+                      "' does not exist or is not a directory");
+  }
+
 }
 
 =head2 get_chromosome_lengths
@@ -240,10 +262,7 @@ sub find_resultsets_index {
 
 sub vcf_metadata_from_irods {
     my ($self, $data_objects) = @_;
-        my %vcf_meta;
-    my @meta_keys = qw/fluidigm_plex sequenom_plex reference/;
-    my %meta_hash;
-    foreach my $key (@meta_keys) { $meta_hash{$key} = 1; }
+    my %vcf_meta;
     foreach my $obj (@{$data_objects}) { # check iRODS metadata
         my @obj_meta = @{$obj->metadata};
         foreach my $pair (@obj_meta) {
@@ -256,8 +275,12 @@ sub vcf_metadata_from_irods {
                 push @{ $vcf_meta{'plex_type'} }, 'sequenom';
                 push @{ $vcf_meta{'plex_name'} }, $val;
             }
-            elsif ($meta_hash{$key}) {
-                push @{ $vcf_meta{$key} }, $val;
+            elsif ($key eq 'reference') {
+                my $rf = WTSI::NPG::Genotyping::VCF::ReferenceFinder->new(
+                    reference_genome => $val,
+                    repository => $self->repository,
+                );
+                push @{ $vcf_meta{'reference'} }, $rf->get_reference_uri();
             }
         }
     }

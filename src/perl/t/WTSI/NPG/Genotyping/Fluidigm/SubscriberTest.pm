@@ -6,6 +6,9 @@ package WTSI::NPG::Genotyping::Fluidigm::SubscriberTest;
 use strict;
 use warnings;
 use DateTime;
+use File::Path qw/make_path/;
+use File::Spec::Functions qw/catfile/;
+use File::Temp qw(tempdir);
 use List::AllUtils qw(uniq);
 
 use base qw(Test::Class);
@@ -13,6 +16,8 @@ use Test::More tests => 42;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
+
+our $log = Log::Log4perl->get_logger();
 
 BEGIN { use_ok('WTSI::NPG::Genotyping::Fluidigm::Subscriber') };
 
@@ -29,9 +34,10 @@ my @sample_plates = qw(1381735059 1381735060 1381735059);
 my @sample_wells = qw(S01 S01 S02);
 my $non_unique_identifier = 'ABCDEFGHI';
 
-my $reference_name = 'Homo_sapiens (1000Genomes)';
+my $reference_name = 'Homo_sapiens (GRCh37)';
 my $snpset_name = 'qc';
 my $snpset_file = 'qc.tsv';
+my $tmp;
 
 my $irods_tmp_coll;
 
@@ -59,6 +65,19 @@ sub make_fixture : Test(setup) {
     $resultset_obj->add_avu('dcterms:identifier', $sample_identifiers[$i]);
     $resultset_obj->add_avu('dcterms:identifier', $non_unique_identifier);
   }
+
+  # set up dummy fasta reference
+  $tmp = tempdir("fluidigm_subscriber_test_XXXXXX", CLEANUP => 1);
+  $ENV{NPG_REPOSITORY_ROOT} = $tmp;
+  my $fastadir = catfile($tmp, 'references', 'Homo_sapiens',
+                         'GRCh37_53', 'all', 'fasta');
+  make_path($fastadir);
+  my $reference_file_path = catfile($fastadir,
+                                    'Homo_sapiens.GRCh37.dna.all.fa');
+  open my $fh, '>>', $reference_file_path || $log->logcroak(
+      "Cannot open reference file path '", $reference_file_path, "'");
+  close $fh || $log->logcroak(
+      "Cannot close reference file path '", $reference_file_path, "'");
 }
 
 sub teardown : Test(teardown) {

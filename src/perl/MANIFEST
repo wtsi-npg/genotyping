@@ -153,6 +153,7 @@ lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
 lib/WTSI/NPG/Genotyping/VCF/Header.pm
 lib/WTSI/NPG/Genotyping/VCF/HeaderParser.pm
 lib/WTSI/NPG/Genotyping/VCF/Parser.pm
+lib/WTSI/NPG/Genotyping/VCF/ReferenceFinder.pm
 lib/WTSI/NPG/Genotyping/VCF/Slurper.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
 lib/WTSI/NPG/Genotyping/Version.pm
@@ -482,6 +483,7 @@ t/query_project_samples/sample1.gtc
 t/query_project_samples/sample1_Grn.idat
 t/query_project_samples/sample1_Red.idat
 t/ready_plex.t
+t/reference_finder.t
 t/reports.t
 t/reports/crHetDensityHeatmap.pdf
 t/reports/crHetDensityScatter.pdf
@@ -693,6 +695,7 @@ t/WTSI/NPG/Genotyping/SNPSetTest.pm
 t/WTSI/NPG/Genotyping/SNPTest.pm
 t/WTSI/NPG/Genotyping/UpdatePlinkAnnotationTest.pm
 t/WTSI/NPG/Genotyping/VCF/ReadyPlexCallsTest.pm
+t/WTSI/NPG/Genotyping/VCF/ReferenceFinderTest.pm
 t/WTSI/NPG/Genotyping/VCF/VCFTest.pm
 t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/PublisherTest.pm

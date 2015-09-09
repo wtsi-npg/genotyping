@@ -8,8 +8,10 @@ use warnings;
 use base qw(Test::Class);
 use Test::More tests => 4;
 use Test::Exception;
-use File::Slurp qw(read_file);
-use File::Temp qw(tempdir);
+use File::Path qw/make_path/;
+use File::Slurp qw/read_file/;
+use File::Spec::Functions qw/catfile/;
+use File::Temp qw/tempdir/;
 use JSON;
 use Log::Log4perl;
 use WTSI::NPG::iRODS;
@@ -65,6 +67,18 @@ sub make_fixture : Test(setup) {
     $log->info("Created temporary directory $tmp");
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid");
+
+    # set up dummy fasta reference
+    $ENV{NPG_REPOSITORY_ROOT} = $tmp;
+    my $fastadir = catfile($tmp, 'references', 'Homo_sapiens',
+                           'GRCh37_53', 'all', 'fasta');
+    make_path($fastadir);
+    my $reference_file_path = catfile($fastadir,
+                                      'Homo_sapiens.GRCh37.dna.all.fa');
+    open my $fh, '>>', $reference_file_path || $log->logcroak(
+        "Cannot open reference file path '", $reference_file_path, "'");
+    close $fh || $log->logcroak(
+        "Cannot close reference file path '", $reference_file_path, "'");
 }
 
 sub setup_fluidigm {
