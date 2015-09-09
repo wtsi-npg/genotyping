@@ -7,9 +7,9 @@
 # glob plate names & plot paths from given output directory
 # TODO replace hard-coded text patterns (for glob etc.) with a config data structure
 
-use warnings; 
+use warnings;
 use strict;
-use CGI::Pretty qw/:standard *table/; # writes prettier html code
+use CGI qw/:standard *table/;
 use Cwd;
 use File::Basename;
 use WTSI::NPG::Genotyping::QC::QCPlotTests;
@@ -30,7 +30,7 @@ sub getLinkThumbnail {
 
 sub getPlateName {
     # extract plate name from plot path
-    # assume plot filenames are in the form plot_PREFIX_PLATE.png 
+    # assume plot filenames are in the form plot_PREFIX_PLATE.png
     # prefix may *not* contain _'s, plate may contain .'s and _'s)
     my $plotPath = shift;
     my $plotName = basename($plotPath);
@@ -42,12 +42,12 @@ sub getPlateName {
     return $name;
 }
 
-sub getPlateInfo {   
+sub getPlateInfo {
     # return list of plate names, and hashes of CR, het, xy plot paths indexed by plate
     # glob given directory; assume plot filenames are in the form PREFIX_PLATE.png (prefix may contain _'s)
     my $plotDir = shift;
     my (%plates, %crPlots, %hetPlots, %magPlots);
-    my ($crExpr, $hetExpr, $magExpr) = qw(plot_cr_* plot_het_* 
+    my ($crExpr, $hetExpr, $magExpr) = qw(plot_cr_* plot_het_*
                                           plot_magnitude_*);
     my @files = glob($plotDir.'/{cr,het,magnitude,}*.png');
     foreach my $file (@files) {
@@ -63,7 +63,7 @@ sub getPlateInfo {
 
 
 my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/output directory, output filename
-if (@ARGV!=3) { 
+if (@ARGV!=3) {
     die "Usage: $0 experiment_name input/output_directory output_filename\n";
 } elsif (!(-e $plotDir && -d $plotDir)) {
     die "Output path '$plotDir' does not exist or is not a directory\n";
@@ -84,16 +84,16 @@ print $out header(-type=>''), # create the HTTP header; content-type declaration
     #p('Some body text goes here')
     ;
 print $out start_table({-border=>1, -cellpadding=>4},);
-print $out Tr({-align=>'CENTER',-valign=>'TOP'}, [ 
+print $out Tr({-align=>'CENTER',-valign=>'TOP'}, [
 		 th(['Plate', 'Sample CR','Sample het rate','Sample Magnitude',
 		    ]),]);
 foreach my $plate (@plates) {
     # for each plate -- use plate name to look up CR, Het, and Mag filenames & generate links
-    unless (defined($crPlots{$plate}) || defined($hetPlots{$plate}) 
+    unless (defined($crPlots{$plate}) || defined($hetPlots{$plate})
             || defined($magPlots{$plate}) ) { next; }
     print $out Tr({-valign=>'TOP'}, [ td([$plate, 
-					 getLinkThumbnail($crPlots{$plate}), 
-					 getLinkThumbnail($hetPlots{$plate}), 
+					 getLinkThumbnail($crPlots{$plate}),
+					 getLinkThumbnail($hetPlots{$plate}),
 					 getLinkThumbnail($magPlots{$plate}),
 					]),
 	]);
