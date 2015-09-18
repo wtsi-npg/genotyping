@@ -34,6 +34,10 @@ module TestHelper
     end
   end
 
+  def plex_path
+    File.join(data_path, 'W30467_snp_set_info_1000Genomes.tsv')
+  end
+
   def egt_path
     if ENV['GENOTYPE_TEST_DATA']
       Dir.glob(ENV['GENOTYPE_TEST_DATA']+"/*.egt").first
