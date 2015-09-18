@@ -47,6 +47,7 @@ Arguments:
 
     config:        <path> of custom pipeline database .ini file. Optional.
     manifest:      <path> of the chip manifest file. Required.
+    plex_manifest: <path> of the qc plex manifest file. Required.
     egt:           <path> of the .EGT intensity cluster file. Required.
     chunk_size:    <integer> number of samples to analyse in a single 
                    job. Optional, defaults to 20.
@@ -80,6 +81,7 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
+       plex_manifest: /genotyping/manifests/fluidigm.tsv
        egt: /genotyping/clusters/Human670-QuadCustom_v1.egt
 
 Returns:
@@ -90,15 +92,16 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :egt, :queue, 
-                               :memory, :select, :chunk_size, :fam_dummy,
-                               :zstart, :ztotal, :filterconfig, :nofilter, 
-                               :nosim)
+      args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
+                               :egt, :queue, :memory, :select, :chunk_size,
+                               :fam_dummy, :zstart, :ztotal, :filterconfig,
+                               :nofilter, :nosim)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest) 
+      plex_manifest = args.delete(:plex_manifest)
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
       fam_dummy = args.delete(:fam_dummy) || -9
@@ -153,7 +156,8 @@ Returns:
         filtered = true
       else
         filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                             gcsimfile, manifest_raw, args, async)
+                             gcsimfile, manifest_raw, plex_manifest,
+                             args, async)
         # must use raw manifest; see comment in prefilter method
       end
 
@@ -219,7 +223,9 @@ Returns:
         # generate new .sim file to reflect sample exclusions
         zsimfile = gtc_to_sim(sjson, manifest, zsimname, smargs, async)
         if zsimfile
-          qcargs = {:run => run_name, :sim => zsimfile}.merge(args)
+          qcargs = {:run => run_name,
+                    :sim => zsimfile,
+                    :plex_manifest => plex_manifest}.merge(args)
         end
       end
       if qcargs
@@ -242,7 +248,7 @@ Returns:
     end
     
     def prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                  gcsimfile, manifest, args, async)
+                  gcsimfile, manifest, plex_manifest, args, async)
       # Run GenCall QC and apply prefilter to remove failing samples
       filtered = nil
       fname = run_name + '.prefilter_results.json'
@@ -256,7 +262,8 @@ Returns:
         gcsfile = File.join(work_dir, gcsname)
         gcqcargs = {:run => run_name, :mafhet => true}.merge(args)
         if gcsimfile
-          gcqcargs = {:sim => gcsimfile}.merge(gcqcargs)
+          gcqcargs = {:sim => gcsimfile,
+                      :plex_manifest => plex_manifest}.merge(gcqcargs)
         end
         if fconfig
           gcqcargs = {:filter => fconfig}.merge(gcqcargs)
@@ -265,8 +272,8 @@ Returns:
         end
         ## run gencall QC to get metrics for prefiltering
         gcqcdir = File.join(work_dir, 'gencall_qc')
-        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                    async, true)
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir,
+                                    gcqcargs, async, true)
       end # if transposed
     end # def prefilter
 
