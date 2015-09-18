@@ -12,6 +12,16 @@ Added:
 - QC check modified to read from VCF instead of database
 
 
+Release 1.11.3: 2015-09-18
+--------------------------
+
+Added:
+- QC plex manifest path now required in workflow YML input.
+
+Fixed:
+- Bug in run_qc.pl; failure to input plex manifest to WIP identity check.
+
+
 Release 1.11.2: 2015-08-24
 --------------------------
 

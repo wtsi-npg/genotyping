@@ -41,7 +41,7 @@ GetOptions("help"              => \$help,
 	   "zcall-filter"      => \$zcallFilter,
 	   "illuminus-filter"  => \$illuminusFilter,
 	   "include"           => \$include,
-           "plex-manifest"     => \$plexManifest,
+           "plex-manifest=s"   => \$plexManifest,
     );
 
 if ($help) {
@@ -50,22 +50,23 @@ if ($help) {
 PLINK_GTFILE is the prefix for binary plink files (without .bed, .bim, .fam extension). May include directory names, eg. /home/foo/project where plink files are /home/foo/project.bed, etc.
 
 Options:
---output-dir=PATH   Directory for QC output
---sim=PATH          Path to SIM file for intensity metrics. See note [1] below.
---dbpath=PATH       Path to pipeline database .db file. Required.
---inipath=PATH      Path to .ini file containing general pipeline and database
-                    configuration; local default is $DEFAULT_INI
---run=NAME          Name of run in pipeline database (needed for database
-                    update from gender check)
---config=PATH       Path to JSON config file; default is taken from inipath
---mafhet            Find heterozygosity separately for SNP populations with
-                    minor allele frequency greater than 1%, and less than 1%.
---title             Title for this analysis; will appear in plots
---zcall-filter      Apply default zcall filter; see note [2] below.
---illuminus-filter  Apply default illuminus filter; see note [2] below.
---filter=PATH       Read custom filter criteria from PATH. See note [2] below.
---include           Do not exclude failed samples from the pipeline DB.
-                    See note [2] below.
+--output-dir=PATH    Directory for QC output
+--sim=PATH           Path to SIM file for intensity metrics. See note [1] below.
+--dbpath=PATH        Path to pipeline database .db file. Required.
+--inipath=PATH       Path to .ini file containing general pipeline and
+                     database configuration; local default is $DEFAULT_INI
+--plex_manifest=PATH Path to .tsv manifest for QC plex. Required.
+--run=NAME           Name of run in pipeline database (needed for database
+                     update from gender check)
+--config=PATH        Path to JSON config file; default is taken from inipath
+--mafhet             Find heterozygosity separately for SNP populations with
+                     minor allele frequency greater than 1%, and less than 1%.
+--title              Title for this analysis; will appear in plots
+--zcall-filter       Apply default zcall filter; see note [2] below.
+--illuminus-filter   Apply default illuminus filter; see note [2].
+--filter=PATH        Read custom filter criteria from PATH. See note [2].
+--include            Do not exclude failed samples from the pipeline DB.
+                     See note [2].
 
 [1] If --sim is not specified, but the intensity files magnitude.txt and
 xydiff.txt are present in the pipeline output directory, intensity metrics
@@ -236,7 +237,6 @@ sub verifyAbsPath {
 sub run_qc_wip {
   # run the work-in-progess refactored QC in parallel with the old one
   my ($plinkPrefix, $dbPath, $iniPath, $outDir, $plexManifest) = @_;
-  $plexManifest ||= "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
