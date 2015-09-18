@@ -60,6 +60,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
       # Only 1 zscore in range; faster but omits threshold evaluation
       # The evaluation is tested by test_zcall_tasks.rb
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
+                                           :plex_manifest => plex_path,
                                            :egt => egt,
                                            :chunk_size => 3,
                                            :zstart => 6,

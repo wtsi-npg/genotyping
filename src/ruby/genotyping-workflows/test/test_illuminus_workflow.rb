@@ -55,6 +55,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
       fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
       args_hash = {:manifest => manifest,
+                   :plex_manifest => plex_path,
                    :config => pipe_ini,
                    :filterconfig => fconfig,
                    :gender_method => 'Supplied',
