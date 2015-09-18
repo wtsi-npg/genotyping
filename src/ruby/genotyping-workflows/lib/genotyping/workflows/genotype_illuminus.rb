@@ -48,6 +48,7 @@ Arguments:
 
     - config: <path> of custom pipeline database .ini file. Optional.
     - manifest: <path> of the chip manifest file. Required.
+    - plex_manifest: <path> of the qc plex manifest file. Required.
     - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
@@ -73,6 +74,7 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
+       plex_manifest: /genotyping/manifests/fluidigm.tsv
 
 Returns:
 
@@ -84,7 +86,8 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
+      args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
+                               :queue, :memory,
                                :select, :chunk_size, :fam_dummy, 
                                :gender_method, :filterconfig, :nofilter)
 
@@ -92,6 +95,7 @@ Returns:
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest)
+      plex_manifest = args.delete(:plex_manifest)
       chunk_size = args.delete(:chunk_size) || 2000
       fam_dummy = args.delete(:fam_dummy) || -9
       gender_method = args.delete(:gender_method)
@@ -140,8 +144,8 @@ Returns:
           gcqcargs = {:run => run_name, :illuminus_filter => true}.merge(args)
         end
         gcqcdir = File.join(work_dir, 'gencall_qc')
-        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                    async, true)
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir, plex_manifest,
+                                    gcqcargs, async, true)
       end
 
       ## use post-filter pipeline DB to generate sample JSON and .sim file
@@ -184,7 +188,8 @@ Returns:
 
       output = File.join(work_dir, 'illuminus_qc')
       qcargs = {:run => run_name, :sim => smfile}.merge(args)
-      ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
+      ilquality = quality_control(dbfile, ilfile, output, plex_manifest,
+                                  qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]

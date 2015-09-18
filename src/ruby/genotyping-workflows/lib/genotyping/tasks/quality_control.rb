@@ -31,14 +31,15 @@ module Genotyping::Tasks
     # - dbfile (String): The SQLite database file name.
     # - input (Array): An Array of 3 filenames, being the Plink BED and
     #   corresponding BIM and FAM files.
+    # - plex_manifest (String): Path to the QC plex manifest file.
     # - args (Hash): Arguments for the operation.
     #
     # - async (Hash): Arguments for asynchronous management.
     #
     # Returns:
     # - boolean
-    def quality_control(dbfile, input, output, args = {}, async = {},
-                        wait=false)
+    def quality_control(dbfile, input, output, plex_manifest,
+                        args = {}, async = {}, wait=false)
       args, work_dir, log_dir = process_task_args(args)
 
       if args_available?(dbfile, input, output, work_dir)
@@ -49,7 +50,8 @@ module Genotyping::Tasks
           Dir.mkdir(output) unless File.exist?(output)
 
           cli_args = args.merge({:dbpath => dbfile,
-                                 :output_dir => output})
+                                  :output_dir => output,
+                                  :plex_manifest => plex_manifest})
 
           margs = [dbfile, input, output]
 
