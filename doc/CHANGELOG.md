@@ -11,6 +11,12 @@ Added:
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
 - QC check modified to read from VCF instead of database
 
+Release 1.11.4: 2015-10-09
+--------------------------
+
+Fixed:
+- Bug in publish_infinium_genotypes.pl which caused it to exit when it
+  detected bad or missing data. It now detects these files and skips them.
 
 Release 1.11.3: 2015-09-18
 --------------------------
