@@ -8,11 +8,13 @@ use strict;
 use warnings;
 use Cwd qw(abs_path);
 use DateTime;
+use File::Basename;
 use Getopt::Long;
 use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
@@ -205,48 +207,64 @@ sub find_files_to_publish {
     my @candidate_files;
     my @data_objects;
 
-    foreach my $file (($red, $grn, $gtc)) {
-      if ($file) {
-        push @candidate_files, $file;
+    try {
+      foreach my $file (($red, $grn, $gtc)) {
+        if ($file) {
+          push @candidate_files, $file;
 
-        # If a file with matching MD5 metadata is present in iRODS, we
-        # do not need to publish
-        my $md5 = $irods->md5sum($file);
-        my @matches = $irods->find_objects_by_meta
-          ($publish_dest,
-           ['beadchip'         => $chip],
-           ['beadchip_section' => $section],
-           ['md5'              => $md5]);
+          my ($basename, $dir, $suffix) = fileparse($file, '.idat', '.gtc');
+          if (not $suffix) {
+            $log->logcroak("Failed to parse a file suffix from '$file'");
+          }
+          elsif (not -f $file) {
+            $log->logcroak("File '$file' is missing or deleted");
+          }
+          else {
+            # If a file with the same chip details and matching MD5
+            # metadata is present in iRODS, we do not need to publish
 
-        my $num_matches = scalar @matches;
-        if ($num_matches == 0) {
-          push @to_publish, $file;
-        }
-        elsif ($num_matches == 1) {
-          push @data_objects, @matches;
-          $log->info("Found a match for '$file' with MD5 '$md5'");
-        }
-        else {
-          $log->logconfess("Found $num_matches files with MD5 '$md5' when ",
-                           "checking for '$file'");
+            my $md5 = $irods->md5sum($file);
+            my @matches = $irods->find_objects_by_meta
+              ($publish_dest,
+               ['beadchip'         => $chip],
+               ['beadchip_section' => $section],
+               ['type'             => $suffix],
+               ['md5'              => $md5]);
+
+            my $num_matches = scalar @matches;
+            if ($num_matches == 0) {
+              push @to_publish, $file;
+            }
+            elsif ($num_matches == 1) {
+              push @data_objects, @matches;
+              $log->info("Found a match for '$file' with MD5 '$md5'");
+            }
+            else {
+              push @data_objects, $matches[0];
+              $log->error("Found $num_matches files with MD5 '$md5' when ",
+                          "checking for '$file': '", $matches[0],
+                          "' and ignoring '", $matches[1], "'");
+            }
+          }
         }
       }
-    }
 
-    my $num_files        = scalar @candidate_files;
-    my $num_data_objects = scalar @data_objects;
+      my $num_files        = scalar @candidate_files;
+      my $num_data_objects = scalar @data_objects;
 
-    $log->info("Beadchip '$chip' section '$section' data objects published ",
-               "previously: $num_data_objects/$num_files");
+      $log->info("Beadchip '$chip' section '$section' data objects published ",
+                 "previously: $num_data_objects/$num_files");
 
-    if ($num_data_objects < $num_files || $force) {
-      push @to_publish, @candidate_files;
-    }
+      if ($num_data_objects < $num_files || $force) {
+        push @to_publish, @candidate_files;
+      }
+    } catch {
+      $log->error("Beadchip section data not published: ", $_);
+    };
   }
 
   return @to_publish;
 }
-
 
 __END__
 
