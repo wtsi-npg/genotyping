@@ -48,6 +48,7 @@ Arguments:
 
     - config: <path> of custom pipeline database .ini file. Optional.
     - manifest: <path> of the chip manifest file. Required.
+    - plex_manifest: <path> of the qc plex manifest file. Required.
     - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
@@ -78,7 +79,6 @@ e.g.
        vcf: /work/my_project/qc_calls.vcf
        plex_manifest: /genotyping/manifests/qc.tsv
 
-
 Returns:
 
 - boolean.
@@ -89,7 +89,8 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :queue, :memory,
+      args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
+                               :queue, :memory,
                                :select, :chunk_size, :fam_dummy, 
                                :gender_method, :filterconfig, :nofilter,
                                :vcf, :plex_manifest)
@@ -98,6 +99,7 @@ Returns:
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest)
+      plex_manifest = args.delete(:plex_manifest)
       chunk_size = args.delete(:chunk_size) || 2000
       fam_dummy = args.delete(:fam_dummy) || -9
       gender_method = args.delete(:gender_method)
@@ -105,7 +107,6 @@ Returns:
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
       vcf = args.delete(:vcf) || nil
-      plex_manifest = args.delete(:plex_manifest) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -142,10 +143,12 @@ Returns:
         gcquality = true
       else
         ## run gencall QC to apply gencall CR filter and find genders
+        gcqcargs = {:run => run_name, 
+                    :plex_manifest => plex_manifest}.merge(args)
         if fconfig
-          gcqcargs = {:run => run_name, :filter => fconfig}.merge(args)
+          gcqcargs = {:filter => fconfig}.merge(gcqcargs)
         else
-          gcqcargs = {:run => run_name, :illuminus_filter => true}.merge(args)
+          gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
         if vcf and plex_manifest
           gcqcargs = {
@@ -153,8 +156,8 @@ Returns:
         end
 
         gcqcdir = File.join(work_dir, 'gencall_qc')
-        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                    async, true)
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir,
+                                    gcqcargs, async, true)
       end
 
       ## use post-filter pipeline DB to generate sample JSON and .sim file

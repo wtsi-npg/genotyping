@@ -23,24 +23,25 @@ run() unless caller();
 
 sub run {
 
-    my ($outdir, $workdir, $manifest, $dbfile, $run, $egt, $verbose, 
-	$host, $workflow, $chunk_size, $memory, $zstart, $ztotal);
+    my ($outdir, $workdir, $manifest, $plex_manifest, $dbfile, $run, $egt,
+        $verbose, $host, $workflow, $chunk_size, $memory, $zstart, $ztotal);
 
     my $log = Log::Log4perl->get_logger();
 
-    GetOptions('outdir=s'      => \$outdir,
-               'workdir=s'     => \$workdir,
-	       'manifest=s'    => \$manifest,
-	       'host=s'        => \$host,
-	       'dbfile=s'      => \$dbfile,
-	       'run=s'         => \$run,
-	       'egt=s'         => \$egt,
-	       'verbose'       => \$verbose,
-	       'workflow=s'    => \$workflow,
-	       'chunk_size=i'  => \$chunk_size,
-	       'memory=i'      => \$memory,
-	       'zstart=i'      => \$zstart,
-	       'ztotal=i'      => \$ztotal,
+    GetOptions('outdir=s'        => \$outdir,
+               'workdir=s'       => \$workdir,
+	       'manifest=s'      => \$manifest,
+               'plex_manifest=s' => \$plex_manifest,
+	       'host=s'          => \$host,
+	       'dbfile=s'        => \$dbfile,
+	       'run=s'           => \$run,
+	       'egt=s'           => \$egt,
+	       'verbose'         => \$verbose,
+	       'workflow=s'      => \$workflow,
+	       'chunk_size=i'    => \$chunk_size,
+	       'memory=i'        => \$memory,
+	       'zstart=i'        => \$zstart,
+	       'ztotal=i'        => \$ztotal,
 	       'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
 	);
     $outdir ||= '.';
@@ -62,10 +63,10 @@ sub run {
     if (! -e $dbpath) {
 	$log->logwarn("Warning: Pipeline database '$dbpath' does not exist; must be created before running workflow.");
     }
-    $host ||= 'farm3-head2'; 
+    $host ||= 'farm3-head2';
     # illuminus paralellizes by SNP, other callers by sample
     if ($workflow && $workflow eq 'illuminus') { $chunk_size ||= 4000; }
-    else { $chunk_size ||= 40; } 
+    else { $chunk_size ||= 40; }
     $memory ||= 2048,
     $zstart ||= 7;
     $ztotal ||= 1;
@@ -82,11 +83,17 @@ sub run {
     DumpFile($outdir.'config.yml', (\%config));
 
     if ($workflow) {
-	my @params = ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory);
+	my @params = ($outdir, $dbpath, $run, $workdir, $manifest, $plex_manifest, $chunk_size, $memory);
 	if (! $manifest) { 
 	    $log->logcroak("Must specify --manifest for workflow!");
 	} elsif (! -e $manifest) {
-	    $log->logwarn("Warning: Manifest '$manifest' does not exist, must be created before running workflow.");
+	    $log->logwarn("Warning: Manifest '$manifest' does not exist, ",
+                          "must be created before running workflow.");
+	} elsif (! $plex_manifest) {
+            $log->logcroak("Must specify --plex-manifest for workflow!");
+        } elsif (! -e $plex_manifest) {
+	    $log->logwarn("Warning: Plex manifest '$plex_manifest' does not ",
+                          "exist, must be created before running workflow.");
 	} elsif ($workflow eq 'illuminus') {
 	    write_illuminus(@params);
 	} elsif ($workflow eq 'zcall') {
@@ -95,21 +102,24 @@ sub run {
 	    } elsif (! -e $egt) {
 		 $log->logwarn("Warning: EGT file '$egt' does not exist, must be created before running workflow.");
 	    } else {
-		write_zcall(\@params, $egt, $zstart, $ztotal);  
+		write_zcall(\@params, $egt, $zstart, $ztotal);
 	    }
 	} else {
-	    $log->logcroak("Invalid workflow argument $workflow; must be one of illuminus, genosnp, zcall");
+	    $log->logcroak("Invalid workflow argument '", $workflow,
+                           "'; must be one of illuminus, zcall");
 	}
     }
 }
 
 sub write_illuminus {
-    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @_;
-   
+    my ($outdir, $dbpath, $run, $workdir, $manifest, $plex_manifest,
+        $chunk_size, $memory) = @_;
+
     my %illuminus_args = (
 	'chunk_size' => $chunk_size,
 	'memory' => $memory,
 	'manifest' => $manifest,
+        'plex_manifest' => $plex_manifest,
 	'gender_method' => 'Supplied'
 	);
     my $workflow_name = 'Genotyping::Workflows::GenotypeIlluminus';
@@ -119,11 +129,13 @@ sub write_illuminus {
 
 sub write_zcall {
     my ($paramsRef, $egt, $zstart, $ztotal) = @_;
-    my ($outdir, $dbpath, $run, $workdir, $manifest, $chunk_size, $memory) = @{$paramsRef};
+    my ($outdir, $dbpath, $run, $workdir, $manifest, $plex_manifest,
+        $chunk_size, $memory) = @{$paramsRef};
     my %zcall_args = (
 	'chunk_size' => $chunk_size,
 	'memory' => $memory,
 	'manifest' => $manifest,
+        'plex_manifest' => $plex_manifest,
 	'egt' => $egt,
 	'zstart' => $zstart,
 	'ztotal' => $ztotal
@@ -160,36 +172,37 @@ genotyping_yml [--dbfile <SQLite filename>] [--help]
 
 Options:
 
-  --chunk_size  Chunk size for parallelization. Optional, defaults to 
-                4000 for Illuminus or 40 for zCall/GenoSNP.
-  --dbfile      The SQLite database filename (not the full path). Optional,
-                defaults to genotyping.db.
-  --egt         Path to an Illumina .egt cluster file. Required for zcall. 
-  --help        Display help.
-  --host        Name of host machine for the beanstalk message queue.
-                Optional, defaults to farm3-head2.
-  --manifest    Path to the .bpm.csv manifest file.
-  --memory      Memory limit hint for LSF, in MB. Default = 2048.
-  --outdir      Directory in which to write YML files. Optional, defaults 
-                to current working directory.
-  --run         The pipeline run name in the database. Required.
-  --verbose     Print messages while processing. Optional.
-  --workdir     Working directory for pipeline run. Required.
-  --workflow    Pipeline workflow for which to create a .yml file. If 
-                supplied, must be one of: illuminus, genosnp, zcall.
-                If absent, only config.yml will be generated.
-  --zstart      Start of zscore range, used for zCall only. Default = 7.
-  --ztotal      Number of zscores in range, for zCall only. Default = 1.
+  --chunk_size    Chunk size for parallelization. Optional, defaults to
+                  4000 (SNPs) for Illuminus or 40 (samples) for zCall.
+  --dbfile        The SQLite database filename (not the full path). Optional,
+                  defaults to genotyping.db.
+  --egt           Path to an Illumina .egt cluster file. Required for zcall.
+  --help          Display help.
+  --host          Name of host machine for the beanstalk message queue.
+                  Optional, defaults to farm3-head2.
+  --manifest      Path to the .bpm.csv manifest file.
+  --plex_manifest Path to the .tsv QC plex manifest.
+  --memory        Memory limit hint for LSF, in MB. Default = 2048.
+  --outdir        Directory in which to write YML files. Optional, defaults
+                  to current working directory.
+  --run           The pipeline run name in the database. Required.
+  --verbose       Print messages while processing. Optional.
+  --workdir       Working directory for pipeline run. Required.
+  --workflow      Pipeline workflow for which to create a .yml file. If
+                  supplied, must be one of: illuminus, genosnp, zcall.
+                  If absent, only config.yml will be generated.
+  --zstart        Start of zscore range, used for zCall only. Default = 7.
+  --ztotal        Number of zscores in range, for zCall only. Default = 1.
 
 =head1 DESCRIPTION
 
 Generates .yml files to run the genotyping pipeline. Output is the generic
 config.yml file, and optionally a workflow file for one of the available
-genotype callers. The workflow file can then be placed in the Percolate 'in' 
-directory while the config file is supplied as an argument to the Percolate 
+genotype callers. The workflow file can then be placed in the Percolate 'in'
+directory while the config file is supplied as an argument to the Percolate
 executable.
 
-The script assumes that the named genotyping database file will be present 
+The script assumes that the named genotyping database file will be present
 in the given working directory.
 
 =head1 METHODS

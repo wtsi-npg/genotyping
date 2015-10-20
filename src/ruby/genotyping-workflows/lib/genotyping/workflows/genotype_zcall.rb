@@ -47,6 +47,7 @@ Arguments:
 
     config:        <path> of custom pipeline database .ini file. Optional.
     manifest:      <path> of the chip manifest file. Required.
+    plex_manifest: <path> of the qc plex manifest file. Required.
     egt:           <path> of the .EGT intensity cluster file. Required.
     chunk_size:    <integer> number of samples to analyse in a single 
                    job. Optional, defaults to 20.
@@ -83,6 +84,7 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
+       plex_manifest: /genotyping/manifests/fluidigm.tsv
        egt: /genotyping/clusters/Human670-QuadCustom_v1.egt
        vcf: /work/my_project/qc_calls.vcf
        plex_manifest: /genotyping/manifests/qc.tsv
@@ -104,6 +106,7 @@ Returns:
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest) 
+      plex_manifest = args.delete(:plex_manifest)
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
       fam_dummy = args.delete(:fam_dummy) || -9
@@ -114,7 +117,6 @@ Returns:
       nofilter = args.delete(:nofilter) || nil
       nosim = args.delete(:nosim) || nil # omit sim files for qc?
       vcf = args.delete(:vcf) || nil
-      plex_manifest = args.delete(:plex_manifest) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -159,7 +161,7 @@ Returns:
       if nofilter
         filtered = true
       else
-        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
+        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson,
                              gcsimfile, manifest_raw, vcf, plex_manifest,
                              args, async)
         # must use raw manifest; see comment in prefilter method
@@ -227,7 +229,9 @@ Returns:
         # generate new .sim file to reflect sample exclusions
         zsimfile = gtc_to_sim(sjson, manifest, zsimname, smargs, async)
         if zsimfile
-          qcargs = {:run => run_name, :sim => zsimfile}.merge(args)
+          qcargs = {:run => run_name,
+                    :sim => zsimfile,
+                    :plex_manifest => plex_manifest}.merge(args)
         end
       end
       if qcargs and vcf and plex_manifest
@@ -269,7 +273,8 @@ Returns:
         gcsfile = File.join(work_dir, gcsname)
         gcqcargs = {:run => run_name, :mafhet => true}.merge(args)
         if gcsimfile
-          gcqcargs = {:sim => gcsimfile}.merge(gcqcargs)
+          gcqcargs = {:sim => gcsimfile,
+                      :plex_manifest => plex_manifest}.merge(gcqcargs)
         end
         if fconfig
           gcqcargs = {:filter => fconfig}.merge(gcqcargs)
@@ -283,8 +288,8 @@ Returns:
 
         ## run gencall QC to get metrics for prefiltering
         gcqcdir = File.join(work_dir, 'gencall_qc')
-        gcquality = quality_control(dbfile, gcsfile, gcqcdir, gcqcargs, 
-                                    async, true)
+        gcquality = quality_control(dbfile, gcsfile, gcqcdir,
+                                    gcqcargs, async, true)
       end # if transposed
     end # def prefilter
 

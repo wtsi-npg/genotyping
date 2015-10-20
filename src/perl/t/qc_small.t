@@ -23,6 +23,7 @@ my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $data_dir = $Bin."/qc_test_data/";
 my $plink = $data_dir.$testName;
 my $sim = $data_dir.$testName.".sim";
+#my $plexManifest = $data_dir."/W30467_snp_set_info_1000Genomes.tsv";
 my $outDir = "$Bin/qc/$testName/";
 my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
@@ -145,7 +146,6 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
 $cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config --vcf=$vcf --plex-manifest $plexManifest";
-
 is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
 
 ## check work-in-progress output files

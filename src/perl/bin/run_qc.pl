@@ -59,7 +59,7 @@ Options:
                       database configuration; local default is $DEFAULT_INI
 --vcf=PATH            Path to .vcf file containing QC plex calls for alternate
                       identity check.
---plex-manifest=PATH
+--plex-manifest=PATH  Path to .tsv manifest for QC plex. Required.
 --run=NAME            Name of run in pipeline database (needed for database
                       update from gender check)
 --config=PATH         Path to JSON config file; default is taken from inipath
@@ -247,7 +247,6 @@ sub verifyAbsPath {
 sub run_qc_wip {
   # run the work-in-progess refactored QC in parallel with the old one
   my ($plinkPrefix, $outDir, $plexManifest, $vcf) = @_;
-  $plexManifest ||= "/nfs/srpipe_references/genotypes/W30467_snp_set_info_1000Genomes.tsv";
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
