@@ -12,7 +12,7 @@ use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use File::Spec;
-use Test::More tests => 22;
+use Test::More tests => 52;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -25,6 +25,8 @@ use WTSI::NPG::iRODS::DataObject;
 
 my $data_path = './t/snpset';
 my $data_file = 'qc.tsv';
+my $data_file_renamed = 'qc_renamed_snp.tsv';
+my $data_file_2 = 'W30467.tsv';
 
 my $irods_tmp_coll;
 
@@ -34,10 +36,10 @@ sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
   $irods_tmp_coll = $irods->add_collection("SNPSetTest.$pid");
   $irods->put_collection($data_path, $irods_tmp_coll);
-
   my $irods_path = "$irods_tmp_coll/snpset/$data_file";
-
   $irods->add_object_avu($irods_path, 'snpset', 'qc');
+  $irods_path = "$irods_tmp_coll/snpset/$data_file_2";
+  $irods->add_object_avu($irods_path, 'snpset', 'qc2');
 }
 
 sub teardown : Test(teardown) {
@@ -195,6 +197,40 @@ sub snp_names : Test(2) {
 
   is_deeply(\@snp_names, \@expected_names,
             'Contains expected SNP names') or diag explain \@snp_names;
+}
+
+sub snp_name_map : Test(26) {
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new
+        (file_name   => "$data_path/$data_file");
+    my $snpset_renamed = WTSI::NPG::Genotyping::SNPSet->new
+        (file_name   => "$data_path/$data_file_renamed");
+    my $rename_map = $snpset->snp_name_map($snpset_renamed);
+    foreach my $snp_name (keys %{$rename_map}) {
+        my $expected;
+        if ($snp_name eq 'rs11096957') {
+            $expected = 'rs11096957_RENAMED';
+        } else {
+            $expected = $snp_name;
+        }
+        is($rename_map->{$snp_name}, $expected, "SNP name OK");
+    }
+}
+
+sub union : Test(4) {
+
+  my $irods = WTSI::NPG::iRODS->new;
+  my $data_object_1 = WTSI::NPG::iRODS::DataObject->new
+    ($irods, "$irods_tmp_coll/snpset/$data_file");
+  my $snpset_1 = WTSI::NPG::Genotyping::SNPSet->new($data_object_1);
+  my $data_object_2 = WTSI::NPG::iRODS::DataObject->new
+    ($irods, "$irods_tmp_coll/snpset/$data_file_2");
+  my $snpset_2 = WTSI::NPG::Genotyping::SNPSet->new($data_object_2);
+  my $union = $snpset_1->union([$snpset_2, ]);
+  isa_ok($union, 'WTSI::NPG::Genotyping::SNPSet', "Union returns a SNPSet");
+  is(scalar(@{$union->snps}), 30, "Correct size of union SNPSet");
+  $union = $snpset_1->union([ ]);
+  isa_ok($union, 'WTSI::NPG::Genotyping::SNPSet', "Union with empty list");
+  is(scalar(@{$union->snps}), 24, "Correct size of union SNPSet");
 }
 
 sub write_snpset_file : Test(2) {

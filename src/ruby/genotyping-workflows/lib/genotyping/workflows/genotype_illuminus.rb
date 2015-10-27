@@ -152,7 +152,10 @@ Returns:
         end
         if vcf and plex_manifest
           gcqcargs = {
-            :vcf => vcf, :plex_manifest => plex_manifest}.merge(gcqcargs)
+            :vcf => vcf,
+            :plex_manifest => plex_manifest,
+            :sample_json => gcsjson
+          }.merge(gcqcargs)
         end
 
         gcqcdir = File.join(work_dir, 'gencall_qc')
@@ -198,10 +201,18 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, fam_dummy, args, async)
 
+      # run QC on final output
       output = File.join(work_dir, 'illuminus_qc')
-      qcargs = {:run => run_name, :sim => smfile}.merge(args)
+      qcargs = {
+        :run => run_name,
+        :sim => smfile
+      }.merge(args)
       if vcf and plex_manifest
-        qcargs = {:vcf => vcf, :plex_manifest => plex_manifest}.merge(qcargs)
+        qcargs = {
+          :vcf => vcf,
+          :plex_manifest => plex_manifest,
+          :sample_json => sjson
+        }.merge(qcargs)
       end
 
       ilquality = quality_control(dbfile, ilfile, output, qcargs, async)

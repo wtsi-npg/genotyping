@@ -11,10 +11,11 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::QC_wip::Check::IdentityPostProcess;
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::VCF::Slurper;
+use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
@@ -46,31 +47,39 @@ run() unless caller();
 sub run {
 
     my $debug;
+    my $ecp_json;
+    my $ecp_default;
+    my $expected_error_rate;
     my $log4perl_config;
-    my $min_shared_snps;
     my $outPath;
     my $pass_threshold;
-    my $plex_manifest;
+    my @plex_manifests;
+    my @plex_manifests_irods;
     my $plink;
-    my $snpset_irods_json;
+    my $sample_json;
+    my $sample_mismatch_prior;
     my $swap_threshold;
-    my $vcf;
+    my @vcf; # array for (maybe) multiple VCF inputs
     my $verbose;
 
     GetOptions(
         'debug'             => \$debug,
+        'ecp_json=s'        => \$ecp_json,
+        'ecp_default=f'     => \$ecp_default,
         'help'              => sub { pod2usage(-verbose => 2,
                                                -exitval => 0) },
         'logconf=s'         => \$log4perl_config,
-        'min_shared_snps=i' => \$min_shared_snps,
         'out=s'             => \$outPath,
+        'prior=f'           => \$sample_mismatch_prior,
         'pass_threshold=f'  => \$pass_threshold,
-        'plex_manifest=s'   => \$plex_manifest,
+        'plex=s'            => \@plex_manifests,
+        'plex_irods=s'      => \@plex_manifests_irods,
         'plink=s'           => \$plink,
-        'snpset_paths=s'    => \$snpset_irods_json,
+        'sample_json=s'     => \$sample_json,
         'swap_threshold=f'  => \$swap_threshold,
-        'vcf=s'             => \$vcf,
-        'verbose'           => \$verbose);
+        'vcf=s'             => \@vcf,
+        'verbose'           => \$verbose,
+        'xer=f'             => \$expected_error_rate);
 
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
@@ -87,16 +96,55 @@ sub run {
         }
     }
 
-    ### read SNPSet object from manifest, or snpset_paths from JSON ###
-    my ($snpset, $snpset_paths);
-    if (defined($plex_manifest)) {
-        $snpset = WTSI::NPG::Genotyping::SNPSet->new($plex_manifest);
-    } elsif (defined($snpset_irods_json)) {
-        $snpset_paths = decode_json(read_file($snpset_irods_json));
-    } else {
-        $log->logcroak("Must supply either a --plex-manifest or a ",
-                       "--snpset-paths argument");
+    ### set up iRODS connection and make it use same logger as script ###
+    my $irods = WTSI::NPG::iRODS->new;
+    $irods->logger($log);
+
+    ### read equivalent calls probability by SNP from JSON, if given
+    my $ecp;
+    if (defined($ecp_json)) {
+        if (defined($ecp_default)) {
+            $log->logcroak("Cannot supply both JSON path and default for ",
+                            "equivalent call probabilities by SNP")
+        }
+        $ecp = decode_json(read_file($ecp_json));
     }
+
+    ### read sample JSON file (required) to map SSID to URI
+    my %ssid_to_uri;
+    if (defined($sample_json)) {
+        unless (-e $sample_json) {
+            $log->logcroak("Cannot read sample JSON path '$sample_json'");
+        }
+        my $sample_data = decode_json(read_file($sample_json));
+        # generate a hash mapping sanger sample ID to URI
+        foreach my $sample (@{$sample_data}) {
+            my $ssid = $sample->{'sanger_sample_id'};
+            if ($ssid_to_uri{$ssid}) {
+                $log->logcroak("Multiple URIs for Sanger sample ID ", $ssid);
+            }
+            $ssid_to_uri{$ssid} = $sample->{'uri'};
+        }
+
+    } else {
+        $log->logcroak("--sample_json argument is required");
+    }
+
+    ### read SNPSet object(s) from file and/or iRODS, create union set ###
+    my @snpsets;
+    foreach my $plex (@plex_manifests) {
+        push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex);
+    }
+    foreach my $plex (@plex_manifests_irods) {
+        my $plex_obj = WTSI::NPG::iRODS::DataObject->new($irods, $plex);
+        push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex_obj);
+    }
+    if (scalar @snpsets == 0) {
+        $log->logcroak("Must supply at least one plex manifest using ",
+                       "--plex or --plex_irods options");
+    }
+    my $first_snpset = shift @snpsets;
+    my $snpset = $first_snpset->union(\@snpsets);
 
     ### check existence of plink dataset ###
     if (!defined($plink)) {
@@ -115,50 +163,62 @@ sub run {
     my %args = (plink_path         => $plink,
                 snpset             => $snpset,
                 logger             => $log);
-    if (defined($min_shared_snps)) {
-        $args{'min_shared_snps'} = $min_shared_snps;
-    }
     if (defined($swap_threshold)) {$args{'swap_threshold'} = $swap_threshold;}
     if (defined($pass_threshold)) {$args{'pass_threshold'} = $pass_threshold;}
-    # Identity.pm has defaults for min_shared_snps, and swap/pass thresholds
+    if (defined($ecp)) { $args{'equivalent_calls_probability'} = $ecp;  }
+    if (defined($ecp_default)) { $args{'ecp_default'} = $ecp_default;  }
+    if (defined($sample_mismatch_prior)) {
+        $args{'sample_mismatch_prior'} = $sample_mismatch_prior;
+    }
+    if (defined($expected_error_rate)) {
+        $args{'expected_error_rate'} = $expected_error_rate;
+    }
     $log->debug("Creating identity check object");
     my $checker = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new(%args);
 
-    ### read QC plex calls from VCF ###
-    my $vcf_fh;
-    if (!defined($vcf)) {
-        $log->logcroak("A --vcf argument is required");
-    } elsif ($vcf eq '-') {
-        $vcf_fh = \*STDIN;
-    } elsif (! -e $vcf) {
-        $log->logcroak("File argument to --vcf does not exist");
-    } else {
-        open $vcf_fh, "<", $vcf || $log->logcroak("Cannot open VCF input '",
-                                                  $vcf, "'");
+    ### read QC plex calls from VCF file(s) ###
+    my %qc_calls;
+    if (!(@vcf)) {
+        $log->logcroak("At least one --vcf argument is required");
     }
-    my %slurp_args = (input_filehandle => $vcf_fh);
-    if (defined($snpset)) {
-        $slurp_args{'snpset'} = $snpset;
-    } elsif (defined($snpset_paths)) {
-        $slurp_args{'snpset_irods_paths'} = $snpset_paths;
-    } else {
-        $log->logcroak("Missing snpset object or paths");
-    }
-    my $vcf_data = WTSI::NPG::Genotyping::VCF::Slurper->new(
-        %slurp_args)->read_dataset();
-    if ($vcf_fh ne '-') {
+    foreach my $vcf (@vcf) {
+        my $vcf_fh;
+        if (! -e $vcf) {
+            $log->logcroak("File argument to --vcf does not exist: '",
+                           $vcf, "'");
+        } else {
+            open $vcf_fh, "<", $vcf ||
+                $log->logcroak("Cannot open VCF input '", $vcf, "'");
+        }
+        my %slurp_args = (
+            input_filehandle => $vcf_fh,
+            snpset           => $snpset,
+        );
+        my $vcf_data = WTSI::NPG::Genotyping::VCF::Slurper->new(
+            %slurp_args)->read_dataset();
         close $vcf_fh || $log->logcroak("Cannot close VCF input '",
                                         $vcf, "'");
+        my %vcf_calls = %{$vcf_data->calls_by_sample()};
+        foreach my $ssid (keys %vcf_calls) {
+            my $uri = $ssid_to_uri{$ssid};
+            if ($uri) {
+                push @{$qc_calls{$uri}}, @{$vcf_calls{$ssid}};
+            } else {
+                # samples in QC plex results do not necessarily appear in
+                # production, eg. sample exclusion in Illuminus/zCall
+                $log->info("No URI for Sanger sample ID ", $ssid);
+            }
+
+        }
     }
-    my $qc_calls = $vcf_data->calls_by_sample();
 
     ### run identity check and write output ###
-    my $result = $checker->run_identity_checks_json_spec($qc_calls);
+    my $result = $checker->run_identity_checks_json_spec(\%qc_calls);
 
     my $out;
     if (defined($outPath)) {
-        open $out, ">", $outPath || $log->logcroak("Cannot open output ",
-                                                   "path '", $outPath, "'");
+        open $out, ">", $outPath ||
+            $log->logcroak("Cannot open output path '", $outPath, "'");
     } else {
         $out = \*STDOUT;
     }
@@ -167,7 +227,6 @@ sub run {
         close $out || $log->logcroak("Cannot open output path '",
                                      $outPath, "'");
     }
-
 }
 
 
@@ -180,24 +239,35 @@ check_identity_bed_wip
 
 =head1 SYNOPSIS
 
-check_identity_bed_wip [--config <database .ini file>] --vcf <VCF file> [-- min-shared-snps <n>] [--pass-threshold <f>] --plex-manifest <path> [--out <path>] --plink <path stem> [--swap_threshold <f>] [--help] [--verbose]
+check_identity_bed_wip --vcf <VCF file> --plink <path stem>
+--sample_json <path > [--plex <path>] [--plex-irods <irods location>]
+[--pass-threshold <f>] [--swap_threshold <f>] [--help] [--verbose]
 
 Options:
 
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
-  --min_shared_snps=NUM  Minimum number of shared SNPs between production and
-                         QC plex to carry out identity check. Optional.
   --out=PATH             Path for JSON output. Optional, defaults to STDOUT.
   --pass_threshold=NUM   Minimum similarity to pass identity check. Optional.
-  --plex_manifest=PATH   Path to .csv manifest for the QC plex SNP set.
+  --plex=PATH            Path to .tsv manifest for a QC plex SNP set. Can
+                         give multiple arguments for multiple plex files, eg.
+                         '--plex file1.tsv --plex file2.tsv'. At least one
+                         manifest must be supplied using the --plex and/or
+                         --plex_irods arguments.
+  --plex_irods=PATH      Location of iRODS data object corresponding to .tsv
+                         manifest for a QC plex SNP set. Can give multiple
+                         arguments, similarly to --plex. At least one
+                         manifest must be supplied using the --plex and/or
+                         --plex_irods arguments.
   --plink=STEM           Plink binary stem (path omitting the .bed, .bim, .fam
                          suffix) for production data.
+  --sample_json=PATH     JSON file for translating between Sanger sample ID
+                         and sample URI. Required.
   --swap_threshold=NUM   Minimum cross-similarity to warn of sample swap.
                          Optional.
-  --vcf=PATH             Path to VCF input file, or - to read from STDIN.
-                         Required.
-  --verbose              Print messages while processing. Optional.
+  --vcf=PATH             Path to VCF input file. Can give multiple arguments
+                         for multiple VCF inputs, similarly to --plex.
+  --verbose              Turn on verbose logging. Optional.
 
 =head1 DESCRIPTION
 

@@ -153,7 +153,7 @@ if ($metadata_json) {
 }
 
 my %parserArgs = (resultsets => $resultsets,
-                  snpset => $snpset,
+                  assay_snpset => $snpset,
                   contig_lengths => $chromosome_lengths,
                   metadata => $metadata);
 

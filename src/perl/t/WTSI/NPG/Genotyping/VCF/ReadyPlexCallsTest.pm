@@ -62,11 +62,14 @@ my $s_params_name = "params_sequenom.json";
 
 my $log = Log::Log4perl->get_logger();
 
+my $tfc = 0; # text fixture count
+
 sub make_fixture : Test(setup) {
     $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 1);
     $log->info("Created temporary directory $tmp");
     $irods = WTSI::NPG::iRODS->new;
-    $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid");
+    $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid.$tfc");
+    $tfc++;
 
     # set up dummy fasta reference
     $ENV{NPG_REPOSITORY_ROOT} = $tmp;
@@ -122,6 +125,7 @@ sub setup_fluidigm {
 sub setup_sequenom {
     # add some dummy fluidigm CSV files to the temporary collection
     # add sample and snpset names to metadata
+    my $vcf_snpset_version = "2.0";
     for (my $i=0;$i<@s_input_files;$i++) {
         my $input = $s_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
@@ -139,13 +143,16 @@ sub setup_sequenom {
     $irods->add_object_avu($snpset_path, 'chromosome_json', $cjson_irods);
     $irods->add_object_avu($snpset_path, 'sequenom_plex', $s_snpset_id);
     $irods->add_object_avu($snpset_path, 'reference_name', $s_reference_name);
+    $irods->add_object_avu($snpset_path, 'snpset_version',
+                           $vcf_snpset_version);
     # write JSON config file with test params
     my %params = (
-        "irods_data_path"      => $irods_tmp_coll,
-        "platform"             => "sequenom",
-        "reference_name"       => $s_reference_name,
-        "reference_path"       => $irods_tmp_coll,
-        "snpset_name"          => $s_snpset_id,
+        irods_data_path      => $irods_tmp_coll,
+        platform             => "sequenom",
+        reference_name       => $s_reference_name,
+        reference_path       => $irods_tmp_coll,
+        snpset_name          => $s_snpset_id,
+        write_snpset_version => $vcf_snpset_version,
     );
     my $params_path_sequenom = $tmp."/".$s_params_name;
     open my $out, ">", $params_path_sequenom ||

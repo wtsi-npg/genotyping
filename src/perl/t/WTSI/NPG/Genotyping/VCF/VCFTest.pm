@@ -143,7 +143,7 @@ sub fluidigm_file_test : Test(116) {
     }
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
-         snpset => $snpset,
+         assay_snpset => $snpset,
          contig_lengths => $chromosome_lengths,
          metadata => \%metadata);
     my $vcf_dataset = $parser->get_vcf_dataset();
@@ -184,7 +184,7 @@ sub fluidigm_irods_test : Test(7) {
     ); # hash of arrayrefs for compatibility with VCF header
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
-         snpset => $snpset,
+         assay_snpset => $snpset,
          contig_lengths => $chromosome_lengths,
          metadata => \%metadata,
          );
@@ -281,7 +281,7 @@ sub sequenom_file_test : Test(7) {
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
-         snpset => $snpset,
+         assay_snpset => $snpset,
          contig_lengths => $chromosome_lengths,
          metadata => \%metadata);
     my $vcf_dataset = $parser->get_vcf_dataset();
@@ -311,7 +311,7 @@ sub sequenom_irods_test : Test(7) {
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
-         snpset => $snpset,
+         assay_snpset => $snpset,
          contig_lengths => $chromosome_lengths,
          metadata => \%metadata);
     my $vcf_dataset = $parser->get_vcf_dataset();

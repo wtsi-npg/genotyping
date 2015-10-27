@@ -204,7 +204,7 @@ sub _build_calls_at {
     else {
       $self->trace("Adding fluidigm result at '$assay_address'");
 
-      my $snp = $self->_snpset->named_snp($result->snp_assayed);
+      my $snp = $self->snpset->named_snp($result->snp_assayed);
       push @calls,
         WTSI::NPG::Genotyping::Call->new(snp      => $snp,
                                          genotype => $result->canonical_call,
