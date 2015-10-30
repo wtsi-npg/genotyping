@@ -35,6 +35,7 @@ my $config = "$bin/../etc/qc_config.json";
 my $filterConfig = $data_dir."zcall_prefilter_test.json";
 my $vcf = $data_dir."small_test_plex.vcf";
 my $plexManifest = $data_dir."small_test_fake_manifest.tsv";
+my $sampleJson = $data_dir."small_test_sample.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
 my ($cmd, $status);
 
@@ -145,8 +146,19 @@ print "\tRemoved output from previous tests; now testing main bootstrap script.\
 
 ## check run_qc.pl bootstrap script
 # omit --title argument, to test default title function
-$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config --vcf=$vcf --plex-manifest $plexManifest";
-is(system($cmd), 0, "run_qc.pl bootstrap script exit status");
+my @args = ("--output-dir=$outDir",
+            "--dbpath=$dbfile",
+            "--sim=$sim",
+            "--run=$piperun",
+            "--inipath=$iniPath",
+            "--config=$config",
+            "--vcf=$vcf",
+            "--plex=$plexManifest",
+            " --sample-json=$sampleJson",
+            "--mafhet",
+            $plink);
+is(system("$bin/run_qc.pl ".join(" ", @args)), 0,
+   "run_qc.pl bootstrap script exit status");
 
 ## check work-in-progress output files
 my $outDirWip = $outDir."/qc_wip";

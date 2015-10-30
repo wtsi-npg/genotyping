@@ -37,6 +37,8 @@ our $PLATFORM_KEY             = 'platform';
 our $REFERENCE_NAME_KEY       = 'reference_name';
 our $REFERENCE_PATH_KEY       = 'reference_path';
 our $SNPSET_NAME_KEY          = 'snpset_name';
+our $READ_VERSION_KEY         = 'read_snpset_version';
+our $WRITE_VERSION_KEY        = 'write_snpset_version';
 our @REQUIRED_CONFIG_KEYS = ($IRODS_DATA_PATH_KEY,
                              $PLATFORM_KEY,
                              $REFERENCE_NAME_KEY,
@@ -72,7 +74,7 @@ sub run {
     my $debug;
     my $inifile;
     my $log4perl_config;
-    my $sample_json;
+    my $samples;
     my $output_path;
     my $verbose;
 
@@ -83,7 +85,7 @@ sub run {
                                                      -exitval => 0) },
                'inifile=s'        => \$inifile,
                'logconf=s'        => \$log4perl_config,
-               'sample-json=s'    => \$sample_json,
+               'samples=s'        => \$samples,
                'out=s'            => \$output_path,
                'verbose'          => \$verbose);
 
@@ -96,7 +98,7 @@ sub run {
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-         $log = Log::Log4perl->get_logger('npg.vcf.qc');
+        $log = Log::Log4perl->get_logger('npg.vcf.qc');
         if ($verbose) {
             $log->level($INFO);
         }
@@ -109,11 +111,11 @@ sub run {
     unless ($config) {
         $log->logcroak("--config argument is required");
     }
-    if ($dbfile && $sample_json) {
-        $log->logcroak("Cannot specify both --dbfile and --sample-json");
-    } elsif (!($dbfile || $sample_json)) {
+    if ($dbfile && $samples) {
+        $log->logcroak("Cannot specify both --dbfile and --samples");
+    } elsif (!($dbfile || $samples)) {
         $log->logcroak("Must specify exactly one of --dbfile ",
-                       "and --sample-json");
+                       "and --samples");
     }
     unless ($output_path) {
         $log->logcroak("--out argument is required");
@@ -147,24 +149,25 @@ sub run {
                  on_connect_do  => 'PRAGMA foreign_keys = ON');
         my @samples = $pipedb->sample->all;
         @sample_ids = uniq map { $_->sanger_sample_id } @samples;
-    } elsif ($sample_json) {
-        my @contents = decode_json(read_file($sample_json));
+    } elsif ($samples) {
+        my @contents = decode_json(read_file($samples));
         @sample_ids = @{$contents[0]};
     }
 
     ### read data from iRODS ###
-    my ($resultsets, $snpset, $chromosome_lengths, $vcf_meta) =
-        _query_irods($irods, \@sample_ids, \%params, $log);
+    my @irods_data = _query_irods($irods, \@sample_ids, \%params, $log);
+    my ($resultsets, $chromosome_lengths, $vcf_meta, $assay_snpset,
+        $vcf_snpset) = @irods_data;
     if (scalar @{$resultsets} == 0) {
         $log->logcroak("No assay result sets found for QC plex '",
                        $params{$SNPSET_NAME_KEY}, "'");
     }
-
     ### call VCF parser on resultsets and write to file ###
     my $vcfData = WTSI::NPG::Genotyping::VCF::AssayResultParser->new(
         resultsets     => $resultsets,
         contig_lengths => $chromosome_lengths,
-        snpset         => $snpset,
+        assay_snpset   => $assay_snpset,
+        vcf_snpset     => $vcf_snpset,
         logger         => $log,
         metadata       => $vcf_meta,
     )->get_vcf_dataset();
@@ -176,26 +179,25 @@ sub run {
 }
 
 sub _query_irods {
-    # get AssayResultSets, SNPSet, and contig lengths from iRODS
+    # get AssayResultSets, SNPSets, and contig lengths from iRODS
     # works for Fluidigm or Sequenom
     my ($irods, $sample_ids, $params, $log) = @_;
     my $subscriber;
+    my %query_params = (irods          => $irods,
+                        data_path      => $params->{$IRODS_DATA_PATH_KEY},
+                        reference_path => $params->{$REFERENCE_PATH_KEY},
+                        reference_name => $params->{$REFERENCE_NAME_KEY},
+                        snpset_name    => $params->{$SNPSET_NAME_KEY},
+                        logger         => $log);
     if ($params->{$PLATFORM_KEY} eq $FLUIDIGM) {
         $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-            (irods          => $irods,
-             data_path      => $params->{$IRODS_DATA_PATH_KEY},
-             reference_path => $params->{$REFERENCE_PATH_KEY},
-             reference_name => $params->{$REFERENCE_NAME_KEY},
-             snpset_name    => $params->{$SNPSET_NAME_KEY},
-             logger         => $log);
+            (%query_params);
     } elsif ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
+        if ($params->{$READ_VERSION_KEY}) {
+            $query_params{'snpset_version'} = $params->{$READ_VERSION_KEY};
+        }
         $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
-            (irods          => $irods,
-             data_path      => $params->{$IRODS_DATA_PATH_KEY},
-             reference_path => $params->{$REFERENCE_PATH_KEY},
-             reference_name => $params->{$REFERENCE_NAME_KEY},
-             snpset_name    => $params->{$SNPSET_NAME_KEY},
-             logger         => $log);
+            (%query_params);
     } else {
         $log->logcroak("Unknown plex type: '", $params->{$PLATFORM_KEY}, "'");
     }
@@ -210,14 +212,29 @@ sub _query_irods {
         push @resultsets, @sample_resultsets;
     }
     my $total = scalar @resultsets;
-    $log->info("Found $total Fluidigm resultsets.");
+    $log->info("Found $total assay resultsets.");
+    my $assay_snpset = $subscriber->snpset;
+    my $vcf_snpset;
+    if ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
+        my @args = (
+            $params->{$REFERENCE_PATH_KEY},
+            $params->{$REFERENCE_NAME_KEY},
+            $params->{$SNPSET_NAME_KEY},
+        );
+        if ($params->{$WRITE_VERSION_KEY}) {
+            push @args, $params->{$WRITE_VERSION_KEY};
+        }
+        $vcf_snpset = $subscriber->find_irods_snpset(@args);
+    } else {
+        $vcf_snpset = $assay_snpset;
+    }
     return (\@resultsets,
-            $subscriber->get_snpset(),
             $subscriber->get_chromosome_lengths(),
             $vcf_metadata,
+            $assay_snpset,
+            $vcf_snpset,
         );
 }
-
 
 ## TODO Retrieve results for multiple plex types / experiments and record in the same VCF file
 
@@ -238,13 +255,15 @@ Options:
                    reading the QC plex calls.
   --dbfile         Path to pipeline SQLite database file. Used to read
                    sample identifiers. Must supply exactly one of --dbfile
-                   or --sample-json.
+                   or --samples.
   --help           Display help.
   --inifile        Path to .ini file to configure pipeline SQLite database
                    connection. Optional. Only relevant if --dbfile is given.
   --out            Path for VCF output. Required.
-  --sample-json    Path to JSON file containing a list of sample identifiers.
-                   Must supply exactly one of --dbfile or --sample-json.
+  --samples        Path to JSON file containing a list of sample identifiers.
+                   The file should contain *only* a simple list, so the
+                   "sample.json" file produced by g2i is not appropriate.
+                   Must supply exactly one of --dbfile or --samples.
 
 =head1 DESCRIPTION
 

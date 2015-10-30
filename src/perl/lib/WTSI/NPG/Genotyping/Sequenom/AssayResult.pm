@@ -61,7 +61,7 @@ sub canonical_call {
 
   my $call = $self->genotype_id;
   if (!$call) {
-    $call = ''; # FIXME -- check that this empty string should be permitted
+    $call = 'NN'; # TODO if genotype is missing, is converting to no-call OK?
   } elsif (length($call) == 1) {
     $call = $call . $call; # homozygote or no call
   }

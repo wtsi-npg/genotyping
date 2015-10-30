@@ -64,6 +64,32 @@ sub BUILD {
   }
 }
 
+
+=head2 clone
+
+  Arg [1]    : None
+
+  Example    : $cloned_call = $call->clone()
+  Description: Return an identical copy of the call.
+  Returntype : WTSI::NPG::Genotyping::Call
+
+=cut
+
+# used to generate test data for evaluating the Bayesian identity check
+# (some test code is external to WTSI genotyping pipeline)
+
+sub clone {
+  my ($self) = @_;
+  my %args = (snp => $self->snp,
+              genotype => $self->genotype,
+              is_call => $self->is_call,
+          );
+  if (defined $self->qscore) {
+      $args{'qscore'} = $self->qscore;
+  }
+  return WTSI::NPG::Genotyping::Call->new(\%args);
+}
+
 =head2 is_homozygous
 
   Arg [1]    : None

@@ -43,10 +43,24 @@ has 'resultsets'  =>
                      'names and calls.',
    );
 
-has 'snpset'     =>
+has 'assay_snpset'     =>
    (is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',
     required     => 1,
+    documentation => 'SNPSet object corresponding to the input AssayResultSets.'
+   );
+
+
+has 'vcf_snpset'     =>
+   (is           => 'ro',
+    isa          => 'WTSI::NPG::Genotyping::SNPSet',
+    required     => 0,
+    lazy         => 1,
+    default      => sub {
+        my ($self) = @_;
+        return $self->assay_snpset;
+      },
+    documentation => 'SNPSet used to generate VCF output. The name of a SNP with a given chromosome and position may differ between assay_snpset and vcf_snpset. Optional; if not given, defaults to assay_snpset.',
    );
 
 has 'metadata' =>
@@ -83,12 +97,13 @@ sub get_vcf_dataset {
 	metadata => $self->metadata,
     );
     my @rows;
-    foreach my $snp (@{$self->snpset->snps}) {
+    foreach my $snp (@{$self->vcf_snpset->snps}) {
         my @sample_calls;
         foreach my $sample (@$samples) {
             unless (defined($calls->{$snp->name}{$sample})) {
-                $self->logcroak("No call found for SNP '", $snp->name,
-                                "' sample '", $sample, "'");
+                $self->logwarn("No call found for SNP '", $snp->name,
+                               "' sample '", $sample, "'");
+                next; # FIXME warn, not croak if no call? renamed snp issue
             }
             push @sample_calls, $calls->{$snp->name}{$sample};
         }
@@ -158,6 +173,7 @@ sub _parse_assay_results {
     my %calls;
     my %samples;
     my $controls = 0;
+    my $renaming = $self->assay_snpset->snp_name_map($self->vcf_snpset);
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
             # foreach AssayResult (Sequenom or Fluidigm)
@@ -171,8 +187,14 @@ sub _parse_assay_results {
             }
             my $sample_id = $ar->canonical_sample_id();
             $samples{$sample_id} = 1;
-            my $snp_id = $ar->snp_assayed();
-            my $snp = $self->snpset->named_snp($snp_id);
+            my $assay_snp_id = $ar->snp_assayed();
+            my $vcf_snp_id = $renaming->{$assay_snp_id};
+            # handles SNP renaming, eg. rs3177980 -> rs3177980
+            if (!defined($vcf_snp_id)) {
+                $self->logcroak("Cannot find assay SNP '",
+                                $assay_snp_id, "' in VCF snpset");
+            }
+            my $vcf_snp = $self->vcf_snpset->named_snp($vcf_snp_id);
             my $call;
             my $qscore = $ar->qscore();
             # * Using $ar->qscore() in place of $qscore in the
@@ -181,20 +203,20 @@ sub _parse_assay_results {
             # argument list, and the constructor dies because the argument
             # list has an odd number of elements
             # * TODO try to reproduce this error in a simplified test case
-            if (is_GenderMarker($snp)) {
+            if (is_GenderMarker($vcf_snp)) {
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
-                    snp      => $snp,
+                    snp      => $vcf_snp,
                     qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             } else {
                 $call = WTSI::NPG::Genotyping::Call->new(
-                    snp      => $snp,
+                    snp      => $vcf_snp,
                     qscore   => $qscore,
                     genotype => $ar->canonical_call()
                 );
             }
-            $calls{$snp_id}{$sample_id} = $call;
+            $calls{$vcf_snp_id}{$sample_id} = $call;
         }
     }
     if ($controls > 0) { 

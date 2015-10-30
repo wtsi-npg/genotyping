@@ -485,7 +485,8 @@ sub insert_fluidigm_calls {
      reference_name => $reference_name,
      snpset_name    => $snpset->name,
      logger         => $log);
-  my $resultsets = $subscriber->get_assay_resultsets(\@sample_ids);
+  my ($resultsets, $vcf_meta) =
+      $subscriber->get_assay_resultsets_and_vcf_metadata(\@sample_ids);
 
   foreach my $sample (@$samples) {
     my $sample_resultsets = $resultsets->{$sample->sanger_sample_id};

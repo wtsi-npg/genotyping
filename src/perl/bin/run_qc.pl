@@ -26,7 +26,7 @@ our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
 my ($help, $outDir, $simPath, $dbPath, $iniPath, $configPath, $title,
     $plinkPrefix, $runName, $mafHet, $filterConfig, $zcallFilter,
-    $illuminusFilter, $include, $plexManifest, $vcf);
+    $illuminusFilter, $include, $plexManifest, $vcf, $sampleJson);
 
 GetOptions("help"              => \$help,
            "output-dir=s"      => \$outDir,
@@ -43,6 +43,7 @@ GetOptions("help"              => \$help,
 	   "illuminus-filter"  => \$illuminusFilter,
 	   "include"           => \$include,
            "plex-manifest=s"   => \$plexManifest,
+           "sample-json=s"     => \$sampleJson,
     );
 
 if ($help) {
@@ -66,6 +67,8 @@ Options:
 --mafhet              Find heterozygosity separately for SNP populations with
                       minor allele frequency greater than 1%, and less than
                       1%.
+--sample-json=PATH    Sample JSON file to relate Sanger sample IDs in VCF
+                      to sample URIs in Plink data.
 --title               Title for this analysis; will appear in plots
 --zcall-filter        Apply default zcall filter; see note [2] below.
 --illuminus-filter    Apply default illuminus filter; see note [2] below.
@@ -128,7 +131,7 @@ my $exclude = !($include);
 ### run QC
 run($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
 $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig, $exclude,
-$plexManifest, $vcf);
+$plexManifest, $vcf, $sampleJson);
 
 sub cleanup {
     # create a 'supplementary' subdirectory of the output directory
@@ -246,14 +249,15 @@ sub verifyAbsPath {
 
 sub run_qc_wip {
   # run the work-in-progess refactored QC in parallel with the old one
-  my ($plinkPrefix, $outDir, $plexManifest, $vcf) = @_;
+  my ($plinkPrefix, $outDir, $plexManifest, $vcf, $sampleJson) = @_;
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
   my $outPath = $outDir."/identity_wip.json";
   my @args = ("--out=$outPath",
 	      "--plink=$plinkPrefix",
-	      "--plex_manifest=$plexManifest",
+	      "--plex=$plexManifest",
+              "--sample_json=$sampleJson",
               "--vcf=$vcf"
 	     );
   my $cmd = $script." ".join(" ", @args);
@@ -267,9 +271,9 @@ sub run_qc_wip {
 sub run {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
         $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
-        $exclude, $plexManifest, $vcf) = @_;
-    if ($plexManifest && $vcf) {
-        run_qc_wip($plinkPrefix, $outDir, $plexManifest, $vcf);
+        $exclude, $plexManifest, $vcf, $sampleJson) = @_;
+    if ($plexManifest && $vcf && $sampleJson) {
+        run_qc_wip($plinkPrefix, $outDir, $plexManifest, $vcf, $sampleJson);
     }
     write_version_log($outDir);
     my %fileNames = readQCFileNames($configPath);

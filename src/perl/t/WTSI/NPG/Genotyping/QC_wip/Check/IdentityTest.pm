@@ -9,13 +9,13 @@ use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 33;
+use Test::More tests => 47;
 use Test::Exception;
 
 use plink_binary;
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity;
+use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -200,46 +200,58 @@ sub run_identity_checks : Test(3) {
       or diag explain $json_results;
 }
 
-sub sample_swap_evaluation : Test(2) {
+sub sample_swap_evaluation : Test(14) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
         (plink_path => $plink_swap,
          snpset     => $snpset);
-
     my $sample_ids = _get_swap_sample_identities();
-    my $compared = $check->pairwise_swap_check($sample_ids);
-    ok($compared, "Failed pair comparison completed");
-
+    my $swap_result = $check->pairwise_swap_check($sample_ids);
+    ok($swap_result, "Failed pair comparison completed");
     my @expected = (
         [
             'urn:wtsi:249442_C09_HELIC5102247',
             'urn:wtsi:249441_F11_HELIC5102138',
-            1,
+            1.0,
             1
         ],
         [
             'urn:wtsi:249461_G12_HELIC5215300',
             'urn:wtsi:249441_F11_HELIC5102138',
-            0.5,
-            0
+            0.9997293,
+            1,
         ],
         [
             'urn:wtsi:249461_G12_HELIC5215300',
             'urn:wtsi:249442_C09_HELIC5102247',
-            0.8,
+            0.05858745,
             0
         ]
     );
-    is_deeply($compared, \@expected, "Comparison matches expected values");
+    my $expected_prior = 0.666667;
+    # don't use is_deeply to compare floats
+    my $epsilon = 0.0005;
+    my $delta = abs($swap_result->{'prior'} - $expected_prior);
+    ok($delta < $epsilon, "Swap prior within tolerance");
+    my $compared = $swap_result->{'comparison'};
+    for (my $i=0;$i<@expected;$i++) {
+        for (my $j=0;$j<4;$j++) {
+            if ($j==2) {
+                my $delta = abs($compared->[$i][$j] - $expected[$i][$j]);
+                ok($delta < $epsilon, "Identity metric within tolerance");
+            } else {
+                is($compared->[$i][$j], $expected[$i][$j],
+                   "Sample swap output matches expected value");
+            }
+        }
+    }
 }
 
 
-sub script : Test(2) {
+sub script : Test(4) {
     # test of command-line script
     # Could move this into Scripts.pm (which is slow to run, ~10 minutes)
-
-    # want this to work with VCF input
 
     my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
     my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
@@ -247,26 +259,48 @@ sub script : Test(2) {
     my $plexDir = "/nfs/srpipe_references/genotypes";
     my $plexFile = "$plexDir/W30467_snp_set_info_1000Genomes.tsv";
     my $refPath = "$data_path/identity_script_output.json";
+    my $sampleJson = "$data_path/fake_sample.json";
 
     ok(system(join q{ }, "$identity_script_wip",
               "--plink $data_path/fake_qc_genotypes",
               "--out $outPath",
-              "--plex_manifest $plexFile",
+              "--plex $plexFile",
+              "--sample_json $sampleJson",
               "--vcf $data_path/qc_plex_calls.vcf"
-          ) == 0, 'Completed identity check');
+          ) == 0, 'Script identity check');
 
     my $outData = from_json(read_file($outPath));
     my $refData = from_json(read_file($refPath));
     is_deeply($outData, $refData,
-              "Identity check JSON output matches reference file");
+              "Script JSON output matches reference file");
 
+    # now test with multiple VCF files and differing SNPSets
+    # VCF and manifest from above are split into two different SNP subsets
+    # Expect them to produce the same result when combined
+    $outPath = "$tempdir/identity_2.json";
+    my $plexFile1 = "$data_path/W30467_snp_set_info_1000Genomes_1.tsv";
+    my $plexFile2 = "$data_path/W30467_snp_set_info_1000Genomes_2.tsv";
+    my $vcf1 = "$data_path/qc_plex_calls_1.vcf";
+    my $vcf2 = "$data_path/qc_plex_calls_2.vcf";
+    ok(system(join q{ }, "$identity_script_wip",
+              "--plink $data_path/fake_qc_genotypes",
+              "--out $outPath",
+              "--plex $plexFile1",
+              "--plex $plexFile2",
+              "--sample_json $sampleJson",
+              "--vcf $vcf1",
+              "--vcf $vcf2",
+          ) == 0, 'Script identity check');
+    $outData = from_json(read_file($outPath));
+    is_deeply($outData, $refData,
+              "Script JSON output matches reference file, 2 inputs");
 }
 
 sub _get_swap_sample_identities {
 
     # Some fake QC data
     # - List of 3 'failed' sample names, 2 of which are swapped
-    # - Create SampleIdentity object for each sample
+    # - Create SampleIdentityBayesian object for each sample
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
@@ -278,15 +312,15 @@ sub _get_swap_sample_identities {
     my @sample_identities;
     my @qc_callsets = _get_qc_callsets();
     foreach my $sample_name (@qc_sample_names) {
-        # need both QC and production calls to create a SampleIdentity object
+        # need both QC and production calls to create object
         my %args = (sample_name      => $sample_name,
                     snpset           => $snpset,
                     production_calls => $production_calls->{$sample_name},
                     qc_calls         => $qc_callsets->{$sample_name},
-                    pass_threshold   => $pass_threshold,
-                    snp_threshold    => $snp_threshold);
-        my $sample_id = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity->
-            new(\%args);
+                    pass_threshold   => $pass_threshold);
+        my $sample_id =
+            WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+                  new(\%args);
         push (@sample_identities, $sample_id);
     }
     return \@sample_identities;

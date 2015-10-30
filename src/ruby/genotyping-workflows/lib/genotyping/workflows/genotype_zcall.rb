@@ -132,16 +132,15 @@ Returns:
       maybe_version_log(log_dir)
 
       run_name = run_name.to_s;
-      gcsjname = run_name + '.gencall.sample.json'
       gcsimname = run_name + '.gencall.sim'
       zsimname = run_name + '.zcall_qc.sim'
+      gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       zname = run_name + '.zcall.bed'
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-
 
       ## normalize manifest
       manifest_name = File.basename(manifest_raw, '.bpm.csv')
@@ -167,7 +166,7 @@ Returns:
         # must use raw manifest; see comment in prefilter method
       end
 
-      ## find sample intensity data
+      ## find sample intensity data for zcall
       sjson = nil
       if filtered
         siargs = {:config => gtconfig}.merge(args)
@@ -234,12 +233,14 @@ Returns:
                     :plex_manifest => plex_manifest}.merge(args)
         end
       end
-      if qcargs and vcf and plex_manifest
-        qcargs = {
-          :vcf => vcf, :plex_manifest => plex_manifest}.merge(qcargs)
-      end
-
-      if qcargs
+      if qcargs # ready to start QC
+        if vcf and plex_manifest
+          qcargs = {
+            :vcf => vcf,
+            :plex_manifest => plex_manifest,
+            :sample_json => sjson
+          }.merge(qcargs)
+        end
         zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       end
       # update placeholder value in Plink .fam files
@@ -259,7 +260,8 @@ Returns:
     end
     
     def prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                  gcsimfile, manifest, vcf, plex_manifest, args, async)
+                  gcsimfile, manifest, vcf, plex_manifest,
+                  args, async)
       # Run GenCall QC and apply prefilter to remove failing samples
       filtered = nil
       fname = run_name + '.prefilter_results.json'
@@ -283,7 +285,10 @@ Returns:
         end
         if vcf and plex_manifest
           gcqcargs = {
-            :vcf => vcf, :plex_manifest => plex_manifest}.merge(gcqcargs)
+            :vcf => vcf,
+            :sample_json => gcsjson,
+            :plex_manifest => plex_manifest
+          }.merge(gcqcargs)
         end
 
         ## run gencall QC to get metrics for prefiltering
