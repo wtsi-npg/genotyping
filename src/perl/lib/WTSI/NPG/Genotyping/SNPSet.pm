@@ -3,7 +3,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::SNPSet;
 
-use File::Temp qw(tempdir);
+use File::Temp qw(tempfile);
 use List::AllUtils qw(first_value);
 use Log::Log4perl::Level;
 use Moose;
@@ -138,16 +138,16 @@ sub union {
   my @colnames = $colnames->members;
   my @snps = values %union_snps;
   my @refs = values %union_refs;
-  # nasty hack to create a file as required by the Storable role
+  # hack to create a file as required by the Storable role
   # TODO find a better solution
-  my $dir = tempdir( CLEANUP => 1 );
-  my $tempfile = $dir.'/snpset.tsv';
-  system("touch $tempfile");
+  my ($fh, $filename) = tempfile("snpset_placeholder_XXXXXX", UNLINK => 1);
   my %args = (
       snps         => \@snps,
       column_names => \@colnames,
-      file_name    => $tempfile,
+      file_name    => $filename,
   );
+  close $fh || $self->logcroak("Cannot close filehandle for tempfile '",
+                               $filename, "'");
   if (scalar @refs > 0) { $args{'references'} = \@refs; }
   if (defined($name)) { $args{'name'} = $name; }
   return WTSI::NPG::Genotyping::SNPSet->new(%args);

@@ -74,7 +74,7 @@ sub run {
     my $debug;
     my $inifile;
     my $log4perl_config;
-    my $sample_json;
+    my $samples;
     my $output_path;
     my $verbose;
 
@@ -85,7 +85,7 @@ sub run {
                                                      -exitval => 0) },
                'inifile=s'        => \$inifile,
                'logconf=s'        => \$log4perl_config,
-               'sample-json=s'    => \$sample_json,
+               'samples=s'        => \$samples,
                'out=s'            => \$output_path,
                'verbose'          => \$verbose);
 
@@ -111,11 +111,11 @@ sub run {
     unless ($config) {
         $log->logcroak("--config argument is required");
     }
-    if ($dbfile && $sample_json) {
-        $log->logcroak("Cannot specify both --dbfile and --sample-json");
-    } elsif (!($dbfile || $sample_json)) {
+    if ($dbfile && $samples) {
+        $log->logcroak("Cannot specify both --dbfile and --samples");
+    } elsif (!($dbfile || $samples)) {
         $log->logcroak("Must specify exactly one of --dbfile ",
-                       "and --sample-json");
+                       "and --samples");
     }
     unless ($output_path) {
         $log->logcroak("--out argument is required");
@@ -149,8 +149,8 @@ sub run {
                  on_connect_do  => 'PRAGMA foreign_keys = ON');
         my @samples = $pipedb->sample->all;
         @sample_ids = uniq map { $_->sanger_sample_id } @samples;
-    } elsif ($sample_json) {
-        my @contents = decode_json(read_file($sample_json));
+    } elsif ($samples) {
+        my @contents = decode_json(read_file($samples));
         @sample_ids = @{$contents[0]};
     }
 
@@ -183,23 +183,21 @@ sub _query_irods {
     # works for Fluidigm or Sequenom
     my ($irods, $sample_ids, $params, $log) = @_;
     my $subscriber;
+    my %query_params = (irods          => $irods,
+                        data_path      => $params->{$IRODS_DATA_PATH_KEY},
+                        reference_path => $params->{$REFERENCE_PATH_KEY},
+                        reference_name => $params->{$REFERENCE_NAME_KEY},
+                        snpset_name    => $params->{$SNPSET_NAME_KEY},
+                        logger         => $log);
     if ($params->{$PLATFORM_KEY} eq $FLUIDIGM) {
         $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-            (irods          => $irods,
-             data_path      => $params->{$IRODS_DATA_PATH_KEY},
-             reference_path => $params->{$REFERENCE_PATH_KEY},
-             reference_name => $params->{$REFERENCE_NAME_KEY},
-             snpset_name    => $params->{$SNPSET_NAME_KEY},
-             logger         => $log);
+            (%query_params);
     } elsif ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
+        if ($params->{$READ_VERSION_KEY}) {
+            $query_params{'snpset_version'} = $params->{$READ_VERSION_KEY};
+        }
         $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
-            (irods          => $irods,
-             data_path      => $params->{$IRODS_DATA_PATH_KEY},
-             reference_path => $params->{$REFERENCE_PATH_KEY},
-             reference_name => $params->{$REFERENCE_NAME_KEY},
-             snpset_name    => $params->{$SNPSET_NAME_KEY},
-             snpset_version => $params->{$READ_VERSION_KEY},
-             logger         => $log);
+            (%query_params);
     } else {
         $log->logcroak("Unknown plex type: '", $params->{$PLATFORM_KEY}, "'");
     }
@@ -222,8 +220,10 @@ sub _query_irods {
             $params->{$REFERENCE_PATH_KEY},
             $params->{$REFERENCE_NAME_KEY},
             $params->{$SNPSET_NAME_KEY},
-            $params->{$WRITE_VERSION_KEY}
         );
+        if ($params->{$WRITE_VERSION_KEY}) {
+            push @args, $params->{$WRITE_VERSION_KEY};
+        }
         $vcf_snpset = $subscriber->find_irods_snpset(@args);
     } else {
         $vcf_snpset = $assay_snpset;
@@ -255,13 +255,15 @@ Options:
                    reading the QC plex calls.
   --dbfile         Path to pipeline SQLite database file. Used to read
                    sample identifiers. Must supply exactly one of --dbfile
-                   or --sample-json.
+                   or --samples.
   --help           Display help.
   --inifile        Path to .ini file to configure pipeline SQLite database
                    connection. Optional. Only relevant if --dbfile is given.
   --out            Path for VCF output. Required.
-  --sample-json    Path to JSON file containing a list of sample identifiers.
-                   Must supply exactly one of --dbfile or --sample-json.
+  --samples        Path to JSON file containing a list of sample identifiers.
+                   The file should contain *only* a simple list, so the
+                   "sample.json" file produced by g2i is not appropriate.
+                   Must supply exactly one of --dbfile or --samples.
 
 =head1 DESCRIPTION
 

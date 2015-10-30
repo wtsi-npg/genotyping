@@ -219,8 +219,8 @@ sub sample_swap_evaluation : Test(14) {
         [
             'urn:wtsi:249461_G12_HELIC5215300',
             'urn:wtsi:249441_F11_HELIC5102138',
-            0.0,
-            0
+            0.9997293,
+            1,
         ],
         [
             'urn:wtsi:249461_G12_HELIC5215300',

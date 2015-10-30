@@ -440,6 +440,7 @@ t/qc/check/identity/fake_qc_genotypes.bim
 t/qc/check/identity/fake_qc_genotypes.fam
 t/qc/check/identity/fake_qc_genotypes.map
 t/qc/check/identity/fake_qc_genotypes.ped
+t/qc/check/identity/fake_sample.json
 t/qc/check/identity/fake_swap_genotypes.bed
 t/qc/check/identity/fake_swap_genotypes.bim
 t/qc/check/identity/fake_swap_genotypes.fam
@@ -651,10 +652,10 @@ t/vcf/sequenom_002.csv
 t/vcf/sequenom_003.csv
 t/vcf/sequenom_004.csv
 t/vcf/sequenom_inputs.txt
-t/vcf/sequenom_wrong_snp_001.csv
-t/vcf/sequenom_wrong_snp_002.csv
-t/vcf/sequenom_wrong_snp_003.csv
-t/vcf/sequenom_wrong_snp_004.csv
+t/vcf/sequenom_alternate_snp_001.csv
+t/vcf/sequenom_alternate_snp_002.csv
+t/vcf/sequenom_alternate_snp_003.csv
+t/vcf/sequenom_alternate_snp_004.csv
 t/vcf/W30467_snp_set_info_GRCh37.tsv
 t/WTSI/NPG/Database/MLWarehouseTest.pm
 t/WTSI/NPG/Database/WarehouseTest.pm

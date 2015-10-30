@@ -77,7 +77,7 @@ has 'snpset_name' =>
 
 has 'snpset_version' =>
   (is            => 'ro',
-   isa           => 'Maybe[Str]',
+   isa           => 'Str',
    required      => 0,
    documentation => 'SNP set version used for assay results');
 
@@ -351,7 +351,8 @@ sub _build_snpset_data_object {
    return $self->_find_snpset_data_object(
        $self->reference_path,
        $self->reference_name,
-       $self->snpset_name
+       $self->snpset_name,
+       $self->snpset_version
    );
 }
 

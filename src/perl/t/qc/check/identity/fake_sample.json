@@ -1,0 +1,50 @@
+[
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_0.gtc",
+        "sanger_sample_id": "000000_A00_DUMMY-SAMPLE",
+        "uri": "urn:wtsi:000000_A00_DUMMY-SAMPLE"
+    },
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_1.gtc",
+        "sanger_sample_id": "249441_F11_HELIC5102138",
+        "uri": "urn:wtsi:249441_F11_HELIC5102138"
+    },
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_2.gtc",
+        "sanger_sample_id": "249442_C09_HELIC5102247",
+        "uri": "urn:wtsi:249442_C09_HELIC5102247"
+    },
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_3.gtc",
+        "sanger_sample_id": "249461_G12_HELIC5215300",
+        "uri": "urn:wtsi:249461_G12_HELIC5215300"
+    },
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_4.gtc",
+        "sanger_sample_id": "249469_H06_HELIC5274668",
+        "uri": "urn:wtsi:249469_H06_HELIC5274668"
+    },
+    {
+        "gender": "Female",
+        "gender_code": 2,
+        "gender_method": "Supplied",
+        "result": "placeholder_filename_5.gtc",
+        "sanger_sample_id": "249470_F02_HELIC5274730",
+        "uri": "urn:wtsi:249470_F02_HELIC5274730"
+    }
+]

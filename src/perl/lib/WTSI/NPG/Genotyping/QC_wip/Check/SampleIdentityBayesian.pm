@@ -330,7 +330,7 @@ sub _count_calls {
                 $self->logcroak("Non-equivalent SNPs in identity ",
                                 "count for production SNP '",
                                 $snp->name, "'");
-            } elsif (!$call_q->is_call) { # QC call is null
+            } elsif (!$call_p->is_call || !$call_q->is_call) {
                 next;
             } elsif ($call_p->equivalent($call_q)) {
                 $k++;
@@ -358,13 +358,9 @@ sub _id_metric {
     foreach my $snp (@{$self->snpset->snps}) {
         my ($n, $k) = $self->_count_calls($calls_by_snp_p->{$snp->name},
                                           $calls_by_snp_q->{$snp->name});
-        if ($n==0) { next; }
+        if ($n==0) { next; } # includes $call_p==undef
         $total_calls += $n;
         my $call_p = $calls_by_snp_p->{$snp->name};
-        if (!defined($call_p)) {
-            $self->info("No production call for SNP '", $snp->name, "'");
-            next;
-        }
         my $calls_q = $calls_by_snp_q->{$snp->name};
         my $id_score_snp = $self->_identity_score_snp($n, $k);
         $id_score = $id_score * $id_score_snp;

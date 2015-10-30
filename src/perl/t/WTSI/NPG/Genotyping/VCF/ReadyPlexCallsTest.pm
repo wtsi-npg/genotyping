@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use base qw(Test::Class);
-use Test::More tests => 4;
+use Test::More tests => 6;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -36,7 +36,6 @@ my $irods_tmp_coll;
 my $pid = $$;
 my $data_path = './t/vcf';
 my $tmp;
-my $snpset_path;
 
 # fluidigm test data
 my $f_expected_vcf = $data_path."/fluidigm.vcf";
@@ -44,7 +43,7 @@ my $f_reference_name = "Homo_sapiens (1000Genomes)";
 my $f_snpset_id = 'qc';
 my $f_snpset_filename = 'qc_fluidigm_snp_info_GRCh37.tsv';
 my @f_input_files = qw(fluidigm_001.csv fluidigm_002.csv
-                     fluidigm_003.csv fluidigm_004.csv);
+                       fluidigm_003.csv fluidigm_004.csv);
 my @f_sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
 my $f_sample_json = $data_path."/fluidigm_samples.json";
 my $f_params_name = "params_fluidigm.json";
@@ -54,11 +53,11 @@ my $s_expected_vcf = $data_path."/sequenom.vcf";
 my $s_reference_name = "Homo_sapiens (1000Genomes)";
 my $s_snpset_id = 'W30467';
 my $s_snpset_filename = 'W30467_snp_set_info_GRCh37.tsv';
-my @s_input_files = qw(sequenom_001.csv sequenom_002.csv
-                       sequenom_003.csv sequenom_004.csv);
+my $s_snpset_filename_1 = 'W30467_snp_set_info_GRCh37_1.tsv';
 my @s_sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
 my $s_sample_json = $data_path."/sequenom_samples.json";
 my $s_params_name = "params_sequenom.json";
+my $s_params_name_1 = "params_sequenom_1.json";
 
 my $log = Log::Log4perl->get_logger();
 
@@ -99,7 +98,7 @@ sub setup_fluidigm {
     my $cjson = $data_path."/".$chromosome_json_filename;
     my $cjson_irods = $irods_tmp_coll."/".$chromosome_json_filename;
     $irods->add_object($cjson, $cjson_irods);
-    $snpset_path = $irods_tmp_coll."/".$f_snpset_filename;
+    my $snpset_path = $irods_tmp_coll."/".$f_snpset_filename;
     $irods->add_object($data_path."/".$f_snpset_filename, $snpset_path);
     $irods->add_object_avu($snpset_path, 'chromosome_json', $cjson_irods);
     $irods->add_object_avu($snpset_path, 'fluidigm_plex', $f_snpset_id);
@@ -122,10 +121,29 @@ sub setup_fluidigm {
                        $params_path_fluidigm, "'");
 }
 
+sub setup_sequenom_alternate {
+    my @s_input_files = qw(sequenom_alternate_snp_001.csv
+                           sequenom_alternate_snp_002.csv
+                           sequenom_alternate_snp_003.csv
+                           sequenom_alternate_snp_004.csv);
+    setup_sequenom(\@s_input_files);
+}
+
+sub setup_sequenom_default {
+    my @s_input_files = qw(sequenom_001.csv
+                           sequenom_002.csv
+                           sequenom_003.csv
+                           sequenom_004.csv);
+    setup_sequenom(\@s_input_files);
+}
+
 sub setup_sequenom {
-    # add some dummy fluidigm CSV files to the temporary collection
+    # add some dummy sequenom CSV files to the temporary collection
     # add sample and snpset names to metadata
-    my $vcf_snpset_version = "2.0";
+    my @s_input_files = @{$_[0]};
+    my $snpset_v1 = "1.0";
+    my $snpset_v2 = "2.0";
+    # upload regular and alternate-snp input files to iRODS
     for (my $i=0;$i<@s_input_files;$i++) {
         my $input = $s_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
@@ -138,13 +156,20 @@ sub setup_sequenom {
     my $cjson = $data_path."/".$chromosome_json_filename;
     my $cjson_irods = $irods_tmp_coll."/".$chromosome_json_filename;
     $irods->add_object($cjson, $cjson_irods);
-    $snpset_path = $irods_tmp_coll."/".$s_snpset_filename;
+    # add snpset (version "1.0")
+    my $snpset_1 = $irods_tmp_coll."/".$s_snpset_filename_1;
+    $irods->add_object($data_path."/".$s_snpset_filename_1, $snpset_1);
+    $irods->add_object_avu($snpset_1, 'chromosome_json', $cjson_irods);
+    $irods->add_object_avu($snpset_1, 'sequenom_plex', $s_snpset_id);
+    $irods->add_object_avu($snpset_1, 'reference_name', $s_reference_name);
+    $irods->add_object_avu($snpset_1,'snpset_version', $snpset_v1);
+    # add snpset (version "2.0")
+    my $snpset_path = $irods_tmp_coll."/".$s_snpset_filename;
     $irods->add_object($data_path."/".$s_snpset_filename, $snpset_path);
     $irods->add_object_avu($snpset_path, 'chromosome_json', $cjson_irods);
     $irods->add_object_avu($snpset_path, 'sequenom_plex', $s_snpset_id);
     $irods->add_object_avu($snpset_path, 'reference_name', $s_reference_name);
-    $irods->add_object_avu($snpset_path, 'snpset_version',
-                           $vcf_snpset_version);
+    $irods->add_object_avu($snpset_path, 'snpset_version', $snpset_v2);
     # write JSON config file with test params
     my %params = (
         irods_data_path      => $irods_tmp_coll,
@@ -152,16 +177,24 @@ sub setup_sequenom {
         reference_name       => $s_reference_name,
         reference_path       => $irods_tmp_coll,
         snpset_name          => $s_snpset_id,
-        write_snpset_version => $vcf_snpset_version,
+        read_snpset_version  => $snpset_v2,
+        write_snpset_version => $snpset_v2,
     );
-    my $params_path_sequenom = $tmp."/".$s_params_name;
-    open my $out, ">", $params_path_sequenom ||
-        $log->logcroak("Cannot open test parameter path '",
-                       $params_path_sequenom, "'");
+    my $config_path = $tmp."/".$s_params_name;
+    my $out;
+    open $out, ">", $config_path ||
+        $log->logcroak("Cannot open config file '", $config_path, "'");
     print $out to_json(\%params);
     close $out ||
-        $log->logcroak("Cannot close test parameter path '",
-                       $params_path_sequenom, "'");
+        $log->logcroak("Cannot close config file '", $config_path, "'");
+    # write another JSON config file with alternate input snpset
+    $params{'read_snpset_version'} = $snpset_v1;
+    my $config_path_1 = $tmp."/".$s_params_name_1;
+    open $out, ">", $config_path_1 ||
+        $log->logcroak("Cannot open config file '", $config_path_1, "'");
+    print $out to_json(\%params);
+    close $out ||
+        $log->logcroak("Cannot close config file '", $config_path_1, "'");
 }
 
 sub teardown : Test(teardown) {
@@ -175,7 +208,7 @@ sub test_ready_calls_fluidigm : Test(2) {
     my $params_path_fluidigm = $tmp."/".$f_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_fluidigm",
-                         "--sample-json $f_sample_json",
+                         "--samples $f_sample_json",
                          "--logconf $LOG_TEST_CONF",
                          "--out $vcf_out";
     ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
@@ -189,13 +222,34 @@ sub test_ready_calls_fluidigm : Test(2) {
 }
 
 sub test_ready_calls_sequenom : Test(2) {
-    setup_sequenom();
+    setup_sequenom_default();
 
     my $vcf_out = "$tmp/test_sequenom.vcf";
     my $params_path_sequenom = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_sequenom",
-                         "--sample-json $s_sample_json",
+                         "--samples $s_sample_json",
+                         "--logconf $LOG_TEST_CONF",
+                         "--out $vcf_out";
+    ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
+    my @got_lines = read_file($vcf_out);
+    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+    my @expected_lines = read_file($s_expected_vcf);
+    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+    is_deeply(\@got_lines, \@expected_lines,
+              "Sequenom VCF output matches expected values");
+
+}
+
+sub test_ready_calls_sequenom_alternate_snp : Test(2) {
+    # tests handling of renamed SNP in different manifest versions
+    setup_sequenom_alternate();
+
+    my $vcf_out = "$tmp/test_sequenom.vcf";
+    my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
+    my $cmd = join q{ }, "$READY_QC_CALLS",
+                         "--config $params_path_sequenom_1",
+                         "--samples $s_sample_json",
                          "--logconf $LOG_TEST_CONF",
                          "--out $vcf_out";
     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
