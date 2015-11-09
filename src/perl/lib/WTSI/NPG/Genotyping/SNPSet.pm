@@ -390,7 +390,7 @@ sub _parse_snps {
 
     $self->_write_column_names($header);
 
-    my %gender_markers;
+    my %x_y_markers;
 
     while (my $record = $csv->getline($fh)) {
       $csv->combine(@$record);
@@ -416,19 +416,19 @@ sub _parse_snps {
          snpset     => $self);
 
       my $key = $snp->name;
-      if ($snp->is_gender_marker) {
-        $self->debug("SNP ", $snp->name, " is a gender marker");
+      if ($snp->is_x_or_y_marker) {
+        $self->debug("SNP ", $snp->name, " is an X or Y marker");
 
-        if (exists $gender_markers{$key}) {
+        if (exists $x_y_markers{$key}) {
           my $x_marker;
           my $y_marker;
 
           # Remove from working hash on finding a pair
-          if (is_HsapiensX($gender_markers{$key}->chromosome)) {
-            $x_marker = delete $gender_markers{$key};
+          if (is_HsapiensX($x_y_markers{$key}->chromosome)) {
+            $x_marker = delete $x_y_markers{$key};
           }
-          elsif (is_HsapiensY($gender_markers{$key}->chromosome)) {
-            $y_marker = delete $gender_markers{$key};
+          elsif (is_HsapiensY($x_y_markers{$key}->chromosome)) {
+            $y_marker = delete $x_y_markers{$key};
           }
 
           if (is_HsapiensX($snp->chromosome)) {
@@ -444,7 +444,7 @@ sub _parse_snps {
              y_marker => $y_marker);
         }
         else {
-          $gender_markers{$key} = $snp;
+          $x_y_markers{$key} = $snp;
         }
       }
       else {
@@ -455,9 +455,9 @@ sub _parse_snps {
 
     # Any unpaired markers are orphans; they must always appear in
     # pairs
-    if (%gender_markers) {
-      $self->logconfess("Orphan gender marker records for [",
-                        join(', ', sort keys %gender_markers), "] in ",
+    if (%x_y_markers) {
+      $self->logconfess("Orphan X or Y marker records for [",
+                        join(', ', sort keys %x_y_markers), "] in ",
                         $self->str);
     }
   }

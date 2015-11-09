@@ -157,7 +157,7 @@ sub fluidigm_file_test : Test(116) {
     is(scalar keys %{$calls_by_sample}, 4, "Correct number of samples");
     foreach my $sample ( keys %{$calls_by_sample} ) {
         my @calls = @{$calls_by_sample->{$sample}};
-        is(scalar @calls, 26, "Correct number of calls for $sample");
+        is(scalar @calls, 24, "Correct number of calls for $sample");
         foreach my $call (@calls) {
             isa_ok($call, 'WTSI::NPG::Genotyping::Call');
         }

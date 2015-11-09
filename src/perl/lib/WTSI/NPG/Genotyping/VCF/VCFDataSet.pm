@@ -34,6 +34,13 @@ has 'sort_output' =>
     documentation => 'If true, output rows are sorted in (chromosome, position) order',
     );
 
+has 'merge_x_y_markers' =>
+    (is       => 'ro',
+     isa      => 'Bool',
+     default  => 1,
+     documentation => 'If true, merge pairs of calls on (X,Y) chromosomes with the same variant name into single GenderMarker calls.',
+ );
+
 our $VERSION = '';
 
 our $X_CHROM_NAME = 'X';
@@ -61,10 +68,16 @@ sub calls_by_sample {
     my ($self) = @_;
     my %calls_by_sample;
     my @sample_names = @{$self->header->sample_names};
-    foreach my $row (@{$self->data}) {
-        my @calls = @{$row->calls};
-        for (my $i=0;$i<@calls;$i++) {
-            push @{$calls_by_sample{$sample_names[$i]}}, $calls[$i];
+    my @calls = @{$self->_find_calls()};
+    for (my $i=0;$i<@calls;$i++) {
+        for (my $j=0;$j<@sample_names;$j++) {
+            my $call = $calls[$i][$j];
+            if (defined($call)) {
+                push @{$calls_by_sample{$sample_names[$j]}}, $call;
+            } else {
+                $self->logconfess("SNP call undefined for ", $i, "th SNP, ",
+                                  $j, "th sample (indexed from zero)");
+            }
         }
     }
     return \%calls_by_sample;
@@ -136,6 +149,55 @@ sub _build_num_samples {
         }
     }
     return $num_samples;
+}
+
+
+sub _find_calls {
+    # find an array of arrays of calls from the component DataRow objects
+    # if necessary, merge DataRows for X and Y markers into GenderMarker calls
+    my ($self) = @_;
+    my @all_calls;
+    my %x_y_calls;
+    foreach my $row (@{$self->data}) {
+        my $is_x = $row->snp->is_XMarker;
+        my $is_y = $row->snp->is_YMarker;
+        if ($self->merge_x_y_markers && ($is_x || $is_y)) {
+            my $key = $row->snp->name;
+            if (exists $x_y_calls{$key}) {
+                # Remove from working hash on finding a pair
+                my $other_calls = delete $x_y_calls{$key};
+                my $calls = $row->calls;
+
+                my @merged_calls;
+                my $total = scalar @{$calls};
+                if ($total != scalar @{$other_calls}) {
+                    $self->logconfess("Cannot merge gender marker call ",
+                                      "lists of different lengths");
+                }
+                for (my $i=0;$i<$total;$i++) {
+                    my $call = $calls->[$i];
+                    my $other_call = $other_calls->[$i];
+                    # merge method does sanity checks on markers & genotypes
+                    my $merged = $call->merge_x_y_markers($other_call);
+                    push @merged_calls, $merged;
+                }
+                push @all_calls, \@merged_calls;
+
+            } else {
+                $x_y_calls{$key} = $row->calls;
+            }
+        } else {
+            push @all_calls, $row->calls;
+        }
+    }
+    # now check for orphans (remaining unpaired markers)
+    if (%x_y_calls) {
+        $self->logconfess("Orphan X or Y call rows for [",
+                          join(', ', sort keys %x_y_calls), "] in ",
+                          "VCF dataset");
+    }
+    return \@all_calls;
+
 }
 
 sub _sort_output_lines {

@@ -36,7 +36,7 @@ has 'swap_threshold' =>
   (is            => 'ro',
    isa           => 'Num',
    required      => 1,
-   default       => 0.9,
+   default       => 0.5,
    documentation => 'Minimum cross-identity for swap warning');
 
 has 'pass_threshold' =>
@@ -143,12 +143,13 @@ sub find_identity {
     $self->debug("Inserting empty results for missing samples");
     foreach my $sample_name (@{$self->sample_names}) {
         if ($missing{$sample_name}) {
+            my $calls_p = $self->production_calls->{$sample_name};
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
                       new(
                           sample_name      => $sample_name,
                           snpset           => $self->snpset,
-                          production_calls => [],
+                          production_calls => $calls_p,
                           qc_calls         => [],
                           pass_threshold   => $self->pass_threshold,
                       );

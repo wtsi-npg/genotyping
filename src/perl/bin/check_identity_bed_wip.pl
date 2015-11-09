@@ -121,7 +121,8 @@ sub run {
         foreach my $sample (@{$sample_data}) {
             my $ssid = $sample->{'sanger_sample_id'};
             if ($ssid_to_uri{$ssid}) {
-                $log->logcroak("Multiple URIs for Sanger sample ID ", $ssid);
+                $log->logwarn("Multiple URIs for Sanger sample ID '",
+                              $ssid, "', omitting '", $sample->{'uri'}, "'");
             }
             $ssid_to_uri{$ssid} = $sample->{'uri'};
         }

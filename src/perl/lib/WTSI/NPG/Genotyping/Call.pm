@@ -5,6 +5,7 @@ package WTSI::NPG::Genotyping::Call;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::GenderMarker;
 use WTSI::NPG::Genotyping::Types qw(:all);
 
 our $VERSION = '';
@@ -281,6 +282,84 @@ sub merge {
 
   return $merged;
 }
+
+
+=head2 merge_x_y_markers
+
+  Arg [1]    : WTSI::NPG::Genotyping::Call
+
+  Example    : my $new_call = $x_call->merge_x_y_markers($y_call), OR:
+               my $new_call = $y_call->merge_x_y_markers($x_call)
+  Description: Merge a call on the Y chromosome with a call on the X
+               chromosome (or vice versa) to create a new call with a
+               GenderMarker instead of a SNP as its variant. The input calls
+               must be an XMarker and YMarker with the same SNP name.
+               Acceptable input genotypes are:
+               - X hom, Y hom: Male
+               - X hom, Y no-call: Female
+               - X no-call, Y no-call: No-call
+               Any other combination of input genotypes will result in a
+               no-call with a warning.
+  Returntype : WTSI::NPG::Genotyping::Call
+
+=cut
+
+sub merge_x_y_markers {
+    my ($self, $other) = @_;
+    my ($x_call, $y_call);
+    if ($self->snp->is_XMarker) { $x_call = $self; }
+    elsif ($self->snp->is_YMarker) { $y_call = $self; }
+    if ($other->snp->is_XMarker) { $x_call = $other; }
+    elsif ($other->snp->is_YMarker) { $y_call = $other; }
+    unless ($x_call && $y_call) {
+        $self->logconfess("Can only use merge_gender to merge an X call ",
+                          "with a Y call or vice versa. Input SNPs were: '",
+                          $self->snp->name, "', '", $other->snp->name, "'",
+                          "', on respective chromosomes: ",
+                          $self->snp->chromosome, ", ",
+                          $other->snp->chromosome);
+    }
+    unless ($x_call->snp->name eq $y_call->snp->name) {
+        $self->logconfess("Cannot merge X and Y markers with differing ",
+                          "names: '", $x_call->snp->name, "', '",
+                          $y_call->snp->name, "'");
+    }
+    my $gender_marker = WTSI::NPG::Genotyping::GenderMarker->new(
+        name     => $x_call->snp->name,
+        x_marker => $x_call->snp,
+        y_marker => $y_call->snp
+    );
+    my $genotype;
+    my $is_call = 0;
+    my $x_hom = $x_call->is_homozygous || $x_call->is_homozygous_complement;
+    my $y_hom = $y_call->is_homozygous || $y_call->is_homozygous_complement;
+    if ($x_call->is_call && $x_hom) {
+        if (!($y_call->is_call)) { # female
+            $genotype = $x_call->genotype;
+            $is_call = 1;
+        } elsif ($y_hom) { # male
+            my $x_allele = substr($x_call->genotype, 0, 1);
+            my $y_allele = substr($y_call->genotype, 0, 1);
+            $genotype = $x_allele.$y_allele;
+            $is_call = 1;
+        }
+    } elsif (!$x_call->is_call && !$y_call->is_call) { # no data
+        $genotype = 'NN';
+    }
+    unless ($genotype) {
+        $self->logwarn("Cannot construct genotype for merged ",
+                       "gender marker call, with calls: '",
+                       $x_call->str, "', '",
+                       $y_call->str, "'; assigning no call.");
+        $genotype = 'NN';
+    }
+    return WTSI::NPG::Genotyping::Call->new(
+        snp      => $gender_marker,
+        genotype => $genotype,
+        is_call  => $is_call
+    );
+}
+
 
 =head2 equivalent
 
