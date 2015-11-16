@@ -103,7 +103,7 @@ sub get_vcf_dataset {
             unless (defined($calls->{$snp->name}{$sample})) {
                 $self->logwarn("No call found for SNP '", $snp->name,
                                "' sample '", $sample, "'");
-                next; # FIXME warn, not croak if no call? renamed snp issue
+                next;
             }
             push @sample_calls, $calls->{$snp->name}{$sample};
         }
@@ -140,18 +140,13 @@ sub _build_reference {
 
 sub _gender_rows {
     # create X and Y DataRow objects for the given gender marker and calls
-    # we may have:
-    # - X call, Y no-call (female sample)
-    # - X call, Y call (male sample)
-    # - X no-call, Y no-call (unknown gender)
     my ($self, $snp, $calls) = @_;
     my (@x_calls, @y_calls);
     foreach my $call (@{$calls}) {
         # output two data rows, for X and Y respectively
-        # each row requires a list of calls
-        my ($x_call, $y_call) = @{$call->xy_call_pair()};
-        push @x_calls, $x_call;
-        push @y_calls, $y_call;
+        # use attributes of GenderMarkerCall
+        push @x_calls, $call->x_call;
+        push @y_calls, $call->y_call;
     }
     my $x_row = WTSI::NPG::Genotyping::VCF::DataRow->new(
         snp             => $snp->x_marker,
@@ -216,10 +211,22 @@ sub _parse_assay_results {
                     genotype => $ar->canonical_call()
                 );
             }
+            if (defined($calls{$vcf_snp_id}{$sample_id})) {
+                my $other_call = $calls{$vcf_snp_id}{$sample_id};
+                # FIXME correctly merge duplicate calls
+                # cf. get_calls in Fluidigm::Subscriber
+                if (!($calls{$vcf_snp_id}{$sample_id}->equivalent($call))) {
+                    $self->logwarn("Conflicting calls for SNP '", $vcf_snp_id,
+                                   "', sample '", $sample_id, "'");
+                } else {
+                    $self->info("Redundant calls for SNP '", $vcf_snp_id,
+                                "', sample '", $sample_id, "'");
+                }
+            }
             $calls{$vcf_snp_id}{$sample_id} = $call;
         }
     }
-    if ($controls > 0) { 
+    if ($controls > 0) {
         my $msg = "Found ".$controls." controls out of ".
             scalar(@{$self->resultsets()})." samples.";
         $self->info($msg);

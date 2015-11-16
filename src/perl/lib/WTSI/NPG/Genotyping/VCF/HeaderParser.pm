@@ -4,11 +4,9 @@ package WTSI::NPG::Genotyping::VCF::HeaderParser;
 
 use Moose;
 
-extends 'WTSI::NPG::Genotyping::VCF::Parser';
-
 use WTSI::NPG::Genotyping::VCF::Header;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::VCF::Parser';
 
 has 'sample_names' =>
    (is             => 'ro',

@@ -4,15 +4,13 @@ package WTSI::NPG::Genotyping::VCF::DataRowParser;
 
 use Moose;
 
-extends 'WTSI::NPG::Genotyping::VCF::Parser';
-
 use MooseX::Types::Moose qw(Int);
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::VCF::Parser';
 
 has 'snpset'  =>
    (is            => 'ro',

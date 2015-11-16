@@ -3,6 +3,7 @@ use utf8;
 package WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 use Moose;
+use Set::Scalar;
 use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::Genotyping::VCF::Header;
 
@@ -157,47 +158,57 @@ sub _find_calls {
     # if necessary, merge DataRows for X and Y markers into GenderMarker calls
     my ($self) = @_;
     my @all_calls;
-    my %x_y_calls;
+    my %x_row_calls;
+    my %y_row_calls;
     foreach my $row (@{$self->data}) {
         my $is_x = $row->snp->is_XMarker;
         my $is_y = $row->snp->is_YMarker;
+        my $key = $row->snp->name;
         if ($self->merge_x_y_markers && ($is_x || $is_y)) {
-            my $key = $row->snp->name;
-            if (exists $x_y_calls{$key}) {
-                # Remove from working hash on finding a pair
-                my $other_calls = delete $x_y_calls{$key};
-                my $calls = $row->calls;
-
-                my @merged_calls;
-                my $total = scalar @{$calls};
-                if ($total != scalar @{$other_calls}) {
-                    $self->logconfess("Cannot merge gender marker call ",
-                                      "lists of different lengths");
+            if ($is_x) {
+                if (defined($x_row_calls{$key})) {
+                    $self->logconfess("Multiple X markers named ", $key, "'");
                 }
-                for (my $i=0;$i<$total;$i++) {
-                    my $call = $calls->[$i];
-                    my $other_call = $other_calls->[$i];
-                    # merge method does sanity checks on markers & genotypes
-                    my $merged = $call->merge_x_y_markers($other_call);
-                    push @merged_calls, $merged;
+                $x_row_calls{$key} = $row->calls;
+            }
+            if ($is_y) {
+                if (defined($y_row_calls{$key})) {
+                    $self->logconfess("Multiple Y markers named ", $key, "'");
                 }
-                push @all_calls, \@merged_calls;
-
-            } else {
-                $x_y_calls{$key} = $row->calls;
+                $y_row_calls{$key} = $row->calls;
             }
         } else {
             push @all_calls, $row->calls;
         }
     }
-    # now check for orphans (remaining unpaired markers)
-    if (%x_y_calls) {
-        $self->logconfess("Orphan X or Y call rows for [",
-                          join(', ', sort keys %x_y_calls), "] in ",
-                          "VCF dataset");
+    # now pair up X/Y calls to create GenderMarkerCalls
+    my $x_name_set = Set::Scalar->new(keys %x_row_calls);
+    my $y_name_set = Set::Scalar->new(keys %y_row_calls);
+    unless ($x_name_set->is_equal($y_name_set)) {
+        $self->logconfess("Cannot complete X/Y pairs; orphan names from ",
+                          "X markers [", join(', ', keys(%x_row_calls)),
+                          "], Y markers [", join(', ', keys(%y_row_calls)),
+                          "]");
+    }
+    foreach my $key (keys %x_row_calls) { # for each variant name
+        my @merged_calls;
+        my @x_calls = @{$x_row_calls{$key}};
+        my @y_calls = @{$y_row_calls{$key}};
+        my $total = scalar @x_calls;
+        unless ($total == scalar @y_calls) {
+            $self->logconfess("Cannot merge X/Y marker call ",
+                              "lists of different lengths");
+        }
+        for (my $i=0;$i<$total;$i++) {
+            my $call =  WTSI::NPG::Genotyping::GenderMarkerCall->new(
+                x_call => $x_calls[$i],
+                y_call => $y_calls[$i]
+            );
+            push @merged_calls, $call;
+        }
+        push @all_calls, \@merged_calls;
     }
     return \@all_calls;
-
 }
 
 sub _sort_output_lines {

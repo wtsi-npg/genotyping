@@ -2,7 +2,7 @@ use utf8;
 
 package WTSI::NPG::Genotyping::VCF::Parser;
 
-use Moose;
+use Moose::Role;
 
 use Text::CSV;
 
@@ -56,8 +56,6 @@ sub _field_index {
         $self->logcroak("Invalid name for VCF field: '", $name, "'");
     }
 }
-
-__PACKAGE__->meta->make_immutable;
 
 no Moose;
 
