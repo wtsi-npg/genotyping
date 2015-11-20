@@ -11,7 +11,7 @@ use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use Test::Exception;
-use Test::More tests => 68;
+use Test::More tests => 64;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -278,47 +278,6 @@ sub merge : Test(9) {
     # test conflicting snps
     dies_ok(sub {$call->merge($other_snp_call)}, 'Dies on non-equal SNPs' );
 }
-
-sub merge_x_y: Test(4) {
-    # merge of x_marker and y_marker call to form a gender_marker call
-
-    my $snpset = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
-
-    my $gm_snp = $snpset->named_snp('GS34251');
-    my $call_m = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp,
-         genotype => 'TC', # het = male sample
-         is_call  => 1);
-    my $x_call_m = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp->x_marker,
-         genotype => 'TT',
-         is_call  => 1);
-    my $y_call_m = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp->y_marker,
-         genotype => 'CC',
-         is_call  => 1);
-    ok($x_call_m->merge_x_y_markers($y_call_m), 'Merged male X & Y calls');
-    my $merged_call_m = $x_call_m->merge_x_y_markers($y_call_m);
-    ok($call_m->equivalent($merged_call_m),
-       'Original and merged calls equivalent');
-    my $call_f = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp,
-         genotype => 'TT', # hom in X allele = female sample
-         is_call  => 1);
-    my $x_call_f = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp->x_marker,
-         genotype => 'TT',
-         is_call  => 1);
-    my $y_call_f = WTSI::NPG::Genotyping::Call->new
-        (snp      => $gm_snp->y_marker,
-         genotype => 'NN',
-         is_call  => 0);
-    ok($x_call_f->merge_x_y_markers($y_call_f), 'Merged female X & Y calls');
-    my $merged_call_f = $x_call_f->merge_x_y_markers($y_call_f);
-    ok($call_f->equivalent($merged_call_f),
-       'Original and merged calls equivalent');
-}
-
 
 sub equivalent : Test(15) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");

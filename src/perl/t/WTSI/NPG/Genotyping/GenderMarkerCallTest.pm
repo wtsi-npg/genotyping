@@ -6,12 +6,13 @@ use List::AllUtils qw(all);
 
 use base qw(Test::Class);
 use Test::Exception;
-use Test::More tests => 24;
+use Test::More tests => 27;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 BEGIN { use_ok('WTSI::NPG::Genotyping::GenderMarkerCall'); }
 
+use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::GenderMarkerCall;
 use WTSI::NPG::Genotyping::SNPSet;
 
@@ -22,7 +23,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::GenderMarkerCall');
 }
 
-sub constructor : Test(4) {
+sub constructor : Test(7) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
   my $snp = $snpset->named_snp('GS34251');
   new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
@@ -37,6 +38,36 @@ sub constructor : Test(4) {
   new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
          [genotype => 'CT',
           snp      => $snp]); # can have a het call for a male sample
+  my $x_call = WTSI::NPG::Genotyping::Call->new(
+      snp      => $snp->x_marker,
+      genotype => 'TT'
+  );
+  my $y_call = WTSI::NPG::Genotyping::Call->new(
+      snp      => $snp->y_marker,
+      genotype => 'CC'
+  );
+  # alternate constructor arguments
+  new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
+         [x_call => $x_call,
+          y_call => $y_call]);
+  my $y_no_call = WTSI::NPG::Genotyping::Call->new(
+      snp      => $snp->y_marker,
+      genotype => 'NN',
+      is_call  => 0
+  );
+  new_ok('WTSI::NPG::Genotyping::GenderMarkerCall',
+         [x_call => $x_call,
+          y_call => $y_no_call]);
+  dies_ok{
+      WTSI::NPG::Genotyping::GenderMarkerCall->new(
+          genotype => 'TT',
+          snp      => $snp,
+          x_call   => $x_call,
+          y_call   => $y_call
+      );
+
+  } "Dies with too many arguments to constructor";
+
 }
 
 sub equivalent : Test(8) {

@@ -204,7 +204,7 @@ sub _query_irods {
     my ($resultset_hashref, $vcf_metadata) =
       $subscriber->get_assay_resultsets_and_vcf_metadata($sample_ids);
 
-    # unpack the resultset hashref from Subscriber.pm
+    # unpack hashref from Subscriber.pm into an array of resultsets
     # TODO exploit ability of Subscriber.pm to find multiple resultsets for each sample
     my @resultsets;
     foreach my $sample (keys %{$resultset_hashref}) {

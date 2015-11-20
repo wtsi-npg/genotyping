@@ -138,6 +138,43 @@ sub _build_reference {
   return join ',', @ref_names;
 }
 
+sub _call_from_assay_result {
+    my ($self, $ar, $renaming) = @_;
+    # use 'npg' methods to get snp, sample, call in standard format
+    my $assay_snp_id = $ar->snp_assayed();
+    my $vcf_snp_id = $renaming->{$assay_snp_id};
+    # handles SNP renaming between different versions of same snpset
+    if (!defined($vcf_snp_id)) {
+        $self->logcroak("Cannot find assay SNP '",
+                        $assay_snp_id, "' in VCF snpset");
+    }
+    my $vcf_snp = $self->vcf_snpset->named_snp($vcf_snp_id);
+    my $call;
+    my $qscore = $ar->qscore();
+    # * Using $ar->qscore() in place of $qscore in the
+    # constructor does not work!
+    # * The $ar->qscore() is not correctly interpolated into the
+    # argument list, and the constructor dies because the argument
+    # list has an odd number of elements
+    # * TODO try to reproduce this error in a simplified test case
+    #
+    # AssayResult for GenderMarker has het genotype for male, hom for female
+    if (is_GenderMarker($vcf_snp)) {
+        $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
+            snp      => $vcf_snp,
+            qscore   => $qscore,
+            genotype => $ar->canonical_call()
+        );
+    } else {
+        $call = WTSI::NPG::Genotyping::Call->new(
+            snp      => $vcf_snp,
+            qscore   => $qscore,
+            genotype => $ar->canonical_call()
+        );
+    }
+    return $call;
+}
+
 sub _gender_rows {
     # create X and Y DataRow objects for the given gender marker and calls
     my ($self, $snp, $calls) = @_;
@@ -172,7 +209,6 @@ sub _parse_assay_results {
     foreach my $resultSet (@{$self->resultsets()}) {
         foreach my $ar (@{$resultSet->assay_results()}) {
             # foreach AssayResult (Sequenom or Fluidigm)
-            # use 'npg' methods to get snp, sample, call in standard format
             if ($ar->is_empty()) { next; }
             my $assay_adr = $ar->assay_address();
             if ($ar->is_control()) {
@@ -182,48 +218,16 @@ sub _parse_assay_results {
             }
             my $sample_id = $ar->canonical_sample_id();
             $samples{$sample_id} = 1;
-            my $assay_snp_id = $ar->snp_assayed();
-            my $vcf_snp_id = $renaming->{$assay_snp_id};
-            # handles SNP renaming, eg. rs3177980 -> rs3177980
-            if (!defined($vcf_snp_id)) {
-                $self->logcroak("Cannot find assay SNP '",
-                                $assay_snp_id, "' in VCF snpset");
-            }
-            my $vcf_snp = $self->vcf_snpset->named_snp($vcf_snp_id);
-            my $call;
-            my $qscore = $ar->qscore();
-            # * Using $ar->qscore() in place of $qscore in the
-            # constructor does not work!
-            # * The $ar->qscore() is not correctly interpolated into the
-            # argument list, and the constructor dies because the argument
-            # list has an odd number of elements
-            # * TODO try to reproduce this error in a simplified test case
-            if (is_GenderMarker($vcf_snp)) {
-                $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
-                    snp      => $vcf_snp,
-                    qscore   => $qscore,
-                    genotype => $ar->canonical_call()
-                );
-            } else {
-                $call = WTSI::NPG::Genotyping::Call->new(
-                    snp      => $vcf_snp,
-                    qscore   => $qscore,
-                    genotype => $ar->canonical_call()
-                );
-            }
-            if (defined($calls{$vcf_snp_id}{$sample_id})) {
-                my $other_call = $calls{$vcf_snp_id}{$sample_id};
-                # FIXME correctly merge duplicate calls
+            my $call = $self->_call_from_assay_result($ar, $renaming);
+            if (defined($calls{$call->snp->name}{$sample_id})) {
+                # Current implementation keeps the first call with a
+                # given SNP and sample ID, discards any others
+                # TODO correctly output duplicate calls in VCF
                 # cf. get_calls in Fluidigm::Subscriber
-                if (!($calls{$vcf_snp_id}{$sample_id}->equivalent($call))) {
-                    $self->logwarn("Conflicting calls for SNP '", $vcf_snp_id,
-                                   "', sample '", $sample_id, "'");
-                } else {
-                    $self->info("Redundant calls for SNP '", $vcf_snp_id,
-                                "', sample '", $sample_id, "'");
-                }
+                $self->logwarn("Multiple calls for SNP '", $call->snp->name,
+                               "', sample '", $sample_id, "'");
             }
-            $calls{$vcf_snp_id}{$sample_id} = $call;
+            $calls{$call->snp->name}{$sample_id} = $call;
         }
     }
     if ($controls > 0) {

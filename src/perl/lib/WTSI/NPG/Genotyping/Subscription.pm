@@ -234,7 +234,7 @@ sub find_object_paths {
 
   Arg [1]    : ArrayRef[AssayResultSet] of QC plex AssayResultSets
   Arg [2]    : ArrayRef[Str] of sample identifiers
-  Example    : my @object_paths = $sub->find_object_paths();
+  Example    : my $ri = $sub->find_resultsets_index($resultsets, $sample_ids);
   Description: Index the results by sample identifier. The identifier is
                guaranteed to be present in the metadata because it was in the
                search criteria. No assumptions can be made about the order in
