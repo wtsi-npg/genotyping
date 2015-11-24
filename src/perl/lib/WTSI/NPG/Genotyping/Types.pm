@@ -13,6 +13,7 @@ use MooseX::Types -declare =>
       ArrayRefOfReference
       ArrayRefOfResultSet
       ArrayRefOfVariant
+      Call
       DNABase
       DNAStrand
       FluidigmResultSet
@@ -37,7 +38,9 @@ use MooseX::Types -declare =>
       SNPSet
       Variant
       XMarker
+      XMarkerCall
       YMarker
+      YMarkerCall
     )
   ];
 
@@ -107,6 +110,7 @@ class_type SequenomResultSet, {
 subtype ResultSet,
   as FluidigmResultSet | SequenomResultSet;
 
+class_type Call,         { class => 'WTSI::NPG::Genotyping::Call' };
 class_type GenderMarker, { class => 'WTSI::NPG::Genotyping::GenderMarker' };
 class_type Reference,    { class => 'WTSI::NPG::Genotyping::Reference' };
 class_type SNP,          { class => 'WTSI::NPG::Genotyping::SNP' };
@@ -126,6 +130,18 @@ subtype YMarker,
   where { is_HsapiensY($_->chromosome) },
   message { $_->name . ' on ' . $_->chromosome .
               ' is not a valid Y chromosome marker' };
+
+subtype XMarkerCall,
+  as Call,
+  where { is_XMarker($_->snp) },
+  message { 'Call for variant '.$_->snp->name . ' on ' . $_->snp->chromosome.
+                ' is not a valid X chromosome marker call' };
+
+subtype YMarkerCall,
+  as Call,
+  where { is_YMarker($_->snp) },
+  message { 'Call for variant '.$_->snp->name . ' on ' . $_->snp->chromosome.
+                ' is not a valid Y chromosome marker call' };
 
 subtype ArrayRefOfReference,
   as ArrayRef[Reference];

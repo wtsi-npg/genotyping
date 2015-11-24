@@ -4,15 +4,13 @@ package WTSI::NPG::Genotyping::VCF::DataRowParser;
 
 use Moose;
 
-extends 'WTSI::NPG::Genotyping::VCF::Parser';
-
 use MooseX::Types::Moose qw(Int);
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::VCF::Parser';
 
 has 'snpset'  =>
    (is            => 'ro',
@@ -160,12 +158,15 @@ sub _parse_data_row {
     my $snp_name = $fields[$self->_field_index('VARIANT_NAME')];
     my $snp = $self->snpset->named_snp($snp_name);
     # TODO: do (chromosome, position) match in manifest and VCF file?
-    # Problem: Different chromosome naming conventions, eg. Chr1 vs. 1
+    # Chromosome names should be consistent if references are consistent
     my @calls;
     my $i = $self->_field_index('SAMPLE_START');
     while ($i < scalar @fields) {
         my $variant;
         if (is_GenderMarker($snp)) {
+            # The X and Y components of a GenderMarker make up two separate
+            # rows in a VCF file. The X/Y calls are collated into
+            # GenderMarker calls by the VCFDataSet class.
             my $chromosome = $fields[$self->_field_index('CHROMOSOME')];
             if (is_HsapiensX($chromosome)) {
                 $variant = $snp->x_marker;

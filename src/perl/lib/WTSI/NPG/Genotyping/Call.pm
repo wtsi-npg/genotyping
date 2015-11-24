@@ -5,6 +5,7 @@ package WTSI::NPG::Genotyping::Call;
 
 use Moose;
 
+use WTSI::NPG::Genotyping::GenderMarker;
 use WTSI::NPG::Genotyping::Types qw(:all);
 
 our $VERSION = '';
@@ -34,34 +35,11 @@ has 'qscore'     =>
        " or undef if the score is missing or not defined");
 
 sub BUILD {
-  my ($self) = @_;
-
-  if ($self->genotype eq 'NN') {
-    $self->is_call(0);
-  }
-
-  if ($self->is_call) {
-    my $gt  = $self->genotype;
-    my $snp = $self->snp;
-    my $r = $snp->ref_allele;
-    my $a = $snp->alt_allele;
-
-    if ($self->is_complement) {
-      unless ($self->is_homozygous_complement ||
-              $self->is_heterozygous_complement) {
-        $self->logconfess("The complement genotype '$gt' is not possible ",
-                          "for SNP ", $snp->name, " which has ref allele '$r' ",
-                          "and alt allele '$a'");
-      }
+    my ($self) = @_;
+    if ($self->genotype eq 'NN') {
+        $self->is_call(0);
     }
-    else {
-      unless ($self->is_homozygous || $self->is_heterozygous) {
-        $self->logconfess("The genotype '$gt' is not possible ",
-                          "for SNP ", $snp->name, " which has ref allele '$r' ",
-                          "and alt allele '$a'");
-      }
-    }
-  }
+    $self->_validate_genotype();
 }
 
 
@@ -282,6 +260,7 @@ sub merge {
   return $merged;
 }
 
+
 =head2 equivalent
 
   Arg [1]    : WTSI::NPG::Genotyping::Call
@@ -367,6 +346,35 @@ sub _complement {
   $genotype =~ tr/ACGTNacgtn/TGCANtgcan/;
   return $genotype;
 }
+
+sub _validate_genotype {
+    my ($self) = @_;
+    if ($self->is_call) {
+        my $gt = $self->genotype;
+        my $snp = $self->snp;
+        my $r = $snp->ref_allele;
+        my $a = $snp->alt_allele;
+        if ($self->is_complement) {
+            unless ($self->is_homozygous_complement ||
+                        $self->is_heterozygous_complement) {
+                $self->logconfess("The complement genotype '$gt' is not ",
+                                  "possible for SNP ", $snp->name,
+                                  " which has ref allele '$r' ",
+                                  "and alt allele '$a'");
+            }
+        }
+        else {
+            unless ($self->is_homozygous || $self->is_heterozygous) {
+                $self->logconfess("The genotype '$gt' is not ",
+                                  "possible for SNP ", $snp->name,
+                                  " which has ref allele '$r' ",
+                                  "and alt allele '$a'");
+            }
+        }
+    }
+    return 1;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

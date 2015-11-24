@@ -75,7 +75,6 @@ sub canonical_sample_id {
   return shift @names;
 }
 
-
 sub snpset_name {
   my ($self) = @_;
 
@@ -142,7 +141,31 @@ sub _build_assay_results {
 
   close $fh or $self->logwarn("Failed to close a string handle");
 
+  $records = $self->_remove_redundant_assay_results($records);
+
   return $records;
+}
+
+sub _remove_redundant_assay_results {
+    # discard any AssayResults which differ only by the 'allele' field
+    # The 'allele' field:
+    # - records the reference allele
+    # - is not used in subsequent creation of Call objects
+    # - is redundant given the assay_id and snpset manifest
+    my ($self, $raw_results) = @_;
+    my @raw_results = @{$raw_results};
+    my @unique_results;
+    foreach my $ar_i (@raw_results) {
+        my $unique = 1;
+        foreach my $ar_j (@unique_results) {
+            if ($ar_i->equivalent_within_allele($ar_j)) {
+                $unique = 0;
+                last;
+            }
+        }
+        if ($unique) { push @unique_results, $ar_i; }
+    }
+    return \@unique_results;
 }
 
 sub _parse_assay_results {

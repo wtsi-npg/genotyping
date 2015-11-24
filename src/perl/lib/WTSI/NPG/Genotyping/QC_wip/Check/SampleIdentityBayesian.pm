@@ -229,13 +229,14 @@ sub to_json_spec {
                 concordance => sprintf("%.4f", $self->concordance));
     my %genotypes;
     # for each SNP, record production call and (zero or more) QC calls
+    my $not_found = 0;
     foreach my $snp (@{$self->snpset->snps}) {
         my $snp_name = $snp->name;
         my $production_call = $self->production_calls_by_snp->{$snp_name};
         my $qc_calls = $self->qc_calls_by_snp->{$snp_name};
-        if (defined($production_call) && defined($qc_calls)) {
-            my @qc_genotypes;
-            foreach my $call_q (@{$qc_calls}) {
+        if (defined($production_call)) {
+            my @qc_genotypes = ();
+            foreach my $call_q (@{$qc_calls}) { # QC calls may be empty
                 push @qc_genotypes, $call_q->genotype;
             }
             $genotypes{$snp_name} = {
@@ -243,9 +244,14 @@ sub to_json_spec {
                 'qc' => \@qc_genotypes,
             }
         } else {
-            $self->info("Call data not found for SNP '", $snp_name,
-                        "', sample '", $self->sample_name, "'");
+            $not_found++;
+            $self->debug("Call data not found for SNP '", $snp_name,
+                         "', sample '", $self->sample_name, "'");
         }
+    }
+    if ($not_found > 0) {
+        $self->info("Call data not found for ", $not_found,
+                    " SNPs on sample '", $self->sample_name, "'");
     }
     $spec{genotypes} = \%genotypes;
     return \%spec;
@@ -329,7 +335,9 @@ sub _count_calls {
             if (!$snp->equals($call_q->snp)) {
                 $self->logcroak("Non-equivalent SNPs in identity ",
                                 "count for production SNP '",
-                                $snp->name, "'");
+                                $snp->name, "', calls: ", $call_p->str,
+                                $call_q->str
+                            );
             } elsif (!$call_p->is_call || !$call_q->is_call) {
                 next;
             } elsif ($call_p->equivalent($call_q)) {

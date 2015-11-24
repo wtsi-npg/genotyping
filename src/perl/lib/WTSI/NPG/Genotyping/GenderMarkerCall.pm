@@ -4,6 +4,8 @@ use utf8;
 package WTSI::NPG::Genotyping::GenderMarkerCall;
 
 use Moose;
+use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::GenderMarker;
 
 extends 'WTSI::NPG::Genotyping::Call';
 
@@ -19,9 +21,32 @@ our $MALE_GENDER = 2;
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'snp' =>
+  (is        => 'ro',
+   isa       => GenderMarker,
+   lazy      => 1,
+   builder   => '_build_snp'
+);
+
+has 'genotype' =>
+  (is        => 'ro',
+   isa       => SNPGenotype,
+   lazy      => 1,
+   builder   => '_build_genotype'
+);
+
+has 'x_call' =>
+  (is        => 'ro',
+   isa       => XMarkerCall,
+   lazy      => 1,
+   builder   => '_build_x_call'
+);
+
+has 'y_call' =>
   (is       => 'ro',
-   isa      => GenderMarker,
-   required => 1);
+   isa      => YMarkerCall,
+   lazy      => 1,
+   builder   => '_build_y_call'
+);
 
 has '_gender' =>
     (is      => 'ro',
@@ -29,6 +54,31 @@ has '_gender' =>
      lazy    => 1,
      builder => '_build_gender',
      init_arg => undef);
+
+# unlike parent class, SNP and genotype are not required arguments
+# must supply EITHER snp, genotype OR x_call, y_call
+
+sub BUILD {
+    my ($self, $args) = @_;
+    my $valid = 0;
+    if (defined($args->{'x_call'}) && defined($args->{'y_call'})) {
+        if (!(defined($args->{'genotype'}) || defined($args->{'snp'}))) {
+            $valid = 1;
+        }
+    } elsif (defined($args->{'genotype'}) && defined($args->{'snp'})) {
+        if (!(defined($args->{'x_call'}) || defined($args->{'y_call'}))) {
+            $valid = 1;
+        }
+    }
+    # die if arguments are invalid
+    unless ($valid) {
+        $self->logconfess( "Invalid arguments to GenderMarkerCall ",
+                           "constructor: Must supply either snp and ",
+                           "genotype, or x_call and y_call, but not both");
+    }
+    # now check validity of genotype (input, or derived from x/y calls)
+    $self->_validate_genotype(); # method of parent class
+}
 
 =head2 complement
 
@@ -100,71 +150,6 @@ sub is_male {
     else { return 0; }
 }
 
-
-=head2 xy_call_pair
-
-  Arg [1]    : None
-
-  Example    : $call_pair = $gender_marker_call->xy_call_pair()
-  Description: Return Call objects for the X and Y markers belonging to
-               this GenderMarker. A male sample will have calls for both
-               X and Y; a female will have a call for X and no-call for Y.
-               A sample of unknown gender will return two no-calls.
-  Returntype : ArrayRef[WTSI::NPG::Genotyping::Call]
-
-=cut
-
-sub xy_call_pair {
-    my ($self) = @_;
-    my @calls;
-    my $x_base = $self->snp->x_allele();
-    my $y_base = $self->snp->y_allele();
-    if ($self->is_female()) {
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->x_marker,
-            genotype => $x_base.$x_base,
-            qscore   => $self->qscore,
-        ));
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->y_marker,
-            genotype => $NULL_GENOTYPE,
-            is_call  => 0,
-        ));
-    } elsif ($self->is_male()) {
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->x_marker,
-            genotype => $x_base.$x_base,
-            qscore   => $self->qscore,
-        ));
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->y_marker,
-            genotype => $y_base.$y_base,
-            qscore   => $self->qscore,
-        ));
-    } else {
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->x_marker,
-            genotype => $NULL_GENOTYPE,
-            is_call  => 0,
-        ));
-        push(@calls, WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->y_marker,
-            genotype => $NULL_GENOTYPE,
-            is_call  => 0,
-        ));
-    }
-    if ($self->snp->strand eq '-') {
-        my @complemented_calls;
-        foreach my $call (@calls) {
-            push @complemented_calls, $call->complement();
-        }
-        return \@complemented_calls;
-    } else {
-        return \@calls;
-    }
-}
-
-
 sub _build_gender {
     # find the gender, taking into account forward/reverse strand
     my ($self) = @_;
@@ -183,6 +168,88 @@ sub _build_gender {
     return $gender;
 }
 
+sub _build_genotype {
+    # find genotype from X and Y call inputs
+    my ($self) = @_;
+    my $genotype;
+    my $is_call = 1;
+    if (!($self->x_call->is_call)) { # no call
+        $is_call = 0;
+        $genotype = $NULL_GENOTYPE;
+    } elsif ($self->y_call->is_call) { # male call
+        my $x_allele = substr($self->x_call->genotype, 0, 1);
+        my $y_allele = substr($self->y_call->genotype, 0, 1);
+        $genotype = $x_allele.$y_allele;
+    } else { # female call
+        $genotype = $self->x_call->genotype;
+    }
+    return $genotype;
+}
+
+sub _build_snp {
+    my ($self) = @_;
+    if ($self->x_call->snp->name ne $self->y_call->snp->name) {
+        $self->logconfess("Mismatched SNP names: X = '",
+                          $self->x_call->snp->name, "', Y = '",
+                          $self->y_call->snp->name, "'"
+                      );
+    }
+    my $x_strand = $self->x_call->snp->strand;
+    my $y_strand = $self->y_call->snp->strand;
+    if ($x_strand ne $y_strand) {
+        $self->logconfess("Mismatched strand directions for input ",
+                          "X and Y markers");
+    }
+    my %args = (
+        name     => $self->x_call->snp->name,
+        x_marker => $self->x_call->snp,
+        y_marker => $self->y_call->snp,
+    );
+    if (defined($x_strand)) { $args{'strand'} = $x_strand; }
+    return WTSI::NPG::Genotyping::GenderMarker->new(%args);
+}
+
+sub _build_x_call {
+    my ($self) = @_;
+    my $x_call;
+    my $x_base = $self->snp->x_allele();
+    if ($self->is_female() || $self->is_male()) {
+        $x_call = WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->x_marker,
+            genotype => $x_base.$x_base,
+            qscore   => $self->qscore,
+        );
+    } else {
+        $x_call = WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->x_marker,
+            genotype => $NULL_GENOTYPE,
+            is_call  => 0,
+        );
+    }
+    if ($self->is_complement) { $x_call = $x_call->complement; }
+    return $x_call;
+}
+
+sub _build_y_call {
+    my ($self) = @_;
+    my $y_call;
+    my $y_base = $self->snp->y_allele();
+    if ($self->is_male()) {
+        $y_call = WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->y_marker,
+            genotype => $y_base.$y_base,
+            qscore   => $self->qscore,
+        );
+    } else {
+        $y_call = WTSI::NPG::Genotyping::Call->new(
+            snp      => $self->snp->y_marker,
+            genotype => $NULL_GENOTYPE,
+            is_call  => 0,
+        );
+    }
+    if ($self->is_complement) { $y_call = $y_call->complement; }
+    return $y_call;
+}
 
 __PACKAGE__->meta->make_immutable;
 
@@ -199,9 +266,38 @@ WTSI::NPG::Genotyping::GenderMarkerCall
 =head1 DESCRIPTION
 
 Extension of the WTSI::NPG::Genotyping::Call class to handle gender markers.
-The input variant is required to be of the GenderMarker type. Includes methods
-to determine whether the call is consistent with an X (female) or Y (male)
-variant.
+
+=head2 Motivation
+
+In genotyping, a gender marker consists of two SNP variants, one each on
+the X and Y chromosome. The X variant is expected to be homozygous in
+females. The two variants together are used to evaluate whether a sample is
+male or female.
+
+There are two ways of representing a call on a gender marker:
+1) Joined: Record the gender marker name and a concatenated genotype, which
+will be homozygous for a female sample and heterozygous for a male sample.
+In the latter case, the major and minor alleles are respectively from the
+X and Y variants.
+2) Split: Record the X and Y variants and their genotypes separately. The
+variants have the same name, but different chromosome and position.
+
+Format 1) is used in results from Sequenom/Fluidigm, and in the Plink
+output from the genotyping pipeline. Format 2) is required by VCF, in which
+each variant must have a single chromosome and position.
+
+=head2 Use cases: 'Split' and 'Join' operations
+
+In order to write Sequenom/Fluidigm calls as VCF, we convert from joined to
+split format in WTSI::NPG::Genotyping::VCF::AssayResultParser. This is done
+by simply using the x_call and y_call attributes of a GenderMarkerCall.
+
+In order to read VCF genotypes and compare with Plink output for the
+identity check, we convert from split to joined format in
+WTSI::NPG::Genotyping::VCF::VCFDataSet. This is done by collating the X and
+Y marker calls read from VCF input, then using the X and Y calls on a given
+GenderMarker to construct a GenderMarkerCall.
+
 
 =head1 AUTHOR
 
