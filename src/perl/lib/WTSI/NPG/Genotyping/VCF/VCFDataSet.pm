@@ -4,6 +4,7 @@ package WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 use Moose;
 use Set::Scalar;
+use WTSI::NPG::Genotyping::GenderMarkerCall;
 use WTSI::NPG::Genotyping::VCF::DataRow;
 use WTSI::NPG::Genotyping::VCF::Header;
 
@@ -200,7 +201,7 @@ sub _find_calls {
                               "lists of different lengths");
         }
         for (my $i=0;$i<$total;$i++) {
-            my $call =  WTSI::NPG::Genotyping::GenderMarkerCall->new(
+            my $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                 x_call => $x_calls[$i],
                 y_call => $y_calls[$i]
             );

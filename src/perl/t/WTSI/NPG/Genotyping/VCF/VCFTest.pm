@@ -10,7 +10,7 @@ use File::Slurp qw /read_file/;
 use File::Spec::Functions qw/catfile/;
 use File::Temp qw(tempdir);
 use JSON;
-use Test::More tests => 182;
+use Test::More;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -32,21 +32,15 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 
 our $REFERENCE_NAME = 'Homo_sapiens (GRCh37_53)';
 
-BEGIN {
-    use_ok('WTSI::NPG::Genotyping::VCF::AssayResultParser');
-    use_ok('WTSI::NPG::Genotyping::VCF::DataRow');
-    use_ok('WTSI::NPG::Genotyping::VCF::DataRowParser');
-    use_ok('WTSI::NPG::Genotyping::VCF::Header');
-    use_ok('WTSI::NPG::Genotyping::VCF::HeaderParser');
-    use_ok('WTSI::NPG::Genotyping::VCF::GtcheckWrapper');
-    use_ok('WTSI::NPG::Genotyping::VCF::Parser');
-    use_ok('WTSI::NPG::Genotyping::VCF::Slurper');
-    use_ok('WTSI::NPG::Genotyping::VCF::VCFDataSet');
-}
-
 use WTSI::NPG::Genotyping::Call;
+use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
+use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
+use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::VCF::AssayResultParser;
+use WTSI::NPG::Genotyping::VCF::DataRowParser;
+use WTSI::NPG::Genotyping::VCF::HeaderParser;
 use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
+use WTSI::NPG::Genotyping::VCF::Slurper;
 
 my $data_path = './t/vcf';
 my $sequenom_snpset_name = 'W30467_snp_set_info_GRCh37.tsv';
@@ -199,8 +193,6 @@ sub fluidigm_irods_test : Test(7) {
 sub header_test : Test(4) {
     # test the contig_to_string and parse_contig_line methods of Header.pm
     my $samples = ['foo', 'bar'];
-    my %contigs = (1 => 249250621,
-                   2 => 243199373);
     my @contig_strings = (
         '<ID=1,length=249250621,species="Homo sapiens">',
         '<ID=2,length=243199373,species="Homo sapiens">',
@@ -450,6 +442,62 @@ sub slurp_test : Test(7) {
     my $dataset_alt_names = $slurper_alt_names->read_dataset();
     isa_ok($dataset_alt_names, 'WTSI::NPG::Genotyping::VCF::VCFDataSet');
     close $fh || die "Cannot close VCF $vcf_fluidigm";
+}
+
+
+sub vcf_dataset_test: Test(4) {
+    my $samples = ['foo', 'bar'];
+    my @contig_strings = (
+        '<ID=1,length=249250621,species="Homo sapiens">',
+        '<ID=2,length=243199373,species="Homo sapiens">',
+    );
+    my %metadata = (reference => [ $reference_vcf_meta, ],
+                    source    => [ 'WTSI_NPG_genotyping_pipeline', ],
+                    contig    => \@contig_strings,
+                );
+    my $header = WTSI::NPG::Genotyping::VCF::Header->new(
+        sample_names => $samples,
+        metadata     => \%metadata,
+        );
+    my $manifest = "$data_path/W30467_snp_set_info_GRCh37.tsv";
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($manifest);
+    my $snp = $snpset->named_snp('rs649058');
+    my $call_1 = WTSI::NPG::Genotyping::Call->new(
+        snp => $snp, genotype => 'AA'
+    );
+    my $call_2 = WTSI::NPG::Genotyping::Call->new(
+        snp => $snp, genotype => 'GA'
+    );
+    my $gm = $snpset->named_snp('GS34251'); # gendermarker
+    my $call_3 = WTSI::NPG::Genotyping::Call->new(
+        snp => $gm->x_marker, genotype => 'TT'
+    );
+    my $call_4 = WTSI::NPG::Genotyping::Call->new(
+        snp => $gm->x_marker, genotype => 'TT'
+    );
+    my $call_5 = WTSI::NPG::Genotyping::Call->new(
+        snp => $gm->y_marker, genotype => 'CC'
+    );
+    my $call_6 = WTSI::NPG::Genotyping::Call->new(
+        snp => $gm->y_marker, genotype => 'NN', is_call => 0,
+    );
+    new_ok('WTSI::NPG::Genotyping::VCF::DataRow',
+           [calls => [$call_1, $call_2]]);
+    my $data_rows = [
+        WTSI::NPG::Genotyping::VCF::DataRow->new(calls => [$call_1, $call_2]),
+        WTSI::NPG::Genotyping::VCF::DataRow->new(calls => [$call_3, $call_4]),
+        WTSI::NPG::Genotyping::VCF::DataRow->new(calls => [$call_5, $call_6]),
+    ];
+    new_ok('WTSI::NPG::Genotyping::VCF::VCFDataSet',
+           [header => $header, data => $data_rows ]);
+    my $dataset = WTSI::NPG::Genotyping::VCF::VCFDataSet->new(
+        header => $header,
+        data => $data_rows,
+    );
+    my %cbs = %{$dataset->calls_by_sample()};
+    is(scalar keys %cbs, 2, "2 samples found in VCFDataSet");
+    # X and Y calls have been merged into a GenderMarkerCall
+    is(scalar @{$cbs{'foo'}}, 2, "2 calls found for sample foo");
 }
 
 sub _read_without_filedate {
