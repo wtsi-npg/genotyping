@@ -8,13 +8,14 @@ Unreleased
 ----------
 
 Added:
+- Support for 12-digit barcodes on Infinium gene expression arrays,
+  retaining support for 10-digit barcodes.
 - Store QC plex calls in a VCF file instead of SQLite pipeline database
 - QC check modified to read from VCF instead of database
 - Find Fluidigm/Sequenom results in iRODS and write as VCF
 - Find genome reference path from iRODS metadata for VCF header; adds
-dependency on wtsi-npg/npg_tracking
+  dependency on wtsi-npg/npg_tracking
 
-<<<<<<< HEAD
 Release 1.11.4: 2015-10-09
 --------------------------
 
@@ -34,7 +35,6 @@ Fixed:
 =======
 Changed:
 - bcftools version upgraded to 1.2
->>>>>>> devel
 
 Release 1.11.2: 2015-08-24
 --------------------------
