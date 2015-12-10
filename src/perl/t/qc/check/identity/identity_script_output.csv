@@ -1,0 +1,7 @@
+sample_name,status,identity,concordance,total_calls,valid_calls,equivalent_calls
+urn:wtsi:000000_A00_DUMMY-SAMPLE,assayed,0.000000,0.0000,20,0,0
+urn:wtsi:249441_F11_HELIC5102138,assayed,1.000000,1.0000,20,20,20
+urn:wtsi:249442_C09_HELIC5102247,assayed,1.000000,1.0000,20,20,20
+urn:wtsi:249461_G12_HELIC5215300,assayed,0.999999,1.0000,20,10,10
+urn:wtsi:249469_H06_HELIC5274668,assayed,1.000000,1.0000,20,20,20
+urn:wtsi:249470_F02_HELIC5274730,assayed,0.924938,0.8000,20,20,16

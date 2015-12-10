@@ -30,6 +30,7 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##callset_name=sequenom
 ##plex_name=W30467
 ##plex_type=sequenom
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample001	sample002	sample003	sample004

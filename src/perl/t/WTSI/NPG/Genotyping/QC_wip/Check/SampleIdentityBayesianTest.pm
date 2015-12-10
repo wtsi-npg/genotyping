@@ -8,7 +8,7 @@ use File::Temp qw(tempdir);
 use JSON;
 
 use base qw(Test::Class);
-use Test::More tests => 4;
+use Test::More tests => 9;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::Call;
@@ -23,6 +23,8 @@ my $sample_name  = 'urn:wtsi:249442_C09_HELIC5102247';
 my $pass_threshold = 0.9;
 my ($qc_calls, $production_calls, $qc_calls_small, $production_calls_small);
 
+our @CALLSET_NAMES = qw/callset_bar callset_foo/;
+
 sub setup : Test(setup) {
 
     # copy-pasted from SampleIdentityTest.pm
@@ -30,7 +32,7 @@ sub setup : Test(setup) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
 
-  # Some fake QC data; x denotes a call mismatch when compared to the
+    # Some fake QC data; x denotes a call mismatch when compared to the
     # Plink data for the same sample
     my @qc_data = (['GS34251',    'TT'],
                    ['GS35205',    'TT'],
@@ -64,13 +66,21 @@ sub setup : Test(setup) {
                    ['rs753381',   'AG']  # AG
                );
 
-    my @qc_calls = map {
-        my ($snp, $genotype) = @$_;
-
-        WTSI::NPG::Genotyping::Call->new
-              (snp      => $snpset->named_snp($snp),
-               genotype => $genotype) } @qc_data;
-
+    my @qc_calls;
+    my $i = 0;
+    foreach my $input (@qc_data) {
+        my ($snp, $genotype) = @{$input};
+        my $callset_name;
+        if ($i<10) { $callset_name = $CALLSET_NAMES[0]; }
+        else { $callset_name = $CALLSET_NAMES[1]; }
+        $i++;
+        my $call = WTSI::NPG::Genotyping::Call->new
+            (snp          => $snpset->named_snp($snp),
+             genotype     => $genotype,
+             callset_name => $callset_name
+         );
+        push @qc_calls, $call;
+    }
     $qc_calls = \@qc_calls;
 
     # as above, but with the original Plink calls
@@ -171,7 +181,63 @@ sub construct : Test(1) {
 
     new_ok('WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian'
                => \@args);
+}
 
+sub output : Test(5) {
+
+    my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+
+    my $sib = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+        new(sample_name      => $sample_name,
+            snpset           => $snpset,
+            production_calls => $production_calls,
+            qc_calls         => $qc_calls,
+            pass_threshold   => $pass_threshold);
+    is_deeply($sib->qc_callset_names, \@CALLSET_NAMES,
+              "QC callset names match");
+
+    my $expected_csv = 'urn:wtsi:249442_C09_HELIC5102247,assayed,0.999989,'.
+        '0.8667,30,30,26,0.8000,10,10,8,0.9000,20,20,18';
+    is($sib->to_csv(), $expected_csv, "CSV string matches expected value");
+
+    # change order of callset names, and add an unknown dummy callset
+    my @alternate_callset_names = ($CALLSET_NAMES[1],
+                                   $CALLSET_NAMES[0],
+                                   'callset_null');
+
+    my $alternate_csv = 'urn:wtsi:249442_C09_HELIC5102247,assayed,0.999989,'.
+        '0.8667,30,30,26,0.9000,20,20,18,0.8000,10,10,8,0.0000,0,0,0';
+    is($sib->to_csv(\@alternate_callset_names),
+       $alternate_csv, "Alternate CSV string matches expected value");
+
+    # remove (some) callset names and check CSV output
+    my @anonymous_qc_calls;
+    foreach my $call (@{$qc_calls}) {
+        my $new_call;
+        if ($call->callset_name eq $CALLSET_NAMES[0]) {
+            $new_call = $call;
+        } else {
+            # omit callset_name argument to Call constructor
+            $new_call = WTSI::NPG::Genotyping::Call->new
+                (snp          => $call->snp,
+                 genotype     => $call->genotype);
+        }
+        push @anonymous_qc_calls, $new_call;
+    }
+    my $anon_sib =
+        WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+              new(sample_name      => $sample_name,
+                  snpset           => $snpset,
+                  production_calls => $production_calls,
+                  qc_calls         => \@anonymous_qc_calls,
+                  pass_threshold   => $pass_threshold);
+    is_deeply($anon_sib->qc_callset_names,
+              ['_unknown_callset_', 'callset_bar'],
+              "Anonymous calls assigned to 'unknown' callset name");
+    # order of call subsets is transposed
+    my $anon_csv = 'urn:wtsi:249442_C09_HELIC5102247,assayed,0.999989,'.
+        '0.8667,30,30,26,0.9000,20,20,18,0.8000,10,10,8';
+    is($anon_sib->to_csv(), $anon_csv, "CSV string matches expected value");
 }
 
 

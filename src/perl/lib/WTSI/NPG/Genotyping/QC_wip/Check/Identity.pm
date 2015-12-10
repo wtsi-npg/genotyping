@@ -162,10 +162,12 @@ sub find_identity {
 
 =head2 pairwise_swap_check
 
-  Arg [1]    : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity]
+  Arg [1]    : ArrayRef[
+                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian
+               ]
   Arg [2]    : Maybe[Num]
 
-  Example    : my $comparison = pairwise_swap_check($results_ref);
+  Example    : my $comparison = pairwise_swap_check($results_ref, $prior);
 
   Description: Pairwise comparison of the given samples to look for possible
                swaps. Warning of a swap occurs if similarity between
@@ -173,8 +175,8 @@ sub find_identity {
                $self->swap_threshold. Typically, the input samples have
                failed the standard identity metric. Prior probability of
                match can be given as an argument, or a default value can be
-               computed. Return value is an ArrayRef of swap check results,
-               and the prior which was used.
+               computed. Return value is a hashref containing detailed
+               results, pass/fail totals and the prior used.
   Returntype : HashRef
 
 =cut
@@ -226,95 +228,93 @@ sub pairwise_swap_check {
     return \%swap_result;
 }
 
-=head2 run_identity_checks
+=head2 write_identity_results
 
   Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
+  Arg [2]     : Str, path for JSON output or '-' for STDOUT
+  Arg [3]     : Str, path for CSV output
 
-  Returntype  : (ArrayRef[
-                  WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity
-                 ],
-                 ArrayRef[ArrayRef[Str]])
+  Returntype  : None
 
-  Description : Run the identity check on each sample, then carry out
-                cross-check on failed samples to detect swaps. Return
-                results of both checks, and prior probability for swap.
+  Description : Run identity checks on all samples. Write JSON and CSV
+                output to the given paths.
 
 =cut
 
-sub run_identity_checks {
-    my ($self, $qc_call_sets) = @_;
-    my $identity_results = $self->find_identity($qc_call_sets);
+sub write_identity_results {
+    my ($self, $qc_calls, $json_path, $csv_path) = @_;
+    my $identity_results = $self->find_identity($qc_calls);
     my $failed = $self->_get_failed_results($identity_results);
-    my $swap_result = $self->pairwise_swap_check($failed);
-    return ($identity_results, $swap_result);
+    my $swap_evaluation = $self->pairwise_swap_check($failed);
+    # write JSON
+    my $json_spec = $self->_results_to_json_spec($identity_results,
+                                                 $swap_evaluation);
+    my $out_json;
+    if ($json_path ne '-') {
+        open $out_json, ">", $json_path ||
+            $self->logcroak("Cannot open JSON path '", $json_path, "'");
+    } else {
+        $out_json = \*STDOUT;
+    }
+    print $out_json encode_json($json_spec);
+    if ($json_path ne '-') {
+        close $out_json || $self->logcroak("Cannot open output path '",
+                                           $json_path, "'");
+    }
+    # write CSV
+    my $out_csv;
+    open $out_csv, ">", $csv_path ||
+        $self->logcroak("Cannot open CSV path '", $csv_path, "'");
+    my $callset_names = $self->_find_callset_names($qc_calls);
+    print $out_csv $self->_csv_header($callset_names)."\n";
+    foreach my $result (@{$identity_results}) {
+        print $out_csv $result->to_csv($callset_names)."\n";
+    }
+    close $out_csv ||
+        $self->logcroak("Cannot close CSV path '", $csv_path, "'");
 }
 
-=head2 run_identity_checks_json_spec
-
-  Arg [1]     : ArrayRef[HashRef[WTSI::NPG::Genotyping::Call]]
-
-  Returntype  : HashRef[ArrayRef]
-
-  Description : Run identity checks on all samples, returning a data structure
-                compatible with JSON output. Intended as a 'main' method to
-                run from a command-line script.
-
-=cut
-
-sub run_identity_checks_json_spec {
-  my ($self, $qc_call_sets) = @_;
-  my ($identity_results, $swap_evaluation) =
-      $self->run_identity_checks($qc_call_sets);
-  my %spec;
-  my %summary = (
-      'failed' => 0,
-      'missing' => 0,
-  );
-  my @id_json_spec = ();
-  # get summary counts
-  foreach my $id_result (@{$identity_results}) {
-      push(@id_json_spec, $id_result->to_json_spec());
-      if ($id_result->missing) { $summary{'missing'}++; }
-      elsif ($id_result->failed) { $summary{'failed'}++; }
-  }
-  $summary{'total'} = scalar @id_json_spec;
-  my $pass_rate = 0;
-  my $assayed = $summary{'total'} - $summary{'missing'};
-  if ($assayed > 0) {
-      $pass_rate = 1 - $summary{'failed'}/$assayed;
-  }
-  $summary{'assayed_pass_rate'} = sprintf "%.4f", $pass_rate;
-  # get params (may be using default values from sample ID object)
-  my $result = $identity_results->[0];
-  my $ecp = $self->equivalent_calls_probability ||
-      $result->equivalent_calls_probability;
-  my $xer = $self->expected_error_rate ||
-      $result->expected_error_rate;
-  my $smp = $self->sample_mismatch_prior ||
-      $result->sample_mismatch_prior;
-  my $consensus_ecp; # record if all SNPs have same ECP
-  foreach my $snp_name (keys %{$ecp}) {
-      if (!defined($consensus_ecp)) {
-          $consensus_ecp = $ecp->{$snp_name};
-      } elsif ($consensus_ecp != $ecp->{$snp_name}) {
-          $consensus_ecp = undef;
-          last;
-      }
-  }
-  # create JSON spec object
-  $spec{'identity'} = \@id_json_spec;
-  $spec{'swap'} = $swap_evaluation;
-  $spec{'summary'} = \%summary; # id total/failed/missing
-  $spec{'params'} = {
-      pass_threshold => $self->pass_threshold,
-      swap_threshold => $self->swap_threshold,
-      equivalent_calls_probability => $ecp,
-      consensus_ecp => $consensus_ecp,
-      expected_error_rate => $xer,
-      sample_mismatch_prior => $smp,
-  };
-  return \%spec;
+sub _csv_header {
+    # return a header customised for the available callsets
+    # always include:
+    #   sample_name,assayed,identity,concordance,total_calls,valid,equivalent
+    # for each callset (if more than one):
+    #   concordance,total_calls,valid_calls,equivalent_calls
+    my ($self, $callset_names) = @_;
+    my @header_fields = qw(sample_name
+                           status
+                           identity
+                           concordance
+                           total_calls
+                           valid_calls
+                           equivalent_calls);
+    my @suffixes = qw(total_calls valid_calls equivalent_calls);
+    if (scalar @{$callset_names} > 1) {
+        foreach my $callset_name (@{$callset_names}) {
+            foreach my $suffix (@suffixes) {
+                push @header_fields, $callset_name.":".$suffix;
+            }
+        }
+    }
+    return join(',', @header_fields);
 }
+
+# find distinct callset names, sorted in alphabetical order
+# each call has a callset_name attribute
+# use for breakdown of calls (eg. Sequenom vs. Fluidigm) in output
+# input: hash of arrays of Call objects
+sub _find_callset_names {
+    my ($self, $qc_calls_by_sample) = @_;
+    my %callset_names;
+    foreach my $sample_name (keys %{$qc_calls_by_sample}) {
+        foreach my $call (@{$qc_calls_by_sample->{$sample_name}}) {
+            $callset_names{$call->callset_name} = 1;
+        }
+    }
+    my @callset_names = sort keys %callset_names;
+    return \@callset_names;
+}
+
 
 # =head2 _read_num_samples
 
@@ -462,6 +462,62 @@ sub _read_production_calls {
   }
   return \%prod_calls_index;
 }
+
+
+sub _results_to_json_spec {
+
+    my ($self, $identity_results, $swap_evaluation) = @_;
+    my %spec;
+    my %summary = (
+        'failed' => 0,
+        'missing' => 0,
+    );
+    my @id_json_spec = ();
+    # get summary counts
+    foreach my $id_result (@{$identity_results}) {
+        push(@id_json_spec, $id_result->to_json_spec());
+        if ($id_result->missing) { $summary{'missing'}++; }
+        elsif ($id_result->failed) { $summary{'failed'}++; }
+    }
+    $summary{'total'} = scalar @id_json_spec;
+    my $pass_rate = 0;
+    my $assayed = $summary{'total'} - $summary{'missing'};
+    if ($assayed > 0) {
+        $pass_rate = 1 - $summary{'failed'}/$assayed;
+    }
+    $summary{'assayed_pass_rate'} = sprintf "%.4f", $pass_rate;
+    # get params (may be using default values from sample ID object)
+    my $result = $identity_results->[0];
+    my $ecp = $self->equivalent_calls_probability ||
+        $result->equivalent_calls_probability;
+    my $xer = $self->expected_error_rate ||
+        $result->expected_error_rate;
+    my $smp = $self->sample_mismatch_prior ||
+        $result->sample_mismatch_prior;
+    my $consensus_ecp; # record if all SNPs have same ECP
+    foreach my $snp_name (keys %{$ecp}) {
+        if (!defined($consensus_ecp)) {
+            $consensus_ecp = $ecp->{$snp_name};
+        } elsif ($consensus_ecp != $ecp->{$snp_name}) {
+            $consensus_ecp = undef;
+            last;
+        }
+    }
+    # create JSON spec object
+    $spec{'identity'} = \@id_json_spec;
+    $spec{'swap'} = $swap_evaluation;
+    $spec{'summary'} = \%summary; # id total/failed/missing
+    $spec{'params'} = {
+        pass_threshold => $self->pass_threshold,
+        swap_threshold => $self->swap_threshold,
+        equivalent_calls_probability => $ecp,
+        consensus_ecp => $consensus_ecp,
+        expected_error_rate => $xer,
+        sample_mismatch_prior => $smp,
+    };
+    return \%spec;
+}
+
 
 sub _from_illumina_snp_name {
   my ($name) = @_;

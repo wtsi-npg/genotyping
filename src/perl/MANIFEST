@@ -446,6 +446,7 @@ t/qc/check/identity/fake_swap_genotypes.bim
 t/qc/check/identity/fake_swap_genotypes.fam
 t/qc/check/identity/fake_swap_genotypes.map
 t/qc/check/identity/fake_swap_genotypes.ped
+t/qc/check/identity/identity_script_output.csv
 t/qc/check/identity/identity_script_output.json
 t/qc/check/identity/identity_script_output_2.json
 t/qc/check/identity/qc_plex_calls.vcf

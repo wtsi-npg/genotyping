@@ -9,7 +9,7 @@ use JSON;
 use List::AllUtils qw(each_array);
 
 use base qw(Test::Class);
-use Test::More tests => 47;
+use Test::More tests => 51;
 use Test::Exception;
 
 use plink_binary;
@@ -48,8 +48,8 @@ sub find_identity : Test(2) {
     (plink_path => $plink_path,
      snpset     => $snpset);
   # get fake QC results for a few samples; others will appear as missing
-  my $qc_callsets = _get_qc_callsets();
-  my $id_results = $check->find_identity($qc_callsets);
+  my $qc_calls = _get_qc_calls();
+  my $id_results = $check->find_identity($qc_calls);
   ok($id_results, "Find identity results for given QC calls");
   my @json_spec_results;
   foreach my $id_result (@{$id_results}) {
@@ -61,17 +61,22 @@ sub find_identity : Test(2) {
               diag explain \@json_spec_results;
 }
 
-sub find_identity_insufficient_snps : Test(2) {
+sub find_identity_insufficient_snps : Test(3) {
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
+    my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
+    my $json_path = "$tempdir/identity.json";
+    my $csv_path = "$tempdir/identity.csv";
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
         (plink_path => $plink_path,
          snpset     => $snpset);
     # get fake QC results for a few samples; others will appear as missing
-    my $qc_callsets = _get_qc_callsets_broken_snpset();
-    my $id_results = $check->run_identity_checks_json_spec($qc_callsets);
-    ok($id_results, "Find identity results with insufficient shared SNPs");
+    my $qc_calls = _get_qc_calls_broken_snpset();
+    $check->write_identity_results($qc_calls, $json_path, $csv_path);
+    ok(-e $json_path, "JSON identity output written");
+    ok(-e $csv_path, "CSV identity output written");
+    my $json_results = decode_json(read_file($json_path));
     my $expected_json = decode_json(read_file($expected_omit_path));
-    is_deeply($id_results, $expected_json,
+    is_deeply($json_results, $expected_json,
               "Results for insufficient SNPs congruent with expected values")
       or diag explain $expected_json;
 }
@@ -184,16 +189,18 @@ sub production_calls : Test(18) {
 sub run_identity_checks : Test(3) {
     # test combined output with identity and swap checks
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
+    my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
+    my $json_path = $tempdir."/identity.json";
+    my $csv_path = $tempdir."/identity.csv";
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
         (plink_path => $plink_path,
          snpset     => $snpset);
     # get fake QC results for a few samples; others will appear as missing
-    my $qc_callsets = _get_qc_callsets();
-    my @results = $check->run_identity_checks($qc_callsets);
-    my ($identity_results, $swap_evaluation) = @results;
-    ok($identity_results, "Identity metric results from combined method");
-    ok($swap_evaluation, "Swap check results from combined method");
-    my $json_results = $check->run_identity_checks_json_spec($qc_callsets);
+    my $qc_calls = _get_qc_calls();
+    $check->write_identity_results($qc_calls, $json_path, $csv_path);
+    ok(-e $json_path, "JSON identity output written");
+    ok(-e $csv_path, "CSV identity output written");
+    my $json_results = decode_json(read_file($json_path));
     my $json_expected = decode_json(read_file($expected_all_json_path));
     is_deeply($json_results, $json_expected,
               "Combined JSON results congruent with expected values")
@@ -248,50 +255,59 @@ sub sample_swap_evaluation : Test(14) {
     }
 }
 
-
-sub script : Test(4) {
+sub script : Test(7) {
     # test of command-line script
     # Could move this into Scripts.pm (which is slow to run, ~10 minutes)
 
     my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
-    my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
-    my $outPath = "$tempdir/identity.json";
+    my $tempdir = tempdir("IdentityTest.script.$pid.XXXXXX", CLEANUP => 1);
+    my $jsonPath = "$tempdir/identity.json";
+    my $csvPath = "$tempdir/identity.csv";
     my $plexDir = "/nfs/srpipe_references/genotypes";
     my $plexFile = "$plexDir/W30467_snp_set_info_1000Genomes.tsv";
     my $refPath = "$data_path/identity_script_output.json";
+    my $expectedCsvPath = "$data_path/identity_script_output.csv";
     my $sampleJson = "$data_path/fake_sample.json";
 
     ok(system(join q{ }, "$identity_script_wip",
               "--plink $data_path/fake_qc_genotypes",
-              "--out $outPath",
+              "--json $jsonPath",
+              "--csv $csvPath",
               "--plex $plexFile",
               "--sample_json $sampleJson",
               "--vcf $data_path/qc_plex_calls.vcf"
           ) == 0, 'Script identity check');
 
-    my $outData = from_json(read_file($outPath));
+    ok(-e $jsonPath, "JSON output written by script");
+    ok(-e $csvPath, "CSV output written by script");
+    my $outData = from_json(read_file($jsonPath));
     my $refData = from_json(read_file($refPath));
     is_deeply($outData, $refData,
               "Script JSON output matches reference file");
+    my $csvGot = read_file($csvPath);
+    my $csvExpected = read_file($expectedCsvPath);
+    is($csvGot, $csvExpected, "Script CSV output matches reference file");
 
     # now test with multiple VCF files and differing SNPSets
     # VCF and manifest from above are split into two different SNP subsets
     # Expect them to produce the same result when combined
-    $outPath = "$tempdir/identity_2.json";
+    $jsonPath = "$tempdir/identity_2.json";
+    $csvPath = "$tempdir/identity_2.csv";
     my $plexFile1 = "$data_path/W30467_snp_set_info_1000Genomes_1.tsv";
     my $plexFile2 = "$data_path/W30467_snp_set_info_1000Genomes_2.tsv";
     my $vcf1 = "$data_path/qc_plex_calls_1.vcf";
     my $vcf2 = "$data_path/qc_plex_calls_2.vcf";
     ok(system(join q{ }, "$identity_script_wip",
               "--plink $data_path/fake_qc_genotypes",
-              "--out $outPath",
+              "--json $jsonPath",
+              "--csv $csvPath",
               "--plex $plexFile1",
               "--plex $plexFile2",
               "--sample_json $sampleJson",
               "--vcf $vcf1",
               "--vcf $vcf2",
           ) == 0, 'Script identity check');
-    $outData = from_json(read_file($outPath));
+    $outData = from_json(read_file($jsonPath));
     is_deeply($outData, $refData,
               "Script JSON output matches reference file, 2 inputs");
 }
@@ -306,17 +322,17 @@ sub _get_swap_sample_identities {
     my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
         (plink_path => $plink_swap,
          snpset     => $snpset);
-    my $qc_callsets = _get_qc_callsets();
+    my $qc_calls = _get_qc_calls();
     my $production_calls = $check->production_calls;
 
     my @sample_identities;
-    my @qc_callsets = _get_qc_callsets();
+    my @qc_calls = _get_qc_calls();
     foreach my $sample_name (@qc_sample_names) {
         # need both QC and production calls to create object
         my %args = (sample_name      => $sample_name,
                     snpset           => $snpset,
                     production_calls => $production_calls->{$sample_name},
-                    qc_calls         => $qc_callsets->{$sample_name},
+                    qc_calls         => $qc_calls->{$sample_name},
                     pass_threshold   => $pass_threshold);
         my $sample_id =
             WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
@@ -326,7 +342,7 @@ sub _get_swap_sample_identities {
     return \@sample_identities;
 }
 
-sub _get_qc_callsets {
+sub _get_qc_calls {
 
    # Some fake QC data
     # - List of 3 'failed' sample names, 2 of which are swapped
@@ -437,30 +453,38 @@ sub _get_qc_callsets {
             ]
     );
 
-    my %qc_callsets;
+    my %qc_calls;
+    my @callset_names = qw/callset_foo callset_bar/;
     foreach my $sample_name (@qc_sample_names) {
-        my @qc_calls =  map {
-            my ($snp, $genotype) = @$_;
-            WTSI::NPG::Genotyping::Call->new
-                  (snp      => $snpset->named_snp($snp),
-                   genotype => $genotype) } @{$qc_data{$sample_name}};
-        $qc_callsets{$sample_name} = \@qc_calls;
+        my @qc_calls;
+        my $i = 0;
+        foreach my $input (@{$qc_data{$sample_name}}) {
+            my ($snp, $genotype) = @{$input};
+            my %args = (snp      => $snpset->named_snp($snp),
+                        genotype => $genotype);
+            if ($i < 10) { $args{'callset_name'} = $callset_names[0]; }
+            else { $args{'callset_name'} = $callset_names[1]; }
+            $i++;
+            push @qc_calls, WTSI::NPG::Genotyping::Call->new(%args);
+        }
+        $qc_calls{$sample_name} = \@qc_calls;
     }
-    return \%qc_callsets;
+    return \%qc_calls;
 }
 
-sub _get_qc_callsets_broken_snpset {
+sub _get_qc_calls_broken_snpset {
     # The 'broken' snpset tests the case of insufficient shared SNPs
     # between production and QC calls: All but two of the SNPs in the
     # standard QC plex are renamed so that they do not appear to be shared
     # with the production snpset. This method renames the snps in QC calls
     # for consistency with the 'broken' snpset.
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($broken_snpset_file);
-    my %qc_callsets = %{_get_qc_callsets()};
-    my %broken_callsets = ();
-
-    foreach my $sample_name (keys(%qc_callsets)) {
-        my @calls = @{$qc_callsets{$sample_name}};
+    my %qc_calls = %{_get_qc_calls()};
+    my %broken_calls = ();
+    my @callset_names = qw/callset_foo callset_bar/;
+    my $i = 0;
+    foreach my $sample_name (keys(%qc_calls)) {
+        my @calls = @{$qc_calls{$sample_name}};
         my @broken_calls = ();
         foreach my $call (@calls) {
             my $snp = $call->snp->name;
@@ -469,11 +493,14 @@ sub _get_qc_callsets_broken_snpset {
             }
             my %args = (snp      => $snpset->named_snp($snp),
                         genotype => $call->genotype);
+            if ($i < 10) { $args{'callset_name'} = $callset_names[0]; }
+            else { $args{'callset_name'} = $callset_names[1]; }
+            $i++;
             push(@broken_calls, WTSI::NPG::Genotyping::Call->new(\%args));
         }
-        $broken_callsets{$sample_name} = \@broken_calls;
+        $broken_calls{$sample_name} = \@broken_calls;
     }
-    return \%broken_callsets;
+    return \%broken_calls;
 }
 
 1;

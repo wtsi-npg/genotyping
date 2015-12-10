@@ -253,8 +253,10 @@ sub run_qc_wip {
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
   my $script = "check_identity_bed_wip.pl";
-  my $outPath = $outDir."/identity_wip.json";
-  my @args = ("--out=$outPath",
+  my $jsonPath = $outDir."/identity_wip.json";
+  my $csvPath = $outDir."/identity_wip.csv";
+  my @args = ("--json=$jsonPath",
+              "--csv=$csvPath",
 	      "--plink=$plinkPrefix",
 	      "--plex=$plexManifest",
               "--sample_json=$sampleJson",

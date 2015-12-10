@@ -64,11 +64,6 @@ our $VERSION = '';
 # uses config to look up snpset from metadata in VCF header
 # alternatively, just use hard-coded defaults
 
-sub BUILD {
-    my ($self) = @_;
-    my $header = $self->header; # ensure header is read first
-}
-
 
 =head2 read_dataset
 
@@ -83,9 +78,12 @@ sub BUILD {
 
 sub read_dataset {
     my ($self) = @_;
+    # header is read first, to get callset name (if any)
+    my $callset_name = $self->header->metadata->{'callset_name'}->[0];
     my $rowParser = WTSI::NPG::Genotyping::VCF::DataRowParser->new(
         input_filehandle => $self->input_filehandle,
         snpset => $self->snpset,
+        callset_name => $callset_name,
     );
     my $rows = $rowParser->get_all_remaining_rows();
     return WTSI::NPG::Genotyping::VCF::VCFDataSet->new(
