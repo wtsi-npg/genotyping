@@ -72,7 +72,7 @@ sub _validate_beadchip {
     $self->logcroak("Missing beadchip number at line $line\n");
   }
 
-  unless ($chip =~ m{^\d{10}$}msx) {
+  unless ($chip =~ m{^\d{10,12}$}msx) {
     $self->logcroak("Invalid beadchip number '$chip' at line $line\n");
   }
 

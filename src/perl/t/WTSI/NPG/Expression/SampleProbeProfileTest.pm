@@ -1,5 +1,3 @@
-use utf8;
-
 package WTSI::NPG::Expression::SampleProbeProfileTest;
 
 use strict;
@@ -83,3 +81,5 @@ sub normalisation_method : Test(5) {
       ("$data_path/$annotation_file")->normalisation_method }
     'Invalid file format 2';
 }
+
+1;

@@ -230,10 +230,10 @@ sub _build_filesets {
 
     my ($beadchip, $section, $suffix) =
       $filename =~ m{^
-                     (\d{10})        # beadchip
+                     (\d{10,12})     # beadchip
                      _([[:upper:]])  # beadchip section
                      _Grn            # channel, always Grn
-                     [.](\S+)         # suffix
+                     [.](\S+)        # suffix
                      $}msxi;
 
     unless ($beadchip && $section && $suffix) {
