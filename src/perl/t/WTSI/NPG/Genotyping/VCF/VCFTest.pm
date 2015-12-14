@@ -118,16 +118,17 @@ sub data_row_parser_test : Test(5) {
 
 }
 
-sub fluidigm_file_test : Test(116) {
+sub fluidigm_file_test : Test(212) {
     my @inputs;
     foreach my $name (@fluidigm_csv) {
         push(@inputs, abs_path($data_path."/".$name));
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my %metadata = (
-        reference => [ $reference_vcf_meta ],
-        plex_type => [ $FLUIDIGM_TYPE ],
-        plex_name => [ 'qc' ],
+        reference    => [ $reference_vcf_meta ],
+        plex_type    => [ $FLUIDIGM_TYPE ],
+        plex_name    => [ 'qc' ],
+        callset_name => [ 'fluidigm' ],
     );
     my @resultsets;
     foreach my $input (@inputs) {
@@ -154,6 +155,7 @@ sub fluidigm_file_test : Test(116) {
         is(scalar @calls, 24, "Correct number of calls for $sample");
         foreach my $call (@calls) {
             isa_ok($call, 'WTSI::NPG::Genotyping::Call');
+            ok($call->callset_name eq 'fluidigm', "Callset name OK");
         }
     }
 }
@@ -171,10 +173,10 @@ sub fluidigm_irods_test : Test(7) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($fluidigm_snpset_path);
     my %metadata = (
-        reference => [ $reference_vcf_meta ],
-        plex_type => [ $FLUIDIGM_TYPE ],
-        plex_name => [ 'qc' ],
-
+        reference    => [ $reference_vcf_meta ],
+        plex_type    => [ $FLUIDIGM_TYPE ],
+        plex_name    => [ 'qc' ],
+        callset_name => [ 'fluidigm' ]
     ); # hash of arrayrefs for compatibility with VCF header
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -270,6 +272,7 @@ sub sequenom_file_test : Test(7) {
         reference => [ $reference_vcf_meta ],
         plex_type => [ $SEQUENOM_TYPE ],
         plex_name => [ 'W30467' ],
+        callset_name => [ 'sequenom' ]
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -297,9 +300,10 @@ sub sequenom_irods_test : Test(7) {
     }
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($sequenom_snpset_path);
     my %metadata = (
-        reference => [ $reference_vcf_meta ],
-        plex_type => [ $SEQUENOM_TYPE ],
-        plex_name => [ 'W30467' ],
+        reference    => [ $reference_vcf_meta ],
+        plex_type    => [ $SEQUENOM_TYPE ],
+        plex_name    => [ 'W30467' ],
+        callset_name => [ 'sequenom' ]
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -331,7 +335,7 @@ sub script_conversion_test : Test(3) {
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
         "--snpset $snpset_ipath --irods --plex_type $SEQUENOM_TYPE ".
-        "--repository $tmp < $sequenomList";
+        "--callset $SEQUENOM_TYPE --repository $tmp < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $vcfOutput, "VCF output written");
     # read VCF output (omitting date) and compare to reference file

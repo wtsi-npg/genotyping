@@ -50,7 +50,6 @@ has 'assay_snpset'     =>
     documentation => 'SNPSet object corresponding to the input AssayResultSets.'
    );
 
-
 has 'vcf_snpset'     =>
    (is           => 'ro',
     isa          => 'WTSI::NPG::Genotyping::SNPSet',
@@ -69,6 +68,14 @@ has 'metadata' =>
     documentation => 'Additional metadata fields to populate the VCF header',
     default       => sub { {} },
    );
+
+has 'callset_name' =>
+    (is            => 'ro',
+     isa           => 'Maybe[Str]',
+     builder       => '_build_callset_name',
+     lazy          => 1,
+     documentation => 'Optional name for set to which calls belong'
+ );
 
 
 sub BUILD {
@@ -125,17 +132,27 @@ sub get_vcf_dataset {
     return $vcf_dataset;
 }
 
+sub _build_callset_name {
+    my ($self) = @_;
+    my $callset_name;
+    if (defined($self->metadata->{'callset_name'})) {
+        $callset_name = $self->metadata->{'callset_name'}->[0];
+    }
+    return $callset_name;
+}
+
 sub _build_reference {
-  my ($self) = @_;
-  my $snpset_refs = $self->snpset->references;
-  my @ref_names;
-  foreach my $ref (@{$snpset_refs}) {
-    push @ref_names, $ref->name;
-  }
-  if (scalar @ref_names == 0) {
-    $self->logcroak("No reference names found in SNPSet initarg. Need to specify a reference initarg?");
-  }
-  return join ',', @ref_names;
+    my ($self) = @_;
+    my $snpset_refs = $self->snpset->references;
+    my @ref_names;
+    foreach my $ref (@{$snpset_refs}) {
+        push @ref_names, $ref->name;
+    }
+    if (scalar @ref_names == 0) {
+        $self->logcroak("No reference names found in SNPSet initarg. ",
+                        "Need to specify a reference initarg?");
+    }
+    return join ',', @ref_names;
 }
 
 sub _call_from_assay_result {
@@ -159,18 +176,16 @@ sub _call_from_assay_result {
     # * TODO try to reproduce this error in a simplified test case
     #
     # AssayResult for GenderMarker has het genotype for male, hom for female
+    my %args = (snp          => $vcf_snp,
+                qscore       => $qscore,
+                genotype     => $ar->canonical_call());
+    if (defined($self->callset_name)) {
+        $args{'callset_name'} = $self->callset_name;
+    }
     if (is_GenderMarker($vcf_snp)) {
-        $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
-            snp      => $vcf_snp,
-            qscore   => $qscore,
-            genotype => $ar->canonical_call()
-        );
+        $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(%args);
     } else {
-        $call = WTSI::NPG::Genotyping::Call->new(
-            snp      => $vcf_snp,
-            qscore   => $qscore,
-            genotype => $ar->canonical_call()
-        );
+        $call = WTSI::NPG::Genotyping::Call->new(%args);
     }
     return $call;
 }

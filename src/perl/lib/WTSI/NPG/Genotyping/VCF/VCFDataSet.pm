@@ -201,10 +201,24 @@ sub _find_calls {
                               "lists of different lengths");
         }
         for (my $i=0;$i<$total;$i++) {
-            my $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
-                x_call => $x_calls[$i],
-                y_call => $y_calls[$i]
-            );
+            my $csn_x = $x_calls[$i]->callset_name;
+            my $csn_y = $y_calls[$i]->callset_name;
+            if ($csn_x eq $csn_y) {
+                $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
+                    x_call       => $x_calls[$i],
+                    y_call       => $y_calls[$i],
+                    callset_name => $csn_x
+                );
+            } else {
+                $self->logwarn("Conflicting callset names ",
+                               "for X and Y calls: [", $csn_x, ", ", $csn_y,
+                               "]. Using ",
+                               "default name for GenderMarkerCall");
+                $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
+                    x_call       => $x_calls[$i],
+                    y_call       => $y_calls[$i]
+                );
+            }
             push @merged_calls, $call;
         }
         push @all_calls, \@merged_calls;

@@ -151,7 +151,9 @@ sub _call_to_vcf_field {
     # convert Call object to string of colon-separated sub-fields
     # sub-fields are genotype in VCF format, quality score, read depth
     my ($self, $call) = @_;
-    if ($self->snp->strand eq '-') { # reverse strand, use complement of call
+    if ($call->is_complement()) {
+        # call is complemented with respect to the reference
+        # complement it again, so it has the same orientation as reference
         $call = $call->complement();
     }
     my @alleles = split //msx, $call->genotype;

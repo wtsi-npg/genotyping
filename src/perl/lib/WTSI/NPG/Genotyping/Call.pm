@@ -34,6 +34,16 @@ has 'qscore'     =>
    documentation => "May be a Phred quality score (positive integer),".
        " or undef if the score is missing or not defined");
 
+has 'callset_name'    =>
+  (is            => 'ro',
+   isa           => 'Str',
+   default       => '_unknown_callset_',
+   documentation => "Identifier for a set of calls to which this ".
+       "call belongs. Optional, receives a default value if not specified.");
+# Instead of default value, could allow an undefined callset name, and
+# specify a string identifier for unknown callsets in a separate
+# attribute/method -- but this way is simpler.
+
 sub BUILD {
     my ($self) = @_;
     if ($self->genotype eq 'NN') {
@@ -41,6 +51,7 @@ sub BUILD {
     }
     $self->_validate_genotype();
 }
+
 
 
 =head2 clone
@@ -58,9 +69,10 @@ sub BUILD {
 
 sub clone {
   my ($self) = @_;
-  my %args = (snp => $self->snp,
-              genotype => $self->genotype,
-              is_call => $self->is_call,
+  my %args = (snp          => $self->snp,
+              genotype     => $self->genotype,
+              is_call      => $self->is_call,
+              callset_name => $self->callset_name,
           );
   if (defined $self->qscore) {
       $args{'qscore'} = $self->qscore;
@@ -206,18 +218,14 @@ sub is_complement {
 
 sub complement {
   my ($self) = @_;
+  my %args = (snp          => $self->snp,
+              genotype     => $self->_complement($self->genotype),
+              is_call      => $self->is_call,
+              callset_name => $self->callset_name);
   if (defined($self->qscore)) {
-      return WTSI::NPG::Genotyping::Call->new
-          (snp      => $self->snp,
-           genotype => $self->_complement($self->genotype),
-           qscore   => $self->qscore,
-           is_call  => $self->is_call);
-  } else {
-      return WTSI::NPG::Genotyping::Call->new
-          (snp      => $self->snp,
-           genotype => $self->_complement($self->genotype),
-           is_call  => $self->is_call);
+      $args{'qscore'} = $self->qscore;
   }
+  return WTSI::NPG::Genotyping::Call->new(%args);
 }
 
 =head2 merge
@@ -334,10 +342,11 @@ sub equivalent {
 sub str {
   my ($self) = @_;
 
-  return sprintf("%s call:%s SNP: %s",
+  return sprintf("%s call:%s SNP: %s callset_name: %s",
                  $self->genotype,
                  $self->is_call ? 'yes' : 'no',
-                 $self->snp->str);
+                 $self->snp->str,
+                 $self->callset_name);
 }
 
 sub _complement {

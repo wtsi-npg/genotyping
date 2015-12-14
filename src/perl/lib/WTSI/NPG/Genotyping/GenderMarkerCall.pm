@@ -213,19 +213,18 @@ sub _build_x_call {
     my ($self) = @_;
     my $x_call;
     my $x_base = $self->snp->x_allele();
+    my %args;
     if ($self->is_female() || $self->is_male()) {
-        $x_call = WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->x_marker,
-            genotype => $x_base.$x_base,
-            qscore   => $self->qscore,
-        );
+        %args = (snp      => $self->snp->x_marker,
+                 genotype => $x_base.$x_base,
+                 qscore   => $self->qscore);
     } else {
-        $x_call = WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->x_marker,
-            genotype => $NULL_GENOTYPE,
-            is_call  => 0,
-        );
+        %args = (snp      => $self->snp->x_marker,
+                 genotype => $NULL_GENOTYPE,
+                 is_call  => 0);
     }
+    $args{'callset_name'} = $self->callset_name;
+    $x_call = WTSI::NPG::Genotyping::Call->new(%args);
     if ($self->is_complement) { $x_call = $x_call->complement; }
     return $x_call;
 }
@@ -234,19 +233,18 @@ sub _build_y_call {
     my ($self) = @_;
     my $y_call;
     my $y_base = $self->snp->y_allele();
+    my %args;
     if ($self->is_male()) {
-        $y_call = WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->y_marker,
-            genotype => $y_base.$y_base,
-            qscore   => $self->qscore,
-        );
+        %args = (snp      => $self->snp->y_marker,
+                 genotype => $y_base.$y_base,
+                 qscore   => $self->qscore);
     } else {
-        $y_call = WTSI::NPG::Genotyping::Call->new(
-            snp      => $self->snp->y_marker,
-            genotype => $NULL_GENOTYPE,
-            is_call  => 0,
-        );
+        %args = (snp      => $self->snp->y_marker,
+                 genotype => $NULL_GENOTYPE,
+                 is_call  => 0);
     }
+    $args{'callset_name'} = $self->callset_name;
+    $y_call = WTSI::NPG::Genotyping::Call->new(%args);
     if ($self->is_complement) { $y_call = $y_call->complement; }
     return $y_call;
 }

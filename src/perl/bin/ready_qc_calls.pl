@@ -30,6 +30,7 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
 our $DEFAULT_DATA_PATH = '/seq/fluidigm';
+our $CALLSET_NAME_KEY = 'callset_name';
 
 # keys for config hash
 our $IRODS_DATA_PATH_KEY      = 'irods_data_path';
@@ -69,6 +70,7 @@ my $log;
 run() unless caller();
 
 sub run {
+    my $callset;
     my $config;
     my $dbfile;
     my $debug;
@@ -78,7 +80,8 @@ sub run {
     my $output_path;
     my $verbose;
 
-    GetOptions('config=s'         => \$config,
+    GetOptions('callset=s'        => \$callset,
+               'config=s'         => \$config,
                'dbfile=s'         => \$dbfile,
                'debug'            => \$debug,
                'help'             => sub { pod2usage(-verbose => 2,
@@ -130,6 +133,7 @@ sub run {
                            "' missing from config file '", $config, "'");
         }
     }
+    $callset ||= $params{$PLATFORM_KEY}; # assign callset default (if needed)
 
     ### set up iRODS connection and make it use same logger as script ###
     my $irods = WTSI::NPG::iRODS->new;
@@ -162,6 +166,7 @@ sub run {
         $log->logcroak("No assay result sets found for QC plex '",
                        $params{$SNPSET_NAME_KEY}, "'");
     }
+    $vcf_meta->{$CALLSET_NAME_KEY} = [$callset, ];  # update VCF metadata
     ### call VCF parser on resultsets and write to file ###
     my $vcfData = WTSI::NPG::Genotyping::VCF::AssayResultParser->new(
         resultsets     => $resultsets,
@@ -251,6 +256,10 @@ ready_qc_calls --dbfile <path to SQLite DB>  --vcf <output path>
 
 Options:
 
+  --callset        Callset name to record in VCF header. Used for grouping
+                   calls (eg. from different platforms or runs) in identity
+                   check output. Optional, defaults to platform name in
+                   file supplied for --config.
   --config         Path to JSON file with configuration parameters for
                    reading the QC plex calls.
   --dbfile         Path to pipeline SQLite database file. Used to read

@@ -7,10 +7,15 @@ package WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
 use Moose;
 use JSON;
 use Math::BigFloat;
+use Text::CSV;
 
 use WTSI::NPG::Genotyping::Call;
 
 our $VERSION = '';
+
+our $VALID_CALL_KEY = 'valid';
+our $EQUIVALENT_CALL_KEY = 'equivalent';
+our $TOTAL_CALL_KEY = 'total';
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -88,6 +93,15 @@ has 'concordance' =>
      documentation => 'Concordance: Fraction of QC calls equivalent '.
          'to production calls, ignoring any no-calls.');
 
+has 'concordance_counts' =>
+    (is       => 'ro',
+     isa      => 'HashRef[HashRef[Num]]',
+     builder  => '_build_concordance_counts',
+     init_arg => undef,
+     lazy     => 1,
+     documentation => 'Counts of valid, equivalent and total calls, for '.
+         'each callset_name in the qc_calls');
+
 has 'identity' =>
     (is       => 'ro',
      isa      => 'Num',
@@ -105,7 +119,6 @@ has 'production_calls_by_snp' =>
      lazy     => 1,
      documentation => 'Production Call objects indexed by SNP name');
 
-
 has 'qc_calls_by_snp' =>
     (is       => 'ro',
      isa      => 'HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]',
@@ -113,6 +126,34 @@ has 'qc_calls_by_snp' =>
      init_arg => undef,
      lazy     => 1,
      documentation => 'ArrayRefs of QC Call objects indexed by SNP name');
+
+has 'qc_callset_names' =>
+    (is       => 'ro',
+     isa      => 'ArrayRef[Str]',
+     builder  => '_build_qc_callset_names',
+     init_arg => undef,
+     lazy     => 1,
+     documentation => 'List of distinct QC callset names, sorted in '.
+         'lexical order');
+
+has 'total_equivalent_calls' =>
+    (is       => 'ro',
+     isa      => 'Int',
+     builder  => '_build_total_equivalent_calls',
+     init_arg => undef,
+     lazy     => 1,
+     documentation => 'Total number of equivalent (non-null) production/QC '.
+         'call pairs across all SNPs');
+
+has 'total_valid_calls' =>
+    (is       => 'ro',
+     isa      => 'Int',
+     builder  => '_build_total_valid_calls',
+     init_arg => undef,
+     lazy     => 1,
+     documentation => 'Total number of valid (non-null) production/QC '.
+         'call pairs across all SNPs');
+
 
 ## TODO get rid of production_calls and qc_calls attributes?
 
@@ -219,6 +260,81 @@ sub swap_metric {
     else { return $id_1; }
 }
 
+
+=head2 to_csv
+
+  Arg [1]    : Optional ArrayRef[Str] of callset names
+
+  Example    : my $csv_string = $si->to_csv($names);
+               my $csv_string = $si->to_csv();
+
+  Description: Express sample identity as a comma-separated string for
+               output in a CSV file.
+
+               The optional argument is an ArrayRef of callset names, used
+               to preserve column order for output of multiple samples.
+               A callset is simply a (named) subset of calls.
+
+               If given, the argument *must* contain all callset names which
+               appear in QC calls for $self. It *may* contain additional
+               callset names not present in $self, which will receive
+               placeholder values in the CSV string.
+
+               CSV output fields are sample name and Bayesian identity
+               metric, followed by concordance, total calls, valid calls,
+               and equivalent calls for all production/QC call pairs in
+               aggregate, and for each callset individually.
+
+  Returntype : Str
+
+=cut
+
+sub to_csv {
+    my ($self, $callsets) = @_;
+    $callsets = $self->_validated_callset_names($callsets);
+    my $assayed = 'missing';
+    if ($self->assayed) { $assayed = 'assayed'; }
+    my @csv_fields = (
+        $self->sample_name,
+        $assayed,
+        sprintf("%.6f", $self->identity),
+        sprintf("%.4f", $self->concordance),
+        scalar(@{$self->qc_calls}), # total calls
+        $self->total_valid_calls,
+        $self->total_equivalent_calls,
+    );
+    if (scalar @{$callsets} > 1) {
+        # print a breakdown of results for each callset (if more than one)
+        foreach my $cs_name (@{$callsets}) {
+            my ($total, $valid, $matching);
+            my $counts = $self->concordance_counts->{$cs_name};
+            if (defined $counts) {
+                $total = $counts->{$TOTAL_CALL_KEY};
+                $valid = $counts->{$VALID_CALL_KEY},
+                    $matching = $counts->{$EQUIVALENT_CALL_KEY}
+                } else {
+                    $self->debug("Counts not defined for callset '",
+                                 $cs_name, "'");
+                    $total = 0;
+                    $valid = 0;
+                    $matching = 0;
+                }
+            my $concordance;
+            if ($valid > 0) { $concordance = $matching / $valid; }
+            else { $concordance = 0; }
+            my @callset_fields = (
+                sprintf("%.4f", $concordance),
+                $total,
+                $valid,
+                $matching);
+            push @csv_fields, @callset_fields;
+        }
+    }
+    my $csv = Text::CSV->new();
+    $csv->combine(@csv_fields);
+    return $csv->string;
+}
+
 # convert to a data structure which can be represented in JSON format
 sub to_json_spec {
     my ($self) = @_;
@@ -232,16 +348,17 @@ sub to_json_spec {
     my $not_found = 0;
     foreach my $snp (@{$self->snpset->snps}) {
         my $snp_name = $snp->name;
-        my $production_call = $self->production_calls_by_snp->{$snp_name};
+        my $call_p = $self->production_calls_by_snp->{$snp_name};
         my $qc_calls = $self->qc_calls_by_snp->{$snp_name};
-        if (defined($production_call)) {
-            my @qc_genotypes = ();
+        if (defined($call_p)) {
+            # for each call, output: genotype, is_call, callset_name
+            my @qc_data = ();
             foreach my $call_q (@{$qc_calls}) { # QC calls may be empty
-                push @qc_genotypes, $call_q->genotype;
+                push @qc_data, $self->_call_to_json_spec($call_q);
             }
             $genotypes{$snp_name} = {
-                'production' => $production_call->genotype,
-                'qc' => \@qc_genotypes,
+                'production' => $self->_call_to_json_spec($call_p),
+                'qc' => \@qc_data,
             }
         } else {
             $not_found++;
@@ -259,18 +376,45 @@ sub to_json_spec {
 
 sub _build_concordance {
     my ($self) = @_;
-    my $n_total = 0;
-    my $k_total = 0;
-    foreach my $snp_name (keys %{$self->production_calls_by_snp}) {
-        my $call_p = $self->production_calls_by_snp->{$snp_name};
-        my $calls_q = $self->qc_calls_by_snp->{$snp_name};
-        my ($n, $k) = $self->_count_calls($call_p, $calls_q);
-        $n_total += $n;
-        $k_total += $k;
-    }
+    my $n_total = $self->total_valid_calls;
+    my $k_total = $self->total_equivalent_calls;
     my $concordance = 0;
     if ($n_total > 0) { $concordance = $k_total / $n_total; }
     return $concordance;
+}
+
+sub _build_concordance_counts {
+    # concordance counts by QC callset name
+    my ($self) = @_;
+    my %concordance_counts;
+    my %all_snp_names;
+    foreach my $snp_name (keys %{$self->production_calls_by_snp}) {
+        $all_snp_names{$snp_name} = 1;
+    }
+    foreach my $snp_name (keys %{$self->qc_calls_by_snp}) {
+        $all_snp_names{$snp_name} = 1;
+    }
+    foreach my $snp_name (keys %all_snp_names) {
+        my $call_p = $self->production_calls_by_snp->{$snp_name};
+        my $calls_q = $self->qc_calls_by_snp->{$snp_name};
+        # split QC calls by callset_name
+        my %calls_by_set;
+        foreach my $call_q (@{$calls_q}) {
+            push @{$calls_by_set{$call_q->callset_name}}, $call_q;
+        }
+        foreach my $callset_name (keys %calls_by_set) {
+            my $calls_q_subset = $calls_by_set{$callset_name};
+            my $total = scalar @{$calls_q_subset};
+            my ($n, $k) = (0,0);
+            if (defined($call_p)) {
+                ($n, $k) = $self->_count_calls($call_p, $calls_q_subset);
+            }
+            $concordance_counts{$callset_name}{$TOTAL_CALL_KEY} += $total;
+            $concordance_counts{$callset_name}{$VALID_CALL_KEY} += $n;
+            $concordance_counts{$callset_name}{$EQUIVALENT_CALL_KEY} += $k;
+        }
+    }
+    return \%concordance_counts;
 }
 
 sub _build_identity {
@@ -300,6 +444,16 @@ sub _build_production_hash {
     return \%grouped;
 }
 
+sub _build_qc_callset_names {
+    my ($self) = @_;
+    my %callsets;
+    foreach my $call (@{$self->qc_calls}) {
+        $callsets{$call->callset_name} = 1;
+    }
+    my @names = sort keys %callsets;
+    return \@names;
+}
+
 sub _build_qc_hash {
     my ($self) = @_;
     my %grouped;
@@ -323,6 +477,41 @@ sub _build_ecp {
     }
     return \%ecp;
 }
+
+sub _build_total_equivalent_calls {
+    my ($self) = @_;
+    my $k_total = 0;
+    # sum the matching call counts for each callset name
+    foreach my $cs_name (keys %{$self->concordance_counts}) {
+        $k_total +=
+            $self->concordance_counts->{$cs_name}->{$EQUIVALENT_CALL_KEY};
+    }
+    return $k_total;
+}
+
+sub _build_total_valid_calls {
+    my ($self) = @_;
+    my $n_total = 0;
+    # sum the non-null call counts for each callset name
+    foreach my $cs_name (keys %{$self->concordance_counts}) {
+        $n_total +=
+            $self->concordance_counts->{$cs_name}->{$VALID_CALL_KEY};
+    }
+    return $n_total;
+}
+
+
+sub _call_to_json_spec {
+    # get a list of values from a Call object, for JSON output
+    # does not include the SNP name, which is used as a hash key
+    my ($self, $call) = @_;
+    return [
+        $call->genotype,
+        $call->is_call,
+        $call->callset_name
+    ];
+}
+
 
 sub _count_calls {
     # count matching and total non-null pairs of production/QC calls
@@ -348,6 +537,31 @@ sub _count_calls {
     }
     return ($n, $k);
 }
+
+sub _validated_callset_names {
+    # validate QC callset names argument for CSV
+    # argument may contain names not used in $self, but not vice versa
+    my ($self, $callsets) = @_;
+    if (defined($callsets)) {
+        my %input_callsets;
+        foreach my $cs_name (@{$callsets}) {
+            $input_callsets{$cs_name} = 1;
+        }
+        foreach my $cs_name (@{$self->qc_callset_names}) {
+            unless ($input_callsets{$cs_name}) {
+                $self->logcroak("Array of callset names for CSV output must ",
+                                "include all callsets used for identity ",
+                                "calculation; callset '", $cs_name,
+                                "' is missing");
+            }
+        }
+    }
+    $callsets ||= $self->qc_callset_names;
+    return $callsets;
+}
+
+######################################################################
+# subroutines to do Bayesian calculation
 
 
 # find Pr(identity|calls)
@@ -434,7 +648,6 @@ sub _binomial {
     my $result = $nok * ($p**$k) * ((1-$p)**($n-$k));
     return $result;
 }
-
 
 
 __PACKAGE__->meta->make_immutable;

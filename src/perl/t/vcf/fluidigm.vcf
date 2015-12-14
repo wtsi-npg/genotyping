@@ -30,6 +30,7 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##callset_name=fluidigm
 ##plex_name=qc
 ##plex_type=fluidigm
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample001	sample002	sample003	sample004

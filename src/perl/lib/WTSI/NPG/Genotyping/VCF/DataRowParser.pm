@@ -13,10 +13,17 @@ use WTSI::NPG::Genotyping::VCF::DataRow;
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::VCF::Parser';
 
 has 'snpset'  =>
-   (is            => 'ro',
-    isa           => 'WTSI::NPG::Genotyping::SNPSet',
-    required      => 1,
-    documentation => 'SNPSet containing the variants in the VCF input',
+    (is            => 'ro',
+     isa           => 'WTSI::NPG::Genotyping::SNPSet',
+     required      => 1,
+     documentation => 'SNPSet containing the variants in the VCF input',
+ );
+
+has 'callset_name' =>
+    (is            => 'ro',
+     isa           => 'Maybe[Str]',
+     documentation => 'Optional name for a callset; calls in this row '.
+         'belong to the named callset.',
    );
 
 our $VERSION = '';
@@ -84,7 +91,7 @@ sub _call_from_vcf_string {
     # - VCF string
     # - $ref, alt alleles from vcf
     # - WTSI:Genotyping:SNP
-    # return a WTSI:Genotyping:Call object
+    # return a WTSI:Genotyping:Call object (with callset_name, if available)
     my ($self, $input, $ref, $alt, $snp) = @_;
     my @terms = split /:/msx, $input;
     if (scalar @terms != 3) {
@@ -131,12 +138,14 @@ sub _call_from_vcf_string {
     }
     my $qscore;
     if (is_Int($gq)) { $qscore = $gq; }
-    my $call = WTSI::NPG::Genotyping::Call->new
-        (snp      => $snp,
-         genotype => $genotype,
-         is_call  => $is_call,
-         qscore   => $qscore
-     );
+    my %args = (snp      => $snp,
+                genotype => $genotype,
+                is_call  => $is_call,
+                qscore   => $qscore);
+    if (defined($self->callset_name)) {
+        $args{'callset_name'} = $self->callset_name;
+    }
+    my $call = WTSI::NPG::Genotyping::Call->new(%args);
     if ($snp->strand eq '-') {
         $call = $call->complement();
     }

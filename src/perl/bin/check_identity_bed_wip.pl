@@ -46,12 +46,13 @@ run() unless caller();
 
 sub run {
 
+    my $csv_path;
     my $debug;
     my $ecp_json;
     my $ecp_default;
     my $expected_error_rate;
     my $log4perl_config;
-    my $outPath;
+    my $json_path;
     my $pass_threshold;
     my @plex_manifests;
     my @plex_manifests_irods;
@@ -63,13 +64,14 @@ sub run {
     my $verbose;
 
     GetOptions(
+        'csv=s'             => \$csv_path,
         'debug'             => \$debug,
         'ecp_json=s'        => \$ecp_json,
         'ecp_default=f'     => \$ecp_default,
         'help'              => sub { pod2usage(-verbose => 2,
                                                -exitval => 0) },
         'logconf=s'         => \$log4perl_config,
-        'out=s'             => \$outPath,
+        'json=s'            => \$json_path,
         'prior=f'           => \$sample_mismatch_prior,
         'pass_threshold=f'  => \$pass_threshold,
         'plex=s'            => \@plex_manifests,
@@ -160,6 +162,14 @@ sub run {
         }
     }
 
+    ### check output path arguments ###
+    if (!defined($json_path)) {
+        $log->logcroak("--json argument is required");
+    }
+    elsif (!defined($csv_path)) {
+        $log->logcroak("--csv argument is required");
+    }
+
     ### create identity check object ###
     my %args = (plink_path         => $plink,
                 snpset             => $snpset,
@@ -214,20 +224,7 @@ sub run {
     }
 
     ### run identity check and write output ###
-    my $result = $checker->run_identity_checks_json_spec(\%qc_calls);
-
-    my $out;
-    if (defined($outPath)) {
-        open $out, ">", $outPath ||
-            $log->logcroak("Cannot open output path '", $outPath, "'");
-    } else {
-        $out = \*STDOUT;
-    }
-    print $out encode_json($result);
-    if (defined($outPath)) {
-        close $out || $log->logcroak("Cannot open output path '",
-                                     $outPath, "'");
-    }
+    $checker->write_identity_results(\%qc_calls, $json_path, $csv_path);
 }
 
 
@@ -246,9 +243,11 @@ check_identity_bed_wip --vcf <VCF file> --plink <path stem>
 
 Options:
 
+  --csv=PATH             Path for CSV output. Required.
   --help                 Display help.
   --logconf=PATH         Path to Perl logger configuration file. Optional.
-  --out=PATH             Path for JSON output. Optional, defaults to STDOUT.
+  --json=PATH            Path for JSON output. Required. May be '-' for
+                         STDOUT.
   --pass_threshold=NUM   Minimum similarity to pass identity check. Optional.
   --plex=PATH            Path to .tsv manifest for a QC plex SNP set. Can
                          give multiple arguments for multiple plex files, eg.

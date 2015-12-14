@@ -49,7 +49,7 @@ my $embedded_conf = "
 
 my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
     $debug, $quiet, $repository, $snpset_path, $chromosome_json,
-    $metadata_json);
+    $metadata_json, $callset_name);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $SEQUENOM_TYPE = 'sequenom';
@@ -57,7 +57,8 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 
 my $irods;
 
-GetOptions('chromosomes=s'     => \$chromosome_json,
+GetOptions('callset=s'         => \$callset_name,
+           'chromosomes=s'     => \$chromosome_json,
            'metadata=s'        => \$metadata_json,
            'snpset=s'          => \$snpset_path,
            'debug'             => \$debug,
@@ -150,6 +151,9 @@ if ($metadata_json) {
     $metadata = _metadata_from_irods(\@inputs, $irods);
 } else {
     $metadata = {};
+}
+if (defined($callset_name)) {
+    $metadata->{'callset_name'} = [ $callset_name, ];
 }
 
 my %parserArgs = (resultsets => $resultsets,

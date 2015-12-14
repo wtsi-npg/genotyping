@@ -135,6 +135,11 @@ sub BUILD {
   } else {
       $test_repository = $ENV{'NPG_REPOSITORY_ROOT'};
   }
+  unless (defined($test_repository)) {
+      $self->logcroak("Test respository for Subscription.pm not defined; ",
+                      "need to specify the NPG_REPOSITORY_ROOT environment ",
+                      "variable?");
+  }
   unless (-d $test_repository) {
       $self->logcroak("Repository '", $test_repository,
                       "' does not exist or is not a directory");
