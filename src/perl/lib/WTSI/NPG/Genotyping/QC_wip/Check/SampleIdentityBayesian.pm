@@ -387,7 +387,14 @@ sub _build_concordance_counts {
     # concordance counts by QC callset name
     my ($self) = @_;
     my %concordance_counts;
+    my %all_snp_names;
     foreach my $snp_name (keys %{$self->production_calls_by_snp}) {
+        $all_snp_names{$snp_name} = 1;
+    }
+    foreach my $snp_name (keys %{$self->qc_calls_by_snp}) {
+        $all_snp_names{$snp_name} = 1;
+    }
+    foreach my $snp_name (keys %all_snp_names) {
         my $call_p = $self->production_calls_by_snp->{$snp_name};
         my $calls_q = $self->qc_calls_by_snp->{$snp_name};
         # split QC calls by callset_name
@@ -398,7 +405,10 @@ sub _build_concordance_counts {
         foreach my $callset_name (keys %calls_by_set) {
             my $calls_q_subset = $calls_by_set{$callset_name};
             my $total = scalar @{$calls_q_subset};
-            my ($n, $k) = $self->_count_calls($call_p, $calls_q_subset);
+            my ($n, $k) = (0,0);
+            if (defined($call_p)) {
+                ($n, $k) = $self->_count_calls($call_p, $calls_q_subset);
+            }
             $concordance_counts{$callset_name}{$TOTAL_CALL_KEY} += $total;
             $concordance_counts{$callset_name}{$VALID_CALL_KEY} += $n;
             $concordance_counts{$callset_name}{$EQUIVALENT_CALL_KEY} += $k;

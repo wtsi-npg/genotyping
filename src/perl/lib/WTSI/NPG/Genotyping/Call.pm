@@ -69,9 +69,10 @@ sub BUILD {
 
 sub clone {
   my ($self) = @_;
-  my %args = (snp => $self->snp,
-              genotype => $self->genotype,
-              is_call => $self->is_call,
+  my %args = (snp          => $self->snp,
+              genotype     => $self->genotype,
+              is_call      => $self->is_call,
+              callset_name => $self->callset_name,
           );
   if (defined $self->qscore) {
       $args{'qscore'} = $self->qscore;
@@ -217,18 +218,14 @@ sub is_complement {
 
 sub complement {
   my ($self) = @_;
+  my %args = (snp          => $self->snp,
+              genotype     => $self->_complement($self->genotype),
+              is_call      => $self->is_call,
+              callset_name => $self->callset_name);
   if (defined($self->qscore)) {
-      return WTSI::NPG::Genotyping::Call->new
-          (snp      => $self->snp,
-           genotype => $self->_complement($self->genotype),
-           qscore   => $self->qscore,
-           is_call  => $self->is_call);
-  } else {
-      return WTSI::NPG::Genotyping::Call->new
-          (snp      => $self->snp,
-           genotype => $self->_complement($self->genotype),
-           is_call  => $self->is_call);
+      $args{'qscore'} = $self->qscore;
   }
+  return WTSI::NPG::Genotyping::Call->new(%args);
 }
 
 =head2 merge

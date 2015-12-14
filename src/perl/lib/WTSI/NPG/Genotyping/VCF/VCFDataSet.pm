@@ -203,17 +203,17 @@ sub _find_calls {
         for (my $i=0;$i<$total;$i++) {
             my $csn_x = $x_calls[$i]->callset_name;
             my $csn_y = $y_calls[$i]->callset_name;
-            my $call;
-            if (defined($csn_x) && defined($csn_y) && $csn_x eq $csn_y) {
+            if ($csn_x eq $csn_y) {
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                     x_call       => $x_calls[$i],
                     y_call       => $y_calls[$i],
                     callset_name => $csn_x
                 );
             } else {
-                $self->info("Undefined or conflicting callset names ",
-                            "for X and Y calls, using ",
-                            "default name for GenderMarkerCall");
+                $self->logwarn("Conflicting callset names ",
+                               "for X and Y calls: [", $csn_x, ", ", $csn_y,
+                               "]. Using ",
+                               "default name for GenderMarkerCall");
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                     x_call       => $x_calls[$i],
                     y_call       => $y_calls[$i]
