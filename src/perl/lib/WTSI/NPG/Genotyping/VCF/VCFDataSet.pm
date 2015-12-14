@@ -203,6 +203,7 @@ sub _find_calls {
         for (my $i=0;$i<$total;$i++) {
             my $csn_x = $x_calls[$i]->callset_name;
             my $csn_y = $y_calls[$i]->callset_name;
+            my $call;
             if ($csn_x eq $csn_y) {
                 $call = WTSI::NPG::Genotyping::GenderMarkerCall->new(
                     x_call       => $x_calls[$i],
