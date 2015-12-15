@@ -1,6 +1,4 @@
 
-use utf8;
-
 {
   package WTSI::NPG::Database::WarehouseStub;
 
@@ -11,7 +9,7 @@ use utf8;
 
   sub find_infinium_gex_sample {
     return {internal_id        => 123456789,
-            sanger_sample_id   => 'QC1Hip-86',
+            sanger_sample_id   => 'QC1Hip-88',
             consent_withdrawn  => 0,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
@@ -26,12 +24,12 @@ use utf8;
             barcode_prefix     => 'DN',
             barcode            => '294866',
             plate_purpose_name => 'GEX',
-            map                => 'A01'};
+            map                => 'C03'};
   }
 
   sub find_infinium_gex_sample_by_sanger_id {
     return {internal_id        => 123456789,
-            sanger_sample_id   => 'QC1Hip-86',
+            sanger_sample_id   => 'QC1Hip-88',
             consent_withdrawn  => 0,
             donor_id           => 'D999',
             uuid               => 'AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDD',
@@ -46,7 +44,7 @@ use utf8;
             barcode_prefix     => 'DN',
             barcode            => '294866',
             plate_purpose_name => 'GEX',
-            map                => 'A01'};
+            map                => 'C03'};
   }
 }
 
@@ -79,8 +77,8 @@ my @data_files = ("$data_path/0123456789_A_Grn.idat",
                   "$data_path/0123456789_B_Grn.idat",
                   "$data_path/0123456789_B_Grn.xml",
 
-                  "$data_path/0123456789_C_Grn.idat",
-                  "$data_path/0123456789_C_Grn.xml");
+                  "$data_path/012345678901_C_Grn.idat",
+                  "$data_path/012345678901_C_Grn.xml");
 
 my $irods_tmp_coll;
 
@@ -144,7 +142,7 @@ sub publish : Test(21) {
 
   my $publication_time = DateTime->now;
   my $publisher = WTSI::NPG::Expression::Publisher->new
-    (data_files       => [@data_files[0 .. 1]],
+    (data_files       => [@data_files[4 .. 5]],
      manifest         => $manifest,
      publication_time => $publication_time,
      sequencescape_db => $ssdb);
@@ -158,15 +156,15 @@ sub publish : Test(21) {
   my $irods = WTSI::NPG::iRODS->new;
   my @idat_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
-     [beadchip             => '0123456789'],
-     [beadchip_section     => 'A'],
+     [beadchip             => '012345678901'],
+     [beadchip_section     => 'C'],
      [type                 => 'idat']);
   cmp_ok(scalar @idat_files, '==', 1, 'Number of idat files published');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-86'},
+    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-88'},
      {attribute => 'gex_plate',               value => 'DN294866F'}, # manifest
-     {attribute => 'gex_well',                value => 'A1'},        # manifest
+     {attribute => 'gex_well',                value => 'C3'},        # manifest
      {attribute => 'md5',
       value     => 'd41d8cd98f00b204e9800998ecf8427e' },
      {attribute => 'sample',                  value => 'sample1' },
@@ -186,9 +184,9 @@ sub publish : Test(21) {
 
   my @xml_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
-     [beadchip             => '0123456789'],
-     [beadchip_section     => 'A'],
-     ['dcterms:identifier' => 'QC1Hip-86'],
+     [beadchip             => '012345678901'],
+     [beadchip_section     => 'C'],
+     ['dcterms:identifier' => 'QC1Hip-88'],
      [type                 => 'xml']);
   cmp_ok(scalar @xml_files, '==', 1, 'Number of XML files published');
 }
@@ -203,7 +201,7 @@ sub publish_overwrite : Test(22) {
 
   my $publication_time = DateTime->now;
   my $publisher = WTSI::NPG::Expression::Publisher->new
-    (data_files       => [@data_files[0 .. 1]],
+    (data_files       => [@data_files[4 .. 5]],
      manifest         => $manifest,
      publication_time => $publication_time,
      sequencescape_db => $ssdb);
@@ -221,15 +219,15 @@ sub publish_overwrite : Test(22) {
   my $irods = WTSI::NPG::iRODS->new;
   my @idat_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
-     [beadchip             => '0123456789'],
-     [beadchip_section     => 'A'],
+     [beadchip             => '012345678901'],
+     [beadchip_section     => 'C'],
      [type                 => 'idat']);
   cmp_ok(scalar @idat_files, '==', 1, 'Number of idat files published');
 
   my $expected_meta =
-    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-86'},
+    [{attribute => 'dcterms:identifier',      value => 'QC1Hip-88'},
      {attribute => 'gex_plate',               value => 'DN294866F'}, # manifest
-     {attribute => 'gex_well',                value => 'A1'},        # manifest
+     {attribute => 'gex_well',                value => 'C3'},        # manifest
      {attribute => 'md5',
       value     => 'd41d8cd98f00b204e9800998ecf8427e' },
      {attribute => 'sample',                  value => 'sample1' },
@@ -249,9 +247,9 @@ sub publish_overwrite : Test(22) {
 
   my @xml_files = $irods->find_objects_by_meta
     ($irods_tmp_coll,
-     [beadchip             => '0123456789'],
-     [beadchip_section     => 'A'],
-     ['dcterms:identifier' => 'QC1Hip-86'],
+     [beadchip             => '012345678901'],
+     [beadchip_section     => 'C'],
+     ['dcterms:identifier' => 'QC1Hip-88'],
      [type                 => 'xml']);
   cmp_ok(scalar @xml_files, '==', 1, 'Number of XML files published');
 }

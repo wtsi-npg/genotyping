@@ -325,6 +325,11 @@ sub includedSampleCsv {
             else { $metricResult[0] = 'Fail'; }
             if ($metric eq $GENDER_NAME) { # use human-readable gender names
                 $metricResult[2] = $GENDERS[$metricResult[2]];
+                # 'supplied' Plink gender may be -9 or other arbitrary number
+                my $totalCodes = scalar @GENDERS;
+                if ($metricResult[3] < 0 || $metricResult[3] >= $totalCodes){
+                    $metricResult[3] = $totalCodes - 1; # 'not available'
+                }
                 $metricResult[3] = $GENDERS[$metricResult[3]];
             }
             push (@fields, @metricResult);
@@ -694,8 +699,10 @@ sub collate {
     %config = %{decode_json(readFileToString($configPath))};
     %FILENAMES = %{$config{'collation_names'}};
 
-    # 0) reprocess duplicate results for given threshold
-    processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
+    # 0) reprocess duplicate results for given threshold (if any)
+    if (defined($thresholdConfig{$DUP_NAME})) {
+        processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
+    }
 
     # 1) find metric values (and write to file if required)
     my $metricResultsRef = findMetricResults($inputDir, \@metricNames);

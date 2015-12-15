@@ -50,17 +50,18 @@ has 'snpset' =>
    required => 0,
    weak_ref => 1);
 
-=head2 is_gender_marker
+=head2 is_x_or_y_marker
 
   Arg [1]    : None
 
-  Description: Return true if this SNP is actually a gender marker.
+  Description: Return true if this SNP is actually an X or Y chromosome
+               marker (ie. one half of a gender marker).
 
   Returntype : Bool
 
 =cut
 
-sub is_gender_marker {
+sub is_x_or_y_marker {
   my ($self) = @_;
 
   return $self->name =~ m{^GS}msx;

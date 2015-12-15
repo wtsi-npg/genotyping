@@ -1,6 +1,6 @@
 #-- encoding: UTF-8
 #
-# Copyright (c) 2013 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2013, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -69,6 +69,9 @@ Arguments:
     memory:        <integer> number of Mb to request for jobs.
     queue:         <normal | long etc.> An LSF queue hint. Optional, 
                    defaults to'normal'.
+    vcf:           <path> Path to VCF file for identity QC
+    plex_manifest: <path> Path to plex manifest file for identity QC
+
 
 e.g.
 
@@ -83,6 +86,8 @@ e.g.
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
        plex_manifest: /genotyping/manifests/fluidigm.tsv
        egt: /genotyping/clusters/Human670-QuadCustom_v1.egt
+       vcf: /work/my_project/qc_calls.vcf
+       plex_manifest: /genotyping/manifests/qc.tsv
 
 Returns:
 
@@ -92,10 +97,10 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
-                               :egt, :queue, :memory, :select, :chunk_size,
-                               :fam_dummy, :zstart, :ztotal, :filterconfig,
-                               :nofilter, :nosim)
+      args = ensure_valid_args(args, :config, :manifest, :egt, :queue, 
+                               :memory, :select, :chunk_size, :fam_dummy,
+                               :zstart, :ztotal, :filterconfig, :nofilter, 
+                               :nosim, :vcf, :plex_manifest)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -111,6 +116,7 @@ Returns:
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
       nosim = args.delete(:nosim) || nil # omit sim files for qc?
+      vcf = args.delete(:vcf) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -126,16 +132,15 @@ Returns:
       maybe_version_log(log_dir)
 
       run_name = run_name.to_s;
-      gcsjname = run_name + '.gencall.sample.json'
       gcsimname = run_name + '.gencall.sim'
       zsimname = run_name + '.zcall_qc.sim'
+      gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.sample.json'
       njname = run_name + '.snp.json'
       cjname = run_name + '.chr.json'
       zname = run_name + '.zcall.bed'
 
       gcsjson = sample_intensities(dbfile, run_name, gcsjname, args) 
-
 
       ## normalize manifest
       manifest_name = File.basename(manifest_raw, '.bpm.csv')
@@ -155,13 +160,13 @@ Returns:
       if nofilter
         filtered = true
       else
-        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                             gcsimfile, manifest_raw, plex_manifest,
+        filtered = prefilter(dbfile, run_name, work_dir, fconfig, gcsjson,
+                             gcsimfile, manifest_raw, vcf, plex_manifest,
                              args, async)
         # must use raw manifest; see comment in prefilter method
       end
 
-      ## find sample intensity data
+      ## find sample intensity data for zcall
       sjson = nil
       if filtered
         siargs = {:config => gtconfig}.merge(args)
@@ -228,7 +233,14 @@ Returns:
                     :plex_manifest => plex_manifest}.merge(args)
         end
       end
-      if qcargs
+      if qcargs # ready to start QC
+        if vcf and plex_manifest
+          qcargs = {
+            :vcf => vcf,
+            :plex_manifest => plex_manifest,
+            :sample_json => sjson
+          }.merge(qcargs)
+        end
         zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       end
       # update placeholder value in Plink .fam files
@@ -248,7 +260,8 @@ Returns:
     end
     
     def prefilter(dbfile, run_name, work_dir, fconfig, gcsjson, 
-                  gcsimfile, manifest, plex_manifest, args, async)
+                  gcsimfile, manifest, vcf, plex_manifest,
+                  args, async)
       # Run GenCall QC and apply prefilter to remove failing samples
       filtered = nil
       fname = run_name + '.prefilter_results.json'
@@ -270,6 +283,14 @@ Returns:
         else
           gcqcargs = {:zcall_filter => true}.merge(gcqcargs)
         end
+        if vcf and plex_manifest
+          gcqcargs = {
+            :vcf => vcf,
+            :sample_json => gcsjson,
+            :plex_manifest => plex_manifest
+          }.merge(gcqcargs)
+        end
+
         ## run gencall QC to get metrics for prefiltering
         gcqcdir = File.join(work_dir, 'gencall_qc')
         gcquality = quality_control(dbfile, gcsfile, gcqcdir,

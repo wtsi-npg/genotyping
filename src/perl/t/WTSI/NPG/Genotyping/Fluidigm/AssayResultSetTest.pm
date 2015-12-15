@@ -118,8 +118,8 @@ sub assay_addresses : Test(1) {
              'Contains expected assay addresses') or diag explain \@addresses;
 }
 
-sub sample_name : Test(1) {
-  is($resultset->sample_name, 'ABC0123456789', 'Correct sample name');
+sub canonical_sample_id : Test(1) {
+  is($resultset->canonical_sample_id, 'ABC0123456789', 'Correct sample ID');
 }
 
 sub snp_names : Test(1) {

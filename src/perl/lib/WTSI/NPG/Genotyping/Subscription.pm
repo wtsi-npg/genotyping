@@ -4,14 +4,21 @@ package WTSI::NPG::Genotyping::Subscription;
 
 use Moose::Role;
 use JSON;
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(all natatime uniq);
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
+use WTSI::NPG::Genotyping::VCF::ReferenceFinder;
 use WTSI::NPG::iRODS;
 
 our $VERSION = '';
 
 our $CHROMOSOME_JSON_ATTR = 'chromosome_json';
+our $REF_GENOME_NAME_ATTR = 'reference_name';
+our $SNPSET_VERSION_ATTR = 'snpset_version';
+
+# The largest number of bind variables iRODS supports for 'IN'
+# queries.
+our $BATCH_QUERY_CHUNK_SIZE = 100;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
@@ -46,11 +53,33 @@ has 'reference_name' =>
    documentation => 'The name of the reference on which the SNP set ' .
                     ' is defined e.g. "Homo sapiens (1000 Genomes)"');
 
+has 'repository' =>
+  (is             => 'ro',
+   isa            => 'Maybe[Str]',
+   default        => $ENV{NPG_REPOSITORY_ROOT},
+   documentation  => 'Root directory containing NPG genome references',
+);
+
+has 'snpset' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::SNPSet',
+   required => 1,
+   builder  => '_build_snpset',
+   lazy     => 1,
+   init_arg => undef);
+
 has 'snpset_name' =>
   (is            => 'ro',
    isa           => 'Str',
    required      => 1,
    documentation => 'The name of the SNP set e.g. "W35961"');
+
+
+has 'snpset_version' =>
+  (is            => 'ro',
+   isa           => 'Str',
+   required      => 0,
+   documentation => 'SNP set version used for assay results');
 
 has '_chromosome_lengths' =>
   (is       => 'ro',
@@ -67,14 +96,6 @@ has '_plex_name_attr' =>
    isa           => 'Str',
    init_arg      => undef,
    documentation => 'iRODS attribute for QC plex name; varies by plex type');
-
-has '_snpset' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::SNPSet',
-   required => 1,
-   builder  => '_build_snpset',
-   lazy     => 1,
-   init_arg => undef);
 
 has '_snpset_data_object' =>
   (is       => 'ro',
@@ -105,7 +126,54 @@ sub BUILD {
   } elsif (!$self->reference_name) {
       $self->logcroak("Must have a non-null reference_name argument");
   }
+
+  # test repository directory
+  # Moose does not appear to assign default until after BUILD is run
+  my $test_repository;
+  if (defined($self->repository)) {
+      $test_repository = $self->repository;
+  } else {
+      $test_repository = $ENV{'NPG_REPOSITORY_ROOT'};
+  }
+  unless (defined($test_repository)) {
+      $self->logcroak("Test respository for Subscription.pm not defined; ",
+                      "need to specify the NPG_REPOSITORY_ROOT environment ",
+                      "variable?");
+  }
+  unless (-d $test_repository) {
+      $self->logcroak("Repository '", $test_repository,
+                      "' does not exist or is not a directory");
+  }
+
 }
+
+
+=head2 find_irods_snpset
+
+  Arg [1]    : Str reference path to search under
+  Arg [2]    : Str reference name in irods metadata
+  Arg [3]    : Str snpset name in irods metadata
+  Arg [4]    : Maybe[Str] snpset version in irods metadata
+  Example    : my $snpset = $sub->find_irods_snpset(@args);
+  Description: Method to query iRODS and find a snpset object. Optional
+               version string is used to find the correct SNPSet version for
+               VCF input/output.
+  Returntype : WTSI::NPG::Genotyping::SNPSet
+
+=cut
+
+sub find_irods_snpset {
+    my ($self, $ref_path, $ref_name, $snpset_name, $snpset_version) = @_;
+    unless ($ref_path && $ref_name && $snpset_name) {
+        $self->logcroak("Missing argument(s) to find_irods_snpset");
+    }
+    my $data_obj = $self->_find_snpset_data_object($ref_path,
+                                                   $ref_name,
+                                                   $snpset_name,
+                                                   $snpset_version);
+    return WTSI::NPG::Genotyping::SNPSet->new($data_obj);
+}
+
 
 =head2 get_chromosome_lengths
 
@@ -123,19 +191,130 @@ sub get_chromosome_lengths {
 }
 
 
-=head2 get_snpset
+=head2 find_object_paths
 
-  Arg [1]    : None
-  Example    : my $snpset = $sub->get_snpset();
-  Description: Accessor method for the snpset attribute. Used to get a
-               snpset for input to a VCF::AssayResultParser constructor.
-  Returntype : WTSI::NPG::Genotyping::SNPSet
+  Arg [1]    : ArrayRef[Str] of sample identifiers
+  Arg [2..]  : Optional specs for iRODS metadata query
+  Example    : my @object_paths = $sub->find_object_paths();
+  Description: Find paths for data objects in iRODS corresponding to the
+               given sample identifiers.
+  Returntype : Array[Str]
 
 =cut
 
-sub get_snpset {
-    my ($self) = @_;
-    return $self->_snpset;
+sub find_object_paths {
+    my ($self, $sample_identifiers, @query_specs) = @_;
+
+    defined $sample_identifiers or
+        $self->logconfess('A defined sample_identifiers ',
+                          'argument is required');
+    ref $sample_identifiers eq 'ARRAY' or
+        $self->logconfess('The sample_identifiers argument ',
+                          'must be an ArrayRef');
+    _are_unique($sample_identifiers) or
+        $self->logconfess('The sample_identifiers argument contained ',
+                          'duplicate values: [',
+                          join(q{, }, @$sample_identifiers), ']');
+
+    my $num_samples = scalar @$sample_identifiers;
+    my $chunk_size = $BATCH_QUERY_CHUNK_SIZE;
+
+    $self->debug("Getting results for $num_samples samples in chunks of ",
+                 $chunk_size);
+
+    my @obj_paths;
+    my $iter = natatime $chunk_size, @$sample_identifiers;
+    while (my @ids = $iter->()) {
+        my @id_obj_paths = $self->irods->find_objects_by_meta
+            ($self->data_path,
+             [$self->_plex_name_attr => $self->snpset_name],
+             [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
+        push @obj_paths, @id_obj_paths;
+    }
+    return @obj_paths;
+}
+
+
+=head2 find_resultsets_index
+
+  Arg [1]    : ArrayRef[AssayResultSet] of QC plex AssayResultSets
+  Arg [2]    : ArrayRef[Str] of sample identifiers
+  Example    : my $ri = $sub->find_resultsets_index($resultsets, $sample_ids);
+  Description: Index the results by sample identifier. The identifier is
+               guaranteed to be present in the metadata because it was in the
+               search criteria. No assumptions can be made about the order in
+               which iRODS has returned the results, with respect to the
+               arguments of the 'IN' clause.
+  Returntype : HashRef[ArrayRef[AssayResultSet]]
+
+=cut
+
+sub find_resultsets_index {
+    my ($self, $resultsets, $sample_identifiers) = @_;
+    my %resultsets_index;
+    foreach my $sample_identifier (@$sample_identifiers) {
+        unless (exists $resultsets_index{$sample_identifier}) {
+            $resultsets_index{$sample_identifier} = [];
+        }
+        my @sample_resultsets = grep {
+            $_->data_object->get_avu($self->dcterms_identifier_attr,
+                                     $sample_identifier) } @{$resultsets};
+        $self->debug("Found ", scalar @sample_resultsets, " resultsets for ",
+                     "sample '$sample_identifier'");
+        # Sanity check that the contents are consistent
+        my @sample_names = map { $_->canonical_sample_id } @sample_resultsets;
+        unless (all { $_ eq $sample_names[0] } @sample_names) {
+            $self->logconfess("The resultsets found for sample AVU value ",
+                              "'$sample_identifier'",
+                              ": did not all have the same ",
+                              "sample name in their data: [",
+                              join(q{, }, @sample_names), "]");
+        }
+        push @{$resultsets_index{$sample_identifier}}, @sample_resultsets;
+    }
+    return \%resultsets_index;
+}
+
+
+=head2 vcf_metadata_from_irods
+
+  Arg [1]    : ArrayRef[DataObject] of iRODS DataObjects
+  Example    : my $vcf_meta = $sub->vcf_metadata_from_irods($objects);
+  Description: Retrieve iRODS metadata for the given DataObjects and use to
+               construct VCF metadata.
+  Returntype : HashRef[ArrayRef[Str]]
+
+=cut
+
+sub vcf_metadata_from_irods {
+    my ($self, $data_objects) = @_;
+    my %vcf_meta;
+    foreach my $obj (@{$data_objects}) { # check iRODS metadata
+        my @obj_meta = @{$obj->metadata};
+        foreach my $pair (@obj_meta) {
+            my $key = $pair->{'attribute'};
+            my $val = $pair->{'value'};
+            if ($key eq 'fluidigm_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'fluidigm';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            } elsif ($key eq 'sequenom_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'sequenom';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            }
+            elsif ($key eq 'reference') {
+                my $rf = WTSI::NPG::Genotyping::VCF::ReferenceFinder->new(
+                    reference_genome => $val,
+                    repository => $self->repository,
+                );
+                push @{ $vcf_meta{'reference'} }, $rf->get_reference_uri();
+            }
+        }
+    }
+    foreach my $key (keys %vcf_meta) {
+        my @values = @{$vcf_meta{$key}};
+        $vcf_meta{$key} = [ uniq @values ];
+    }
+    return \%vcf_meta;
 }
 
 
@@ -167,38 +346,57 @@ sub _build_chromosome_lengths {
 }
 
 sub _build_snpset {
-   my ($self) = @_;
-   return WTSI::NPG::Genotyping::SNPSet->new($self->_snpset_data_object);
+    my ($self) = @_;
+    return WTSI::NPG::Genotyping::SNPSet->new($self->_snpset_data_object);
+
 }
 
 sub _build_snpset_data_object {
    my ($self) = @_;
+   return $self->_find_snpset_data_object(
+       $self->reference_path,
+       $self->reference_name,
+       $self->snpset_name,
+       $self->snpset_version
+   );
+}
 
-   my $snpset_name = $self->snpset_name;
-   my $reference_name = $self->reference_name;
-
-   my @obj_paths = $self->irods->find_objects_by_meta
-     ($self->reference_path,
-      [$self->_plex_name_attr            => $snpset_name],
-      [$self->reference_genome_name_attr => $reference_name]);
-
-   my $num_snpsets = scalar @obj_paths;
-   if ($num_snpsets > 1) {
-       $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
-                         "and reference '$reference_name' ",
-                         "under reference path '", $self->reference_path,
-                         "' was not specific enough; $num_snpsets SNP sets ",
-                         "were returned: [", join(', ',  @obj_paths), "]");
+sub _find_snpset_data_object {
+    my ($self, $ref_path, $ref_name, $snpset_name, $snpset_version) = @_;
+    unless ($ref_path && $ref_name && $snpset_name) {
+        $self->logcroak("Missing argument(s) to find_snpset_data_object");
+    }
+    my @imeta_args =
+       ($ref_path,
+        [$self->_plex_name_attr  => $snpset_name],
+        [$REF_GENOME_NAME_ATTR   => $ref_name],
+    );
+    if (defined($snpset_version)) {
+        push @imeta_args, [$SNPSET_VERSION_ATTR => $snpset_version];
+    }
+    my @obj_paths = $self->irods->find_objects_by_meta(@imeta_args);
+    my $num_snpsets = scalar @obj_paths;
+    unless (defined($snpset_version)) {
+        $snpset_version = '(not supplied)';
+    }
+    if ($num_snpsets > 1) {
+        $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
+                          "and reference '$ref_name' ",
+                          "under reference path '", $ref_path,
+                          "', with snpset version ", $snpset_version,
+                          " was not specific enough; $num_snpsets SNP sets ",
+                          "were returned: [", join(', ',  @obj_paths), "]");
    } elsif ($num_snpsets == 0) {
         $self->logconfess("The SNP set query for SNP set '$snpset_name' ",
-                         "and reference '$reference_name' ",
-                         "under reference path '", $self->reference_path,
-                         "' did not return any SNP sets");
+                          "and reference '$ref_name' ",
+                          "under reference path '", $ref_path,
+                          "', with snpset version ", $snpset_version,
+                          " did not return any SNP sets");
    }
-
-   my $path = shift @obj_paths;
-   return WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
+    my $path = shift @obj_paths;
+    return WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
 }
+
 
 no Moose;
 

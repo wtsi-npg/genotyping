@@ -1,0 +1,53 @@
+##fileformat=VCFv4.2
+##fileDate=20150730
+##source=WTSI_NPG_genotyping_pipeline
+##reference=t/vcf/W30467_snp_set_info_GRCh37.tsv
+##contig=<ID=1,length=249250621,species="Homo sapiens">
+##contig=<ID=10,length=135534747,species="Homo sapiens">
+##contig=<ID=11,length=135006516,species="Homo sapiens">
+##contig=<ID=12,length=133851895,species="Homo sapiens">
+##contig=<ID=13,length=115169878,species="Homo sapiens">
+##contig=<ID=14,length=107349540,species="Homo sapiens">
+##contig=<ID=15,length=102531392,species="Homo sapiens">
+##contig=<ID=16,length=90354753,species="Homo sapiens">
+##contig=<ID=17,length=81195210,species="Homo sapiens">
+##contig=<ID=18,length=78077248,species="Homo sapiens">
+##contig=<ID=19,length=59128983,species="Homo sapiens">
+##contig=<ID=2,length=243199373,species="Homo sapiens">
+##contig=<ID=20,length=63025520,species="Homo sapiens">
+##contig=<ID=21,length=48129895,species="Homo sapiens">
+##contig=<ID=22,length=51304566,species="Homo sapiens">
+##contig=<ID=3,length=198022430,species="Homo sapiens">
+##contig=<ID=4,length=191154276,species="Homo sapiens">
+##contig=<ID=5,length=180915260,species="Homo sapiens">
+##contig=<ID=6,length=171115067,species="Homo sapiens">
+##contig=<ID=7,length=159138663,species="Homo sapiens">
+##contig=<ID=8,length=146364022,species="Homo sapiens">
+##contig=<ID=9,length=141213431,species="Homo sapiens">
+##contig=<ID=X,length=155270560,species="Homo sapiens">
+##contig=<ID=Y,length=59373566,species="Homo sapiens">
+##INFO=<ID=ORIGINAL_STRAND,Number=1,Type=String,Description="Direction of strand in input file">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	000000_A00_DUMMY-SAMPLE	249441_F11_HELIC5102138	249442_C09_HELIC5102247	249461_G12_HELIC5215300	249469_H06_HELIC5274668	249470_F02_HELIC5274730
+1	74941293	rs649058	G	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/1:.:1
+1	237048500	rs1805087	A	G	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	1/1:.:1
+1	240492734	rs3795677	G	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	./.:.:1	1/0:.:1	1/1:.:1
+2	49189921	rs6166	C	T	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/1:.:1
+2	211060050	rs2286963	T	G	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	./.:.:1	1/0:.:1	0/1:.:1
+2	234601669	rs6759892	T	G	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1
+3	183818416	rs7627615	G	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1
+5	90151589	rs2247870	G	A	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	0/1:.:1
+7	45932669	rs4619	A	G	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	0/1:.:1
+8	12957475	rs532841	C	T	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1
+8	23060256	rs6557634	T	C	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1
+10	106022789	rs4925	C	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	./.:.:1	1/0:.:1	1/0:.:1
+11	17408630	rs5215	C	T	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1
+12	109937534	rs7298565	G	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1
+13	110818598	rs3742207	T	G	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	0/1:.:1
+15	86123988	rs4075254	G	A	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	0/1:.:1
+15	86124555	rs4843075	G	A	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	./.:.:1	1/0:.:1	1/0:.:1
+17	3480447	rs8065080	T	C	.	.	.	GT:GQ:DP	./.:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1	1/0:.:1
+19	41869392	rs2241714	T	C	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	./.:.:1	0/1:.:1	0/1:.:1
+20	39797465	rs753381	T	C	.	.	.	GT:GQ:DP	./.:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1	0/1:.:1

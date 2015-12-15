@@ -61,7 +61,7 @@ sub canonical_call {
 
   my $call = $self->genotype_id;
   if (!$call) {
-    $call = ''; # FIXME -- check that this empty string should be permitted
+    $call = 'NN'; # TODO if genotype is missing, is converting to no-call OK?
   } elsif (length($call) == 1) {
     $call = $call . $call; # homozygote or no call
   }
@@ -92,6 +92,38 @@ sub canonical_sample_id {
     return $self->sample_id;
 }
 
+
+=head2 equivalent_within_allele
+
+  Arg [1]    : WTSI::NPG::Genotyping::Sequenom::AssayResult
+
+  Example    : $equivalent = $result->equivalent_within_allele($other);
+  Description: Return True if the two AssayResults are identical, or differ
+               only by allele (and CSV input string); False otherwise
+  Returntype : Bool
+
+=cut
+
+sub equivalent_within_allele {
+    my ($self, $other) = @_;
+
+    my $equivalent = 0;
+    if (
+        $self->assay_id      eq $other->assay_id &&
+        $self->chip          eq $other->chip &&
+        $self->customer      eq $other->customer &&
+        $self->experiment    eq $other->experiment &&
+        $self->genotype_id   eq $other->genotype_id &&
+        $self->height        == $other->height &&
+        $self->mass          == $other->mass &&
+        $self->plate         eq $other->plate &&
+        $self->sample_id     eq $other->sample_id &&
+        $self->well_position eq $other->well_position
+    ) {
+        $equivalent = 1;
+    }
+    return $equivalent;
+}
 
 =head2 qscore
 

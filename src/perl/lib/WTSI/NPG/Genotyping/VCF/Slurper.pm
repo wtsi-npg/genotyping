@@ -6,14 +6,18 @@ use Moose;
 
 use WTSI::NPG::Genotyping::VCF::DataRowParser;
 use WTSI::NPG::Genotyping::VCF::HeaderParser;
+use WTSI::NPG::Genotyping::VCF::VCFDataSet;
+use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'snpset'  =>
    (is            => 'ro',
     isa           => 'WTSI::NPG::Genotyping::SNPSet',
-    required      => 1,
+    builder       => '_build_snpset',
     documentation => 'SNPSet containing the variants in the VCF input',
+    lazy          => 1,
    );
 
 has 'input_filehandle' =>
@@ -23,6 +27,21 @@ has 'input_filehandle' =>
     documentation => 'Filehandle for input of VCF data.',
    );
 
+has 'irods'      =>
+  (is            => 'ro',
+   isa           => 'WTSI::NPG::iRODS',
+   required      => 1,
+   default       => sub { return WTSI::NPG::iRODS->new },
+   documentation => 'An iRODS handle');
+
+has 'header' =>
+   (is            => 'ro',
+    isa           => 'WTSI::NPG::Genotyping::VCF::Header',
+    builder       => '_build_header',
+    documentation => 'Object representing the VCF header',
+    lazy          => 1,
+   );
+
 has 'sample_names' =>
    (is             => 'ro',
     isa            => 'ArrayRef[Str]',
@@ -30,7 +49,20 @@ has 'sample_names' =>
                       'override names read from the VCF header.'
    );
 
+has 'snpset_irods_paths' =>
+   (is             => 'ro',
+    isa            => 'HashRef[HashRef[Str]]',
+    documentation  => "Optional hashref containing snpset iRODS paths by ".
+                      "platform name (eg. 'sequenom', 'fluidigm') and ".
+                      "snpset name (eg. 'W30467', 'qc')."
+   );
+
+
 our $VERSION = '';
+
+# can supply a JSON config file instead of SNPSet object
+# uses config to look up snpset from metadata in VCF header
+# alternatively, just use hard-coded defaults
 
 
 =head2 read_dataset
@@ -46,22 +78,60 @@ our $VERSION = '';
 
 sub read_dataset {
     my ($self) = @_;
+    # header is read first, to get callset name (if any)
+    my $callset_name = $self->header->metadata->{'callset_name'}->[0];
+    my $rowParser = WTSI::NPG::Genotyping::VCF::DataRowParser->new(
+        input_filehandle => $self->input_filehandle,
+        snpset => $self->snpset,
+        callset_name => $callset_name,
+    );
+    my $rows = $rowParser->get_all_remaining_rows();
+    return WTSI::NPG::Genotyping::VCF::VCFDataSet->new(
+        header => $self->header,
+        data   => $rows,
+    );
+}
+
+sub _build_header {
+    my ($self) = @_;
     my %hpArgs = (  input_filehandle => $self->input_filehandle );
     if ($self->sample_names) {
         $hpArgs{'sample_names'} = $self->sample_names;
     }
     my $headerParser = WTSI::NPG::Genotyping::VCF::HeaderParser->new(
         %hpArgs);
-    my $header = $headerParser->header();
-    my $rowParser = WTSI::NPG::Genotyping::VCF::DataRowParser->new(
-        input_filehandle => $self->input_filehandle,
-        snpset => $self->snpset,
-    );
-    my $rows = $rowParser->get_all_remaining_rows();
-    return WTSI::NPG::Genotyping::VCF::VCFDataSet->new(
-        header => $header,
-        data   => $rows,
-    );
+    return $headerParser->header();
+}
+
+sub _build_snpset {
+    # use metadata from header to look up snpset location in iRODS
+    my ($self) = @_;
+    unless (defined($self->snpset_irods_paths)) {
+        $self->logcroak("Cannot build snpset from VCF header without a ",
+                        "snpset_paths attribute");
+    }
+    my %metadata = %{$self->header->metadata};
+
+    if (!defined($metadata{'plex_type'}) ||
+            !defined($metadata{'plex_name'})) {
+        $self->logcroak("Cannot build snpset from VCF header without ",
+                        "plex_type and plex_name entries");
+    }
+    my @plex_types =  @{$metadata{'plex_type'}};
+    if (scalar @plex_types > 1) {
+        $self->logcroak("Cannot have more than one plex type in VCF header");
+    }
+    my @plex_names =  @{$metadata{'plex_name'}};
+    if (scalar @plex_names > 1) {
+        $self->logcroak("Cannot have more than one plex name in VCF header");
+    }
+    my $plex_type = shift @plex_types;
+    my $plex_name = shift @plex_names;
+    my $snpset_path = $self->snpset_irods_paths->{$plex_type}->{$plex_name};
+    my $snpset_obj = WTSI::NPG::iRODS::DataObject->new(
+        $self->irods,
+        $snpset_path);
+    return WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);
 }
 
 

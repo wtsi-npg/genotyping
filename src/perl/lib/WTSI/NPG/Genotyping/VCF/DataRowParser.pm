@@ -4,21 +4,26 @@ package WTSI::NPG::Genotyping::VCF::DataRowParser;
 
 use Moose;
 
-extends 'WTSI::NPG::Genotyping::VCF::Parser';
-
 use MooseX::Types::Moose qw(Int);
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Genotyping::VCF::DataRow;
 
-with 'WTSI::DNAP::Utilities::Loggable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::VCF::Parser';
 
 has 'snpset'  =>
-   (is            => 'ro',
-    isa           => 'WTSI::NPG::Genotyping::SNPSet',
-    required      => 1,
-    documentation => 'SNPSet containing the variants in the VCF input',
+    (is            => 'ro',
+     isa           => 'WTSI::NPG::Genotyping::SNPSet',
+     required      => 1,
+     documentation => 'SNPSet containing the variants in the VCF input',
+ );
+
+has 'callset_name' =>
+    (is            => 'ro',
+     isa           => 'Maybe[Str]',
+     documentation => 'Optional name for a callset; calls in this row '.
+         'belong to the named callset.',
    );
 
 our $VERSION = '';
@@ -86,7 +91,7 @@ sub _call_from_vcf_string {
     # - VCF string
     # - $ref, alt alleles from vcf
     # - WTSI:Genotyping:SNP
-    # return a WTSI:Genotyping:Call object
+    # return a WTSI:Genotyping:Call object (with callset_name, if available)
     my ($self, $input, $ref, $alt, $snp) = @_;
     my @terms = split /:/msx, $input;
     if (scalar @terms != 3) {
@@ -133,12 +138,14 @@ sub _call_from_vcf_string {
     }
     my $qscore;
     if (is_Int($gq)) { $qscore = $gq; }
-    my $call = WTSI::NPG::Genotyping::Call->new
-        (snp      => $snp,
-         genotype => $genotype,
-         is_call  => $is_call,
-         qscore   => $qscore
-     );
+    my %args = (snp      => $snp,
+                genotype => $genotype,
+                is_call  => $is_call,
+                qscore   => $qscore);
+    if (defined($self->callset_name)) {
+        $args{'callset_name'} = $self->callset_name;
+    }
+    my $call = WTSI::NPG::Genotyping::Call->new(%args);
     if ($snp->strand eq '-') {
         $call = $call->complement();
     }
@@ -160,12 +167,15 @@ sub _parse_data_row {
     my $snp_name = $fields[$self->_field_index('VARIANT_NAME')];
     my $snp = $self->snpset->named_snp($snp_name);
     # TODO: do (chromosome, position) match in manifest and VCF file?
-    # Problem: Different chromosome naming conventions, eg. Chr1 vs. 1
+    # Chromosome names should be consistent if references are consistent
     my @calls;
     my $i = $self->_field_index('SAMPLE_START');
     while ($i < scalar @fields) {
         my $variant;
         if (is_GenderMarker($snp)) {
+            # The X and Y components of a GenderMarker make up two separate
+            # rows in a VCF file. The X/Y calls are collated into
+            # GenderMarker calls by the VCFDataSet class.
             my $chromosome = $fields[$self->_field_index('CHROMOSOME')];
             if (is_HsapiensX($chromosome)) {
                 $variant = $snp->x_marker;

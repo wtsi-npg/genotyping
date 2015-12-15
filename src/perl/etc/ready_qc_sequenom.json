@@ -3,5 +3,7 @@
     "platform": "sequenom",
     "reference_name": "Homo_sapiens (1000Genomes)",
     "reference_path": "/seq/sequenom/multiplexes",
-    "snpset_name": "W30467"
+    "snpset_name": "W30467",
+    "read_snpset_version": "1.0",
+    "write_snpset_version": "2.0"
 }

@@ -1,6 +1,4 @@
 
-use utf8;
-
 {
   package WTSI::NPG::Database::WarehouseStub;
 
@@ -54,8 +52,8 @@ BEGIN { use_ok('WTSI::NPG::Expression::InfiniumDataObject'); }
 use WTSI::NPG::Expression::InfiniumDataObject;
 
 my $data_path = './t/expression_data_object';
-my $idat_file = '0123456789_A_Grn.idat';
-my $xml_file = '0123456789_A_Grn.xml';
+my $idat_file = '012345678901_A_Grn.idat';
+my $xml_file = '012345678901_A_Grn.xml';
 
 my $irods_tmp_coll;
 
@@ -189,3 +187,5 @@ sub update_secondary_metadata : Test(7) {
       or diag explain \@groups_after;
   }
 }
+
+1;

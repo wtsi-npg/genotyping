@@ -7,16 +7,21 @@ package main;
 use strict;
 use warnings;
 use Carp;
+use File::Basename qw(fileparse);
 use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
+use List::MoreUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
 
+use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Genotyping::Types qw(:all);
 use WTSI::NPG::Utilities qw(user_session_log);
 use WTSI::NPG::Genotyping::VCF::AssayResultParser;
+use WTSI::NPG::Genotyping::VCF::ReferenceFinder;
 use WTSI::NPG::Genotyping::VCF::VCFDataSet;
 
 our $VERSION = '';
@@ -43,7 +48,8 @@ my $embedded_conf = "
 
 
 my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
-    $debug, $quiet, $reference, $snpset_path, $chromosome_json);
+    $debug, $quiet, $repository, $snpset_path, $chromosome_json,
+    $metadata_json, $callset_name);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $SEQUENOM_TYPE = 'sequenom';
@@ -51,7 +57,9 @@ our $FLUIDIGM_TYPE = 'fluidigm';
 
 my $irods;
 
-GetOptions('chromosomes=s'     => \$chromosome_json,
+GetOptions('callset=s'         => \$callset_name,
+           'chromosomes=s'     => \$chromosome_json,
+           'metadata=s'        => \$metadata_json,
            'snpset=s'          => \$snpset_path,
            'debug'             => \$debug,
            'help'              => sub { pod2usage(-verbose => 2,
@@ -60,7 +68,7 @@ GetOptions('chromosomes=s'     => \$chromosome_json,
            'irods'             => \$use_irods,
            'logconf=s'         => \$logConfig,
            'plex_type=s'       => \$inputType,
-	   'reference=s'       => \$reference,
+           'repository=s'      => \$repository,
            'vcf=s'             => \$vcfPath,
            'quiet'             => \$quiet,
        );
@@ -80,6 +88,14 @@ unless ($inputType eq $SEQUENOM_TYPE || $inputType eq $FLUIDIGM_TYPE) {
 }
 unless ($snpset_path) {
     $log->logcroak("Must specify a snpset path in iRODS or local filesystem");
+}
+
+my $snpsetFile = fileparse($snpset_path);
+
+$repository ||= $ENV{NPG_REPOSITORY_ROOT};
+unless (-d $repository) {
+    $log->logcroak("Repository path '", $repository,
+                   "' does not exist or is not a directory.");
 }
 
 ### read snpset and chromosome data
@@ -128,18 +144,62 @@ if ($input ne '-') {
 ### process inputs and write VCF output ###
 
 my $resultsets = _build_resultsets(\@inputs, $inputType, $irods);
+my $metadata;
+if ($metadata_json) {
+    $metadata = decode_json(read_file($metadata_json));
+} elsif ($use_irods) {
+    $metadata = _metadata_from_irods(\@inputs, $irods);
+} else {
+    $metadata = {};
+}
+if (defined($callset_name)) {
+    $metadata->{'callset_name'} = [ $callset_name, ];
+}
 
 my %parserArgs = (resultsets => $resultsets,
-                  input_type => $inputType,
-                  snpset => $snpset,
+                  assay_snpset => $snpset,
                   contig_lengths => $chromosome_lengths,
-		  reference => $reference);
-if ($use_irods) { $parserArgs{irods} = $irods; }
+                  metadata => $metadata);
 
 my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
     (\%parserArgs);
 my $vcf_dataset = $parser->get_vcf_dataset();
 $vcf_dataset->write_vcf($vcfPath);
+
+
+sub _metadata_from_irods {
+    my ($inputs, $irods) = @_;
+    # create VCF metadata from iRODS metadata
+    # $inputs is an ArrayRef of iRODS paths
+    # TODO fix redundancy with vcf_metadata_from_irods in Subscription.pm
+    my %vcf_meta;
+    foreach my $input (@{$inputs}) { # check iRODS metadata
+        my $obj = WTSI::NPG::iRODS::DataObject->new($irods, $input);
+        my @obj_meta = @{$obj->metadata};
+        foreach my $pair (@obj_meta) {
+            my $key = $pair->{'attribute'};
+            my $val = $pair->{'value'};
+            if ($key eq 'fluidigm_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'fluidigm';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            } elsif ($key eq 'sequenom_plex') {
+                push @{ $vcf_meta{'plex_type'} }, 'sequenom';
+                push @{ $vcf_meta{'plex_name'} }, $val;
+            } elsif ($key eq 'reference') {
+                my $rf = WTSI::NPG::Genotyping::VCF::ReferenceFinder->new(
+                    reference_genome => $val,
+                    repository       => $repository,
+                );
+                push @{ $vcf_meta{'reference'} }, $rf->get_reference_uri();
+            }
+        }
+    }
+    foreach my $key (keys %vcf_meta) {
+        my @values = @{$vcf_meta{$key}};
+        $vcf_meta{$key} = [ uniq @values ];
+    }
+    return \%vcf_meta;
+}
 
 
 sub _build_resultsets {
@@ -234,10 +294,13 @@ Options:
                       are assumed to be in the local filesystem, and the
                       --snpset and --chromosomes options are required.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
+  --repository=DIR    Location of the root directory for NPG genome
+                      reference repository. Defaults to the value of the
+                      NPG_REPOSITORY_ROOT environment variable.
   --snpset            Path to a tab-separated manifest file with information
                       on the SNPs in the QC plex. Path must be in iRODS if the
                       --irods option is in effect, or on the local filesystem
-                      otherwise.
+                      otherwise. Required.
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.

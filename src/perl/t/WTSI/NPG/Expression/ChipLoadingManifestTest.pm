@@ -46,3 +46,5 @@ sub samples : Test(2) {
 
   cmp_ok(scalar @{$manifest2->samples}, '==', 21);
 }
+
+1;

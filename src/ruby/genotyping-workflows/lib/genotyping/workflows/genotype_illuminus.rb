@@ -1,6 +1,6 @@
 #-- encoding: UTF-8
 #
-# Copyright (c) 2012 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2012, 2015 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,6 +62,8 @@ Arguments:
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
     - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
+    - vcf: <path> Path to VCF file for identity QC
+    - plex_manifest: <path> Path to plex manifest file for identity QC
 
 e.g.
 
@@ -74,7 +76,8 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
-       plex_manifest: /genotyping/manifests/fluidigm.tsv
+       vcf: /work/my_project/qc_calls.vcf
+       plex_manifest: /genotyping/manifests/qc.tsv
 
 Returns:
 
@@ -89,7 +92,8 @@ Returns:
       args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
                                :queue, :memory,
                                :select, :chunk_size, :fam_dummy, 
-                               :gender_method, :filterconfig, :nofilter)
+                               :gender_method, :filterconfig, :nofilter,
+                               :vcf, :plex_manifest)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
@@ -102,6 +106,7 @@ Returns:
       gtconfig = args.delete(:config)
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
+      vcf = args.delete(:vcf) || nil
 
       args.delete(:memory)
       args.delete(:queue)
@@ -145,6 +150,14 @@ Returns:
         else
           gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
+        if vcf and plex_manifest
+          gcqcargs = {
+            :vcf => vcf,
+            :plex_manifest => plex_manifest,
+            :sample_json => gcsjson
+          }.merge(gcqcargs)
+        end
+
         gcqcdir = File.join(work_dir, 'gencall_qc')
         gcquality = quality_control(dbfile, gcsfile, gcqcdir,
                                     gcqcargs, async, true)
@@ -188,12 +201,21 @@ Returns:
       ilfile = update_annotation(merge_bed(ilchunks, ilname, args, async),
                                  sjson, njson, fam_dummy, args, async)
 
+      # run QC on final output
       output = File.join(work_dir, 'illuminus_qc')
-      qcargs = {:run => run_name,
-                :sim => smfile,
-                :plex_manifest => plex_manifest}.merge(args)
-      ilquality = quality_control(dbfile, ilfile, output,
-                                  qcargs, async)
+      qcargs = {
+        :run => run_name,
+        :sim => smfile
+      }.merge(args)
+      if vcf and plex_manifest
+        qcargs = {
+          :vcf => vcf,
+          :plex_manifest => plex_manifest,
+          :sample_json => sjson
+        }.merge(qcargs)
+      end
+
+      ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
 
       if [gcsfile, ilfile, gcquality, ilquality].all?
          [gcsfile, ilfile, gcquality, ilquality]

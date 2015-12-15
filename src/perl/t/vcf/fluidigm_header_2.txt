@@ -1,7 +1,7 @@
 ##fileformat=VCFv4.2
 ##fileDate=20140908
 ##source=WTSI_NPG_genotyping_pipeline
-##reference=irods:///seq/fluidigm/multiplexes/qc_fluidigm_snp_info_GRCh37.tsv
+##reference=file://placeholder
 ##contig=<ID=1,length=249250621,species="Homo sapiens">
 ##contig=<ID=10,length=135534747,species="Homo sapiens">
 ##contig=<ID=11,length=135006516,species="Homo sapiens">
@@ -30,4 +30,7 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##callset_name=fluidigm
+##plex_name=qc
+##plex_type=fluidigm
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	north	south	east	west

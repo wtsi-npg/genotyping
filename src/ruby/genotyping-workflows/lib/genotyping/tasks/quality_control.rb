@@ -88,6 +88,10 @@ module Genotyping::Tasks
     #
     # Returns:
     # - boolean
+    #
+    # NOTE: This is the old version of the identity check. Calls are read
+    # from the SQLite pipeline database instead of a VCF file.
+    #
     def check_identity(dbfile, input, output, args = {}, async = {})
       
       args, work_dir, log_dir = process_task_args(args)

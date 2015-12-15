@@ -47,25 +47,25 @@ sub size {
   return scalar @{$self->assay_results};
 }
 
-=head2 sample_name
+=head2 canonical_sample_id
 
   Arg [1]    : None
 
-  Example    : $result->sample_name
-  Description: Return the name of the sample analysed. Since Fluidigm
-               results are split into files per sample, there should be
-               only one sample name per file. This method raises an error
-               if it encounters multiple sample names.
+  Example    : $result->canonical_sample_id
+  Description: Return the name (canonical sample identifier) of the sample
+               analysed. Since Fluidigm results are split into files per
+               sample, there should be only one sample name per file. This
+               method raises an error if it encounters multiple sample names.
   Returntype : Str
 
 =cut
 
-# TODO change this to canonical_sample_id for consistency with sequenom?
+# was 'sample_name', now canonical_sample_id for consistency with sequenom
 
-sub sample_name {
+sub canonical_sample_id {
   my ($self) = @_;
 
-  my @names = uniq map { $_->sample_name }
+  my @names = uniq map { $_->canonical_sample_id }
     grep { ! $_->is_empty } @{$self->assay_results};
 
   if (scalar @names > 1) {

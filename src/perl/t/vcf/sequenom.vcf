@@ -1,7 +1,7 @@
 ##fileformat=VCFv4.2
 ##fileDate=20140908
 ##source=WTSI_NPG_genotyping_pipeline
-##reference=irods:///seq/sequenom/multiplexes/W30467_snp_set_info_GRCh37.tsv
+##reference=file://placeholder
 ##contig=<ID=1,length=249250621,species="Homo sapiens">
 ##contig=<ID=10,length=135534747,species="Homo sapiens">
 ##contig=<ID=11,length=135006516,species="Homo sapiens">
@@ -30,6 +30,9 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##callset_name=sequenom
+##plex_name=W30467
+##plex_type=sequenom
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample001	sample002	sample003	sample004
 1	74941293	rs649058	G	A	.	.	ORIGINAL_STRAND=+	GT:GQ:DP	0/0:.:1	0/1:.:1	0/1:.:1	0/1:.:1
 1	169676486	rs1131498	A	G	.	.	ORIGINAL_STRAND=-	GT:GQ:DP	0/0:.:1	0/1:.:1	0/1:.:1	0/1:.:1

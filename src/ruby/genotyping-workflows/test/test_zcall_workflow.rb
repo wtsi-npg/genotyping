@@ -57,6 +57,10 @@ class TestWorkflowZCall < Test::Unit::TestCase
       run_name = 'run1'
 
       FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
+      vcf = File.join(external_data, 'sequenom_abvc.vcf')
+      plex_manifest = File.join(external_data,
+                                'W30467_snp_set_info_GRCh37.tsv')
+
       # Only 1 zscore in range; faster but omits threshold evaluation
       # The evaluation is tested by test_zcall_tasks.rb
       args = [dbfile, run_name, work_dir, {:manifest => manifest,
@@ -65,7 +69,9 @@ class TestWorkflowZCall < Test::Unit::TestCase
                                            :chunk_size => 3,
                                            :zstart => 6,
                                            :ztotal => 1,
-                                           :memory => 2048}]
+                                           :memory => 2048,
+                                           :vcf => vcf,
+                                           :plex_manifest => plex_manifest }]
       timeout = 1800 # was 720
       log = 'percolate.log'
       result = test_workflow(name, Genotyping::Workflows::GenotypeZCall,
