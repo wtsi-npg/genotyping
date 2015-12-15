@@ -8,13 +8,24 @@ Unreleased
 ----------
 
 Added:
+- Replace old identity check with new Bayesian version in "main" QC output
+and plots
+
+Release 1.11.5: 2015-12-15
+--------------------------
+
+Added:
 - Support for 12-digit barcodes on Infinium gene expression arrays,
   retaining support for 10-digit barcodes.
-- Store QC plex calls in a VCF file instead of SQLite pipeline database
-- QC check modified to read from VCF instead of database
-- Find Fluidigm/Sequenom results in iRODS and write as VCF
+- "Callset name" attribute for the Call class, allowing Call objects to
+  be sorted into groups (eg. by genotyping platform)
+- New Bayesian identity check:
+  - Find Fluidigm/Sequenom results in iRODS and write as VCF
+  - CSV and JSON output, including breakdown of QC results by callset name
+  - Read QC calls from VCF instead of database
 - Find genome reference path from iRODS metadata for VCF header; adds
   dependency on wtsi-npg/npg_tracking
+
 
 Release 1.11.4: 2015-10-09
 --------------------------
