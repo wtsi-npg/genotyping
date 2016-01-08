@@ -23,7 +23,6 @@ my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $data_dir = $Bin."/qc_test_data/";
 my $plink = $data_dir.$testName;
 my $sim = $data_dir.$testName.".sim";
-#my $plexManifest = $data_dir."/W30467_snp_set_info_1000Genomes.tsv";
 my $outDir = "$Bin/qc/$testName/";
 my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)

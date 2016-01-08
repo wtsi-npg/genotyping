@@ -34,6 +34,7 @@ Fixed:
 - Bug in publish_infinium_genotypes.pl which caused it to exit when it
   detected bad or missing data. It now detects these files and skips them.
 
+
 Release 1.11.3: 2015-09-18
 --------------------------
 
@@ -43,9 +44,9 @@ Added:
 Fixed:
 - Bug in run_qc.pl; failure to input plex manifest to WIP identity check.
 
-=======
 Changed:
 - bcftools version upgraded to 1.2
+
 
 Release 1.11.2: 2015-08-24
 --------------------------
