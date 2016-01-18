@@ -59,6 +59,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
                                 'W30467_snp_set_info_GRCh37.tsv')
 
       args_hash = {:manifest => manifest,
+                   :plex_manifest => plex_path,
                    :config => pipe_ini,
                    :filterconfig => fconfig,
                    :gender_method => 'Supplied',

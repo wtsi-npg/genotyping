@@ -8,19 +8,32 @@ Unreleased
 ----------
 
 Added:
-- Store QC plex calls in a VCF file instead of SQLite pipeline database
-- QC check modified to read from VCF instead of database
-- Find Fluidigm/Sequenom results in iRODS and write as VCF
-- Find genome reference path from iRODS metadata for VCF header; adds
-dependency on wtsi-npg/npg_tracking
+- Replace old identity check with new Bayesian version in "main" QC output
+and plots
 
-<<<<<<< HEAD
+Release 1.11.5: 2015-12-15
+--------------------------
+
+Added:
+- Support for 12-digit barcodes on Infinium gene expression arrays,
+  retaining support for 10-digit barcodes.
+- "Callset name" attribute for the Call class, allowing Call objects to
+  be sorted into groups (eg. by genotyping platform)
+- New Bayesian identity check:
+  - Find Fluidigm/Sequenom results in iRODS and write as VCF
+  - CSV and JSON output, including breakdown of QC results by callset name
+  - Read QC calls from VCF instead of database
+- Find genome reference path from iRODS metadata for VCF header; adds
+  dependency on wtsi-npg/npg_tracking
+
+
 Release 1.11.4: 2015-10-09
 --------------------------
 
 Fixed:
 - Bug in publish_infinium_genotypes.pl which caused it to exit when it
   detected bad or missing data. It now detects these files and skips them.
+
 
 Release 1.11.3: 2015-09-18
 --------------------------
@@ -31,10 +44,9 @@ Added:
 Fixed:
 - Bug in run_qc.pl; failure to input plex manifest to WIP identity check.
 
-=======
 Changed:
 - bcftools version upgraded to 1.2
->>>>>>> devel
+
 
 Release 1.11.2: 2015-08-24
 --------------------------
