@@ -195,11 +195,14 @@ sub generate_calls {
         ['rs753381',   'AG']
     );
 
-    my @calls = map {
-        my ($snp, $genotype) = @$_;
-        WTSI::NPG::Genotyping::Call->new
-              (snp      => $snpset->named_snp($snp),
-               genotype => $genotype) } @data;
+    my @calls;
+    foreach my $pair (@data) {
+        my ($snp, $genotype) = @{$pair};
+        push @calls,  WTSI::NPG::Genotyping::Call->new
+            (snp      => $snpset->named_snp($snp),
+             genotype => $genotype);
+
+    }
     return \@calls;
 }
 
