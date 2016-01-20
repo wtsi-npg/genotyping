@@ -4,7 +4,6 @@ package WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesianTest;
 use strict;
 use warnings;
 use File::Slurp qw(read_file);
-use File::Temp qw(tempdir);
 use JSON;
 
 use base qw(Test::Class);
