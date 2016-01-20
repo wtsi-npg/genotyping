@@ -458,6 +458,11 @@ t/qc/check/identity/fake_swap_genotypes.ped
 t/qc/check/identity/qc_plex_calls.vcf
 t/qc/check/identity/qc_plex_calls_1.vcf
 t/qc/check/identity/qc_plex_calls_2.vcf
+t/qc/check/identity/simulated_ecp.txt
+t/qc/check/identity/simulated_qcr.txt
+t/qc/check/identity/simulated_qcs.txt
+t/qc/check/identity/simulated_smp.txt
+t/qc/check/identity/simulated_xer.txt
 t/qc/check/identity/W30467_snp_set_info_1000Genomes.tsv
 t/qc/check/identity/W30467_snp_set_info_1000Genomes_1.tsv
 t/qc/check/identity/W30467_snp_set_info_1000Genomes_2.tsv
