@@ -3,7 +3,7 @@ package WTSI::NPG::Expression::ResultSetTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 5;
 use Test::Exception;
 

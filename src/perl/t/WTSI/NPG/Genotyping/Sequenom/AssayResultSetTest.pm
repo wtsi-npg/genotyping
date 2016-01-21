@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::Sequenom::AssayResultSetTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 11;
 use Test::Exception;

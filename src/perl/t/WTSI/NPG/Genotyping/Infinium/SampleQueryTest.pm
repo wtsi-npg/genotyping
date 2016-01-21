@@ -91,7 +91,7 @@ package WTSI::NPG::Genotyping::Infinium::SampleQueryTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 6;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');

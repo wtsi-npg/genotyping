@@ -11,7 +11,7 @@ use File::Spec::Functions qw/catfile/;
 use File::Temp qw(tempdir);
 use List::AllUtils qw(uniq);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 42;
 use Test::Exception;
 

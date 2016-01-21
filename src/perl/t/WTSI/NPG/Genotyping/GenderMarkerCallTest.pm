@@ -1,10 +1,13 @@
+
+package WTSI::NPG::Genotyping::GenderMarkerCallTest;
+
 use strict;
 use warnings;
 
 use Log::Log4perl;
 use List::AllUtils qw(all);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::Exception;
 use Test::More tests => 27;
 

@@ -1,6 +1,6 @@
 use utf8;
 
-package WTSI::NPG::Genotyping::IdentityTest;
+package WTSI::NPG::Genotyping::QC::IdentityTest;
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 28;
 use Test::Exception;
 

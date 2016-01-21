@@ -10,9 +10,9 @@ use File::Compare;
 use File::Temp qw(tempdir tempfile);
 use List::AllUtils qw(all);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
-use Test::More tests => 52;
+use Test::More tests => 50;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -199,7 +199,7 @@ sub snp_names : Test(2) {
             'Contains expected SNP names') or diag explain \@snp_names;
 }
 
-sub snp_name_map : Test(26) {
+sub snp_name_map : Test(24) {
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new
         (file_name   => "$data_path/$data_file");
     my $snpset_renamed = WTSI::NPG::Genotyping::SNPSet->new

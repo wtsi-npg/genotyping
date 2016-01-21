@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Expression::SampleProbeProfileTest;
 
-Test::Class->runtests;
+WTSI::NPG::Expression::SampleProbeProfileTest->runtests;

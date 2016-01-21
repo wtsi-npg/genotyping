@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Fluidigm::ExportFileTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Fluidigm::ExportFileTest->runtests;

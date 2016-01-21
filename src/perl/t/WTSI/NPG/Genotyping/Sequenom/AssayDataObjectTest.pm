@@ -92,7 +92,7 @@ package WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 17;
 use Test::Exception;

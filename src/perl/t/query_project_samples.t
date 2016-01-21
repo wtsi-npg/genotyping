@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Infinium::SampleQueryTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Infinium::SampleQueryTest->runtests;

@@ -719,5 +719,6 @@ t/WTSI/NPG/Genotyping/VCF/VCFTest.pm
 t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
+t/WTSI/NPG/Test.pm
 t/WTSI/NPG/UtilitiesTest.pm
 t/wtsi_genotyping.t
