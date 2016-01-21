@@ -3,7 +3,7 @@ package WTSI::NPG::Expression::ProfileAnnotationTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 10;
 use Test::Exception;

@@ -8,7 +8,7 @@ use File::Slurp qw(read_file);
 use JSON;
 use List::AllUtils qw(each_array);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 51;
 use Test::Exception;
 

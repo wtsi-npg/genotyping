@@ -3,7 +3,7 @@ package WTSI::NPG::Genotyping::VCF::ReferenceFinderTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 
 use Test::More tests => 5;
 

@@ -9,9 +9,9 @@ use warnings;
 use Log::Log4perl;
 use List::AllUtils qw(all);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::Exception;
-use Test::More tests => 70;
+use Test::More tests => 69;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
@@ -48,7 +48,7 @@ sub clone : Test(4) {
      "Qscore preserved by cloning");
 }
 
-sub constructor : Test(7) {
+sub constructor : Test(6) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new("$data_path/$data_file");
 
   new_ok('WTSI::NPG::Genotyping::Call',
@@ -354,5 +354,5 @@ sub equivalent : Test(15) {
   ok(!$no_call->equivalent($no_call), 'No call not equivalent with self');
 }
 
-1;
+return 1;
 

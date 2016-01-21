@@ -6,8 +6,8 @@ package WTSI::NPG::Genotyping::Database::PipelineTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
-use Test::More tests => 67;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 64;
 use Test::Exception;
 
 use File::Temp qw(tempdir);
@@ -48,7 +48,7 @@ sub teardown : Test(teardown) {
   }
 }
 
-sub require : Test(3) {
+sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Database::Pipeline');
 }
 
@@ -83,7 +83,7 @@ sub connect : Test(6) {
   ok($tmpdb->is_connected, 'Is connected');
 }
 
-sub disconnect : Test(4) {
+sub disconnect : Test(3) {
   ok($db->is_connected, 'Is connected');
   ok($db->disconnect, 'Can disconnect');
   ok(!$db->is_connected, 'Finally, is not connected');

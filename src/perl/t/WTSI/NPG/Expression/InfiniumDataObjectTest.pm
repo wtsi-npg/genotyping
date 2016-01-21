@@ -38,7 +38,7 @@ package WTSI::NPG::Expression::InfiniumDataObjectTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 13;
 use Test::Exception;

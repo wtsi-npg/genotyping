@@ -118,8 +118,8 @@ use warnings;
 use Cwd qw(abs_path);
 use DateTime;
 
-use base qw(Test::Class);
-use Test::More tests => 338;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 316;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -425,7 +425,7 @@ sub publish_methylation : Test(45) {
   }
 }
 
-sub publish_overwrite : Test(91) {
+sub publish_overwrite : Test(69) {
   my $publication_time = DateTime->now;
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new

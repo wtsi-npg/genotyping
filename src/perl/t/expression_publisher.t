@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Expression::PublisherTest;
 
-Test::Class->runtests;
+WTSI::NPG::Expression::PublisherTest->runtests;

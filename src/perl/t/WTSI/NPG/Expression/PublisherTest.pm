@@ -55,7 +55,7 @@ use warnings;
 use Cwd qw(abs_path);
 use DateTime;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 47;
 use Test::Exception;
 

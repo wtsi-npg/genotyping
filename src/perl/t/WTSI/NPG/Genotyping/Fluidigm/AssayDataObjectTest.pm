@@ -46,7 +46,7 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 11;
 use Test::Exception;
