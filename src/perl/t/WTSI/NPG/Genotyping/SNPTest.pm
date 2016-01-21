@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::SNPTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 5;
 use Test::Exception;
 use Log::Log4perl;

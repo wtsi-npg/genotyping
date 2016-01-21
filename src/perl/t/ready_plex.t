@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest->runtests;

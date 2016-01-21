@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Infinium::PublisherTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Infinium::PublisherTest->runtests;

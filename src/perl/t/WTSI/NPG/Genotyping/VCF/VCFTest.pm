@@ -1,9 +1,9 @@
-package WTSI::NPG::Genotyping::VCFTest;
+package WTSI::NPG::Genotyping::VCF::VCFTest;
 
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Cwd qw(abs_path);
 use File::Path qw/make_path/;
 use File::Slurp qw /read_file/;
@@ -118,7 +118,7 @@ sub data_row_parser_test : Test(5) {
 
 }
 
-sub fluidigm_file_test : Test(212) {
+sub fluidigm_file_test : Test(204) {
     my @inputs;
     foreach my $name (@fluidigm_csv) {
         push(@inputs, abs_path($data_path."/".$name));

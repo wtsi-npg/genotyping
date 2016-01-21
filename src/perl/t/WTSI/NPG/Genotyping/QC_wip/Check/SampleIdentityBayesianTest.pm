@@ -6,7 +6,7 @@ use warnings;
 use File::Slurp qw(read_file);
 use JSON;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 9;
 use Test::Exception;
 

@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::UpdatePlinkAnnotation;
+package WTSI::NPG::Genotyping::UpdatePlinkAnnotationTest;
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use File::Temp qw(tempdir tempfile);
 use JSON;
 use Log::Log4perl;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 9;
 use Test::Exception;
 

@@ -1,7 +1,7 @@
 
 use utf8;
 
-package WTSI::NPG::Genotyping::IlluminaTest;
+package WTSI::NPG::Genotyping::IlluminusTest;
 
 use strict;
 use warnings;
@@ -9,8 +9,8 @@ use File::Compare;
 use File::Temp qw(tempdir);
 use JSON;
 
-use base qw(Test::Class);
-use Test::More tests => 12;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 11;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -128,7 +128,7 @@ sub test_nullify_females : Test(2) {
      "$out_file is identical to $expected_file");
 }
 
-sub test_write_it_header : Test(3) {
+sub test_write_it_header : Test(2) {
   my $expected_file = "$data_path/iln_header.txt";
 
   my $tmpdir = tempdir(CLEANUP => 1);

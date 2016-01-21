@@ -5,7 +5,7 @@ package WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 6;
 use Test::Exception;
 use File::Path qw/make_path/;

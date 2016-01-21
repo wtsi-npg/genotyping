@@ -8,7 +8,7 @@ use warnings;
 use English;
 use File::Spec;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 3;
 use Test::Exception;
 

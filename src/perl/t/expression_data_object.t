@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Expression::InfiniumDataObjectTest;
 
-Test::Class->runtests;
+WTSI::NPG::Expression::InfiniumDataObjectTest->runtests;

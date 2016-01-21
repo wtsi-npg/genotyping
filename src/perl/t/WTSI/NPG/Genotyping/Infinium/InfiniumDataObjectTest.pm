@@ -58,10 +58,10 @@ package WTSI::NPG::Genotyping::Infinium::InfiniumDataObjectTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use List::AllUtils qw(none);
-use Test::More tests => 15;
+use Test::More tests => 14;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -110,7 +110,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Infinium::InfiniumDataObject');
 }
 
-sub metadata : Test(3) {
+sub metadata : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my $gtc_irods_path = "$irods_tmp_coll/$gtc_file";

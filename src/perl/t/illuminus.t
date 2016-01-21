@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::IlluminusTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::IlluminusTest->runtests;

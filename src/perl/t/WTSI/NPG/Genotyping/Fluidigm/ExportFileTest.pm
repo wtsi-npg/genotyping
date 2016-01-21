@@ -9,7 +9,7 @@ use warnings;
 use File::Compare;
 use File::Temp qw(tempdir);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 299;
 use Test::Exception;
 

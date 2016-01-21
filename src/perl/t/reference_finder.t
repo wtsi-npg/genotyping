@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::VCF::ReferenceFinderTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::VCF::ReferenceFinderTest->runtests;

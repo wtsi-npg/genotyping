@@ -133,7 +133,7 @@ use strict;
 use warnings;
 use DateTime;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 46;
 use Test::Exception;
 
