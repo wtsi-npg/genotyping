@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::SimplePublisherTest;
 
-Test::Class->runtests;
+WTSI::NPG::SimplePublisherTest->runtests;

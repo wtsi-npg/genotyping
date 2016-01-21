@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use File::Temp qw(tempfile);
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 810;
 use Test::Exception;
 

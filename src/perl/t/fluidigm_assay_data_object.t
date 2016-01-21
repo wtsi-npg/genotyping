@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Fluidigm::AssayDataObjectTest->runtests;

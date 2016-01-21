@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::CallTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::CallTest->runtests;

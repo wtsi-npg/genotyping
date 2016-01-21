@@ -6,8 +6,8 @@ package WTSI::NPG::Genotyping::Infinium::ResultSetTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
-use Test::More tests => 12;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 11;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -25,7 +25,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Infinium::ResultSet');
 }
 
-sub constructor : Test(10) {
+sub constructor : Test(9) {
 
   new_ok('WTSI::NPG::Genotyping::Infinium::ResultSet',
          [beadchip         => '0123456789',

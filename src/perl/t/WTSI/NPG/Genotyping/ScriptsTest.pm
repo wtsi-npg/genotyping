@@ -10,8 +10,8 @@ use File::Temp qw(tempdir);
 use Log::Log4perl;
 use JSON;
 
-use base qw(Test::Class);
-use Test::More tests => 33;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 32;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -257,7 +257,7 @@ sub test_ready_pipe : Test(2) {
   ok(-e "$dbfile");
 }
 
-sub test_ready_infinium : Test(8) {
+sub test_ready_infinium : Test(7) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $dbfile = "$tmpdir/test_ready_infinium.db";
 

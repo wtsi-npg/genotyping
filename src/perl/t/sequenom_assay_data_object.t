@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Sequenom::AssayDataObjectTest->runtests;

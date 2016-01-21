@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::SNPSetPublisherTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::SNPSetPublisherTest->runtests;

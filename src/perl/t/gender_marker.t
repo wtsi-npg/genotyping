@@ -6,5 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::GenderMarkerTest;
 
-Test::Class->runtests;
-
+WTSI::NPG::Genotyping::GenderMarkerTest->runtests;

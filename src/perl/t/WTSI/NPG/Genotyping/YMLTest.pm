@@ -8,7 +8,7 @@ use warnings;
 use File::Temp qw/tempdir/;
 use YAML qw/LoadFile/;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 8;
 use Test::Exception;
 

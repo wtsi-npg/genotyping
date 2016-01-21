@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::GenderMarkerTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 17;
 use Test::Exception;
 
