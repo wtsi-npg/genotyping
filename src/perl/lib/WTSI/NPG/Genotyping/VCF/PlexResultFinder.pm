@@ -23,8 +23,6 @@ has 'sample_ids' =>
    required      => 1,
    documentation => 'Sample identifiers for query');
 
-
-
 our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
 our $DEFAULT_DATA_PATH = '/seq/fluidigm';
@@ -45,13 +43,19 @@ our @REQUIRED_CONFIG_KEYS = ($IRODS_DATA_PATH_KEY,
                              $REFERENCE_PATH_KEY,
                              $SNPSET_NAME_KEY);
 
+=head2 read_write_single
 
-# TODO
-# - read query parameters (as config file? as arguments?)
-# - query iRODS with appropriate Subscriber object
-# - call AssayResultParser on results
-# - write as VCF
+  Arg [1]    : HashRef of query params
+  Arg [2]    : Path for VCF output
+  Arg [3]    : Callset name for VCF metadata
 
+  Example    : my $total = read_write_single($params, "foo.vcf", "data_foo");
+  Description: Run a single query on iRODS and write the results (if any)
+               as VCF. Returns the number of AssayResultSet objects found.
+
+  Returntype : Int
+
+=cut
 
 sub read_write_single {
     my ($self, $params, $output_path, $callset_name) = @_;
@@ -82,6 +86,24 @@ sub read_write_single {
     }
     return scalar @{$resultsets};
 }
+
+
+=head2 read_write_all
+
+  Arg [1]    : ArrayRef[HashRef] of query params
+  Arg [2]    : Directory for VCF output
+
+  Example    : my $paths = read_write_all($params_array, $out_dir);
+  Description: Run the read_write_single method to write separate VCF files
+               for each set of query parameters in the input. Callset name
+               may be specified in the config hashref; otherwise it defaults
+               to the name of the genotyping platform. Output filename
+               similarly may be specified in config; default is
+               $PLATFORM_$SNPSET.vcf. Returns the VCF paths written.
+               Output will only be written for non-empty query results.
+  Returntype : ArrayRef[Str]
+
+=cut
 
 sub read_write_all {
     # loop over input arguments (config hashes) and write results
@@ -203,6 +225,20 @@ WTSI::NPG::Genotyping::VCF::PlexResultFinder
 =head1 DESCRIPTION
 
 Find QC plex results (eg. Sequenom, Fluidigm) in iRODS and write as VCF.
+
+=head2 Method
+
+=over 1
+
+=item * Input parameters for one or more iRODS queries
+
+=item * Query iRODS with appropriate Subscriber object
+
+=item * Call AssayResultParser on data returned by query
+
+=item * Write as VCF
+
+=back
 
 =head1 AUTHOR
 
