@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 6;
+use Test::More tests => 18;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -15,6 +15,8 @@ use File::Temp qw/tempdir/;
 use JSON;
 use Log::Log4perl;
 use WTSI::NPG::iRODS;
+
+use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 
 our $LOG_TEST_CONF =  './etc/log4perl_tests.conf';
 
@@ -44,7 +46,6 @@ my $f_snpset_id = 'qc';
 my $f_snpset_filename = 'qc_fluidigm_snp_info_GRCh37.tsv';
 my @f_input_files = qw(fluidigm_001.csv fluidigm_002.csv
                        fluidigm_003.csv fluidigm_004.csv);
-my @f_sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
 my $f_sample_json = $data_path."/fluidigm_samples.json";
 my $f_params_name = "params_fluidigm.json";
 
@@ -54,14 +55,31 @@ my $s_reference_name = "Homo_sapiens (1000Genomes)";
 my $s_snpset_id = 'W30467';
 my $s_snpset_filename = 'W30467_snp_set_info_GRCh37.tsv';
 my $s_snpset_filename_1 = 'W30467_snp_set_info_GRCh37_1.tsv';
-my @s_sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
 my $s_sample_json = $data_path."/sequenom_samples.json";
 my $s_params_name = "params_sequenom.json";
 my $s_params_name_1 = "params_sequenom_1.json";
 
+
+my @sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
+my $chromosome_json_filename = "chromosome_lengths_GRCh37.json";
+my $cjson_irods;
+
 my $log = Log::Log4perl->get_logger();
 
 my $tfc = 0; # text fixture count
+
+
+sub require : Test(1) {
+    require_ok('WTSI::NPG::Genotyping::VCF::PlexResultFinder');
+}
+
+sub construct : Test(1) {
+
+    new_ok('WTSI::NPG::Genotyping::VCF::PlexResultFinder',
+           [irods => $irods,
+            sample_ids => ['sample_1', 'sample_2']]);
+
+}
 
 sub make_fixture : Test(setup) {
     $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 1);
@@ -69,6 +87,7 @@ sub make_fixture : Test(setup) {
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid.$tfc");
     $tfc++;
+    $cjson_irods = $irods_tmp_coll."/".$chromosome_json_filename;
 
     # set up dummy fasta reference
     $ENV{NPG_REPOSITORY_ROOT} = $tmp;
@@ -90,14 +109,9 @@ sub setup_fluidigm {
         my $input = $f_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
         $irods->add_object($data_path."/".$input, $ipath);
-        $irods->add_object_avu($ipath,'dcterms:identifier',$f_sample_ids[$i]);
+        $irods->add_object_avu($ipath,'dcterms:identifier', $sample_ids[$i]);
         $irods->add_object_avu($ipath, 'fluidigm_plex', $f_snpset_id);
     }
-    # add chromosome_json to temp irods
-    my $chromosome_json_filename = "chromosome_lengths_GRCh37.json";
-    my $cjson = $data_path."/".$chromosome_json_filename;
-    my $cjson_irods = $irods_tmp_coll."/".$chromosome_json_filename;
-    $irods->add_object($cjson, $cjson_irods);
     my $snpset_path = $irods_tmp_coll."/".$f_snpset_filename;
     $irods->add_object($data_path."/".$f_snpset_filename, $snpset_path);
     $irods->add_object_avu($snpset_path, 'chromosome_json', $cjson_irods);
@@ -148,14 +162,9 @@ sub setup_sequenom {
         my $input = $s_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
         $irods->add_object($data_path."/".$input, $ipath);
-        $irods->add_object_avu($ipath,'dcterms:identifier',$s_sample_ids[$i]);
+        $irods->add_object_avu($ipath,'dcterms:identifier', $sample_ids[$i]);
         $irods->add_object_avu($ipath, 'sequenom_plex', $s_snpset_id);
     }
-    # add chromosome_json to temp irods
-    my $chromosome_json_filename = "chromosome_lengths_GRCh37.json";
-    my $cjson = $data_path."/".$chromosome_json_filename;
-    my $cjson_irods = $irods_tmp_coll."/".$chromosome_json_filename;
-    $irods->add_object($cjson, $cjson_irods);
     # add snpset (version "1.0")
     my $snpset_1 = $irods_tmp_coll."/".$s_snpset_filename_1;
     $irods->add_object($data_path."/".$s_snpset_filename_1, $snpset_1);
@@ -197,11 +206,20 @@ sub setup_sequenom {
         $log->logcroak("Cannot close config file '", $config_path_1, "'");
 }
 
+sub setup_chromosome_json {
+    # upload chromosome json file to temporary irods collection
+    # can only upload once per collection
+    # must upload before running setup_fluidigm or setup_sequenom
+    my $cjson = $data_path."/".$chromosome_json_filename;
+    $irods->add_object($cjson, $cjson_irods);
+}
+
 sub teardown : Test(teardown) {
     $irods->remove_collection($irods_tmp_coll);
 }
 
 sub test_ready_calls_fluidigm : Test(2) {
+    setup_chromosome_json();
     setup_fluidigm();
 
     my $vcf_out = "$tmp/fluidigm_qc.vcf";
@@ -223,6 +241,7 @@ sub test_ready_calls_fluidigm : Test(2) {
 }
 
 sub test_ready_calls_sequenom : Test(2) {
+    setup_chromosome_json();
     setup_sequenom_default();
 
     my $vcf_out = "$tmp/sequenom_W30467.vcf";
@@ -244,6 +263,7 @@ sub test_ready_calls_sequenom : Test(2) {
 
 sub test_ready_calls_sequenom_alternate_snp : Test(2) {
     # tests handling of renamed SNP in different manifest versions
+    setup_chromosome_json();
     setup_sequenom_alternate();
 
     my $vcf_out = "$tmp/sequenom_W30467.vcf";
@@ -261,6 +281,95 @@ sub test_ready_calls_sequenom_alternate_snp : Test(2) {
     is_deeply(\@got_lines, \@expected_lines,
               "Sequenom VCF output matches expected values");
 
+}
+
+sub test_ready_calls_both : Test(3) {
+    # test ready calls script with *both* sequenom and fluidigm specified
+    setup_chromosome_json();
+    setup_fluidigm();
+    setup_sequenom_default();
+    my $fluidigm_out = "$tmp/fluidigm_qc.vcf";
+    my $sequenom_out = "$tmp/sequenom_W30467.vcf";
+    my $fluidigm_params = $tmp."/".$f_params_name;
+    my $sequenom_params = $tmp."/".$s_params_name;
+    my $cmd = join q{ }, "$READY_QC_CALLS",
+                         "--config $fluidigm_params",
+                         "--config $sequenom_params",
+                         "--samples $s_sample_json",
+                         "--logconf $LOG_TEST_CONF",
+                         "--out $tmp";
+    ok(system($cmd) == 0, 'Wrote Sequenom and Fluidigm calls to VCF');
+    my @got_f = read_file($fluidigm_out);
+    @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
+    my @expected_f = read_file($f_expected_vcf);
+    @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
+    is_deeply(\@got_f, \@expected_f,
+              "Fluidigm VCF output matches expected values");
+    my @got_s = read_file($sequenom_out);
+    @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
+    my @expected_s = read_file($s_expected_vcf);
+    @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
+    is_deeply(\@got_s, \@expected_s,
+              "Sequenom VCF output matches expected values");
+
+}
+
+sub test_result_finder : Test(7) {
+    setup_chromosome_json();
+    setup_fluidigm();
+    setup_sequenom_default();
+
+    # test for single query
+    my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+        irods      => $irods,
+        sample_ids => \@sample_ids
+    );
+    my $params_f = {
+        irods_data_path      => $irods_tmp_coll,
+        platform             => "fluidigm",
+        reference_name       => $f_reference_name,
+        reference_path       => $irods_tmp_coll,
+        snpset_name          => $f_snpset_id,
+    };
+    my $out_fluidigm_0 = "$tmp/class_test_fluidigm_0.vcf";
+    my $total = $finder->read_write_single($params_f,
+                                           $out_fluidigm_0,
+                                           'class_test_fluidigm');
+    ok($total==4, "Results found for 4 Fluidigm samples");
+    ok(-e $out_fluidigm_0, "Fluidigm output found");
+
+    # test for more than one query
+    my $snpset_v2 = '2.0';
+    my $params_s = {
+        irods_data_path      => $irods_tmp_coll,
+        platform             => "sequenom",
+        reference_name       => $s_reference_name,
+        reference_path       => $irods_tmp_coll,
+        snpset_name          => $s_snpset_id,
+        read_snpset_version  => $snpset_v2,
+        write_snpset_version => $snpset_v2,
+    };
+
+    my $paths = $finder->read_write_all([$params_f, $params_s], $tmp);
+    my $f_out_vcf = "$tmp/fluidigm_qc.vcf";
+    my $s_out_vcf = "$tmp/sequenom_W30467.vcf";
+    my $out_paths = [$f_out_vcf, $s_out_vcf];
+    is_deeply($paths, $out_paths, "Fluidigm & Sequenom outputs returned");
+    ok(-e $f_out_vcf, "Fluidigm output found");
+    ok(-e $s_out_vcf, "Sequenom output found");
+
+    my @got_f = read_file($f_out_vcf);
+    @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
+    my @expected_f = read_file($f_expected_vcf);
+    @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
+    is_deeply(\@got_f, \@expected_f,
+              "Fluidigm VCF output matches expected values");
+    my @got_s = read_file($s_out_vcf);
+    @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
+    my @expected_s = read_file($s_expected_vcf);
+    @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
+    is_deeply(\@got_s, \@expected_s,
+              "Sequenom VCF output matches expected values");
 }
 
 return 1;

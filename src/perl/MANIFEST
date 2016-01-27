@@ -158,6 +158,7 @@ lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
 lib/WTSI/NPG/Genotyping/VCF/Header.pm
 lib/WTSI/NPG/Genotyping/VCF/HeaderParser.pm
 lib/WTSI/NPG/Genotyping/VCF/Parser.pm
+lib/WTSI/NPG/Genotyping/VCF/PlexResultFinder.pm
 lib/WTSI/NPG/Genotyping/VCF/ReferenceFinder.pm
 lib/WTSI/NPG/Genotyping/VCF/Slurper.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
