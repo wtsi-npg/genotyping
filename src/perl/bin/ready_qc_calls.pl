@@ -20,6 +20,7 @@ use WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 use WTSI::NPG::Genotyping::Sequenom::Subscriber;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::VCF::AssayResultParser;
+use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Utilities qw(user_session_log);
@@ -71,17 +72,17 @@ run() unless caller();
 
 sub run {
     my $callset;
-    my $config;
+    my @config;
     my $dbfile;
     my $debug;
     my $inifile;
     my $log4perl_config;
     my $samples;
-    my $output_path;
+    my $output_dir;
     my $verbose;
 
     GetOptions('callset=s'        => \$callset,
-               'config=s'         => \$config,
+               'config=s'         => \@config,
                'dbfile=s'         => \$dbfile,
                'debug'            => \$debug,
                'help'             => sub { pod2usage(-verbose => 2,
@@ -89,7 +90,7 @@ sub run {
                'inifile=s'        => \$inifile,
                'logconf=s'        => \$log4perl_config,
                'samples=s'        => \$samples,
-               'out=s'            => \$output_path,
+               'out=s'            => \$output_dir,
                'verbose'          => \$verbose);
 
     $inifile ||= $DEFAULT_INI;
@@ -110,34 +111,28 @@ sub run {
         }
     }
 
-    ### validate command-line arguments ###
-    unless ($config) {
-        $log->logcroak("--config argument is required");
+    ### validate command-line arguments and read params files ###
+    if (scalar @config == 0) {
+        $log->logcroak("Must supply at least one --config argument");
     }
-    if ($dbfile && $samples) {
-        $log->logcroak("Cannot specify both --dbfile and --samples");
-    } elsif (!($dbfile || $samples)) {
+    my @params;
+    foreach my $config_path (@config) {
+        if (-e $config_path) {
+            push @params, decode_json(read_file($config_path));
+        } else {
+            $log->logcroak("Config path '", $config_path, "' does not exist");
+        }
+    }
+    if (!(defined($output_dir))) {
+        $log->logcroak("--out argument is required");
+    } elsif (!(-d $output_dir)) {
+        $log->logcroak("--out argument '", $output_dir,
+                       "' is not a directory");
+    }
+    if (($dbfile && $samples) || !($dbfile || $samples)  ) {
         $log->logcroak("Must specify exactly one of --dbfile ",
                        "and --samples");
     }
-    unless ($output_path) {
-        $log->logcroak("--out argument is required");
-    }
-
-    ### read and validate config file ###
-    my $contents = decode_json(read_file($config));
-    my %params = %{$contents};
-    foreach my $key (@REQUIRED_CONFIG_KEYS) {
-        unless ($params{$key}) {
-            $log->logcroak("Required parameter '", $key,
-                           "' missing from config file '", $config, "'");
-        }
-    }
-    $callset ||= $params{$PLATFORM_KEY}; # assign callset default (if needed)
-
-    ### set up iRODS connection and make it use same logger as script ###
-    my $irods = WTSI::NPG::iRODS->new;
-    $irods->logger($log);
 
     ### read sample identifiers ###
     my @sample_ids;
@@ -158,87 +153,12 @@ sub run {
         @sample_ids = @{$contents[0]};
     }
 
-    ### read data from iRODS ###
-    my @irods_data = _query_irods($irods, \@sample_ids, \%params, $log);
-    my ($resultsets, $chromosome_lengths, $vcf_meta, $assay_snpset,
-        $vcf_snpset) = @irods_data;
-    if (scalar @{$resultsets} == 0) {
-        $log->logcroak("No assay result sets found for QC plex '",
-                       $params{$SNPSET_NAME_KEY}, "'");
-    }
-    $vcf_meta->{$CALLSET_NAME_KEY} = [$callset, ];  # update VCF metadata
-    ### call VCF parser on resultsets and write to file ###
-    my $vcfData = WTSI::NPG::Genotyping::VCF::AssayResultParser->new(
-        resultsets     => $resultsets,
-        contig_lengths => $chromosome_lengths,
-        assay_snpset   => $assay_snpset,
-        vcf_snpset     => $vcf_snpset,
-        logger         => $log,
-        metadata       => $vcf_meta,
-    )->get_vcf_dataset();
-    open my $out, ">", $output_path ||
-        $log->logcroak("Cannot open VCF output: '", $output_path, "'");
-    print $out $vcfData->str()."\n";
-    close $out ||
-        $log->logcroak("Cannot close VCF output: '", $output_path, "'");
-}
-
-sub _query_irods {
-    # get AssayResultSets, SNPSets, and contig lengths from iRODS
-    # works for Fluidigm or Sequenom
-    my ($irods, $sample_ids, $params, $log) = @_;
-    my $subscriber;
-    my %query_params = (irods          => $irods,
-                        data_path      => $params->{$IRODS_DATA_PATH_KEY},
-                        reference_path => $params->{$REFERENCE_PATH_KEY},
-                        reference_name => $params->{$REFERENCE_NAME_KEY},
-                        snpset_name    => $params->{$SNPSET_NAME_KEY},
-                        logger         => $log);
-    if ($params->{$PLATFORM_KEY} eq $FLUIDIGM) {
-        $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-            (%query_params);
-    } elsif ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
-        if ($params->{$READ_VERSION_KEY}) {
-            $query_params{'snpset_version'} = $params->{$READ_VERSION_KEY};
-        }
-        $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
-            (%query_params);
-    } else {
-        $log->logcroak("Unknown plex type: '", $params->{$PLATFORM_KEY}, "'");
-    }
-    my ($resultset_hashref, $vcf_metadata) =
-      $subscriber->get_assay_resultsets_and_vcf_metadata($sample_ids);
-
-    # unpack hashref from Subscriber.pm into an array of resultsets
-    # TODO exploit ability of Subscriber.pm to find multiple resultsets for each sample
-    my @resultsets;
-    foreach my $sample (keys %{$resultset_hashref}) {
-        my @sample_resultsets = @{$resultset_hashref->{$sample}};
-        push @resultsets, @sample_resultsets;
-    }
-    my $total = scalar @resultsets;
-    $log->info("Found $total assay resultsets.");
-    my $assay_snpset = $subscriber->snpset;
-    my $vcf_snpset;
-    if ($params->{$PLATFORM_KEY} eq $SEQUENOM) {
-        my @args = (
-            $params->{$REFERENCE_PATH_KEY},
-            $params->{$REFERENCE_NAME_KEY},
-            $params->{$SNPSET_NAME_KEY},
-        );
-        if ($params->{$WRITE_VERSION_KEY}) {
-            push @args, $params->{$WRITE_VERSION_KEY};
-        }
-        $vcf_snpset = $subscriber->find_irods_snpset(@args);
-    } else {
-        $vcf_snpset = $assay_snpset;
-    }
-    return (\@resultsets,
-            $subscriber->get_chromosome_lengths(),
-            $vcf_metadata,
-            $assay_snpset,
-            $vcf_snpset,
-        );
+    ### create PlexResultFinder and write VCF ###
+    my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+        sample_ids => \@sample_ids,
+        logger     => $log,
+    );
+    my $vcf_paths = $finder->read_write_all(\@params, $output_dir);
 }
 
 ## TODO Retrieve results for multiple plex types / experiments and record in the same VCF file

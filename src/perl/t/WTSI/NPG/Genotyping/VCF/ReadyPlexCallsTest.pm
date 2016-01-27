@@ -204,13 +204,14 @@ sub teardown : Test(teardown) {
 sub test_ready_calls_fluidigm : Test(2) {
     setup_fluidigm();
 
-    my $vcf_out = "$tmp/test_fluidigm.vcf";
+    my $vcf_out = "$tmp/fluidigm_qc.vcf";
     my $params_path_fluidigm = $tmp."/".$f_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_fluidigm",
                          "--samples $f_sample_json",
                          "--logconf $LOG_TEST_CONF",
-                         "--out $vcf_out";
+                         "--verbose",
+                         "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
     my @got_lines = read_file($vcf_out);
     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
@@ -224,13 +225,13 @@ sub test_ready_calls_fluidigm : Test(2) {
 sub test_ready_calls_sequenom : Test(2) {
     setup_sequenom_default();
 
-    my $vcf_out = "$tmp/test_sequenom.vcf";
+    my $vcf_out = "$tmp/sequenom_W30467.vcf";
     my $params_path_sequenom = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_sequenom",
                          "--samples $s_sample_json",
                          "--logconf $LOG_TEST_CONF",
-                         "--out $vcf_out";
+                         "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
     my @got_lines = read_file($vcf_out);
     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
@@ -245,13 +246,13 @@ sub test_ready_calls_sequenom_alternate_snp : Test(2) {
     # tests handling of renamed SNP in different manifest versions
     setup_sequenom_alternate();
 
-    my $vcf_out = "$tmp/test_sequenom.vcf";
+    my $vcf_out = "$tmp/sequenom_W30467.vcf";
     my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_sequenom_1",
                          "--samples $s_sample_json",
                          "--logconf $LOG_TEST_CONF",
-                         "--out $vcf_out";
+                         "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
     my @got_lines = read_file($vcf_out);
     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
