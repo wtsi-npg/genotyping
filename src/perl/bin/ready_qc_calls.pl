@@ -72,7 +72,7 @@ run() unless caller();
 
 sub run {
     my $callset;
-    my @config;
+    my $config;
     my $dbfile;
     my $debug;
     my $inifile;
@@ -82,7 +82,7 @@ sub run {
     my $verbose;
 
     GetOptions('callset=s'        => \$callset,
-               'config=s'         => \@config,
+               'config=s'         => \$config,
                'dbfile=s'         => \$dbfile,
                'debug'            => \$debug,
                'help'             => sub { pod2usage(-verbose => 2,
@@ -112,6 +112,10 @@ sub run {
     }
 
     ### validate command-line arguments and read params files ###
+    my @config = split(/,/, $config);
+    # JSON config files supplied as a comma-separated list
+    # Use instead of eg. "--config foo.json --config bar.json" for
+    # compatibility with Percolate cli_args_map function
     if (scalar @config == 0) {
         $log->logcroak("Must supply at least one --config argument");
     }
@@ -120,7 +124,10 @@ sub run {
         if (-e $config_path) {
             push @params, decode_json(read_file($config_path));
         } else {
-            $log->logcroak("Config path '", $config_path, "' does not exist");
+            $log->logcroak("Config path '", $config_path,
+                           "' does not exist. Paths must be supplied as ",
+                           "a comma-separated list; individual paths ",
+                           "cannot contain commas.");
         }
     }
     if (!(defined($output_dir))) {
@@ -180,8 +187,10 @@ Options:
                    calls (eg. from different platforms or runs) in identity
                    check output. Optional, defaults to platform name in
                    file supplied for --config.
-  --config         Path to JSON file with configuration parameters for
-                   reading the QC plex calls.
+  --config         Comma-separated list of paths to one or more JSON files,
+                   with configuration parameters for reading the QC plex
+                   calls. The individual paths *cannot* contain commas.
+                   Required.
   --dbfile         Path to pipeline SQLite database file. Used to read
                    sample identifiers. Must supply exactly one of --dbfile
                    or --samples.

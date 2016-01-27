@@ -293,8 +293,7 @@ sub test_ready_calls_both : Test(3) {
     my $fluidigm_params = $tmp."/".$f_params_name;
     my $sequenom_params = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $fluidigm_params",
-                         "--config $sequenom_params",
+                         "--config $fluidigm_params,$sequenom_params",
                          "--samples $s_sample_json",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
