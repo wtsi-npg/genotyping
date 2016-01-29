@@ -50,13 +50,14 @@ module Genotyping::Tasks
           Dir.mkdir(output) unless File.exist?(output)
 
           cli_args = args.merge({:dbpath => dbfile,
-                                  :output_dir => output})
-
+                                 :output_dir => output,
+                                 :plink => base})
+          
           margs = [dbfile, input, output]
 
           command = [RUN_QC,
                      cli_arg_map(cli_args, :prefix => '--') { |key|
-                       key.gsub(/_/, '-') }, base].flatten.join(' ')
+                       key.gsub(/_/, '-') }].flatten.join(' ')
 
           task_id = task_identity(:quality_control, *margs)
           log = File.join(log_dir, task_id + '.log')
