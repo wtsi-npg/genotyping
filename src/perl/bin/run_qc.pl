@@ -137,7 +137,7 @@ sub run {
                 $log->logcroak("VCF path '", $vcf_path,
                                "' does not exist. Paths must be supplied as ",
                                "a comma-separated list; individual paths ",
-                               "cannot contain commas.")
+                               "cannot contain commas.");
             }
         }
         @plexManifests = split(/,/msx, $plexManifests);
@@ -146,7 +146,7 @@ sub run {
                 $log->logcroak("Plex manifest path '", $plex_path,
                                "' does not exist. Paths must be supplied as ",
                                "a comma-separated list; individual paths ",
-                               "cannot contain commas.")
+                               "cannot contain commas.");
             }
         }
     } elsif ($vcf && !$plexManifests) {
