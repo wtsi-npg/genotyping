@@ -236,7 +236,7 @@ Find QC plex results (eg. Sequenom, Fluidigm) in iRODS and write as VCF.
 
 =item * Call AssayResultParser on data returned by query
 
-=item * Write as VCF
+=item * Write as one or more VCF files
 
 =back
 
