@@ -131,7 +131,7 @@ sub run {
     my @vcf;
     my @plexManifests;
     if ($vcf && $plexManifests) {
-        @vcf = split(/,/, $vcf);
+        @vcf = split(/,/msx, $vcf);
         foreach my $vcf_path (@vcf) {
             unless (-e $vcf_path) {
                 $log->logcroak("VCF path '", $vcf_path,
@@ -140,7 +140,7 @@ sub run {
                                "cannot contain commas.")
             }
         }
-        @plexManifests = split(/,/, $plexManifests);
+        @plexManifests = split(/,/msx, $plexManifests);
         foreach my $plex_path (@plexManifests) {
             unless (-e $plex_path) {
                 $log->logcroak("Plex manifest path '", $plex_path,

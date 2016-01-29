@@ -23,6 +23,8 @@ has 'sample_ids' =>
    required      => 1,
    documentation => 'Sample identifiers for query');
 
+our $VERSION = '';
+
 our $SEQUENOM = 'sequenom';
 our $FLUIDIGM = 'fluidigm';
 our $DEFAULT_DATA_PATH = '/seq/fluidigm';

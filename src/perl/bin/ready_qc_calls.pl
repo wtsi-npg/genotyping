@@ -112,7 +112,7 @@ sub run {
     }
 
     ### validate command-line arguments and read params files ###
-    my @config = split(/,/, $config);
+    my @config = split(/,/msx, $config);
     # JSON config files supplied as a comma-separated list
     # Use instead of eg. "--config foo.json --config bar.json" for
     # compatibility with Percolate cli_args_map function
