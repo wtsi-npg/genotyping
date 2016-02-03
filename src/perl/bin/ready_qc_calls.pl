@@ -16,13 +16,7 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
-use WTSI::NPG::Genotyping::Fluidigm::Subscriber;
-use WTSI::NPG::Genotyping::Sequenom::Subscriber;
-use WTSI::NPG::Genotyping::SNPSet;
-use WTSI::NPG::Genotyping::VCF::AssayResultParser;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
-use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
