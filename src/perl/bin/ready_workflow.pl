@@ -157,6 +157,13 @@ sub write_workflow {
 }
 
 
+# TODO modify, and rename, as ready_workflow.pl
+# - generate VCF from (default or user supplied) query configs
+# - generate YML, including VCF
+# - populate analysis directory
+#   - copy SQLite DB file
+#   - generate YML config and workflow files
+
 __END__
 
 
