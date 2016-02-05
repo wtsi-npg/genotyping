@@ -9,9 +9,12 @@ use strict;
 
 use Cwd qw(getcwd abs_path);
 use File::Copy qw(copy);
+use File::Slurp qw(read_file);
 use File::Spec::Functions qw(catfile);
 use FindBin qw($Bin);
 use Getopt::Long;
+use JSON;
+use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -182,27 +185,41 @@ sub run {
                "' is ready to run Percolate.");
 }
 
-# sub generate_vcf {
-#     # read sample identifiers from pipeline DB
-#     # query irods and write VCF
-#     my ($dbfile, $inifile, $workdir, $plex_manifests, $plex_configs) = @_;
-#     my @initargs = (name        => 'pipeline',
-#                     inifile     => $inifile,
-#                     dbfile      => $dbfile);
-#     my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-#         (@initargs)->connect
-#             (RaiseError     => 1,
-#              sqlite_unicode => 1,
-#              on_connect_do  => 'PRAGMA foreign_keys = ON');
-#     my @samples = $pipedb->sample->all;
-#     my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
-#     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
-#         sample_ids => \@sample_ids,
-#         logger     => $log,
-#     );
-#     my $vcf_paths = $finder->read_write_all(\@params, $output_dir);
-#     return $vcf_paths;
-# }
+sub generate_vcf {
+    # read sample identifiers from pipeline DB
+    # query irods for QC plex data and write VCF
+    my ($dbfile, $inifile, $workdir, $plex_manifests, $plex_configs) = @_;
+    my $vcfdir = catfile($workdir, 'vcf');
+    if (! -e $vcfdir) {
+        mkdir $vcfdir || $log->logcroak("Cannot create VCF subdirectory '",
+                                        $vcfdir, "'");
+    }
+    my @initargs = (name        => 'pipeline',
+                    inifile     => $inifile,
+                    dbfile      => $dbfile);
+    my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
+        (@initargs)->connect
+            (RaiseError     => 1,
+             sqlite_unicode => 1,
+             on_connect_do  => 'PRAGMA foreign_keys = ON');
+    my @samples = $pipedb->sample->all;
+    my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
+    my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+        sample_ids => \@sample_ids,
+        logger     => $log,
+    );
+    my @params;
+    foreach my $plex_config (@{$plex_configs}) {
+        if (-e $plex_config) {
+            push @params, decode_json(read_file($plex_config));
+        } else {
+            $log->logcroak("Cannot read QC plex config path '",
+                           $plex_config, "'");
+        }
+    }
+    my $vcf_paths = $finder->read_write_all(\@params, $vcfdir);
+    return $vcf_paths;
+}
 
 sub make_working_directory {
     # make in, pass, fail if needed; copy dbfile to working directory
