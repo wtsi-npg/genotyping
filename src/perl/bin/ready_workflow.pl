@@ -17,12 +17,16 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 use YAML qw /DumpFile/;
 
+use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 # Prototype script for simplifying use of the genotyping pipeline
 # Generate appropriate .yml files for use by Percolate
 
 our $VERSION = '';
+
+our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
 our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
@@ -59,6 +63,7 @@ sub run {
     my $dbfile;
     my $run;
     my $egt;
+    my $inifile;
     my $log4perl_config;
     my $verbose;
     my $host;
@@ -79,6 +84,7 @@ sub run {
 	       'dbfile=s'        => \$dbfile,
 	       'run=s'           => \$run,
 	       'egt=s'           => \$egt,
+               'inifile=s'       => \$inifile,
 	       'verbose'         => \$verbose,
 	       'workflow=s'      => \$workflow,
 	       'chunk_size=i'    => \$chunk_size,
@@ -107,6 +113,11 @@ sub run {
     }
 
     ### validate command-line arguments ###
+
+    $inifile ||= $DEFAULT_INI;
+    if (! -e $inifile) {
+        $log->logcroak("--inifile argument '", $inifile, "' does not exist");
+    }
     if ($workdir) {
         $workdir = abs_path($workdir);
         $log->info("Working directory absolute path is '", $workdir, "'");
@@ -160,7 +171,8 @@ sub run {
     ### create and populate the working directory ###
     make_working_directory($workdir, $dbfile);
     write_config_yml($workdir, $host);
-    #my $vcf = generate_vcf($workdir, \@plex_manifests, \@plex_config);
+    #my $vcf = generate_vcf($dbfile, $inifile, $workdir,
+    #                       \@plex_manifests, \@plex_config);
     # dummy values for initial test
     my $vcf = ['foo.vcf',];
     write_workflow_yml($workdir, $workflow, $run, $manifest,
@@ -170,15 +182,27 @@ sub run {
                "' is ready to run Percolate.");
 }
 
-sub generate_vcf {
-    # read sample identifiers from pipeline DB
-    # query irods and write VCF
-    my ($dbfile, $workdir, $plex_manifests, $plex_configs) = @_;
-    my @vcf;
-
-
-    return @vcf;
-}
+# sub generate_vcf {
+#     # read sample identifiers from pipeline DB
+#     # query irods and write VCF
+#     my ($dbfile, $inifile, $workdir, $plex_manifests, $plex_configs) = @_;
+#     my @initargs = (name        => 'pipeline',
+#                     inifile     => $inifile,
+#                     dbfile      => $dbfile);
+#     my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
+#         (@initargs)->connect
+#             (RaiseError     => 1,
+#              sqlite_unicode => 1,
+#              on_connect_do  => 'PRAGMA foreign_keys = ON');
+#     my @samples = $pipedb->sample->all;
+#     my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
+#     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+#         sample_ids => \@sample_ids,
+#         logger     => $log,
+#     );
+#     my $vcf_paths = $finder->read_write_all(\@params, $output_dir);
+#     return $vcf_paths;
+# }
 
 sub make_working_directory {
     # make in, pass, fail if needed; copy dbfile to working directory
@@ -231,46 +255,22 @@ sub write_config_yml {
     return $config_path;
 }
 
-sub get_illuminus_args {
-    my ($chunk_size, $memory, $manifest, $vcf, $plex_manifests) = @_;
-    my %illuminus_args = (
-	'chunk_size' => $chunk_size,
-	'memory' => $memory,
-	'manifest' => $manifest,
-        'plex_manifest' => $plex_manifests,
-        'vcf' => $vcf,
-	'gender_method' => 'Supplied'
-    );
-}
-
-sub get_zcall_args {
-    my ($chunk_size, $memory, $manifest, $vcf, $plex_manifests,
-        $egt, $zstart, $ztotal) = @_;
-    my %zcall_args = (
-	'chunk_size' => $chunk_size,
-	'memory' => $memory,
-	'manifest' => $manifest,
-        'plex_manifest' => $plex_manifests,
-        'vcf' => $vcf,
-	'egt' => $egt,
-	'zstart' => $zstart,
-	'ztotal' => $ztotal
-    );
-    return \%zcall_args;
-}
-
 sub write_workflow_yml {
     my ($workdir, $workflow, $run, $manifest, $chunk_size,
         $memory, $vcf, $plex_manifests, $egt, $zstart, $ztotal) = @_;
     my $dbpath = catfile($workdir, $GENOTYPING_DB_NAME);
     my @params = ($workdir, $dbpath, $run, $manifest,
                   $vcf, $plex_manifests, $chunk_size, $memory);
-
-    my $workflow_args;
+    my %workflow_args = (
+	'chunk_size' => $chunk_size,
+	'memory' => $memory,
+	'manifest' => $manifest,
+        'plex_manifest' => $plex_manifests,
+        'vcf' => $vcf,
+    );
     my $workflow_module;
     if ($workflow eq 'illuminus') {
-        $workflow_args = get_illuminus_args($chunk_size, $memory, $manifest,
-                                            $vcf, $plex_manifests);
+        $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
     } elsif ($workflow eq 'zcall') {
         if (!$egt) {
@@ -278,16 +278,16 @@ sub write_workflow_yml {
         } elsif (! -e $egt) {
             $log->logcroak("EGT file '", $egt, "' does not exist.");
         } else {
-            $workflow_args = get_zcall_args($chunk_size, $memory,
-                                            $manifest, $vcf, $plex_manifests,
-                                            $egt, $zstart, $ztotal);
+            $workflow_args{'egt'} = $egt;
+            $workflow_args{'zstart'} = $zstart;
+            $workflow_args{'ztotal'} = $ztotal;
             $workflow_module = $MODULE_ZCALL;
         }
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
                        "'; must be one of illuminus, zcall");
     }
-    my @args = ($dbpath, $run, $workdir, $workflow_args);
+    my @args = ($dbpath, $run, $workdir, \%workflow_args);
     my %params = (
 	'library'   => 'genotyping',
 	'workflow'  => $workflow_module,
