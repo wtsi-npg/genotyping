@@ -25,6 +25,8 @@ use WTSI::NPG::Utilities qw(user_session_log);
 our $VERSION = '';
 our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
+our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
+our $MODULE_ZCALL = 'Genotyping::Workflows::GenotypeZCall';
 
 my $uid = `whoami`;
 chomp($uid);
@@ -161,7 +163,6 @@ sub run {
     #my $vcf = generate_vcf($workdir, \@plex_manifests, \@plex_config);
     # dummy values for initial test
     my $vcf = ['foo.vcf',];
-    #my $plex_manifests = ['bar.tsv',];
     write_workflow_yml($workdir, $workflow, $run, $manifest,
                        $chunk_size, $memory, $vcf, \@plex_manifests,
                        $zstart, $ztotal);
@@ -170,10 +171,13 @@ sub run {
 }
 
 sub generate_vcf {
-
     # read sample identifiers from pipeline DB
     # query irods and write VCF
+    my ($dbfile, $workdir, $plex_manifests, $plex_configs) = @_;
+    my @vcf;
 
+
+    return @vcf;
 }
 
 sub make_working_directory {
@@ -227,76 +231,70 @@ sub write_config_yml {
     return $config_path;
 }
 
-sub write_illuminus {
-    my ($workdir, $dbpath, $run, $manifest, $vcf, $plex_manifest,
-        $chunk_size, $memory) = @_;
-
+sub get_illuminus_args {
+    my ($chunk_size, $memory, $manifest, $vcf, $plex_manifests) = @_;
     my %illuminus_args = (
 	'chunk_size' => $chunk_size,
 	'memory' => $memory,
 	'manifest' => $manifest,
-        'plex_manifest' => $plex_manifest,
+        'plex_manifest' => $plex_manifests,
         'vcf' => $vcf,
 	'gender_method' => 'Supplied'
-	);
-    my $workflow_name = 'Genotyping::Workflows::GenotypeIlluminus';
-    write_final($dbpath, $run, $workdir, $workflow_name, \%illuminus_args,
-                catfile($workdir, 'in', 'genotype_illuminus.yml'));
+    );
 }
 
-sub write_zcall {
-    my ($paramsRef, $egt, $zstart, $ztotal) = @_;
-    my ($workdir, $dbpath, $run, $manifest, $vcf, $plex_manifest,
-        $chunk_size, $memory) = @{$paramsRef};
+sub get_zcall_args {
+    my ($chunk_size, $memory, $manifest, $vcf, $plex_manifests,
+        $egt, $zstart, $ztotal) = @_;
     my %zcall_args = (
 	'chunk_size' => $chunk_size,
 	'memory' => $memory,
 	'manifest' => $manifest,
-        'plex_manifest' => $plex_manifest,
+        'plex_manifest' => $plex_manifests,
         'vcf' => $vcf,
 	'egt' => $egt,
 	'zstart' => $zstart,
 	'ztotal' => $ztotal
-	);
-    my $workflow_name = 'Genotyping::Workflows::GenotypeZCall';
-    write_final($dbpath, $run, $workdir, $workflow_name, \%zcall_args,
-                catfile($workdir, 'in', 'genotype_zcall.yml'));
-}
-
-sub write_final {
-    my ($dbpath, $run, $workdir, $workflow_name, $extra_args_ref, $out) = @_;
-    my @workflow_args = ($dbpath, $run, $workdir, $extra_args_ref);
-    my %args = (
-	'library' => 'genotyping',
-	'workflow' => $workflow_name,
-	'arguments' => \@workflow_args,
-	);
-    DumpFile($out, (\%args));
+    );
+    return \%zcall_args;
 }
 
 sub write_workflow_yml {
     my ($workdir, $workflow, $run, $manifest, $chunk_size,
         $memory, $vcf, $plex_manifests, $egt, $zstart, $ztotal) = @_;
-
     my $dbpath = catfile($workdir, $GENOTYPING_DB_NAME);
-
     my @params = ($workdir, $dbpath, $run, $manifest,
                   $vcf, $plex_manifests, $chunk_size, $memory);
 
+    my $workflow_args;
+    my $workflow_module;
     if ($workflow eq 'illuminus') {
-        write_illuminus(@params);
+        $workflow_args = get_illuminus_args($chunk_size, $memory, $manifest,
+                                            $vcf, $plex_manifests);
+        $workflow_module = $MODULE_ILLUMINUS;
     } elsif ($workflow eq 'zcall') {
         if (!$egt) {
             $log->logcroak("Must specify --egt for zcall workflow");
         } elsif (! -e $egt) {
             $log->logcroak("EGT file '", $egt, "' does not exist.");
         } else {
-            write_zcall(\@params, $egt, $zstart, $ztotal);
+            $workflow_args = get_zcall_args($chunk_size, $memory,
+                                            $manifest, $vcf, $plex_manifests,
+                                            $egt, $zstart, $ztotal);
+            $workflow_module = $MODULE_ZCALL;
         }
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
                        "'; must be one of illuminus, zcall");
     }
+    my @args = ($dbpath, $run, $workdir, $workflow_args);
+    my %params = (
+	'library'   => 'genotyping',
+	'workflow'  => $workflow_module,
+	'arguments' => \@args,
+    );
+    my $out = catfile($workdir, "in", "genotype_".$workflow.".yml");
+    DumpFile($out, (\%params));
 }
 
 
