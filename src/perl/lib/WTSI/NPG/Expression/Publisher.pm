@@ -108,7 +108,7 @@ sub _publish_files {
   my $sample_id = $resultset->sample_id;
 
   my $ssdb = $self->sequencescape_db;
-  my $ss_sample = $ssdb->find_infinium_gex_sample_by_sanger_id($sample_id);
+  my $ss_sample = $ssdb->find_infinium_gex_sample($plate, $well);
   my $expected_sanger_id = $ss_sample->{sanger_sample_id};
 
   unless ($expected_sanger_id) {
@@ -266,8 +266,8 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
-Reserved.
+Copyright (C) 2013, 2014, 2015, 2016 Genome Research Limited. All
+Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
