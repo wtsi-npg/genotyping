@@ -9,8 +9,11 @@ our $VERSION = '';
 with 'WTSI::DNAP::Utilities::Loggable';
 
 has 'sample_id'        => (is => 'ro', isa => 'Str', required => 1);
-has 'plate_id'         => (is => 'ro', isa => 'Str', required => 0);
-has 'well_id'          => (is => 'ro', isa => 'Str', required => 0);
+
+# Set to required because V2 manifests must provide it
+has 'plate_id'         => (is => 'ro', isa => 'Str', required => 1);
+# Set to required because V2 manifests must provide it
+has 'well_id'          => (is => 'ro', isa => 'Str', required => 1);
 
 has 'beadchip'         => (is => 'ro', isa => 'Str', required => 1);
 has 'beadchip_section' => (is => 'ro', isa => 'Str', required => 1);
@@ -55,7 +58,7 @@ Keith James <kdj@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2013, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
