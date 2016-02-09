@@ -116,7 +116,6 @@ sub run {
     }
 
     ### validate command-line arguments ###
-
     $inifile ||= $DEFAULT_INI;
     if (! -e $inifile) {
         $log->logcroak("--inifile argument '", $inifile, "' does not exist");
@@ -174,6 +173,11 @@ sub run {
     ### create and populate the working directory ###
     make_working_directory($workdir, $dbfile);
     write_config_yml($workdir, $host);
+
+    # optionally, copy the EGT file, manifest, and plex manifests to workdir?
+    # eg. have a 'copy_all' option to enable this
+    # ($egt, $manifest, \@plex_manifests) = copy_all(blah)
+
     #my $vcf = generate_vcf($dbfile, $inifile, $workdir,
     #                       \@plex_manifests, \@plex_config);
     # dummy values for initial test
@@ -239,6 +243,7 @@ sub make_working_directory {
     copy($dbfile, $workdb) || $log->logcroak("Cannot copy '", $dbfile,
                                              "' to '", $workdb, "'");
     $log->info("Copied '", $dbfile, "' to '", $workdb, "'");
+    # create the in, pass, fail subdirectories
     foreach my $name (qw/in pass fail/) {
         my $subdir = catfile($workdir, $name);
         if (-e $subdir) {
@@ -324,6 +329,8 @@ sub write_workflow_yml {
 
 # TODO copy_all option to copy egt, manifest, and plex manifest files?
 
+# TODO FIXME allow a sample_json list for sample names instead of dbfile
+# use for testing
 
 __END__
 
