@@ -15,12 +15,17 @@ use Log::Log4perl;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
+my $tmp;
+
+sub setup: Test(setup) {
+
+    $tmp = tempdir("ready_workflow_test_XXXXXX", CLEANUP => 0);
+
+}
+
 sub test_command_illuminus : Test(1) {
 
     my $data_path = './t/ready_workflow';
-
-    my $tmp = tempdir("ready_workflow_test_XXXXXX", CLEANUP => 0);
-
 
     my $dbfile = $data_path."/small_test.db";
 
@@ -43,3 +48,6 @@ sub test_command_illuminus : Test(1) {
     is(0, system($cmd), "script exit status is zero");
 
 }
+
+
+return 1;
