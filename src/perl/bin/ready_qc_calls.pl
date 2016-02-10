@@ -71,7 +71,6 @@ sub run {
     my $debug;
     my $inifile;
     my $log4perl_config;
-    my $samples;
     my $output_dir;
     my $verbose;
 
@@ -83,7 +82,6 @@ sub run {
                                                      -exitval => 0) },
                'inifile=s'        => \$inifile,
                'logconf=s'        => \$log4perl_config,
-               'samples=s'        => \$samples,
                'out=s'            => \$output_dir,
                'verbose'          => \$verbose);
 
@@ -130,29 +128,23 @@ sub run {
         $log->logcroak("--out argument '", $output_dir,
                        "' is not a directory");
     }
-    if (($dbfile && $samples) || !($dbfile || $samples)  ) {
-        $log->logcroak("Must specify exactly one of --dbfile ",
-                       "and --samples");
+    if (!$dbfile) {
+        $log->logcroak("--dbfile argument is required");
+    } elsif (! -e $dbfile) {
+        $log->logcroak("--dbfile argument '", $dbfile, "' does not exist");
     }
 
-    ### read sample identifiers ###
-    my @sample_ids;
-    if ($dbfile) {
-        # get sample names from pipeline DB
-        my @initargs = (name        => 'pipeline',
-                        inifile     => $inifile,
-                        dbfile      => $dbfile);
-        my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
-            (@initargs)->connect
-                (RaiseError     => 1,
-                 sqlite_unicode => 1,
-                 on_connect_do  => 'PRAGMA foreign_keys = ON');
-        my @samples = $pipedb->sample->all;
-        @sample_ids = uniq map { $_->sanger_sample_id } @samples;
-    } elsif ($samples) {
-        my @contents = decode_json(read_file($samples));
-        @sample_ids = @{$contents[0]};
-    }
+    ### read sample identifiers from pipeline DB ###
+    my @initargs = (name        => 'pipeline',
+                    inifile     => $inifile,
+                    dbfile      => $dbfile);
+    my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
+        (@initargs)->connect
+            (RaiseError     => 1,
+             sqlite_unicode => 1,
+             on_connect_do  => 'PRAGMA foreign_keys = ON');
+    my @samples = $pipedb->sample->all;
+    my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
 
     ### create PlexResultFinder and write VCF ###
     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
@@ -186,16 +178,12 @@ Options:
                    calls. The individual paths *cannot* contain commas.
                    Required.
   --dbfile         Path to pipeline SQLite database file. Used to read
-                   sample identifiers. Must supply exactly one of --dbfile
-                   or --samples.
+                   sample identifiers. Required.
   --help           Display help.
   --inifile        Path to .ini file to configure pipeline SQLite database
                    connection. Optional. Only relevant if --dbfile is given.
   --out            Path for VCF output. Required.
-  --samples        Path to JSON file containing a list of sample identifiers.
-                   The file should contain *only* a simple list, so the
-                   "sample.json" file produced by g2i is not appropriate.
-                   Must supply exactly one of --dbfile or --samples.
+
 
 =head1 DESCRIPTION
 

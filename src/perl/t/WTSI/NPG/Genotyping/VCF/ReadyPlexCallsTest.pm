@@ -39,6 +39,8 @@ my $pid = $$;
 my $data_path = './t/vcf';
 my $tmp;
 
+my $dbfile = $data_path."/4_samples.db";
+
 # fluidigm test data
 my $f_expected_vcf = $data_path."/fluidigm.vcf";
 my $f_reference_name = "Homo_sapiens (1000Genomes)";
@@ -59,8 +61,10 @@ my $s_sample_json = $data_path."/sequenom_samples.json";
 my $s_params_name = "params_sequenom.json";
 my $s_params_name_1 = "params_sequenom_1.json";
 
-
-my @sample_ids = qw(sample_001 sample_002 sample_003 sample_004);
+my @sample_ids = qw(urn:wtsi:plate0001_A01_sample000001
+                    urn:wtsi:plate0001_B01_sample000002
+                    urn:wtsi:plate0001_C01_sample000003
+                    urn:wtsi:plate0001_D01_sample000004);
 my $chromosome_json_filename = "chromosome_lengths_GRCh37.json";
 my $cjson_irods;
 
@@ -226,7 +230,7 @@ sub test_ready_calls_fluidigm : Test(2) {
     my $params_path_fluidigm = $tmp."/".$f_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_fluidigm",
-                         "--samples $f_sample_json",
+                         "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--verbose",
                          "--out $tmp";
@@ -248,7 +252,7 @@ sub test_ready_calls_sequenom : Test(2) {
     my $params_path_sequenom = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_sequenom",
-                         "--samples $s_sample_json",
+                         "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
@@ -270,7 +274,7 @@ sub test_ready_calls_sequenom_alternate_snp : Test(2) {
     my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $params_path_sequenom_1",
-                         "--samples $s_sample_json",
+                         "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
@@ -294,7 +298,7 @@ sub test_ready_calls_both : Test(3) {
     my $sequenom_params = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $fluidigm_params,$sequenom_params",
-                         "--samples $s_sample_json",
+                         "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
     ok(system($cmd) == 0, 'Wrote Sequenom and Fluidigm calls to VCF');
