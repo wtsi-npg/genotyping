@@ -89,7 +89,7 @@ sub construct : Test(1) {
 }
 
 sub make_fixture : Test(setup) {
-    $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 0);
+    $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 1);
     $log->info("Created temporary directory $tmp");
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid.$tfc");
@@ -231,12 +231,10 @@ sub teardown : Test(teardown) {
 
 sub test_ready_calls_fluidigm : Test(2) {
     setup_chromosome_json();
-    setup_fluidigm();
-
+    my $fluidigm_params = setup_fluidigm();
     my $vcf_out = "$tmp/fluidigm_qc.vcf";
-    my $params_path_fluidigm = $tmp."/".$f_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_fluidigm",
+                         "--config $fluidigm_params",
                          "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--verbose",
@@ -253,12 +251,10 @@ sub test_ready_calls_fluidigm : Test(2) {
 
 sub test_ready_calls_sequenom : Test(2) {
     setup_chromosome_json();
-    setup_sequenom_default();
-
+    my $sequenom_params = setup_sequenom_default();
     my $vcf_out = "$tmp/sequenom_W30467.vcf";
-    my $params_path_sequenom = $tmp."/".$s_params_name;
     my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_sequenom",
+                         "--config $sequenom_params",
                          "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
@@ -275,12 +271,10 @@ sub test_ready_calls_sequenom : Test(2) {
 sub test_ready_calls_sequenom_alternate_snp : Test(2) {
     # tests handling of renamed SNP in different manifest versions
     setup_chromosome_json();
-    setup_sequenom_alternate();
-
+    my $sequenom_params = setup_sequenom_alternate();
     my $vcf_out = "$tmp/sequenom_W30467.vcf";
-    my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
     my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_sequenom_1",
+                         "--config $sequenom_params",
                          "--dbfile $dbfile",
                          "--logconf $LOG_TEST_CONF",
                          "--out $tmp";
@@ -297,12 +291,10 @@ sub test_ready_calls_sequenom_alternate_snp : Test(2) {
 sub test_ready_calls_both : Test(3) {
     # test ready calls script with *both* sequenom and fluidigm specified
     setup_chromosome_json();
-    setup_fluidigm();
-    setup_sequenom_default();
-    my $fluidigm_out = "$tmp/fluidigm_qc.vcf";
-    my $sequenom_out = "$tmp/sequenom_W30467.vcf";
-    my $fluidigm_params = $tmp."/".$f_params_name;
-    my $sequenom_params = $tmp."/".$s_params_name;
+    my $fluidigm_params = setup_fluidigm();
+    my $sequenom_params = setup_sequenom_default();
+    my $fluidigm_out = catfile($tmp, "fluidigm_qc.vcf");
+    my $sequenom_out = catfile($tmp, "sequenom_W30467.vcf");
     my $cmd = join q{ }, "$READY_QC_CALLS",
                          "--config $fluidigm_params,$sequenom_params",
                          "--dbfile $dbfile",
