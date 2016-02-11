@@ -24,8 +24,6 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
 
-use Data::Dumper; # FIXME troubleshooting
-
 # Prototype script for simplifying use of the genotyping pipeline
 # Generate appropriate .yml files for use by Percolate
 
@@ -225,7 +223,6 @@ sub generate_vcf {
         }
     }
     my $vcf_paths = $finder->read_write_all(\@params, $vcfdir);
-    print STDERR Dumper $vcf_paths;
     return $vcf_paths;
 }
 
