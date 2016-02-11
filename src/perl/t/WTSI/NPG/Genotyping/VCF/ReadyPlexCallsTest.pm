@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 18;
+use Test::More tests => 3; # 19;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -32,6 +32,7 @@ Log::Log4perl::init($LOG_TEST_CONF);
 
 
 our $READY_QC_CALLS = './bin/ready_qc_calls.pl';
+our $READY_WORKFLOW = './bin/ready_workflow.pl';
 
 my $irods;
 my $irods_tmp_coll;
@@ -40,6 +41,8 @@ my $data_path = './t/vcf';
 my $tmp;
 
 my $dbfile = $data_path."/4_samples.db";
+
+my $manifest = $ENV{'GENOTYPE_TEST_DATA'}."/Human670-QuadCustom_v1_A.bpm.csv";
 
 # fluidigm test data
 my $f_expected_vcf = $data_path."/fluidigm.vcf";
@@ -86,7 +89,7 @@ sub construct : Test(1) {
 }
 
 sub make_fixture : Test(setup) {
-    $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 1);
+    $tmp = tempdir("ready_plex_test_XXXXXX", CLEANUP => 0);
     $log->info("Created temporary directory $tmp");
     $irods = WTSI::NPG::iRODS->new;
     $irods_tmp_coll = $irods->add_collection("ReadyPlexCallsTest.$pid.$tfc");
@@ -137,6 +140,7 @@ sub setup_fluidigm {
     close $out ||
         $log->logcroak("Cannot close test parameter path '",
                        $params_path_fluidigm, "'");
+    return $params_path_fluidigm;
 }
 
 sub setup_sequenom_alternate {
@@ -152,7 +156,7 @@ sub setup_sequenom_default {
                            sequenom_002.csv
                            sequenom_003.csv
                            sequenom_004.csv);
-    setup_sequenom(\@s_input_files);
+    return setup_sequenom(\@s_input_files);
 }
 
 sub setup_sequenom {
@@ -208,6 +212,7 @@ sub setup_sequenom {
     print $out to_json(\%params);
     close $out ||
         $log->logcroak("Cannot close config file '", $config_path_1, "'");
+    return ($config_path, $config_path_1);
 }
 
 sub setup_chromosome_json {
@@ -218,161 +223,193 @@ sub setup_chromosome_json {
     $irods->add_object($cjson, $cjson_irods);
 }
 
-sub teardown : Test(teardown) {
-    $irods->remove_collection($irods_tmp_coll);
-}
+# sub teardown : Test(teardown) {
+#     $irods->remove_collection($irods_tmp_coll);
+# }
 
-sub test_ready_calls_fluidigm : Test(2) {
+# sub test_ready_calls_fluidigm : Test(2) {
+#     setup_chromosome_json();
+#     setup_fluidigm();
+
+#     my $vcf_out = "$tmp/fluidigm_qc.vcf";
+#     my $params_path_fluidigm = $tmp."/".$f_params_name;
+#     my $cmd = join q{ }, "$READY_QC_CALLS",
+#                          "--config $params_path_fluidigm",
+#                          "--dbfile $dbfile",
+#                          "--logconf $LOG_TEST_CONF",
+#                          "--verbose",
+#                          "--out $tmp";
+#     ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
+#     my @got_lines = read_file($vcf_out);
+#     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+#     my @expected_lines = read_file($f_expected_vcf);
+#     @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+#     is_deeply(\@got_lines, \@expected_lines,
+#               "Fluidigm VCF output matches expected values");
+
+# }
+
+# sub test_ready_calls_sequenom : Test(2) {
+#     setup_chromosome_json();
+#     setup_sequenom_default();
+
+#     my $vcf_out = "$tmp/sequenom_W30467.vcf";
+#     my $params_path_sequenom = $tmp."/".$s_params_name;
+#     my $cmd = join q{ }, "$READY_QC_CALLS",
+#                          "--config $params_path_sequenom",
+#                          "--dbfile $dbfile",
+#                          "--logconf $LOG_TEST_CONF",
+#                          "--out $tmp";
+#     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
+#     my @got_lines = read_file($vcf_out);
+#     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+#     my @expected_lines = read_file($s_expected_vcf);
+#     @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+#     is_deeply(\@got_lines, \@expected_lines,
+#               "Sequenom VCF output matches expected values");
+
+# }
+
+# sub test_ready_calls_sequenom_alternate_snp : Test(2) {
+#     # tests handling of renamed SNP in different manifest versions
+#     setup_chromosome_json();
+#     setup_sequenom_alternate();
+
+#     my $vcf_out = "$tmp/sequenom_W30467.vcf";
+#     my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
+#     my $cmd = join q{ }, "$READY_QC_CALLS",
+#                          "--config $params_path_sequenom_1",
+#                          "--dbfile $dbfile",
+#                          "--logconf $LOG_TEST_CONF",
+#                          "--out $tmp";
+#     ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
+#     my @got_lines = read_file($vcf_out);
+#     @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+#     my @expected_lines = read_file($s_expected_vcf);
+#     @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+#     is_deeply(\@got_lines, \@expected_lines,
+#               "Sequenom VCF output matches expected values");
+
+# }
+
+# sub test_ready_calls_both : Test(3) {
+#     # test ready calls script with *both* sequenom and fluidigm specified
+#     setup_chromosome_json();
+#     setup_fluidigm();
+#     setup_sequenom_default();
+#     my $fluidigm_out = "$tmp/fluidigm_qc.vcf";
+#     my $sequenom_out = "$tmp/sequenom_W30467.vcf";
+#     my $fluidigm_params = $tmp."/".$f_params_name;
+#     my $sequenom_params = $tmp."/".$s_params_name;
+#     my $cmd = join q{ }, "$READY_QC_CALLS",
+#                          "--config $fluidigm_params,$sequenom_params",
+#                          "--dbfile $dbfile",
+#                          "--logconf $LOG_TEST_CONF",
+#                          "--out $tmp";
+#     ok(system($cmd) == 0, 'Wrote Sequenom and Fluidigm calls to VCF');
+#     my @got_f = read_file($fluidigm_out);
+#     @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
+#     my @expected_f = read_file($f_expected_vcf);
+#     @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
+#     is_deeply(\@got_f, \@expected_f,
+#               "Fluidigm VCF output matches expected values");
+#     my @got_s = read_file($sequenom_out);
+#     @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
+#     my @expected_s = read_file($s_expected_vcf);
+#     @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
+#     is_deeply(\@got_s, \@expected_s,
+#               "Sequenom VCF output matches expected values");
+
+# }
+
+# sub test_result_finder : Test(7) {
+#     setup_chromosome_json();
+#     setup_fluidigm();
+#     setup_sequenom_default();
+
+#     # test for single query
+#     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+#         irods      => $irods,
+#         sample_ids => \@sample_ids
+#     );
+#     my $params_f = {
+#         irods_data_path      => $irods_tmp_coll,
+#         platform             => "fluidigm",
+#         reference_name       => $f_reference_name,
+#         reference_path       => $irods_tmp_coll,
+#         snpset_name          => $f_snpset_id,
+#     };
+#     my $out_fluidigm_0 = "$tmp/class_test_fluidigm_0.vcf";
+#     my $total = $finder->read_write_single($params_f,
+#                                            $out_fluidigm_0,
+#                                            'class_test_fluidigm');
+#     ok($total==4, "Results found for 4 Fluidigm samples");
+#     ok(-e $out_fluidigm_0, "Fluidigm output found");
+
+#     # test for more than one query
+#     my $snpset_v2 = '2.0';
+#     my $params_s = {
+#         irods_data_path      => $irods_tmp_coll,
+#         platform             => "sequenom",
+#         reference_name       => $s_reference_name,
+#         reference_path       => $irods_tmp_coll,
+#         snpset_name          => $s_snpset_id,
+#         read_snpset_version  => $snpset_v2,
+#         write_snpset_version => $snpset_v2,
+#     };
+
+#     my $paths = $finder->read_write_all([$params_f, $params_s], $tmp);
+#     my $f_out_vcf = "$tmp/fluidigm_qc.vcf";
+#     my $s_out_vcf = "$tmp/sequenom_W30467.vcf";
+#     my $out_paths = [$f_out_vcf, $s_out_vcf];
+#     is_deeply($paths, $out_paths, "Fluidigm & Sequenom outputs returned");
+#     ok(-e $f_out_vcf, "Fluidigm output found");
+#     ok(-e $s_out_vcf, "Sequenom output found");
+
+#     my @got_f = read_file($f_out_vcf);
+#     @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
+#     my @expected_f = read_file($f_expected_vcf);
+#     @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
+#     is_deeply(\@got_f, \@expected_f,
+#               "Fluidigm VCF output matches expected values");
+#     my @got_s = read_file($s_out_vcf);
+#     @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
+#     my @expected_s = read_file($s_expected_vcf);
+#     @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
+#     is_deeply(\@got_s, \@expected_s,
+#               "Sequenom VCF output matches expected values");
+# }
+
+sub test_workflow_script: Test(1) {
+
+
     setup_chromosome_json();
-    setup_fluidigm();
+    my $f_config = setup_fluidigm();
+    my ($s_config_0, $s_config_1) = setup_sequenom_default();
 
-    my $vcf_out = "$tmp/fluidigm_qc.vcf";
-    my $params_path_fluidigm = $tmp."/".$f_params_name;
-    my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_fluidigm",
+    my $plex_manifest_fluidigm   = $data_path."/".$f_snpset_filename;
+    my $plex_manifest_sequenom   = $data_path."/".$s_snpset_filename;
+    my $plex_manifest_sequenom_1 = $data_path."/".$s_snpset_filename_1;
+
+    my $cmd = join q{ }, "$READY_WORKFLOW",
                          "--dbfile $dbfile",
-                         "--logconf $LOG_TEST_CONF",
+                         "--manifest $manifest",
+                         "--run run1",
                          "--verbose",
-                         "--out $tmp";
-    ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
-    my @got_lines = read_file($vcf_out);
-    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
-    my @expected_lines = read_file($f_expected_vcf);
-    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
-    is_deeply(\@got_lines, \@expected_lines,
-              "Fluidigm VCF output matches expected values");
+                         "--plex_config $f_config",
+                         #"--plex_config $s_config_1",
+                         "--plex_manifest $plex_manifest_fluidigm",
+                         #"--plex_manifest $plex_manifest_sequenom",
+                         #"--plex_manifest $plex_manifest_sequenom_1",
+                         "--workdir $tmp/genotype_workdir",
+                         "--workflow illuminus";
 
-}
 
-sub test_ready_calls_sequenom : Test(2) {
-    setup_chromosome_json();
-    setup_sequenom_default();
+    print STDERR $cmd."\n";
 
-    my $vcf_out = "$tmp/sequenom_W30467.vcf";
-    my $params_path_sequenom = $tmp."/".$s_params_name;
-    my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_sequenom",
-                         "--dbfile $dbfile",
-                         "--logconf $LOG_TEST_CONF",
-                         "--out $tmp";
-    ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
-    my @got_lines = read_file($vcf_out);
-    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
-    my @expected_lines = read_file($s_expected_vcf);
-    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
-    is_deeply(\@got_lines, \@expected_lines,
-              "Sequenom VCF output matches expected values");
+    is(0, system($cmd), "script exit status is zero");
 
-}
 
-sub test_ready_calls_sequenom_alternate_snp : Test(2) {
-    # tests handling of renamed SNP in different manifest versions
-    setup_chromosome_json();
-    setup_sequenom_alternate();
-
-    my $vcf_out = "$tmp/sequenom_W30467.vcf";
-    my $params_path_sequenom_1 = $tmp."/".$s_params_name_1;
-    my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $params_path_sequenom_1",
-                         "--dbfile $dbfile",
-                         "--logconf $LOG_TEST_CONF",
-                         "--out $tmp";
-    ok(system($cmd) == 0, 'Wrote Sequenom calls to VCF');
-    my @got_lines = read_file($vcf_out);
-    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
-    my @expected_lines = read_file($s_expected_vcf);
-    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
-    is_deeply(\@got_lines, \@expected_lines,
-              "Sequenom VCF output matches expected values");
-
-}
-
-sub test_ready_calls_both : Test(3) {
-    # test ready calls script with *both* sequenom and fluidigm specified
-    setup_chromosome_json();
-    setup_fluidigm();
-    setup_sequenom_default();
-    my $fluidigm_out = "$tmp/fluidigm_qc.vcf";
-    my $sequenom_out = "$tmp/sequenom_W30467.vcf";
-    my $fluidigm_params = $tmp."/".$f_params_name;
-    my $sequenom_params = $tmp."/".$s_params_name;
-    my $cmd = join q{ }, "$READY_QC_CALLS",
-                         "--config $fluidigm_params,$sequenom_params",
-                         "--dbfile $dbfile",
-                         "--logconf $LOG_TEST_CONF",
-                         "--out $tmp";
-    ok(system($cmd) == 0, 'Wrote Sequenom and Fluidigm calls to VCF');
-    my @got_f = read_file($fluidigm_out);
-    @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
-    my @expected_f = read_file($f_expected_vcf);
-    @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
-    is_deeply(\@got_f, \@expected_f,
-              "Fluidigm VCF output matches expected values");
-    my @got_s = read_file($sequenom_out);
-    @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
-    my @expected_s = read_file($s_expected_vcf);
-    @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
-    is_deeply(\@got_s, \@expected_s,
-              "Sequenom VCF output matches expected values");
-
-}
-
-sub test_result_finder : Test(7) {
-    setup_chromosome_json();
-    setup_fluidigm();
-    setup_sequenom_default();
-
-    # test for single query
-    my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
-        irods      => $irods,
-        sample_ids => \@sample_ids
-    );
-    my $params_f = {
-        irods_data_path      => $irods_tmp_coll,
-        platform             => "fluidigm",
-        reference_name       => $f_reference_name,
-        reference_path       => $irods_tmp_coll,
-        snpset_name          => $f_snpset_id,
-    };
-    my $out_fluidigm_0 = "$tmp/class_test_fluidigm_0.vcf";
-    my $total = $finder->read_write_single($params_f,
-                                           $out_fluidigm_0,
-                                           'class_test_fluidigm');
-    ok($total==4, "Results found for 4 Fluidigm samples");
-    ok(-e $out_fluidigm_0, "Fluidigm output found");
-
-    # test for more than one query
-    my $snpset_v2 = '2.0';
-    my $params_s = {
-        irods_data_path      => $irods_tmp_coll,
-        platform             => "sequenom",
-        reference_name       => $s_reference_name,
-        reference_path       => $irods_tmp_coll,
-        snpset_name          => $s_snpset_id,
-        read_snpset_version  => $snpset_v2,
-        write_snpset_version => $snpset_v2,
-    };
-
-    my $paths = $finder->read_write_all([$params_f, $params_s], $tmp);
-    my $f_out_vcf = "$tmp/fluidigm_qc.vcf";
-    my $s_out_vcf = "$tmp/sequenom_W30467.vcf";
-    my $out_paths = [$f_out_vcf, $s_out_vcf];
-    is_deeply($paths, $out_paths, "Fluidigm & Sequenom outputs returned");
-    ok(-e $f_out_vcf, "Fluidigm output found");
-    ok(-e $s_out_vcf, "Sequenom output found");
-
-    my @got_f = read_file($f_out_vcf);
-    @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
-    my @expected_f = read_file($f_expected_vcf);
-    @expected_f = grep !/^[#]{2}(fileDate|reference)=/, @expected_f;
-    is_deeply(\@got_f, \@expected_f,
-              "Fluidigm VCF output matches expected values");
-    my @got_s = read_file($s_out_vcf);
-    @got_s = grep !/^[#]{2}(fileDate|reference)=/, @got_s;
-    my @expected_s = read_file($s_expected_vcf);
-    @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
-    is_deeply(\@got_s, \@expected_s,
-              "Sequenom VCF output matches expected values");
 }
 
 return 1;
