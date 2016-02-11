@@ -24,6 +24,8 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
 
+use Data::Dumper; # FIXME troubleshooting
+
 # Prototype script for simplifying use of the genotyping pipeline
 # Generate appropriate .yml files for use by Percolate
 
@@ -178,10 +180,10 @@ sub run {
     # eg. have a 'copy_all' option to enable this
     # ($egt, $manifest, \@plex_manifests) = copy_all(blah)
 
-    #my $vcf = generate_vcf($dbfile, $inifile, $workdir,
-    #                       \@plex_manifests, \@plex_config);
+    my $vcf = generate_vcf($dbfile, $inifile, $workdir,
+                           \@plex_manifests, \@plex_config);
     # dummy values for initial test
-    my $vcf = ['foo.vcf',];
+    #my $vcf = ['foo.vcf',];
     write_workflow_yml($workdir, $workflow, $run, $manifest,
                        $chunk_size, $memory, $vcf, \@plex_manifests,
                        $zstart, $ztotal);
@@ -201,6 +203,7 @@ sub generate_vcf {
     my @initargs = (name        => 'pipeline',
                     inifile     => $inifile,
                     dbfile      => $dbfile);
+    # read sample identifiers from pipeline DB
     my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
         (@initargs)->connect
             (RaiseError     => 1,
@@ -222,6 +225,7 @@ sub generate_vcf {
         }
     }
     my $vcf_paths = $finder->read_write_all(\@params, $vcfdir);
+    print STDERR Dumper $vcf_paths;
     return $vcf_paths;
 }
 
@@ -332,6 +336,7 @@ sub write_workflow_yml {
 # TODO FIXME allow a sample_json list for sample names instead of dbfile
 # use for testing
 
+
 __END__
 
 
@@ -351,7 +356,7 @@ Options:
 
   --chunk_size    Chunk size for parallelization. Optional, defaults to
                   4000 (SNPs) for Illuminus or 40 (samples) for zCall.
-  --dbfile        Path to an SQLite database file for analysis. Required.
+  --dbfile        Path to an SQLite pipeline database file. Required.
   --egt           Path to an Illumina .egt cluster file. Required for zcall.
   --help          Display help.
   --host          Name of host machine for the beanstalk message queue.
