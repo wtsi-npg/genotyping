@@ -397,9 +397,9 @@ sub test_workflow_script: Test(1) {
                          "--run run1",
                          "--verbose",
                          "--plex_config $f_config",
-                         #"--plex_config $s_config_1",
+                         "--plex_config $s_config_0",
                          "--plex_manifest $plex_manifest_fluidigm",
-                         #"--plex_manifest $plex_manifest_sequenom",
+                         "--plex_manifest $plex_manifest_sequenom",
                          #"--plex_manifest $plex_manifest_sequenom_1",
                          "--workdir $tmp/genotype_workdir",
                          "--workflow illuminus";
