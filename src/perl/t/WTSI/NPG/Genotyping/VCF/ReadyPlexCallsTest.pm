@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use Cwd qw/abs_path/;
-use Test::More tests => 36;
+use Test::More tests => 38;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -46,8 +46,10 @@ my $tmp;
 
 my $dbfile = $data_path."/4_samples.db";
 
-my $manifest = $ENV{'GENOTYPE_TEST_DATA'}."/Human670-QuadCustom_v1_A.bpm.csv";
-my $egt = $ENV{'GENOTYPE_TEST_DATA'}."/Human670-QuadCustom_v1_A.egt";
+my $manifest = catfile($ENV{'GENOTYPE_TEST_DATA'},
+                       "Human670-QuadCustom_v1_A.bpm.csv");
+my $egt = catfile($ENV{'GENOTYPE_TEST_DATA'},
+                  "Human670-QuadCustom_v1_A.egt");
 
 # fluidigm test data
 my $f_expected_vcf = $data_path."/fluidigm.vcf";
@@ -379,7 +381,7 @@ sub test_result_finder : Test(7) {
               "Sequenom VCF output matches expected values");
 }
 
-sub test_workflow_script_illuminus: Test(10) {
+sub test_workflow_script_illuminus: Test(12) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
@@ -387,6 +389,7 @@ sub test_workflow_script_illuminus: Test(10) {
     my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
     my $workdir = abs_path(catfile($tmp, "genotype_workdir_illuminus"));
     my $config_path = catfile($workdir, "config.yml");
+    my $db_path = catfile($workdir, "genotyping.db");
     my $cmd = join q{ }, "$READY_WORKFLOW",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
@@ -407,8 +410,8 @@ sub test_workflow_script_illuminus: Test(10) {
         my $subdir = catfile($workdir, $name);
         ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
     }
-    ok(-e catfile($workdir, "in", "genotype_illuminus.yml"),
-       "genotype_illuminus.yml found");
+    my $params_path = catfile($workdir, "in", "genotype_illuminus.yml");
+    ok(-e $params_path, "genotype_illuminus.yml found");
     # check contents of YML files
     my $config = LoadFile($config_path);
     ok($config, "Config data structure loaded from YML");
@@ -424,9 +427,34 @@ sub test_workflow_script_illuminus: Test(10) {
     is_deeply($config, $expected_config,
               "YML Illuminus config matches expected values");
 
-    #print STDERR Dumper($config)."\n";
-
-
+    my $params = LoadFile($params_path);
+    ok($params, "Workflow parameter data structure loaded from YML");
+    my $expected_params = {
+        'workflow' => 'Genotyping::Workflows::GenotypeIlluminus',
+        'library' => 'genotyping',
+        'arguments' => [
+            $db_path,
+            'run1',
+            $workdir,
+            {
+                'memory' => '2048',
+                'manifest' => $manifest,
+                'chunk_size' => '4000',
+                'plex_manifest' => [
+                    $plex_manifest_fluidigm,
+                    $plex_manifest_sequenom,
+                ],
+                'vcf' => [
+                    catfile($workdir, 'vcf', 'fluidigm_qc.vcf'),
+                    catfile($workdir, 'vcf', 'sequenom_W30467.vcf'),
+                ],
+                'gender_method' => 'Supplied'
+            }
+        ]
+    };
+    is_deeply($params, $expected_params,
+              "YML Illuminus workflow params match expected values");
+    #print STDERR Dumper($params)."\n";
 }
 
 sub test_workflow_script_zcall: Test(8) {
