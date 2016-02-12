@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 27;
+use Test::More tests => 34;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -409,7 +409,7 @@ sub test_workflow_script_illuminus: Test(8) {
 
 }
 
-sub test_workflow_script_zcall: Test(1) {
+sub test_workflow_script_zcall: Test(8) {
 
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
@@ -433,7 +433,15 @@ sub test_workflow_script_zcall: Test(1) {
                          "--workflow zcall";
 
     is(0, system($cmd), "zcall setup exit status is zero");
-
+    ok(-e $workdir, "Workflow directory found");
+    ok(-e catfile($workdir, 'config.yml'), "config.yml found");
+    ok(-e catfile($workdir, 'genotyping.db'), "genotyping.db found");
+    foreach my $name (qw/in pass fail/) {
+        my $subdir = catfile($workdir, $name);
+        ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
+    }
+    ok(-e catfile($workdir, "in", "genotype_zcall.yml"),
+       "genotype_zcall.yml found");
 
 
 }
