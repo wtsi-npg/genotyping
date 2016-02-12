@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 26;
+use Test::More tests => 27;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -43,6 +43,7 @@ my $tmp;
 my $dbfile = $data_path."/4_samples.db";
 
 my $manifest = $ENV{'GENOTYPE_TEST_DATA'}."/Human670-QuadCustom_v1_A.bpm.csv";
+my $egt = $ENV{'GENOTYPE_TEST_DATA'}."/Human670-QuadCustom_v1_A.egt";
 
 # fluidigm test data
 my $f_expected_vcf = $data_path."/fluidigm.vcf";
@@ -374,18 +375,13 @@ sub test_result_finder : Test(7) {
               "Sequenom VCF output matches expected values");
 }
 
-sub test_workflow_script: Test(8) {
-
-
+sub test_workflow_script_illuminus: Test(8) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
-
     my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
     my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
-
-    my $workdir = $tmp."/genotype_workdir";
-
+    my $workdir = $tmp."/genotype_workdir_illuminus";
     my $cmd = join q{ }, "$READY_WORKFLOW",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
@@ -397,9 +393,7 @@ sub test_workflow_script: Test(8) {
                          "--plex_manifest $plex_manifest_sequenom",
                          "--workdir $workdir",
                          "--workflow illuminus";
-
-    is(0, system($cmd), "script exit status is zero");
-
+    is(0, system($cmd), "illuminus setup exit status is zero");
     # check presence of required files and subfolders for workflow
     ok(-e $workdir, "Workflow directory found");
     ok(-e catfile($workdir, 'config.yml'), "config.yml found");
@@ -412,6 +406,35 @@ sub test_workflow_script: Test(8) {
        "genotype_illuminus.yml found");
 
     # TODO check contents of YML files
+
+}
+
+sub test_workflow_script_zcall: Test(1) {
+
+    setup_chromosome_json();
+    my $f_config = setup_fluidigm();
+    my $s_config = setup_sequenom_default();
+    my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
+    my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
+    my $workdir = $tmp."/genotype_workdir_zcall";
+    my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--dbfile $dbfile",
+                         "--manifest $manifest",
+                         "--run run1",
+                         "--verbose",
+                         "--plex_config $f_config",
+                         "--plex_config $s_config",
+                         "--plex_manifest $plex_manifest_fluidigm",
+                         "--plex_manifest $plex_manifest_sequenom",
+                         "--egt $egt",
+                         "--zstart 6",
+                         "--ztotal 3",
+                         "--workdir $workdir",
+                         "--workflow zcall";
+
+    is(0, system($cmd), "zcall setup exit status is zero");
+
+
 
 }
 

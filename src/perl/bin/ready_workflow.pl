@@ -139,6 +139,9 @@ sub run {
         $log->logcroak("--manifest argument '", $manifest,
                        "' does not exist");
     }
+    if (defined($egt) && !(-e $egt)) {
+        $log->logcroak("--egt argument '", $egt, "' does not exist");
+    }
     if (scalar @plex_manifests == 0) {
         $log->logcroak("Must supply at least one QC plex manifest");
     }
@@ -183,7 +186,7 @@ sub run {
     #my $vcf = ['foo.vcf',];
     write_workflow_yml($workdir, $workflow, $run, $manifest,
                        $chunk_size, $memory, $vcf, \@plex_manifests,
-                       $zstart, $ztotal);
+                       $egt, $zstart, $ztotal);
     $log->info("Finished; genotyping pipeline directory '", $workdir,
                "' is ready to run Percolate.");
 }
