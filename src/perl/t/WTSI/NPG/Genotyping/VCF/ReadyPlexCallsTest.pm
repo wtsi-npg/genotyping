@@ -6,7 +6,8 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 34;
+use Cwd qw/abs_path/;
+use Test::More tests => 36;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -15,6 +16,9 @@ use File::Temp qw/tempdir/;
 use JSON;
 use Log::Log4perl;
 use WTSI::NPG::iRODS;
+use YAML qw/LoadFile/;
+
+use Data::Dumper; # FIXME for development only
 
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 
@@ -375,13 +379,14 @@ sub test_result_finder : Test(7) {
               "Sequenom VCF output matches expected values");
 }
 
-sub test_workflow_script_illuminus: Test(8) {
+sub test_workflow_script_illuminus: Test(10) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
     my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
     my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
-    my $workdir = $tmp."/genotype_workdir_illuminus";
+    my $workdir = abs_path(catfile($tmp, "genotype_workdir_illuminus"));
+    my $config_path = catfile($workdir, "config.yml");
     my $cmd = join q{ }, "$READY_WORKFLOW",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
@@ -396,7 +401,7 @@ sub test_workflow_script_illuminus: Test(8) {
     is(0, system($cmd), "illuminus setup exit status is zero");
     # check presence of required files and subfolders for workflow
     ok(-e $workdir, "Workflow directory found");
-    ok(-e catfile($workdir, 'config.yml'), "config.yml found");
+    ok(-e $config_path, "config.yml found");
     ok(-e catfile($workdir, 'genotyping.db'), "genotyping.db found");
     foreach my $name (qw/in pass fail/) {
         my $subdir = catfile($workdir, $name);
@@ -404,8 +409,23 @@ sub test_workflow_script_illuminus: Test(8) {
     }
     ok(-e catfile($workdir, "in", "genotype_illuminus.yml"),
        "genotype_illuminus.yml found");
+    # check contents of YML files
+    my $config = LoadFile($config_path);
+    ok($config, "Config data structure loaded from YML");
+    my $expected_config =  {
+          'msg_port' => '11300',
+          'max_processes' => '250',
+          'root_dir' => $workdir,
+          'log_level' => 'DEBUG',
+          'async' => 'lsf',
+          'msg_host' => 'farm3-head2',
+          'log' => catfile($workdir, 'percolate.log')
+        };
+    is_deeply($config, $expected_config,
+              "YML Illuminus config matches expected values");
 
-    # TODO check contents of YML files
+    #print STDERR Dumper($config)."\n";
+
 
 }
 
