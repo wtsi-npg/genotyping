@@ -75,7 +75,6 @@ sub run {
     my $memory;
     my $zstart;
     my $ztotal;
-    my $logconf;
     my @plex_config;
     my @plex_manifests;
 
