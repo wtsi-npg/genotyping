@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use Cwd qw/abs_path/;
-use Test::More tests => 38;
+use Test::More tests => 42;
 use Test::Exception;
 use File::Path qw/make_path/;
 use File::Slurp qw/read_file/;
@@ -17,8 +17,6 @@ use JSON;
 use Log::Log4perl;
 use WTSI::NPG::iRODS;
 use YAML qw/LoadFile/;
-
-use Data::Dumper; # FIXME for development only
 
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 
@@ -41,7 +39,7 @@ our $READY_WORKFLOW = './bin/ready_workflow.pl';
 my $irods;
 my $irods_tmp_coll;
 my $pid = $$;
-my $data_path = './t/vcf';
+my $data_path = abs_path('./t/vcf');
 my $tmp;
 
 my $dbfile = $data_path."/4_samples.db";
@@ -454,17 +452,18 @@ sub test_workflow_script_illuminus: Test(12) {
     };
     is_deeply($params, $expected_params,
               "YML Illuminus workflow params match expected values");
-    #print STDERR Dumper($params)."\n";
 }
 
-sub test_workflow_script_zcall: Test(8) {
-
+sub test_workflow_script_zcall: Test(12) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
     my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
     my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
-    my $workdir = $tmp."/genotype_workdir_zcall";
+    my $workdir = abs_path(catfile($tmp, "genotype_workdir_illuminus"));
+    my $config_path = catfile($workdir, "config.yml");
+    my $db_path = catfile($workdir, "genotyping.db");
+    my $params_path = catfile($workdir, "in", "genotype_zcall.yml");
     my $cmd = join q{ }, "$READY_WORKFLOW",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
@@ -479,7 +478,6 @@ sub test_workflow_script_zcall: Test(8) {
                          "--ztotal 3",
                          "--workdir $workdir",
                          "--workflow zcall";
-
     is(0, system($cmd), "zcall setup exit status is zero");
     ok(-e $workdir, "Workflow directory found");
     ok(-e catfile($workdir, 'config.yml'), "config.yml found");
@@ -488,10 +486,50 @@ sub test_workflow_script_zcall: Test(8) {
         my $subdir = catfile($workdir, $name);
         ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
     }
-    ok(-e catfile($workdir, "in", "genotype_zcall.yml"),
-       "genotype_zcall.yml found");
-
-
+    ok(-e $params_path, "genotype_zcall.yml found");
+    # check contents of YML files
+    my $config = LoadFile($config_path);
+    ok($config, "Config data structure loaded from YML");
+    my $expected_config =  {
+          'msg_port' => '11300',
+          'max_processes' => '250',
+          'root_dir' => $workdir,
+          'log_level' => 'DEBUG',
+          'async' => 'lsf',
+          'msg_host' => 'farm3-head2',
+          'log' => catfile($workdir, 'percolate.log')
+        };
+    is_deeply($config, $expected_config,
+              "YML zCall config matches expected values");
+    my $params = LoadFile($params_path);
+    ok($params, "Workflow parameter data structure loaded from YML");
+    my $expected_params = {
+        'workflow' => 'Genotyping::Workflows::GenotypeZCall',
+        'library' => 'genotyping',
+        'arguments' => [
+            $db_path,
+            'run1',
+            $workdir,
+            {
+                'zstart' => '6',
+                'chunk_size' => '40',
+                'egt' => $egt,
+                'vcf' => [
+                    catfile($workdir, 'vcf', 'fluidigm_qc.vcf'),
+                    catfile($workdir, 'vcf', 'sequenom_W30467.vcf'),
+                ],
+                'memory' => '2048',
+                'ztotal' => '3',
+                'manifest' => $manifest,
+                'plex_manifest' => [
+                    $plex_manifest_fluidigm,
+                    $plex_manifest_sequenom,
+                ]
+            }
+        ]
+    };
+    is_deeply($params, $expected_params,
+              "YML zCall workflow params match expected values");
 }
 
 return 1;
