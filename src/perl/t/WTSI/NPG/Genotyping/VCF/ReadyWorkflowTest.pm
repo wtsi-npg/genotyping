@@ -25,14 +25,8 @@ our $LOG_TEST_CONF =  './etc/log4perl_tests.conf';
 
 Log::Log4perl::init($LOG_TEST_CONF);
 
-# test for ready_qc_calls.pl
+# test for ready_qc_calls.pl and ready_workflow.pm
 # TODO Later merge this into ScriptsTest.pm, but keep separate for now for quicker testing in development (running ScriptsTest.pm takes ~11 minutes!)
-
-# Requirements:
-# - Pipeline database for sample names (or option to read from file)
-# - Appropriate (dummy?) Fluidigm/Sequenom files in iRODS
-# - Run script and validate VCF output
-
 
 our $READY_QC_CALLS = './bin/ready_qc_calls.pl';
 our $READY_WORKFLOW = './bin/ready_workflow.pl';
