@@ -4,6 +4,6 @@ use utf8;
 use strict;
 use warnings;
 
-use WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest;
+use WTSI::NPG::Genotyping::VCF::ReadyWorkflowTest;
 
-WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest->runtests;
+WTSI::NPG::Genotyping::VCF::ReadyWorkflowTest->runtests;
