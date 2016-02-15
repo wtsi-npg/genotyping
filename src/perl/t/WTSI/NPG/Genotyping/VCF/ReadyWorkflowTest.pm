@@ -1,13 +1,13 @@
 use utf8;
 
-package WTSI::NPG::Genotyping::VCF::ReadyPlexCallsTest;
+package WTSI::NPG::Genotyping::VCF::ReadyWorkflowTest;
 
 use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
 use Cwd qw/abs_path/;
-use Test::More tests => 42;
+use Test::More tests => 50;
 use Test::Exception;
 use File::Basename qw(fileparse);
 use File::Path qw/make_path/;
@@ -381,7 +381,7 @@ sub test_result_finder : Test(7) {
               "Sequenom VCF output matches expected values");
 }
 
-sub test_workflow_script_illuminus: Test(12) {
+sub test_workflow_script_illuminus: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
@@ -412,6 +412,21 @@ sub test_workflow_script_illuminus: Test(12) {
     }
     my $params_path = catfile($workdir, "in", "genotype_illuminus.yml");
     ok(-e $params_path, "genotype_illuminus.yml found");
+    my $vcf_path_fluidigm = catfile($workdir, 'vcf', 'fluidigm_qc.vcf');
+    my $vcf_path_sequenom = catfile($workdir, 'vcf', 'sequenom_W30467.vcf');
+    ok(-e $vcf_path_fluidigm, "Fluidigm VCF file found for Illuminus");
+
+    my $got_fluidigm = _read_without_filedate($vcf_path_fluidigm);
+    my $expected_fluidigm_path = catfile($data_path, 'fluidigm.vcf');
+    my $expected_fluidigm = _read_without_filedate($expected_fluidigm_path);
+    is_deeply($got_fluidigm, $expected_fluidigm,
+              "Fluidigm VCF matches expected values");
+    ok(-e $vcf_path_sequenom, "Sequenom VCF file found for Illuminus");
+    my $got_sequenom = _read_without_filedate($vcf_path_sequenom);
+    my $expected_sequenom_path = catfile($data_path, 'sequenom.vcf');
+    my $expected_sequenom = _read_without_filedate($expected_sequenom_path);
+    is_deeply($got_sequenom, $expected_sequenom,
+              "Sequenom VCF matches expected values");
     # check contents of YML files
     my $config = LoadFile($config_path);
     ok($config, "Config data structure loaded from YML");
@@ -448,8 +463,8 @@ sub test_workflow_script_illuminus: Test(12) {
                     catfile($workdir, $sequenom_manifest_name),
                 ],
                 'vcf' => [
-                    catfile($workdir, 'vcf', 'fluidigm_qc.vcf'),
-                    catfile($workdir, 'vcf', 'sequenom_W30467.vcf'),
+                    $vcf_path_fluidigm,
+                    $vcf_path_sequenom,
                 ],
                 'gender_method' => 'Supplied'
             }
@@ -459,7 +474,7 @@ sub test_workflow_script_illuminus: Test(12) {
               "YML Illuminus workflow params match expected values");
 }
 
-sub test_workflow_script_zcall: Test(12) {
+sub test_workflow_script_zcall: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
@@ -492,6 +507,20 @@ sub test_workflow_script_zcall: Test(12) {
         ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
     }
     ok(-e $params_path, "genotype_zcall.yml found");
+    my $vcf_path_fluidigm = catfile($workdir, 'vcf', 'fluidigm_qc.vcf');
+    my $vcf_path_sequenom = catfile($workdir, 'vcf', 'sequenom_W30467.vcf');
+    ok(-e $vcf_path_fluidigm, "Fluidigm VCF file found for zCall");
+    my $got_fluidigm = _read_without_filedate($vcf_path_fluidigm);
+    my $expected_fluidigm_path = catfile($data_path, 'fluidigm.vcf');
+    my $expected_fluidigm = _read_without_filedate($expected_fluidigm_path);
+    is_deeply($got_fluidigm, $expected_fluidigm,
+              "Fluidigm VCF matches expected values");
+    ok(-e $vcf_path_sequenom, "Sequenom VCF file found for zCall");
+    my $got_sequenom = _read_without_filedate($vcf_path_sequenom);
+    my $expected_sequenom_path = catfile($data_path, 'sequenom.vcf');
+    my $expected_sequenom = _read_without_filedate($expected_sequenom_path);
+    is_deeply($got_sequenom, $expected_sequenom,
+              "Sequenom VCF matches expected values");
     # check contents of YML files
     my $config = LoadFile($config_path);
     ok($config, "Config data structure loaded from YML");
@@ -524,8 +553,8 @@ sub test_workflow_script_zcall: Test(12) {
                 'chunk_size' => '40',
                 'egt' => catfile($workdir, $egt_name),
                 'vcf' => [
-                    catfile($workdir, 'vcf', 'fluidigm_qc.vcf'),
-                    catfile($workdir, 'vcf', 'sequenom_W30467.vcf'),
+                    $vcf_path_fluidigm,
+                    $vcf_path_sequenom,
                 ],
                 'memory' => '2048',
                 'ztotal' => '3',
@@ -539,6 +568,28 @@ sub test_workflow_script_zcall: Test(12) {
     };
     is_deeply($params, $expected_params,
               "YML zCall workflow params match expected values");
+}
+
+
+sub _read_without_filedate {
+    # read a VCF file, omitting the ##fileDate and ##reference lines
+    # Duplicated in VCFTest.pm
+    my ($inPath) = @_;
+    my $lines = read_file($inPath);
+    return _remove_filedate_reference($lines);
+}
+
+sub _remove_filedate_reference {
+    # remove the fileDate and reference from a string containing VCF
+    # return an ArrayRef[Str] containing data
+    my ($vcf_str) = @_;
+    my @lines_in = split m/\n/msx, $vcf_str;
+    my @lines_out;
+    foreach my $line (@lines_in) {
+        if ( $line =~ /^[#]{2}(fileDate|reference)/msx ) { next; }
+        else { push(@lines_out, $line); }
+    }
+    return \@lines_out;
 }
 
 return 1;
