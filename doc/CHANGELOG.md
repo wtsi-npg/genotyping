@@ -11,6 +11,16 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
+
+Release 1.11.6: 2016-02-08
+--------------------------
+
+Fixed:
+- Bug in WTSI::NPG::Expression::Publisher where it used a query against
+the SequenceScape warehouse that was not specific enough to allow it
+to proceed when a sample had been analysed more than once.
+
+
 Release 1.11.5: 2015-12-15
 --------------------------
 
