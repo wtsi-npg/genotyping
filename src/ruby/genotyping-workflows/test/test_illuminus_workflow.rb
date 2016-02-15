@@ -66,8 +66,8 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
                    :chunk_size => 10000,
                    :memory => 2048,
                    :queue => 'yesterday',
-                   :vcf => vcf,
-                   :plex_manifest => plex_manifest
+                   :vcf => [vcf, ],
+                   :plex_manifest => [plex_manifest, ]
       }
       args = [dbfile, run_name, work_dir, args_hash]
       timeout = 1400

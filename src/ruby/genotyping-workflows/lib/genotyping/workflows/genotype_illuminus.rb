@@ -41,14 +41,14 @@ GenotypeIlluminus args
 
 Arguments:
 
-- db_file (String): The SQLite pipeline database file.
-- run_name (String): The name of a pipeline run defined in the pipeline database.
-- work_dir (String): The working directory, an absolute path.
+- db_file <String>: The SQLite pipeline database file.
+- run_name <String>: The name of a pipeline run defined in the pipeline database.
+- work_dir <String>: The working directory, an absolute path.
 - other arguments (keys and values):
 
     - config: <path> of custom pipeline database .ini file. Optional.
     - manifest: <path> of the chip manifest file. Required.
-    - plex_manifest: <path> of the qc plex manifest file. Required.
+    - plex_manifest: <Array> containing paths to one or more qc plex manifest files. Required.
     - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
@@ -62,7 +62,7 @@ Arguments:
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
     - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
-    - vcf: <path> Path to VCF file for identity QC
+    - vcf: <Array> containing paths to one or more VCF files for identity QC
     - plex_manifest: <path> Path to plex manifest file for identity QC
 
 e.g.
@@ -76,8 +76,12 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
-       vcf: /work/my_project/qc_calls.vcf
-       plex_manifest: /genotyping/manifests/qc.tsv
+       vcf:
+           - /work/my_project/qc_calls_foo.vcf
+           - /work/my_project/qc_calls_bar.vcf
+       plex_manifest:
+           -/genotyping/manifests/qc_foo.tsv
+           -/genotyping/manifests/qc_bar.tsv
 
 Returns:
 
@@ -106,7 +110,7 @@ Returns:
       gtconfig = args.delete(:config)
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
-      vcf = args.delete(:vcf) || nil
+      vcf = args.delete(:vcf) || Array.new()
 
       args.delete(:memory)
       args.delete(:queue)
@@ -151,9 +155,12 @@ Returns:
           gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
         if vcf and plex_manifest
+          # use comma-separated lists of VCF/plex files in QC args
+          vcf_str = vcf.join(",")
+          plex_manifest_str = plex_manifest.join(",")
           gcqcargs = {
-            :vcf => vcf,
-            :plex_manifest => plex_manifest,
+            :vcf => vcf_str,
+            :plex_manifest => plex_manifest_str,
             :sample_json => gcsjson
           }.merge(gcqcargs)
         end
@@ -208,9 +215,12 @@ Returns:
         :sim => smfile
       }.merge(args)
       if vcf and plex_manifest
+        # use comma-separated lists of VCF/plex files in QC args
+        vcf_str = vcf.join(",")
+        plex_manifest_str = plex_manifest.join(",")
         qcargs = {
-          :vcf => vcf,
-          :plex_manifest => plex_manifest,
+          :vcf => vcf_str,
+          :plex_manifest => plex_manifest_str,
           :sample_json => sjson
         }.merge(qcargs)
       end
