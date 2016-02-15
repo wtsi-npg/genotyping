@@ -8,6 +8,7 @@ use warnings;
 use strict;
 
 use Cwd qw(getcwd abs_path);
+use File::Basename qw(fileparse);
 use File::Copy qw(copy);
 use File::Slurp qw(read_file);
 use File::Spec::Functions qw(catfile);
@@ -62,6 +63,7 @@ run() unless caller();
 sub run {
     my $workdir;
     my $manifest;
+    my $compact;
     my $debug;
     my $dbfile;
     my $run;
@@ -90,6 +92,7 @@ sub run {
 	       'verbose'         => \$verbose,
 	       'workflow=s'      => \$workflow,
 	       'chunk_size=i'    => \$chunk_size,
+               'compact'         => \$compact,
 	       'memory=i'        => \$memory,
 	       'zstart=i'        => \$zstart,
 	       'ztotal=i'        => \$ztotal,
@@ -173,22 +176,44 @@ sub run {
     $ztotal ||= 1;
 
     ### create and populate the working directory ###
-    make_working_directory($workdir, $dbfile);
+    make_working_directory($workdir);
     write_config_yml($workdir, $host);
 
-    # optionally, copy the EGT file, manifest, and plex manifests to workdir?
-    # eg. have a 'copy_all' option to enable this
-    # ($egt, $manifest, \@plex_manifests) = copy_all(blah)
+    # if required, copy database, manifests, and EGT to working directory
+    my $plex_manifests;
+    if ($compact) {
+        $plex_manifests = \@plex_manifests;
+    } else {
+        $dbfile = copy_file_to_directory($dbfile, $workdir);
+        $manifest = copy_file_to_directory($manifest, $workdir);
+        if (defined($egt)) {
+            $egt = copy_file_to_directory($egt, $workdir);
+        }
+        my @copied_plex_manifests;
+        foreach my $plex_manifest (@plex_manifests) {
+            my $dest = copy_file_to_directory($plex_manifest, $workdir);
+            push @copied_plex_manifests, $dest;
+        }
+        $plex_manifests = \@copied_plex_manifests;
+    }
 
     my $vcf = generate_vcf($dbfile, $inifile, $workdir,
-                           \@plex_manifests, \@plex_config);
-    # dummy values for initial test
-    #my $vcf = ['foo.vcf',];
-    write_workflow_yml($workdir, $workflow, $run, $manifest,
-                       $chunk_size, $memory, $vcf, \@plex_manifests,
+                           $plex_manifests, \@plex_config);
+    write_workflow_yml($workdir, $workflow, $dbfile, $run, $manifest,
+                       $chunk_size, $memory, $vcf, $plex_manifests,
                        $egt, $zstart, $ztotal);
     $log->info("Finished; genotyping pipeline directory '", $workdir,
                "' is ready to run Percolate.");
+}
+
+sub copy_file_to_directory {
+    # convenience method to copy a file and return the destination file path
+    my ($source, $dir) = @_;
+    my $filename = fileparse($source);
+    my $dest = catfile($dir, $filename);
+    copy($source, $dest) || $log->logcroak("Cannot copy '", $source,
+                                           "' to '", $dest, "'");
+    return $dest;
 }
 
 sub generate_vcf {
@@ -230,7 +255,7 @@ sub generate_vcf {
 
 sub make_working_directory {
     # make in, pass, fail if needed; copy dbfile to working directory
-    my ($workdir, $dbfile) = @_;
+    my ($workdir) = @_;
     if (-e $workdir) {
         if (-d $workdir) {
             $log->info("Directory '", $workdir, "' already exists");
@@ -242,10 +267,6 @@ sub make_working_directory {
         mkdir $workdir || $log->logcroak("Cannot create directory '",
                                          $workdir, "'");
     }
-    my $workdb = catfile($workdir, $GENOTYPING_DB_NAME);
-    copy($dbfile, $workdb) || $log->logcroak("Cannot copy '", $dbfile,
-                                             "' to '", $workdb, "'");
-    $log->info("Copied '", $dbfile, "' to '", $workdb, "'");
     # create the in, pass, fail subdirectories
     foreach my $name (qw/in pass fail/) {
         my $subdir = catfile($workdir, $name);
@@ -281,11 +302,8 @@ sub write_config_yml {
 }
 
 sub write_workflow_yml {
-    my ($workdir, $workflow, $run, $manifest, $chunk_size,
+    my ($workdir, $workflow, $dbpath, $run, $manifest, $chunk_size,
         $memory, $vcf, $plex_manifests, $egt, $zstart, $ztotal) = @_;
-    my $dbpath = catfile($workdir, $GENOTYPING_DB_NAME);
-    my @params = ($workdir, $dbpath, $run, $manifest,
-                  $vcf, $plex_manifests, $chunk_size, $memory);
     my %workflow_args = (
 	'chunk_size' => $chunk_size,
 	'memory' => $memory,
@@ -355,6 +373,9 @@ Options:
 
   --chunk_size    Chunk size for parallelization. Optional, defaults to
                   4000 (SNPs) for Illuminus or 40 (samples) for zCall.
+  --compact       Do not copy the .egt, manifest, and plex manifest files to
+                  the workflow directory. Uses less space, but makes the
+                  analysis directory less self-contained.
   --dbfile        Path to an SQLite pipeline database file. Required.
   --egt           Path to an Illumina .egt cluster file. Required for zcall.
   --help          Display help.
