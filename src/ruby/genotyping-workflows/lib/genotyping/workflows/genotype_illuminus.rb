@@ -1,6 +1,6 @@
 #-- encoding: UTF-8
 #
-# Copyright (c) 2012, 2015 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2012, 2015, 2016 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -63,7 +63,7 @@ Arguments:
     overrides the filterconfig argument.
     - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
     - vcf: <Array> containing paths to one or more VCF files for identity QC
-    - plex_manifest: <path> Path to plex manifest file for identity QC
+    - plex_manifest: <Array> containing paths to one or more plex manifest files for identity QC
 
 e.g.
 
