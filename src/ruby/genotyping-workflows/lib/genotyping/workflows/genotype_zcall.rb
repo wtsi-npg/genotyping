@@ -242,13 +242,11 @@ Returns:
       if qcargs # ready to start QC
         if vcf and plex_manifest
           # use comma-separated lists of VCF/plex files in QC args
-          vcf_str = vcf.join(",")
-          plex_manifest_str = plex_manifest.join(",")
-          qcargs = {
-            :vcf => vcf_str,
-            :plex_manifest => plex_manifest_str,
+          qcargs = qcargs.merge({
+            :vcf => vcf.join(","),
+            :plex_manifest => plex_manifest.join(","),
             :sample_json => sjson
-          }.merge(qcargs)
+          }) # overwrites original contents of qcargs
         end
         zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       end
@@ -294,13 +292,11 @@ Returns:
         end
         if vcf and plex_manifest
           # use comma-separated lists of VCF/plex files in QC args
-          vcf_str = vcf.join(",")
-          plex_manifest_str = plex_manifest.join(",")
-          gcqcargs = {
-            :vcf => vcf_str,
+          gcqcargs = gcqcargs.merge({
+            :vcf => vcf.join(","),
             :sample_json => gcsjson,
-            :plex_manifest => plex_manifest_str
-          }.merge(gcqcargs)
+            :plex_manifest => plex_manifest.join(",")
+          }) # overwrites original contents of gcqcargs
         end
 
         ## run gencall QC to get metrics for prefiltering

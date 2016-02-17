@@ -125,7 +125,7 @@ Returns:
               :log_dir => log_dir}.merge(args)
       maybe_version_log(log_dir)
 
-      run_name = run_name.to_s;
+      run_name = run_name.to_s
       gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.illuminus.sample.json'
       njname = run_name + '.snp.json'
@@ -154,15 +154,15 @@ Returns:
         else
           gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
-        if vcf and plex_manifest
+        if not (vcf.empty? or plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
           vcf_str = vcf.join(",")
           plex_manifest_str = plex_manifest.join(",")
-          gcqcargs = {
-            :vcf => vcf_str,
-            :plex_manifest => plex_manifest_str,
-            :sample_json => gcsjson
-          }.merge(gcqcargs)
+          gcqcargs = gcqcargs.merge({
+              :vcf => vcf_str,
+              :plex_manifest => plex_manifest_str,
+              :sample_json => gcsjson
+          }) # overwrites original values in gcqcargs
         end
 
         gcqcdir = File.join(work_dir, 'gencall_qc')
@@ -214,15 +214,13 @@ Returns:
         :run => run_name,
         :sim => smfile
       }.merge(args)
-      if vcf and plex_manifest
+      if not (vcf.empty? and plex_manifest.empty?)
         # use comma-separated lists of VCF/plex files in QC args
-        vcf_str = vcf.join(",")
-        plex_manifest_str = plex_manifest.join(",")
-        qcargs = {
-          :vcf => vcf_str,
-          :plex_manifest => plex_manifest_str,
+        qcargs = qcargs.merge({
+          :vcf => vcf.join(","),
+          :plex_manifest => plex_manifest.join(","),
           :sample_json => sjson
-        }.merge(qcargs)
+        }) # overwrites original values in qcargs
       end
 
       ilquality = quality_control(dbfile, ilfile, output, qcargs, async)
