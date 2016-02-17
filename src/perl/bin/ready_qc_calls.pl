@@ -182,7 +182,7 @@ Options:
   --help           Display help.
   --inifile        Path to .ini file to configure pipeline SQLite database
                    connection. Optional. Only relevant if --dbfile is given.
-  --out            Path for VCF output. Required.
+  --out            Path to directory for VCF output. Required.
 
 
 =head1 DESCRIPTION
