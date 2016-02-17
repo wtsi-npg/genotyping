@@ -60,7 +60,7 @@ class TestWorkflowZCall < Test::Unit::TestCase
       vcf = File.join(external_data, 'sequenom_abvc.vcf')
       plex_0 = File.join(external_data, 'W30467_snp_set_info_GRCh37.tsv')
       plex_1 = File.join(external_data, 'qc_fluidigm_snp_info_GRCh37.tsv')
-       # plex_1 not needed for workflow, but tests handling multiple plex args
+      # plex_1 not needed for workflow, but tests handling multiple plex args
 
       # Only 1 zscore in range; faster but omits threshold evaluation
       # The evaluation is tested by test_zcall_tasks.rb
