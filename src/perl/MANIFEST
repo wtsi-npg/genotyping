@@ -7,7 +7,6 @@ bin/create_test_database.pl
 bin/filter_illuminus_output.pl
 bin/find_modified_files.pl
 bin/gendermix_standalone.pl
-bin/genotyping_yml.pl
 bin/identity_simulation.pl
 bin/illuminus.pl
 bin/manifest_plex_intersection.pl
@@ -158,6 +157,7 @@ lib/WTSI/NPG/Genotyping/VCF/GtcheckWrapper.pm
 lib/WTSI/NPG/Genotyping/VCF/Header.pm
 lib/WTSI/NPG/Genotyping/VCF/HeaderParser.pm
 lib/WTSI/NPG/Genotyping/VCF/Parser.pm
+lib/WTSI/NPG/Genotyping/VCF/PlexResultFinder.pm
 lib/WTSI/NPG/Genotyping/VCF/ReferenceFinder.pm
 lib/WTSI/NPG/Genotyping/VCF/Slurper.pm
 lib/WTSI/NPG/Genotyping/VCF/VCFDataSet.pm
@@ -368,11 +368,6 @@ t/gender/input_xhet_large.txt
 t/gender_marker.t
 t/gender_marker_call.t
 t/gender_standalone.t
-t/genotyping_yml.t
-t/genotyping_yml/config.yml
-t/genotyping_yml/genotype_illuminus.yml
-t/genotyping_yml/genotype_zcall.yml
-t/genotyping_yml/genotyping_DUMMY.db
 t/identity.t
 t/identity_check_sample_wip_bayesian.t
 t/identity_check_wip.t
@@ -499,7 +494,7 @@ t/query_project_samples.t
 t/query_project_samples/sample1.gtc
 t/query_project_samples/sample1_Grn.idat
 t/query_project_samples/sample1_Red.idat
-t/ready_plex.t
+t/ready_workflow.t
 t/reference_finder.t
 t/reports.t
 t/reports/crHetDensityHeatmap.pdf
@@ -661,7 +656,6 @@ t/vcf/fluidigm_004.csv
 t/vcf/fluidigm_header_1.txt
 t/vcf/fluidigm_header_2.txt
 t/vcf/fluidigm_inputs.txt
-t/vcf/fluidigm_samples.json
 t/vcf/pairwise_discordance_fluidigm.json
 t/vcf/pairwise_discordance_sequenom.json
 t/vcf/qc_fluidigm_snp_info_GRCh37.tsv
@@ -675,7 +669,6 @@ t/vcf/sequenom_alternate_snp_002.csv
 t/vcf/sequenom_alternate_snp_003.csv
 t/vcf/sequenom_alternate_snp_004.csv
 t/vcf/sequenom_inputs.txt
-t/vcf/sequenom_samples.json
 t/vcf/W30467_snp_set_info_GRCh37.tsv
 t/vcf/W30467_snp_set_info_GRCh37_1.tsv
 t/WTSI/NPG/Database/MLWarehouseTest.pm
@@ -722,10 +715,9 @@ t/WTSI/NPG/Genotyping/SNPSetPublisherTest.pm
 t/WTSI/NPG/Genotyping/SNPSetTest.pm
 t/WTSI/NPG/Genotyping/SNPTest.pm
 t/WTSI/NPG/Genotyping/UpdatePlinkAnnotationTest.pm
-t/WTSI/NPG/Genotyping/VCF/ReadyPlexCallsTest.pm
+t/WTSI/NPG/Genotyping/VCF/ReadyWorkflowTest.pm
 t/WTSI/NPG/Genotyping/VCF/ReferenceFinderTest.pm
 t/WTSI/NPG/Genotyping/VCF/VCFTest.pm
-t/WTSI/NPG/Genotyping/YMLTest.pm
 t/WTSI/NPG/PublisherTest.pm
 t/WTSI/NPG/SimplePublisherTest.pm
 t/WTSI/NPG/Test.pm
