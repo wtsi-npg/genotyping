@@ -212,7 +212,7 @@ sub find_files_to_publish {
         if ($file) {
           push @candidate_files, $file;
 
-          my ($basename, $dir, $suffix) = fileparse($file, '.idat', '.gtc');
+          my ($basename, $dir, $suffix) = fileparse($file, 'idat', 'gtc');
           if (not $suffix) {
             $log->logcroak("Failed to parse a file suffix from '$file'");
           }
