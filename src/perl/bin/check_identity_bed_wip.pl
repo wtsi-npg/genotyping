@@ -54,13 +54,13 @@ sub run {
     my $log4perl_config;
     my $json_path;
     my $pass_threshold;
-    my @plex_manifests;
-    my @plex_manifests_irods;
+    my $plex_manifests;
+    my $plex_manifests_irods;
     my $plink;
     my $sample_json;
     my $sample_mismatch_prior;
     my $swap_threshold;
-    my @vcf; # array for (maybe) multiple VCF inputs
+    my $vcf;
     my $verbose;
 
     GetOptions(
@@ -74,12 +74,12 @@ sub run {
         'json=s'            => \$json_path,
         'prior=f'           => \$sample_mismatch_prior,
         'pass_threshold=f'  => \$pass_threshold,
-        'plex=s'            => \@plex_manifests,
-        'plex_irods=s'      => \@plex_manifests_irods,
+        'plex=s'            => \$plex_manifests,
+        'plex_irods=s'      => \$plex_manifests_irods,
         'plink=s'           => \$plink,
         'sample_json=s'     => \$sample_json,
         'swap_threshold=f'  => \$swap_threshold,
-        'vcf=s'             => \@vcf,
+        'vcf=s'             => \$vcf,
         'verbose'           => \$verbose,
         'xer=f'             => \$expected_error_rate);
 
@@ -135,12 +135,30 @@ sub run {
 
     ### read SNPSet object(s) from file and/or iRODS, create union set ###
     my @snpsets;
-    foreach my $plex (@plex_manifests) {
-        push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex);
+    if ($plex_manifests) {
+        my @plex_manifests = split(/,/msx, $plex_manifests);
+        foreach my $plex (@plex_manifests) {
+            unless (-e $plex) {
+                $log->logcroak("Plex manifest filesystem path '", $plex,
+                               "' does not exist. Paths must be supplied as ",
+                               "a comma-separated list; individual paths ",
+                               "cannot contain commas.");
+            }
+            push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex);
+        }
     }
-    foreach my $plex (@plex_manifests_irods) {
-        my $plex_obj = WTSI::NPG::iRODS::DataObject->new($irods, $plex);
-        push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex_obj);
+    if ($plex_manifests_irods) {
+        my @plex_manifests_irods = split(/,/msx, $plex_manifests_irods);
+        foreach my $plex (@plex_manifests_irods) {
+            unless ($irods->is_object($plex)) {
+                $log->logcroak("Plex manifest iRODS path '", $plex,
+                               "' does not exist. Paths must be supplied as ",
+                               "a comma-separated list; individual paths ",
+                               "cannot contain commas.");
+            }
+            my $plex_obj = WTSI::NPG::iRODS::DataObject->new($irods, $plex);
+            push @snpsets, WTSI::NPG::Genotyping::SNPSet->new($plex_obj);
+        }
     }
     if (scalar @snpsets == 0) {
         $log->logcroak("Must supply at least one plex manifest using ",
@@ -189,17 +207,20 @@ sub run {
 
     ### read QC plex calls from VCF file(s) ###
     my %qc_calls;
-    if (!(@vcf)) {
-        $log->logcroak("At least one --vcf argument is required");
+    if (!$vcf) {
+        $log->logcroak("At least one VCF path is required. Multiple paths ",
+                       "may be supplied as a comma-separated list; ",
+                       "individual paths cannot contain commas.");
     }
-    foreach my $vcf (@vcf) {
+    my @vcf= split(/,/msx, $vcf);
+    foreach my $vcf_path (@vcf) {
         my $vcf_fh;
-        if (! -e $vcf) {
+        if (! -e $vcf_path) {
             $log->logcroak("File argument to --vcf does not exist: '",
-                           $vcf, "'");
+                           $vcf_path, "'");
         } else {
-            open $vcf_fh, "<", $vcf ||
-                $log->logcroak("Cannot open VCF input '", $vcf, "'");
+            open $vcf_fh, "<", $vcf_path ||
+                $log->logcroak("Cannot open VCF input '", $vcf_path, "'");
         }
         my %slurp_args = (
             input_filehandle => $vcf_fh,
@@ -208,7 +229,7 @@ sub run {
         my $vcf_data = WTSI::NPG::Genotyping::VCF::Slurper->new(
             %slurp_args)->read_dataset();
         close $vcf_fh || $log->logcroak("Cannot close VCF input '",
-                                        $vcf, "'");
+                                        $vcf_path, "'");
         my %vcf_calls = %{$vcf_data->calls_by_sample()};
         foreach my $ssid (keys %vcf_calls) {
             my $uri = $ssid_to_uri{$ssid};
@@ -249,24 +270,25 @@ Options:
   --json=PATH            Path for JSON output. Required. May be '-' for
                          STDOUT.
   --pass_threshold=NUM   Minimum similarity to pass identity check. Optional.
-  --plex=PATH            Path to .tsv manifest for a QC plex SNP set. Can
-                         give multiple arguments for multiple plex files, eg.
-                         '--plex file1.tsv --plex file2.tsv'. At least one
-                         manifest must be supplied using the --plex and/or
-                         --plex_irods arguments.
-  --plex_irods=PATH      Location of iRODS data object corresponding to .tsv
-                         manifest for a QC plex SNP set. Can give multiple
-                         arguments, similarly to --plex. At least one
-                         manifest must be supplied using the --plex and/or
-                         --plex_irods arguments.
+  --plex=PATH            Path to one or more .tsv manifests for QC plex
+                         SNP sets. Multiple plex manifests are given as a
+                         comma-separated list; the paths themselves may not
+                         contain commas.
+  --plex_irods=PATH      Location of one or more iRODS data objects
+                         corresponding to .tsv manifest for QC plex SNP
+                         sets. Can give multiple arguments, similarly to
+                         --plex. At least one manifest must be supplied
+                         using the --plex and/or --plex_irods arguments.
   --plink=STEM           Plink binary stem (path omitting the .bed, .bim, .fam
                          suffix) for production data.
   --sample_json=PATH     JSON file for translating between Sanger sample ID
                          and sample URI. Required.
   --swap_threshold=NUM   Minimum cross-similarity to warn of sample swap.
                          Optional.
-  --vcf=PATH             Path to VCF input file. Can give multiple arguments
-                         for multiple VCF inputs, similarly to --plex.
+  --vcf=PATH             Path to one or more VCF input files. Can give
+                         multiple paths as a comma-separated list,
+                         similarly to --plex. Must supply at least one VCF
+                         path.
   --verbose              Turn on verbose logging. Optional.
 
 =head1 DESCRIPTION
@@ -285,7 +307,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
