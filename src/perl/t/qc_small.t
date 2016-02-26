@@ -151,11 +151,11 @@ my @args = ("--output-dir=$outDir",
             "--run=$piperun",
             "--inipath=$iniPath",
             "--config=$config",
-            "--vcf=$vcf",
+            "--vcf=$vcf,$vcf",
             "--plex=$plexManifest",
-            " --sample-json=$sampleJson",
+            "--sample-json=$sampleJson",
             "--mafhet",
-            $plink);
+            "--plink=$plink");
 is(system("$bin/run_qc.pl ".join(" ", @args)), 0,
    "run_qc.pl bootstrap script exit status");
 
@@ -189,7 +189,7 @@ ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
 ## run_qc.pl again, without the arguments for alternate identity check
 system("rm -Rf $outDir/*"); # remove output from previous tests
 system("cp $dbfileMasterA $tempdir");
-$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim $plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
+$cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim --plink=$plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
 
 is(system($cmd), 0,
    "run_qc.pl bootstrap script exit status, no alternate identity check");

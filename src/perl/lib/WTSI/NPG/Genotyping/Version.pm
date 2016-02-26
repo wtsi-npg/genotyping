@@ -12,7 +12,7 @@ use Exporter;
 
 our $VERSION = '';
 
-our $YEARS = '2014, 2015';
+our $YEARS = '2014, 2015, 2016';
 
 sub version_text {
     my $text = "WTSI Genotyping Pipeline version $VERSION\n".
