@@ -301,11 +301,9 @@ sub script : Test(7) {
               "--plink $data_path/fake_qc_genotypes",
               "--json $jsonPath",
               "--csv $csvPath",
-              "--plex $plexFile1",
-              "--plex $plexFile2",
+              "--plex ".$plexFile1.",".$plexFile2,
               "--sample_json $sampleJson",
-              "--vcf $vcf1",
-              "--vcf $vcf2",
+              "--vcf ".$vcf1.","."$vcf2",
           ) == 0, 'Script identity check');
     $outData = from_json(read_file($jsonPath));
     is_deeply($outData, $refData,
