@@ -240,7 +240,7 @@ Returns:
         end
       end
       if qcargs # ready to start QC
-        if vcf and plex_manifest
+        if not (vcf.empty? or plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
           qcargs = qcargs.merge({
             :vcf => vcf.join(","),
@@ -290,7 +290,7 @@ Returns:
         else
           gcqcargs = {:zcall_filter => true}.merge(gcqcargs)
         end
-        if vcf and plex_manifest
+        if not (vcf.empty? or plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
           gcqcargs = gcqcargs.merge({
             :vcf => vcf.join(","),
