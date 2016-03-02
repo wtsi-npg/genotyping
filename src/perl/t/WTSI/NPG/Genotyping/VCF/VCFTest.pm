@@ -506,6 +506,7 @@ sub vcf_dataset_test: Test(4) {
 
 sub _read_without_filedate {
     # read a VCF file, omitting the ##fileDate and ##reference lines
+    # duplicated in ReadyWorkflowTest.pm
     my ($inPath) = @_;
     my $lines = read_file($inPath);
     return _remove_filedate_reference($lines);

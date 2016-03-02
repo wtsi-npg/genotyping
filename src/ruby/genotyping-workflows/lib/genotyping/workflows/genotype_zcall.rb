@@ -1,6 +1,6 @@
 #-- encoding: UTF-8
 #
-# Copyright (c) 2013, 2015 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2013, 2015, 2016 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -69,8 +69,10 @@ Arguments:
     memory:        <integer> number of Mb to request for jobs.
     queue:         <normal | long etc.> An LSF queue hint. Optional, 
                    defaults to'normal'.
-    vcf:           <path> Path to VCF file for identity QC
-    plex_manifest: <path> Path to plex manifest file for identity QC
+    vcf:           <Array> containing paths to one or more VCF files for
+                   identity QC
+    plex_manifest: <Array> containing paths to one or more plex manifest
+                   files for identity QC
 
 
 e.g.
@@ -86,8 +88,12 @@ e.g.
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
        plex_manifest: /genotyping/manifests/fluidigm.tsv
        egt: /genotyping/clusters/Human670-QuadCustom_v1.egt
-       vcf: /work/my_project/qc_calls.vcf
-       plex_manifest: /genotyping/manifests/qc.tsv
+       vcf:
+           - /work/my_project/qc_calls_foo.vcf
+           - /work/my_project/qc_calls_bar.vcf
+       plex_manifest:
+           - /genotyping/manifests/qc_foo.tsv
+           - /genotyping/manifests/qc_bar.tsv
 
 Returns:
 
@@ -116,7 +122,7 @@ Returns:
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
       nosim = args.delete(:nosim) || nil # omit sim files for qc?
-      vcf = args.delete(:vcf) || nil
+      vcf = args.delete(:vcf) || Array.new()
 
       args.delete(:memory)
       args.delete(:queue)
@@ -234,12 +240,13 @@ Returns:
         end
       end
       if qcargs # ready to start QC
-        if vcf and plex_manifest
-          qcargs = {
-            :vcf => vcf,
-            :plex_manifest => plex_manifest,
+        if not (vcf.empty? or plex_manifest.empty?)
+          # use comma-separated lists of VCF/plex files in QC args
+          qcargs = qcargs.merge({
+            :vcf => vcf.join(","),
+            :plex_manifest => plex_manifest.join(","),
             :sample_json => sjson
-          }.merge(qcargs)
+          }) # overwrites original contents of qcargs
         end
         zquality = quality_control(dbfile, zfile, zqc, qcargs, async)
       end
@@ -283,12 +290,13 @@ Returns:
         else
           gcqcargs = {:zcall_filter => true}.merge(gcqcargs)
         end
-        if vcf and plex_manifest
-          gcqcargs = {
-            :vcf => vcf,
+        if not (vcf.empty? or plex_manifest.empty?)
+          # use comma-separated lists of VCF/plex files in QC args
+          gcqcargs = gcqcargs.merge({
+            :vcf => vcf.join(","),
             :sample_json => gcsjson,
-            :plex_manifest => plex_manifest
-          }.merge(gcqcargs)
+            :plex_manifest => plex_manifest.join(",")
+          }) # overwrites original contents of gcqcargs
         end
 
         ## run gencall QC to get metrics for prefiltering
