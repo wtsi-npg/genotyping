@@ -34,39 +34,6 @@ has '_plex_name_attr' =>
    lazy          => 1,
    documentation => 'iRODS attribute for QC plex name');
 
-=head2 get_assay_resultset
-
-  Arg [1] : Str sample identifier (dcterms:identifier)
-  Arg [n] : Optional additional query specs as ArrayRefs.
-  Example : $sub->get_assay_resultset('qc', '0123456789',
-                                      [study => 12345]);
-  Description: Fetch an assay result by SNP set, sample and other optional
-               criteria. Raises an error if the query finds >1 result set.
-  Returntype : WTSI::NPG::Genotyping::Fluidigm::AssayResultSet
-
-=cut
-
-sub get_assay_resultset {
-    my ($self, $sample_identifier, @query_specs) = @_;
-    my ($resultsets, $vcf_meta) = $self->get_assay_resultsets_and_vcf_metadata
-      ([$sample_identifier], @query_specs);
-
-    my $num_samples = scalar keys %$resultsets;
-    if ($num_samples > 1) {
-      $self->logconfess("The assay results query returned data for >1 ",
-                        "sample: [", join(q{, }, keys %$resultsets, "]"));
-    }
-
-    my @resultsets = @{$resultsets->{$sample_identifier}};
-    my $num_resultsets = scalar @resultsets;
-    if ($num_resultsets > 1) {
-      $self->logconfess("The assay results query was not specific enough; ",
-                        "$num_resultsets result sets were returned: [",
-                        join(q{, }, map { $_->str } @resultsets), "]");
-    }
-
-    return shift @resultsets;
-}
 
 =head2 get_assay_resultsets_and_vcf_metadata
 
@@ -189,6 +156,22 @@ sub get_calls {
   return \@calls;
 }
 
+
+=head2 platform_name
+
+  Arg [1] : None
+  Example : my $name = $sub->platform_name();
+  Description: Return an identifier string for the genotyping platform;
+               in this case, 'fluidigm'. Used to construct a default
+               callset name in the Subscription role.
+  Returntype : Str
+
+=cut
+
+sub platform_name {
+    return 'fluidigm';
+}
+
 sub _build_calls_at {
   my ($self, $assay_address, $resultsets) = @_;
 
@@ -204,7 +187,7 @@ sub _build_calls_at {
     else {
       $self->trace("Adding fluidigm result at '$assay_address'");
 
-      my $snp = $self->snpset->named_snp($result->snp_assayed);
+      my $snp = $self->read_snpset->named_snp($result->snp_assayed);
       push @calls,
         WTSI::NPG::Genotyping::Call->new(snp      => $snp,
                                          genotype => $result->canonical_call,
@@ -248,11 +231,11 @@ specific samples from iRODS.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
