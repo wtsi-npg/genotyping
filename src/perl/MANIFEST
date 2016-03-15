@@ -701,6 +701,7 @@ t/WTSI/NPG/Genotyping/Infinium/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Infinium/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Infinium/SampleQueryTest.pm
+t/WTSI/NPG/Genotyping/QC/CollationTest.pm
 t/WTSI/NPG/Genotyping/QC/IdentityTest.pm
 t/WTSI/NPG/Genotyping/QC_wip/Check/IdentitySimulatorTest.pm
 t/WTSI/NPG/Genotyping/QC_wip/Check/IdentityTest.pm
