@@ -470,6 +470,7 @@ t/qc_test_data/output_examples/identity_check.json
 t/qc_test_data/output_examples/magnitude.txt
 t/qc_test_data/output_examples/qc_exclusions.json
 t/qc_test_data/output_examples/qc_metrics.json
+t/qc_test_data/output_examples/qc_results.csv
 t/qc_test_data/output_examples/qc_results.json
 t/qc_test_data/output_examples/sample_cr_het.txt
 t/qc_test_data/output_examples/sample_xhet_gender.txt

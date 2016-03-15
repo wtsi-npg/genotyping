@@ -14,7 +14,6 @@ use FindBin qw($Bin);
 use JSON;
 
 use Test::More tests => 49;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readSampleInclusion/;
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
 my $testName = 'small_test';

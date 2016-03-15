@@ -340,25 +340,8 @@ sub readSampleData {
 	push(@data, \@fields);
     }
     close $in;
-    return @data;    
+    return @data;
 }
-
-sub readSampleInclusion {
-    # get inclusion/exclusion status of each sample in pipeline DB
-    # returns a hash reference
-    my $dbfile = shift;
-    my $result = `echo 'select name,include from sample;' | sqlite3 $dbfile`;
-    my @lines = split("\n", $result);
-    my %inclusion;
-    foreach my $line (@lines) {
-	my @fields = split('\|', $line); 
-	my $status = pop @fields;
-	my $name = join("|", @fields); # OK even if name includes | characters
-	$inclusion{$name} = $status;
-    }
-    return \%inclusion;
-}
-
 sub readThresholds {
     # read QC metric thresholds from config path
     my $configPath = shift;
