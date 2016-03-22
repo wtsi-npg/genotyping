@@ -40,6 +40,8 @@ my $tmp;
 my $db_file_name = "4_samples.db";
 my $dbfile = catfile($data_path, $db_file_name);
 
+$ENV{'GENOTYPE_TEST_DATA'} = '/nfs/gapi/data/genotype/pipeline_test/';
+
 my $manifest = catfile($ENV{'GENOTYPE_TEST_DATA'},
                        "Human670-QuadCustom_v1_A.bpm.csv");
 my $egt = catfile($ENV{'GENOTYPE_TEST_DATA'},

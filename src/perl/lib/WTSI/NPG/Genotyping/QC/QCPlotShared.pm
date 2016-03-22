@@ -11,6 +11,7 @@ use Carp;
 use Config::Tiny;
 use Cwd;
 use FindBin qw($Bin);
+use File::Slurp qw(read_file);
 use POSIX qw(floor);
 use Log::Log4perl qw(:easy);
 use JSON;
@@ -20,7 +21,7 @@ use Exporter;
 Log::Log4perl->easy_init($ERROR);
 
 our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readFileToString readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $INI_PATH $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
+our @EXPORT_OK = qw/defaultPipelineDBConfig defaultConfigDir defaultJsonConfig defaultTexIntroPath getDatabaseObject getPlateLocations getPlateLocationsFromPath getSummaryStats meanSd median parseLabel parseThresholds plateLabel readMetricResultHash readQCFileNames readQCMetricInputs readQCNameArray readQCShortNameHash readSampleData readSampleInclusion readThresholds $INI_PATH $INI_FILE_DEFAULT $UNKNOWN_PLATE $UNKNOWN_ADDRESS/;
 
 our $VERSION = '';
 
@@ -244,16 +245,6 @@ sub plateLabel {
     return $label;
 }
 
-sub readFileToString {
-    # generic method to read a file (eg. json) into a single string variable
-    my $inPath = shift();
-    if (!(defined($inPath)) || !(-r $inPath)) { carp "Cannot read input path \"$inPath\"\n"; }
-    open my $in, "<", $inPath;
-    my @lines = <$in>;
-    close $in;
-    return join('', @lines);
-}
-
 sub readMetricResultHash {
     # read QC results data structure from JSON file
     # assumes top-level structure is a hash
@@ -286,7 +277,7 @@ sub readQCFileNames {
 sub readQCNameConfig {
     # read qc metric names from JSON config
     my $inPath = shift();
-    my %names = %{decode_json(readFileToString($inPath))};
+    my %names = %{decode_json(read_file($inPath))};
     return %names;
 }
 
@@ -327,7 +318,7 @@ sub readQCResultHash {
     # read QC results data structure from JSON file
     # assumes top-level structure is a hash
     my $inPath = shift;
-    my %results = %{decode_json(readFileToString($inPath))};
+    my %results = %{decode_json(read_file($inPath))};
     return %results;
 }
 
@@ -349,29 +340,12 @@ sub readSampleData {
 	push(@data, \@fields);
     }
     close $in;
-    return @data;    
+    return @data;
 }
-
-sub readSampleInclusion {
-    # get inclusion/exclusion status of each sample in pipeline DB
-    # returns a hash reference
-    my $dbfile = shift;
-    my $result = `echo 'select name,include from sample;' | sqlite3 $dbfile`;
-    my @lines = split("\n", $result);
-    my %inclusion;
-    foreach my $line (@lines) {
-	my @fields = split('\|', $line); 
-	my $status = pop @fields;
-	my $name = join("|", @fields); # OK even if name includes | characters
-	$inclusion{$name} = $status;
-    }
-    return \%inclusion;
-}
-
 sub readThresholds {
     # read QC metric thresholds from config path
     my $configPath = shift;
-    my %config = %{decode_json(readFileToString($configPath))};
+    my %config = %{decode_json(read_file($configPath))};
     return parseThresholds(%config);
 }
 
