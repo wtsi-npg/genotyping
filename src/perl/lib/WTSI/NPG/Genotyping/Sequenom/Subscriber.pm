@@ -151,6 +151,21 @@ sub get_assay_resultsets_and_vcf_metadata {
 }
 
 
+=head2 platform_name
+
+  Arg [1] : None
+  Example : my $name = $sub->platform_name();
+  Description: Return an identifier string for the genotyping platform;
+               in this case, 'sequenom'. Used to construct a default
+               callset name in the Subscription role.
+  Returntype : Str
+
+=cut
+
+sub platform_name {
+    return 'sequenom';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -188,7 +203,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

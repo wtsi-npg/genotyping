@@ -224,8 +224,14 @@ sub update_secondary_metadata_missing_value : Test(2) {
   # so this one is done first. The test ensures that an invalid AVU
   # value only causes that AVU to be skipped - all subsequent ones are
   # applied.
+  #
+  # In this instance, the update for 'dcterms:identifier' fails because of
+  # the invalid value, so the existing 'dcterms:identifier' AVU remains
+  # unchanged with a value of '9999999999'. Subsequently, the value of
+  # 'sample_supplier_name' is successfully updated from 'zzzzzzzzzz' to
+  # 'aaaaaaaaaa'.
   my $expected_meta =
-    [# attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'dcterms:identifier',      value => '9999999999'},
      {attribute => 'sample',                  value => 'sample1' },
      {attribute => 'sample_accession_number', value => 'A0123456789'},
      {attribute => 'sample_cohort',           value => 'AAA111222333'},

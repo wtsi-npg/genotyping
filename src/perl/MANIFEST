@@ -351,6 +351,7 @@ t/fluidigm_resultset/missing_tif/0123456789/0123456789.csv
 t/fluidigm_resultset/missing_tif/0123456789/Data/athos.tif
 t/fluidigm_resultset/missing_tif/0123456789/Data/porthos.tif
 t/fluidigm_subscriber.t
+t/fluidigm_subscriber/chromosome_lengths_GRCh37.json
 t/fluidigm_subscriber/qc.tsv
 t/fluidigm_subscriber/S01_1381735059.csv
 t/fluidigm_subscriber/S01_1381735060.csv
@@ -470,6 +471,7 @@ t/qc_test_data/output_examples/identity_check.json
 t/qc_test_data/output_examples/magnitude.txt
 t/qc_test_data/output_examples/qc_exclusions.json
 t/qc_test_data/output_examples/qc_metrics.json
+t/qc_test_data/output_examples/qc_results.csv
 t/qc_test_data/output_examples/qc_results.json
 t/qc_test_data/output_examples/sample_cr_het.txt
 t/qc_test_data/output_examples/sample_xhet_gender.txt
@@ -609,6 +611,7 @@ t/sequenom_assay_result.t
 t/sequenom_assay_resultset.t
 t/sequenom_publisher.t
 t/sequenom_subscriber.t
+t/sequenom_subscriber/chromosome_lengths_GRCh37.json
 t/sequenom_subscriber/sequenom_001.csv
 t/sequenom_subscriber/sequenom_002.csv
 t/sequenom_subscriber/sequenom_003.csv
@@ -701,6 +704,7 @@ t/WTSI/NPG/Genotyping/Infinium/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Infinium/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Infinium/SampleQueryTest.pm
+t/WTSI/NPG/Genotyping/QC/CollationTest.pm
 t/WTSI/NPG/Genotyping/QC/IdentityTest.pm
 t/WTSI/NPG/Genotyping/QC_wip/Check/IdentitySimulatorTest.pm
 t/WTSI/NPG/Genotyping/QC_wip/Check/IdentityTest.pm

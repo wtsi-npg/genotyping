@@ -90,5 +90,19 @@ sub publish_file : Test(8) {
   ok($updated_lorem_obj->validate_checksum_metadata,
      'New md5 metadata matches file');
 
-  ok(!$lorem_obj->is_present, 'Update moved data object');
+  my $lorem_obj_presence = $lorem_obj->is_present;
+  ok(!$lorem_obj_presence, 'Update moved data object');
+
+  # calling $lorem_obj->is_present raises warnings (because the object is
+  # not present). These warnings are written to the test log. Calling
+  # is_present *outside* the test assertion (as above) behaves as
+  # expected.
+  #
+  # If the call is made *within* the test assertion, for example:
+  # ok(!$lorem_obj->is_present, 'Update moved data object');
+  # then the warnings are also printed to the terminal. The reason
+  # for this is unclear, as the test log should be configured to direct
+  # them to the logfile. For the time being, the is_present call has been
+  # left outside the assertion to suppress unwanted output in the terminal
+  # window.
 }
