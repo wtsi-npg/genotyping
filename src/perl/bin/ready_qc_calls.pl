@@ -103,7 +103,7 @@ sub run {
         }
     }
 
-    ### validate command-line arguments and read params files ###
+    ### validate command-line arguments ###
     my @config = split(/,/msx, $config);
     # JSON config files supplied as a comma-separated list
     # Use instead of eg. "--config foo.json --config bar.json" for
@@ -111,11 +111,8 @@ sub run {
     if (scalar @config == 0) {
         $log->logcroak("Must supply at least one --config argument");
     }
-    my @params;
     foreach my $config_path (@config) {
-        if (-e $config_path) {
-            push @params, decode_json(read_file($config_path));
-        } else {
+        unless (-e $config_path) {
             $log->logcroak("Config path '", $config_path,
                            "' does not exist. Paths must be supplied as ",
                            "a comma-separated list; individual paths ",
@@ -149,9 +146,10 @@ sub run {
     ### create PlexResultFinder and write VCF ###
     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
         sample_ids => \@sample_ids,
+        subscriber_config => \@config,
         logger     => $log,
     );
-    my $vcf_paths = $finder->read_write_all(\@params, $output_dir);
+    my $vcf_paths = $finder->write_vcf($output_dir);
 }
 
 ## TODO Retrieve results for multiple plex types / experiments and record in the same VCF file
