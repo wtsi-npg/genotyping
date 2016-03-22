@@ -118,8 +118,14 @@ sub write_vcf {
     foreach my $subscriber (@{$self->subscribers}) {
         my $filename = $subscriber->callset.".vcf";
         my $output_path = catfile($outdir, $filename);
-        $self->_write_vcf_single($subscriber, $output_path);
-        push @vcf_paths, $output_path;
+        my $total = $self->_write_vcf_single($subscriber, $output_path);
+        if ($total > 0) {
+            push @vcf_paths, $output_path;
+            $self->info("Wrote $total resultsets to VCF ", $output_path);
+        } else {
+            $self->info("No resultsets found, omitting VCF output ",
+                        "for callset ", $subscriber->callset);
+        }
     }
     return \@vcf_paths;
 }
