@@ -235,12 +235,11 @@ Returns:
         zsimfile = gtc_to_sim(sjson, manifest, zsimname, smargs, async)
         if zsimfile
           qcargs = {:run => run_name,
-                    :sim => zsimfile,
-                    :plex_manifest => plex_manifest}.merge(args)
+                    :sim => zsimfile}.merge(args)
         end
       end
       if qcargs # ready to start QC
-        if not (vcf.empty? or plex_manifest.empty?)
+        if (not vcf.empty?) and (not plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
           qcargs = qcargs.merge({
             :vcf => vcf.join(","),
@@ -282,15 +281,14 @@ Returns:
         gcsfile = File.join(work_dir, gcsname)
         gcqcargs = {:run => run_name, :mafhet => true}.merge(args)
         if gcsimfile
-          gcqcargs = {:sim => gcsimfile,
-                      :plex_manifest => plex_manifest}.merge(gcqcargs)
+          gcqcargs = {:sim => gcsimfile}.merge(gcqcargs)
         end
         if fconfig
           gcqcargs = {:filter => fconfig}.merge(gcqcargs)
         else
           gcqcargs = {:zcall_filter => true}.merge(gcqcargs)
         end
-        if not (vcf.empty? or plex_manifest.empty?)
+        if (not vcf.empty?) and (not plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
           gcqcargs = gcqcargs.merge({
             :vcf => vcf.join(","),
