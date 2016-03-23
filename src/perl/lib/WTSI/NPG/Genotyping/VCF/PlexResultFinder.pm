@@ -146,39 +146,42 @@ sub _build_subscribers {
         my $platform = delete $args{$PLATFORM_KEY};
         my $subscriber;
         # Subscriber creation may fail, eg. if plex manifest cannot be located
+        # Only warn if no valid Subscribers are created
         if ($platform eq $FLUIDIGM) {
             try {
                 $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
                     (%args);
             } catch {
-                $self->logwarn("Unable to create Fluidigm subscriber: ", $_);
-            }
+                $self->info("Unable to create Fluidigm subscriber: ", $_);
+           }
         } elsif ($platform eq $SEQUENOM) {
             try {
                 $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
                     (%args);
             } catch {
-                $self->logwarn("Unable to create Sequenom subscriber: ", $_);
+                $self->info("Unable to create Sequenom subscriber: ", $_);
             }
         } else {
             $self->logcroak("Unknown plex type: '", $platform, "'");
         }
-        my $callset = $subscriber->callset();
-        if ($callsets{$callset}) {
-            $self->logcroak("Non-unique callset name '", $callset, "'");
-        } else {
-            $callsets{$callset} = 1;
+        if (defined($subscriber)) {
+            my $callset = $subscriber->callset();
+            if ($callsets{$callset}) {
+                $self->logcroak("Non-unique callset name '", $callset, "'");
+            } else {
+                $callsets{$callset} = 1;
+            }
+            push @subscribers, $subscriber;
         }
-        push @subscribers, $subscriber;
     }
     my $total = scalar @subscribers;
     if ($total == 0) {
         $self->logwarn("No valid iRODS subscribers could be created ",
-                       "from given config files; no QC plex data will ",
-                       "be retrieved");
+                       "from given config files; QC plex data will ",
+                       "not be retrieved");
     } else {
-        $self->info("Successfully created ", $total, " iRODS subscribers to ",
-                    "query for QC plex data");
+        $self->info("Successfully created ", $total, " iRODS subscriber(s)",
+                    " to query for QC plex data");
     }
     return \@subscribers;
 }
