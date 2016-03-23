@@ -7,7 +7,7 @@ use Moose;
 use File::Slurp qw(read_file);
 use File::Spec::Functions qw/catfile/;
 use JSON;
-
+use Try::Tiny;
 
 use WTSI::NPG::Genotyping::Fluidigm::Subscriber;
 use WTSI::NPG::Genotyping::Sequenom::Subscriber;
@@ -82,6 +82,10 @@ sub write_manifests {
         $self->logcroak("Output argument '", $outdir, "' is not a directory");
     }
     my @output_paths;
+    if (scalar @{$self->subscribers} == 0) {
+        $self->logwarn("No valid Subscriber objects available; QC plex ",
+                       "manifests cannot be found");
+    }
     foreach my $subscriber (@{$self->subscribers}) {
         my $filename = $subscriber->callset.".tsv";
         my $output_path = catfile($outdir, $filename);
@@ -124,8 +128,11 @@ sub write_vcf {
             $self->info("Wrote $total resultsets to VCF ", $output_path);
         } else {
             $self->info("No resultsets found, omitting VCF output ",
-                        "for callset ", $subscriber->callset);
+                        "for callset '", $subscriber->callset, "'");
         }
+    }
+    if (scalar @vcf_paths == 0) {
+        $self->logwarn("No QC plex data found for VCF output");
     }
     return \@vcf_paths;
 }
@@ -138,12 +145,21 @@ sub _build_subscribers {
         my %args = %{$config};
         my $platform = delete $args{$PLATFORM_KEY};
         my $subscriber;
+        # Subscriber creation may fail, eg. if plex manifest cannot be located
         if ($platform eq $FLUIDIGM) {
-            $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
-                (%args);
+            try {
+                $subscriber = WTSI::NPG::Genotyping::Fluidigm::Subscriber->new
+                    (%args);
+            } catch {
+                $self->logwarn("Unable to create Fluidigm subscriber: ", $_);
+            }
         } elsif ($platform eq $SEQUENOM) {
-            $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
-                (%args);
+            try {
+                $subscriber = WTSI::NPG::Genotyping::Sequenom::Subscriber->new
+                    (%args);
+            } catch {
+                $self->logwarn("Unable to create Sequenom subscriber: ", $_);
+            }
         } else {
             $self->logcroak("Unknown plex type: '", $platform, "'");
         }
@@ -154,6 +170,15 @@ sub _build_subscribers {
             $callsets{$callset} = 1;
         }
         push @subscribers, $subscriber;
+    }
+    my $total = scalar @subscribers;
+    if ($total == 0) {
+        $self->logwarn("No valid iRODS subscribers could be created ",
+                       "from given config files; no QC plex data will ",
+                       "be retrieved");
+    } else {
+        $self->info("Successfully created ", $total, " iRODS subscribers to ",
+                    "query for QC plex data");
     }
     return \@subscribers;
 }
