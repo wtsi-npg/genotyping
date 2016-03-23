@@ -147,20 +147,17 @@ Returns:
         gcquality = true
       else
         ## run gencall QC to apply gencall CR filter and find genders
-        gcqcargs = {:run => run_name, 
-                    :plex_manifest => plex_manifest}.merge(args)
+        gcqcargs = {:run => run_name}.merge(args)
         if fconfig
           gcqcargs = {:filter => fconfig}.merge(gcqcargs)
         else
           gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
-        if not (vcf.empty? or plex_manifest.empty?)
+        if (not vcf.empty?) and (not plex_manifest.empty?)
           # use comma-separated lists of VCF/plex files in QC args
-          vcf_str = vcf.join(",")
-          plex_manifest_str = plex_manifest.join(",")
           gcqcargs = gcqcargs.merge({
-              :vcf => vcf_str,
-              :plex_manifest => plex_manifest_str,
+              :vcf => vcf.join(","),
+              :plex_manifest => plex_manifest.join(","),
               :sample_json => gcsjson
           }) # overwrites original values in gcqcargs
         end
@@ -214,7 +211,7 @@ Returns:
         :run => run_name,
         :sim => smfile
       }.merge(args)
-      if not (vcf.empty? and plex_manifest.empty?)
+      if (not vcf.empty?) and (not plex_manifest.empty?)
         # use comma-separated lists of VCF/plex files in QC args
         qcargs = qcargs.merge({
           :vcf => vcf.join(","),

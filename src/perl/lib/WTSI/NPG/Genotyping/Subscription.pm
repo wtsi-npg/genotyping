@@ -190,6 +190,12 @@ sub BUILD {
                       "' does not exist or is not a directory");
   }
 
+  # ensure that snpset attributes are valid
+  # attributes are lazy; want to die at object creation time, not in a
+  # subsequent method call
+  my $read_data_obj = $self->read_snpset_data_object;
+  my $write_data_obj = $self->write_snpset_data_object;
+
 }
 
 

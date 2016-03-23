@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use Cwd qw/abs_path/;
-use Test::More tests => 52;
+use Test::More tests => 66;
 use Test::Exception;
 use File::Basename qw(fileparse);
 use File::Path qw/make_path/;
@@ -118,6 +118,9 @@ sub make_fixture : Test(setup) {
 sub setup_fluidigm {
     # add some dummy fluidigm CSV files to the temporary collection
     # add sample and snpset names to metadata
+    # optionally, use a different reference name
+    my ($reference_name, ) = @_;
+    $reference_name ||= $f_reference_name;
     for (my $i=0;$i<@f_input_files;$i++) {
         my $input = $f_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
@@ -134,7 +137,7 @@ sub setup_fluidigm {
     my %params = (
         "data_path"            => $irods_tmp_coll,
         "platform"             => "fluidigm",
-        "reference_name"       => $f_reference_name,
+        "reference_name"       => $reference_name,
         "reference_path"       => $irods_tmp_coll,
         "snpset_name"          => $f_snpset_id,
         "callset"              => "fluidigm_".$f_snpset_id,
@@ -238,6 +241,27 @@ sub teardown : Test(teardown) {
 }
 
 sub test_ready_calls_fluidigm : Test(2) {
+    setup_chromosome_json();
+    my $fluidigm_params = setup_fluidigm();
+    my $vcf_out = "$tmp/fluidigm_qc.vcf";
+    my $cmd = join q{ }, "$READY_QC_CALLS",
+                         "--config $fluidigm_params",
+                         "--dbfile $dbfile",
+                         "--logconf $LOG_TEST_CONF",
+                         "--verbose",
+                         "--out $tmp";
+    ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
+    my @got_lines = read_file($vcf_out);
+    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+    my @expected_lines = read_file($f_expected_vcf);
+    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+    is_deeply(\@got_lines, \@expected_lines,
+              "Fluidigm VCF output matches expected values");
+
+}
+
+sub test_ready_calls_fluidigm_bad_reference : Test(2) {
+    # test 
     setup_chromosome_json();
     my $fluidigm_params = setup_fluidigm();
     my $vcf_out = "$tmp/fluidigm_qc.vcf";
@@ -379,6 +403,7 @@ sub test_workflow_script_illuminus: Test(16) {
     my $config_path = catfile($workdir, "config.yml");
     my $working_db = catfile($workdir, $db_file_name);
     my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
                          "--run run1",
@@ -462,6 +487,77 @@ sub test_workflow_script_illuminus: Test(16) {
               "YML Illuminus workflow params match expected values");
 }
 
+sub test_workflow_script_illuminus_bad_plex_reference: Test(12) {
+    # use a bad reference name
+    # Subscriber object creation fails
+    # VCF and plex manifest outputs are empty
+    setup_chromosome_json();
+    my $f_config = setup_fluidigm('jabberwocky');
+    my $workdir = abs_path(catfile($tmp,
+                                   "genotype_workdir_illuminus_no_plex"));
+    my $config_path = catfile($workdir, "config.yml");
+    my $working_db = catfile($workdir, $db_file_name);
+    my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
+                         "--dbfile $dbfile",
+                         "--manifest $manifest",
+                         "--run run1",
+                         "--verbose",
+                         "--plex_config $f_config",
+                         "--workdir $workdir",
+                         "--workflow illuminus",
+                         "2> /dev/null"; # suppress chatter to stderr
+    is(0, system($cmd), "illuminus setup exit status is zero");
+    # check presence of required files and subfolders for workflow
+    ok(-e $workdir, "Workflow directory found");
+    ok(-e $config_path, "config.yml found");
+    ok(-e $working_db, "genotyping SQLite database found");
+    foreach my $name (qw/in pass fail/) {
+        my $subdir = catfile($workdir, $name);
+        ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
+    }
+    my $params_path = catfile($workdir, "in", "genotype_illuminus.yml");
+    ok(-e $params_path, "genotype_illuminus.yml found");
+    # check contents of YML files
+    my $config = LoadFile($config_path);
+    ok($config, "Config data structure loaded from YML");
+    my $expected_config =  {
+          'msg_port' => '11300',
+          'max_processes' => '250',
+          'root_dir' => $workdir,
+          'log_level' => 'DEBUG',
+          'async' => 'lsf',
+          'msg_host' => 'farm3-head2',
+          'log' => catfile($workdir, 'percolate.log')
+        };
+    is_deeply($config, $expected_config,
+              "YML Illuminus config matches expected values");
+
+    my $params = LoadFile($params_path);
+    ok($params, "Workflow parameter data structure loaded from YML");
+    my $manifest_name = fileparse($manifest);
+    my $expected_params = {
+        'workflow' => 'Genotyping::Workflows::GenotypeIlluminus',
+        'library' => 'genotyping',
+        'arguments' => [
+            $working_db,
+            'run1',
+            $workdir,
+            {
+                'memory' => '2048',
+                'manifest' => catfile($workdir, $manifest_name),
+                'chunk_size' => '4000',
+                'plex_manifest' => [],
+                'vcf' => [],
+                'gender_method' => 'Supplied'
+            }
+        ]
+    };
+    is_deeply($params, $expected_params,
+              "YML Illuminus workflow params match expected values");
+
+}
+
 sub test_workflow_script_zcall: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
@@ -470,6 +566,7 @@ sub test_workflow_script_zcall: Test(16) {
     my $working_db = catfile($workdir, $db_file_name);
     my $params_path = catfile($workdir, "in", "genotype_zcall.yml");
     my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
                          "--run run1",
