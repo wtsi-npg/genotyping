@@ -12,6 +12,7 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 use WTSI::NPG::Genotyping::SNP;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -20,8 +21,8 @@ our $NO_CALL_GENOTYPE = 'NN';
 
 our $CHROMOSOME_JSON_ATTR = 'chromosome_json';
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation',
-  'WTSI::NPG::Genotyping::Annotation', 'WTSI::NPG::Genotyping::Subscription';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation',
+    'WTSI::NPG::Genotyping::Subscription';
 
 has '_plex_name_attr' =>
   (is            => 'ro',
@@ -29,7 +30,7 @@ has '_plex_name_attr' =>
    init_arg      => undef,
    default       => sub {
        my ($self) = @_;
-       return $self->fluidigm_plex_name_attr;
+       return $FLUIDIGM_PLEX_NAME;
    },
    lazy          => 1,
    documentation => 'iRODS attribute for QC plex name');

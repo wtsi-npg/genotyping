@@ -16,12 +16,13 @@ use WTSI::NPG::Genotyping::SNP;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
 our $VERSION = '';
 
 our @HEADER = qw(SNP_NAME REF_ALLELE ALT_ALLELE CHR POS STRAND);
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
-  'WTSI::NPG::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 has 'name' =>
   (is       => 'ro',
@@ -356,7 +357,7 @@ sub _build_references {
   my @references;
   if ($self->data_object) {
     my @reference_name_avus = $self->data_object->find_in_metadata
-      ($self->reference_genome_name_attr);
+        ($REFERENCE);
 
     foreach my $avu (@reference_name_avus) {
       push @references, WTSI::NPG::Genotyping::Reference->new

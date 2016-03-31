@@ -9,6 +9,7 @@ use Moose;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Types qw(Platform);
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 use WTSI::NPG::SimplePublisher;
 
 our $VERSION = '';
@@ -79,7 +80,7 @@ sub publish {
 
   my @meta = ([$snpset_name => $self->snpset_name]);
   foreach my $reference (@references) {
-    push @meta, [$self->reference_genome_name_attr => $reference->name]
+    push @meta, [$REFERENCE => $reference->name]
   }
 
   my $rods_path = $publisher->publish_file($self->file_name, \@meta,

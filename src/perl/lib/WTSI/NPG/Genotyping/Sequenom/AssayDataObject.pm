@@ -8,9 +8,9 @@ use Try::Tiny;
 
 our $VERSION = '';
 
-with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
-
 extends 'WTSI::NPG::iRODS::DataObject';
+
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 sub update_secondary_metadata {
   my ($self, $snpdb, $ssdb) = @_;

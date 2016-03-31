@@ -8,6 +8,7 @@ use Moose;
 use Try::Tiny;
 
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 use WTSI::NPG::Publisher;
 
 our $VERSION = '';
@@ -136,7 +137,7 @@ sub publish {
 
     $self->info("Created new collection '", $analysis_coll->str, "'");
 
-    my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
+    my @uuid_meta = grep { $_->[0] eq $ANALYSIS_UUID }
       @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
 
@@ -165,9 +166,9 @@ sub publish {
 
         my @sample_objects = $irods->find_objects_by_meta
           ($self->sample_archive,
-           [$self->dcterms_title_attr             => $project_title],
-           [$self->infinium_beadchip_attr         => $sample->beadchip],
-           [$self->infinium_beadchip_section_attr => $sample->rowcol]);
+           [$DCTERMS_TITLE             => $project_title],
+           [$INFINIUM_BEADCHIP         => $sample->beadchip],
+           [$INFINIUM_BEADCHIP_SECTION => $sample->rowcol]);
 
         unless (@sample_objects) {
           $self->logconfess("Failed to find data in iRODS in sample archive '",
@@ -182,7 +183,7 @@ sub publish {
 
           # Xref analysis to sample studies
           my @studies = map { $_->{value} }
-            $obj->find_in_metadata($self->study_id_attr);
+            $obj->find_in_metadata($STUDY_ID);
 
           if (@studies) {
             $self->debug("Sample '$included_sample_name' has metadata for ",
@@ -190,7 +191,7 @@ sub publish {
 
             foreach my $study (@studies) {
               unless (exists $studies_seen{$study}) {
-                push(@analysis_meta, [$self->study_id_attr => $study]);
+                push(@analysis_meta, [$STUDY_ID => $study]);
                 $studies_seen{$study}++;
               }
             }
@@ -202,7 +203,7 @@ sub publish {
           }
 
           # Xref samples to analysis UUID
-          $obj->add_avu($self->analysis_uuid_attr, $analysis_uuid);
+          $obj->add_avu($ANALYSIS_UUID, $analysis_uuid);
           ++$num_objects;
         }
 

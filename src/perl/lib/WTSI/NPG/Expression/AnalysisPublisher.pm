@@ -14,6 +14,7 @@ use WTSI::NPG::Publisher;
 use WTSI::NPG::SimplePublisher;
 use WTSI::NPG::Utilities qw(collect_files);
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -77,6 +78,7 @@ sub publish {
   # Make a path based on the md5sum of the manifest
   my $irods = $self->irods;
 
+  my $analysis_uuid_attr = $ANALYSIS_UUID;
   my $analysis_coll;
   my $analysis_uuid;
   my $num_samples = 0;
@@ -94,7 +96,7 @@ sub publish {
                                          $self->accountee_uri));
     }
 
-    my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
+    my @uuid_meta = grep { $_->[0] eq $analysis_uuid_attr }
       @analysis_meta;
     $analysis_uuid = $uuid_meta[0]->[1];
     if ($analysis_uuid) {
@@ -105,7 +107,6 @@ sub publish {
       $self->logconfess("Failed to find an analysis UUID in metadata: ",
                         dump(\@analysis_meta));
     }
-
     $analysis_coll = $self->ensure_analysis_collection($publish_dest, $uuid);
     my @analysis_files = $self->find_analysis_files;
 
@@ -116,9 +117,10 @@ sub publish {
     foreach my $sample (@{$self->manifest->samples}) {
       my @sample_objects = $irods->find_objects_by_meta
         ($self->sample_archive,
-         [$self->dcterms_identifier_attr          => $sample->{sample_id}],
+         [$DCTERMS_IDENTIFIER                    => $sample->{sample_id}],
          [$self->expression_beadchip_attr         => $sample->{beadchip}],
          [$self->expression_beadchip_section_attr => $sample->{beadchip_section}]);
+
       unless (@sample_objects) {
         $self->logconfess("Failed to find data in iRODS in sample archive '",
                           $self->sample_archive, "' for sample '",
@@ -133,7 +135,7 @@ sub publish {
 
         # Xref analysis to sample studies
         my @studies = map { $_->{value} }
-          $obj->find_in_metadata($self->study_id_attr);
+          $obj->find_in_metadata($STUDY_ID);
 
         if (@studies) {
           $self->debug("Sample '", $sample->{sample_id}, "' has metadata for ",
@@ -141,7 +143,7 @@ sub publish {
 
           foreach my $study (@studies) {
             unless (exists $studies_seen{$study}) {
-              push(@analysis_meta, [$self->study_id_attr => $study]);
+              push(@analysis_meta, [$STUDY_ID => $study]);
               $studies_seen{$study}++;
             }
           }
@@ -153,7 +155,7 @@ sub publish {
         }
 
         # Xref samples to analysis UUID
-        $obj->add_avu($self->analysis_uuid_attr, $analysis_uuid);
+        $obj->add_avu($analysis_uuid_attr, $analysis_uuid);
         ++$num_objects;
       }
 

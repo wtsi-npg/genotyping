@@ -43,11 +43,13 @@ my $study_id = 0;
 my $irods_tmp_coll;
 
 my $pid = $$;
+my $test_num = 0;
 
 sub make_fixture : Test(setup) {
   my $irods = WTSI::NPG::iRODS->new;
   $irods_tmp_coll =
-    $irods->add_collection("ExpressionAnalysisPublisherTest.$pid");
+    $irods->add_collection("ExpressionAnalysisPublisherTest.$pid.$test_num");
+  $test_num++;
 
   $irods->put_collection($sample_data_path, $irods_tmp_coll);
 

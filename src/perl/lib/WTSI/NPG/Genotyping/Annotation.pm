@@ -21,7 +21,8 @@ our %GENOTYPING_METADATA_ATTR =
    fluidigm_plate_name       => 'fluidigm_plate',
    fluidigm_plate_well       => 'fluidigm_well',
    fluidigm_plex_name        => 'fluidigm_plex',
-   manual_qc                 => 'manual_qc');
+   manual_qc                 => 'manual_qc',
+   reference_genome_name     => 'reference_name');
 
 my $meta = __PACKAGE__->meta;
 

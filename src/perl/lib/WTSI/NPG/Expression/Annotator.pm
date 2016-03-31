@@ -6,6 +6,8 @@ use List::AllUtils qw(any);
 use Moose::Role;
 use UUID;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation';
 
 our $VERSION = '';
@@ -28,7 +30,7 @@ sub make_infinium_metadata {
   my ($self, $resultset) = @_;
 
   my @meta =
-    ([$self->dcterms_identifier_attr          => $resultset->sample_id],
+    ([$DCTERMS_IDENTIFIER                     => $resultset->sample_id],
      [$self->expression_beadchip_attr         => $resultset->beadchip],
      [$self->expression_beadchip_section_attr => $resultset->beadchip_section]);
 
@@ -69,7 +71,7 @@ sub make_profile_annotation_metadata {
 
 =head2 make_analysis_metadata
 
-  Arg [1]    : UUID to use instead of gereating a new one. Optional.
+  Arg [1]    : UUID to use instead of generating a new one. Optional.
   Example    : my @meta = $obj->make_analysis_metadata()
   Description: Return a list of metadata key/value pairs describing an analysis.
   Returntype : array of arrayrefs

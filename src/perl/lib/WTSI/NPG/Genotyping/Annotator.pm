@@ -5,6 +5,8 @@ package WTSI::NPG::Genotyping::Annotator;
 use Moose::Role;
 use UUID;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
 our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation';
@@ -24,33 +26,33 @@ sub make_infinium_metadata {
   my ($self, $if_sample) = @_;
 
   return
-    ([$self->infinium_beadchip_attr         => $if_sample->{beadchip}],
-     [$self->infinium_beadchip_section_attr => $if_sample->{beadchip_section}],
-     [$self->infinium_beadchip_design_attr  => $if_sample->{beadchip_design}],
-     [$self->infinium_project_title_attr    => $if_sample->{project}],
-     [$self->infinium_sample_name_attr      => $if_sample->{sample}],
-     [$self->infinium_plate_name_attr       => $if_sample->{plate}],
-     [$self->infinium_plate_well_attr       => $if_sample->{well}]);
+    ([$INFINIUM_BEADCHIP         => $if_sample->{beadchip}],
+     [$INFINIUM_BEADCHIP_SECTION => $if_sample->{beadchip_section}],
+     [$INFINIUM_BEADCHIP_DESIGN  => $if_sample->{beadchip_design}],
+     [$INFINIUM_PROJECT_TITLE    => $if_sample->{project}],
+     [$INFINIUM_SAMPLE_NAME      => $if_sample->{sample}],
+     [$INFINIUM_PLATE_NAME       => $if_sample->{plate}],
+     [$INFINIUM_PLATE_WELL       => $if_sample->{well}]);
 }
 
 sub make_sequenom_metadata {
   my ($self, $well) = @_;
 
-  return ([$self->sequenom_plate_name_attr => $well->{plate}],
-          [$self->sequenom_plate_well_attr => $well->{well}]);
+  return ([$SEQUENOM_PLATE_NAME => $well->{plate}],
+          [$SEQUENOM_PLATE_WELL => $well->{well}]);
 }
 
 sub make_fluidigm_metadata {
   my ($self, $well) = @_;
 
-  return ([$self->fluidigm_plate_name_attr => $well->{plate}],
-          [$self->fluidigm_plate_well_attr => $well->{well}]);
+  return ([$FLUIDIGM_PLATE_NAME => $well->{plate}],
+          [$FLUIDIGM_PLATE_WELL => $well->{well}]);
 }
 
 sub make_manual_qc_metadata {
   my ($self, $manual_qc) = @_;
 
-  return ([$self->manual_qc_attr => $manual_qc]);
+  return ([$QC_STATE => $manual_qc]);
 }
 
 =head2 make_analysis_metadata
@@ -72,10 +74,10 @@ sub make_analysis_metadata {
   UUID::generate($uuid_bin);
   UUID::unparse($uuid_bin, $uuid_str);
 
-  my @meta = ([$self->analysis_uuid_attr => $uuid_str]);
+  my @meta = ([$ANALYSIS_UUID => $uuid_str]);
 
   foreach my $title (@$genotyping_project_titles) {
-    push(@meta, [$self->infinium_project_title_attr => $title]);
+    push(@meta, [$INFINIUM_PROJECT_TITLE => $title]);
   }
 
   return @meta;
@@ -84,29 +86,29 @@ sub make_analysis_metadata {
 sub infinium_fingerprint {
   my ($self, @meta) = @_;
 
-  return $self->make_fingerprint([$self->infinium_beadchip_attr,
-                                  $self->infinium_beadchip_section_attr,
-                                  $self->infinium_beadchip_design_attr,
-                                  $self->infinium_project_title_attr,
-                                  $self->infinium_sample_name_attr,
-                                  $self->infinium_plate_name_attr,
-                                  $self->infinium_plate_well_attr],
+  return $self->make_fingerprint([$INFINIUM_BEADCHIP,
+                                  $INFINIUM_BEADCHIP_SECTION,
+                                  $INFINIUM_BEADCHIP_DESIGN,
+                                  $INFINIUM_PROJECT_TITLE,
+                                  $INFINIUM_SAMPLE_NAME,
+                                  $INFINIUM_PLATE_NAME,
+                                  $INFINIUM_PLATE_WELL],
                                  \@meta);
 }
 
 sub sequenom_fingerprint {
   my ($self, @meta) = @_;
 
-  return $self->make_fingerprint([$self->sequenom_plate_name_attr,
-                                  $self->sequenom_plate_well_attr],
+  return $self->make_fingerprint([$SEQUENOM_PLATE_NAME,
+                                  $SEQUENOM_PLATE_WELL],
                                  \@meta);
 }
 
 sub fluidigm_fingerprint {
   my ($self, @meta) = @_;
 
-  return $self->make_fingerprint([$self->fluidigm_plate_name_attr,
-                                  $self->fluidigm_plate_well_attr],
+  return $self->make_fingerprint([$FLUIDIGM_PLATE_NAME,
+                                  $FLUIDIGM_PLATE_WELL],
                                  \@meta);
 }
 

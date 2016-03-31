@@ -13,6 +13,8 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
 use WTSI::NPG::Publisher;
 
 our $VERSION = '';
@@ -153,8 +155,8 @@ sub publish_samples {
   $self->debug("Publishing raw Fluidigm CSV data file '",
                $self->resultset->export_file, "'");
   my @meta =
-    ([$self->fluidigm_plate_name_attr => $export_file->fluidigm_barcode],
-     [$self->dcterms_audience_attr    => $self->audience_uri->as_string]);
+    ([$FLUIDIGM_PLATE_NAME => $export_file->fluidigm_barcode],
+     [$DCTERMS_AUDIENCE => $self->audience_uri->as_string]);
 
   # Publish the unsplit file
   $publisher->publish_file($self->resultset->export_file, \@meta,
@@ -189,7 +191,7 @@ sub publish_samples {
       my $snpset_name = $self->_find_snpset_name($snpset);
 
       my $obj = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-        ($self->irods, $rods_path)->add_avu($self->fluidigm_plex_name_attr,
+        ($self->irods, $rods_path)->add_avu($FLUIDIGM_PLEX_NAME,
                                             $snpset_name);
 
       # Now that adding the secondary metadata is fast enough, we can
@@ -255,7 +257,7 @@ sub _build_snpsets {
 
   my @snpset_paths = $self->irods->find_objects_by_meta
     ($self->reference_path,
-     [$self->fluidigm_plex_name_attr    => '%', 'like'],
+     [$FLUIDIGM_PLEX_NAME    => '%', 'like'],
      [$self->reference_genome_name_attr => $self->reference_name]);
 
   my @snpsets;
@@ -286,7 +288,7 @@ sub _find_resultset_snpset {
   my @matched;
   foreach my $snpset (@{$self->snpsets}) {
     my @names = $snpset->data_object->find_in_metadata
-      ($self->fluidigm_plex_name_attr);
+      ($FLUIDIGM_PLEX_NAME);
 
     my @snp_names = $snpset->snp_names;
     my $num_snps = scalar @snp_names;
@@ -330,7 +332,7 @@ sub _find_snpset_name {
   my ($self, $snpset) = @_;
 
   my @snpset_names = map { $_->{value} }
-    $snpset->data_object->find_in_metadata($self->fluidigm_plex_name_attr);
+    $snpset->data_object->find_in_metadata($FLUIDIGM_PLEX_NAME);
   my $num_names = scalar @snpset_names;
 
   $num_names > 0 or

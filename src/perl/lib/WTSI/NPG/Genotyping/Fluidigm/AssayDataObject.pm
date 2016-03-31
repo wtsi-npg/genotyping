@@ -9,9 +9,9 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
 our $VERSION = '';
 
-with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
-
 extends 'WTSI::NPG::iRODS::DataObject';
+
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 =head2 assay_resultset
 
