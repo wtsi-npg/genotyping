@@ -15,7 +15,7 @@ use WTSI::NPG::SimplePublisher;
 our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Accountable',
-  'WTSI::NPG::Annotator';
+  'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotation';
 
 has 'file_name' =>
   (is       => 'ro',
@@ -80,7 +80,7 @@ sub publish {
 
   my @meta = ([$snpset_name => $self->snpset_name]);
   foreach my $reference (@references) {
-    push @meta, [$REFERENCE => $reference->name]
+    push @meta, [$self->reference_genome_name_attr => $reference->name]
   }
 
   my $rods_path = $publisher->publish_file($self->file_name, \@meta,
