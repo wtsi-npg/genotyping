@@ -72,7 +72,6 @@ lib/WTSI/NPG/Database/DBIx.pm
 lib/WTSI/NPG/Database/MLWarehouse.pm
 lib/WTSI/NPG/Database/Warehouse.pm
 lib/WTSI/NPG/Expression/AnalysisPublisher.pm
-lib/WTSI/NPG/Expression/Annotation.pm
 lib/WTSI/NPG/Expression/Annotator.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifest.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV1.pm

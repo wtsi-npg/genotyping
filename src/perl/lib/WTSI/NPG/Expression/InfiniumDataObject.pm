@@ -22,12 +22,12 @@ sub update_secondary_metadata {
   my $well;
   my $sample_id;
 
-  my $plate_avu = $self->get_avu($self->expression_plate_name_attr);
+  my $plate_avu = $self->get_avu($EXPRESSION_PLATE_NAME);
   if ($plate_avu) {
     $plate = $plate_avu->{value};
   }
 
-  my $well_avu = $self->get_avu($self->expression_plate_well_attr);
+  my $well_avu = $self->get_avu($EXPRESSION_PLATE_WELL);
   if ($well_avu) {
     $well = $well_avu->{value};
   }
