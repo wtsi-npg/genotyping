@@ -83,7 +83,6 @@ lib/WTSI/NPG/Expression/Publisher.pm
 lib/WTSI/NPG/Expression/ResultSet.pm
 lib/WTSI/NPG/Expression/SampleProbeProfile.pm
 lib/WTSI/NPG/Genotyping.pm
-lib/WTSI/NPG/Genotyping/Annotation.pm
 lib/WTSI/NPG/Genotyping/Annotator.pm
 lib/WTSI/NPG/Genotyping/Call.pm
 lib/WTSI/NPG/Genotyping/Database/Infinium.pm
