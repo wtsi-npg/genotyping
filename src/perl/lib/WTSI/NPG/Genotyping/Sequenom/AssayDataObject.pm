@@ -6,6 +6,8 @@ use Data::Dump qw(dump);
 use Moose;
 use Try::Tiny;
 
+use WTSI::NPG::iRODS::Metadata;
+
 our $VERSION = '';
 
 extends 'WTSI::NPG::iRODS::DataObject';
@@ -18,12 +20,12 @@ sub update_secondary_metadata {
   my $plate_name;
   my $well;
 
-  my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
+  my $sequenom_plate_avu = $self->get_avu($SEQUENOM_PLATE_NAME);
   if ($sequenom_plate_avu) {
     $plate_name = $sequenom_plate_avu->{value};
   }
 
-  my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
+  my $well_avu = $self->get_avu($SEQUENOM_PLATE_WELL);
   if ($well_avu) {
     $well = $well_avu->{value};
   }
@@ -87,9 +89,9 @@ sub update_secondary_metadata {
 sub update_qc_metadata {
   my ($self, $snpdb) = @_;
 
-  my $sequenom_plate_avu = $self->get_avu($self->sequenom_plate_name_attr);
+  my $sequenom_plate_avu = $self->get_avu($SEQUENOM_PLATE_NAME);
   my $plate_name = $sequenom_plate_avu->{value};
-  my $well_avu = $self->get_avu($self->sequenom_plate_well_attr);
+  my $well_avu = $self->get_avu($SEQUENOM_PLATE_WELL);
   my $well = $well_avu->{value};
 
   # Get well manual QC status from the SNP database.

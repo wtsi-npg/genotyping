@@ -13,7 +13,7 @@ use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+use WTSI::NPG::iRODS::Metadata;
 
 use WTSI::NPG::Publisher;
 
@@ -258,7 +258,7 @@ sub _build_snpsets {
   my @snpset_paths = $self->irods->find_objects_by_meta
     ($self->reference_path,
      [$FLUIDIGM_PLEX_NAME    => '%', 'like'],
-     [$self->reference_genome_name_attr => $self->reference_name]);
+     [$REFERENCE_GENOME_NAME => $self->reference_name]);
 
   my @snpsets;
   foreach my $rods_path (@snpset_paths) {

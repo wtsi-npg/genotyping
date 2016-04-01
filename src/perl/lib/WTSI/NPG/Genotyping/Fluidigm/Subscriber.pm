@@ -21,8 +21,7 @@ our $NO_CALL_GENOTYPE = 'NN';
 
 our $CHROMOSOME_JSON_ATTR = 'chromosome_json';
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation',
-    'WTSI::NPG::Genotyping::Subscription';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Subscription';
 
 has '_plex_name_attr' =>
   (is            => 'ro',

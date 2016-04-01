@@ -9,7 +9,7 @@ use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable';
 
 =head2 make_infinium_metadata
 

@@ -15,8 +15,7 @@ our $VERSION = '';
 # queries.
 our $BATCH_QUERY_CHUNK_SIZE = 100;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Annotation',
-    'WTSI::NPG::Genotyping::Subscription';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Subscription';
 
 has '_plex_name_attr' =>
   (is            => 'ro',
@@ -68,7 +67,7 @@ sub get_assay_resultsets {
   while (my @ids = $iter->()) {
     my @id_obj_paths = $self->irods->find_objects_by_meta
       ($self->data_path,
-       [$self->sequenom_plex_name_attr => $self->snpset_name],
+       [$SEQUENOM_PLEX_NAME => $self->snpset_name],
        [$DCTERMS_IDENTIFIER => \@ids, 'in'], @query_specs);
     push @obj_paths, @id_obj_paths;
   }
