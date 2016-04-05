@@ -45,10 +45,10 @@ our $PLEX_MANIFEST_SUBDIRECTORY = 'plex_manifests';
 
 my $uid = `whoami`;
 chomp($uid);
-my $session_log = user_session_log($uid, 'ready_qc_calls');
+my $session_log = user_session_log($uid, 'ready_workflow');
 
 my $embedded_conf = "
-   log4perl.logger.npg.ready_qc_calls = ERROR, A1, A2
+   log4perl.logger.npg.ready_workflow = ERROR, A1, A2
 
    log4perl.appender.A1           = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.utf8      = 1

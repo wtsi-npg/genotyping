@@ -6,6 +6,7 @@ package WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 use WTSI::NPG::Utilities qw(trim);
 
 our $VERSION = '';
@@ -16,8 +17,7 @@ our $HEADER_BARCODE_COL = 2;
 our $HEADER_CONF_THRESHOLD_ROW = 5;
 our $HEADER_CONF_THRESHOLD_COL = 1;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Addressable',
-  'WTSI::NPG::Genotyping::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Addressable';
 
 has 'file_name' =>
   (is       => 'ro',
@@ -165,8 +165,8 @@ sub fluidigm_metadata {
     $self->logconfess("FluidigmExportFile '", $self->fluidigm_barcode,
                       "' has no sample address '$address'");
 
-  return ([$self->fluidigm_plate_name_attr => $self->fluidigm_barcode],
-          [$self->fluidigm_plate_well_attr => $address]);
+  return ([$FLUIDIGM_PLATE_NAME => $self->fluidigm_barcode],
+          [$FLUIDIGM_PLATE_WELL => $address]);
 }
 
 =head2 fluidigm_fingerprint

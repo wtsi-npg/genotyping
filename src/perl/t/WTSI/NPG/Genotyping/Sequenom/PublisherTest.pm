@@ -314,7 +314,8 @@ sub test_metadata {
     ok($data_object->get_avu('dcterms:modified'), 'Has dcterms:modified');
   }
   else {
-    ok(!$data_object->get_avu('dcterms:modified'), 'Has no dcterms:modified');
+    my @exists = $data_object->find_in_metadata('dcterms:modified');
+    ok(scalar(@exists)==0, 'Has no dcterms:modified');
   }
 
   foreach my $avu (@$expected_metadata) {

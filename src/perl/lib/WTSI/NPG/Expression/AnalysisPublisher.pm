@@ -14,6 +14,7 @@ use WTSI::NPG::Publisher;
 use WTSI::NPG::SimplePublisher;
 use WTSI::NPG::Utilities qw(collect_files);
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -62,7 +63,7 @@ sub BUILD {
 }
 
 sub publish {
-  my ($self, $publish_dest, $uuid) = @_;
+  my ($self, $publish_dest, $input_uuid) = @_;
 
   defined $publish_dest or
     $self->logconfess('A defined publish_dest argument is required');
@@ -78,7 +79,7 @@ sub publish {
   my $irods = $self->irods;
 
   my $analysis_coll;
-  my $analysis_uuid;
+  my $uuid;
   my $num_samples = 0;
   my $num_objects = 0;
 
@@ -86,39 +87,39 @@ sub publish {
     # Analysis directory
     my @analysis_meta;
 
-    push(@analysis_meta, $self->make_analysis_metadata($uuid));
-    unless ($uuid) {
+    push(@analysis_meta, $self->make_analysis_metadata($input_uuid));
+    unless ($input_uuid) {
       push(@analysis_meta,
            $self->make_creation_metadata($self->affiliation_uri,
                                          $self->publication_time,
                                          $self->accountee_uri));
     }
 
-    my @uuid_meta = grep { $_->[0] eq $self->analysis_uuid_attr }
+    my @uuid_meta = grep { $_->[0] eq $ANALYSIS_UUID }
       @analysis_meta;
-    $analysis_uuid = $uuid_meta[0]->[1];
-    if ($analysis_uuid) {
-      $self->debug("Found analysis_uuid '$analysis_uuid' in metadata: ",
+    $uuid = $uuid_meta[0]->[1];
+    if ($uuid) {
+      $self->debug("Found analysis_uuid '$uuid' in metadata: ",
                    dump(\@analysis_meta));
     }
     else {
       $self->logconfess("Failed to find an analysis UUID in metadata: ",
                         dump(\@analysis_meta));
     }
-
     $analysis_coll = $self->ensure_analysis_collection($publish_dest, $uuid);
     my @analysis_files = $self->find_analysis_files;
 
     foreach my $file (@analysis_files) {
-      $self->publish_analysis_file($analysis_coll, $file, $analysis_uuid);
+      $self->publish_analysis_file($analysis_coll, $file, $uuid);
     }
 
     foreach my $sample (@{$self->manifest->samples}) {
       my @sample_objects = $irods->find_objects_by_meta
         ($self->sample_archive,
-         [$self->dcterms_identifier_attr          => $sample->{sample_id}],
-         [$self->expression_beadchip_attr         => $sample->{beadchip}],
-         [$self->expression_beadchip_section_attr => $sample->{beadchip_section}]);
+         [$DCTERMS_IDENTIFIER          => $sample->{sample_id}],
+         [$EXPRESSION_BEADCHIP         => $sample->{beadchip}],
+         [$EXPRESSION_BEADCHIP_SECTION => $sample->{beadchip_section}]);
+
       unless (@sample_objects) {
         $self->logconfess("Failed to find data in iRODS in sample archive '",
                           $self->sample_archive, "' for sample '",
@@ -133,7 +134,7 @@ sub publish {
 
         # Xref analysis to sample studies
         my @studies = map { $_->{value} }
-          $obj->find_in_metadata($self->study_id_attr);
+          $obj->find_in_metadata($STUDY_ID);
 
         if (@studies) {
           $self->debug("Sample '", $sample->{sample_id}, "' has metadata for ",
@@ -141,7 +142,7 @@ sub publish {
 
           foreach my $study (@studies) {
             unless (exists $studies_seen{$study}) {
-              push(@analysis_meta, [$self->study_id_attr => $study]);
+              push(@analysis_meta, [$STUDY_ID => $study]);
               $studies_seen{$study}++;
             }
           }
@@ -153,7 +154,7 @@ sub publish {
         }
 
         # Xref samples to analysis UUID
-        $obj->add_avu($self->analysis_uuid_attr, $analysis_uuid);
+        $obj->add_avu($ANALYSIS_UUID, $uuid);
         ++$num_objects;
       }
 
@@ -173,10 +174,10 @@ sub publish {
                 "data objects for $num_samples samples");
   } catch {
     $self->error("Failed to publish: ", $_);
-    undef $analysis_uuid;
+    undef $uuid;
   };
 
-  return $analysis_uuid;
+  return $uuid;
 }
 
 sub ensure_analysis_collection {

@@ -9,6 +9,7 @@ use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::VCF::ReferenceFinder;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -252,7 +253,7 @@ sub find_object_paths {
         my @id_obj_paths = $self->irods->find_objects_by_meta
             ($self->data_path,
              [$self->_plex_name_attr => $self->snpset_name],
-             [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
+             [$DCTERMS_IDENTIFIER => \@ids, 'in'], @query_specs);
         push @obj_paths, @id_obj_paths;
     }
     return @obj_paths;
@@ -281,7 +282,7 @@ sub find_resultsets_index {
             $resultsets_index{$sample_identifier} = [];
         }
         my @sample_resultsets = grep {
-            $_->data_object->get_avu($self->dcterms_identifier_attr,
+            $_->data_object->get_avu($DCTERMS_IDENTIFIER,
                                      $sample_identifier) } @{$resultsets};
         $self->debug("Found ", scalar @sample_resultsets, " resultsets for ",
                      "sample '$sample_identifier'");

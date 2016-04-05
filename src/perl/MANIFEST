@@ -72,7 +72,6 @@ lib/WTSI/NPG/Database/DBIx.pm
 lib/WTSI/NPG/Database/MLWarehouse.pm
 lib/WTSI/NPG/Database/Warehouse.pm
 lib/WTSI/NPG/Expression/AnalysisPublisher.pm
-lib/WTSI/NPG/Expression/Annotation.pm
 lib/WTSI/NPG/Expression/Annotator.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifest.pm
 lib/WTSI/NPG/Expression/ChipLoadingManifestV1.pm
@@ -83,7 +82,6 @@ lib/WTSI/NPG/Expression/Publisher.pm
 lib/WTSI/NPG/Expression/ResultSet.pm
 lib/WTSI/NPG/Expression/SampleProbeProfile.pm
 lib/WTSI/NPG/Genotyping.pm
-lib/WTSI/NPG/Genotyping/Annotation.pm
 lib/WTSI/NPG/Genotyping/Annotator.pm
 lib/WTSI/NPG/Genotyping/Call.pm
 lib/WTSI/NPG/Genotyping/Database/Infinium.pm

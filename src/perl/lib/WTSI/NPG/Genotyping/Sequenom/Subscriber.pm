@@ -7,6 +7,7 @@ use List::AllUtils qw(all natatime);
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -14,8 +15,7 @@ our $VERSION = '';
 # queries.
 our $BATCH_QUERY_CHUNK_SIZE = 100;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Annotation',
-  'WTSI::NPG::Genotyping::Annotation', 'WTSI::NPG::Genotyping::Subscription';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Genotyping::Subscription';
 
 has '_plex_name_attr' =>
   (is            => 'ro',
@@ -23,7 +23,7 @@ has '_plex_name_attr' =>
    init_arg      => undef,
    default       => sub {
        my ($self) = @_;
-       return $self->sequenom_plex_name_attr;
+       return $SEQUENOM_PLEX_NAME;
    },
    lazy          => 1,
    documentation => 'iRODS attribute for QC plex name');
@@ -67,8 +67,8 @@ sub get_assay_resultsets {
   while (my @ids = $iter->()) {
     my @id_obj_paths = $self->irods->find_objects_by_meta
       ($self->data_path,
-       [$self->sequenom_plex_name_attr => $self->snpset_name],
-       [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
+       [$SEQUENOM_PLEX_NAME => $self->snpset_name],
+       [$DCTERMS_IDENTIFIER => \@ids, 'in'], @query_specs);
     push @obj_paths, @id_obj_paths;
   }
 
@@ -90,7 +90,7 @@ sub get_assay_resultsets {
     }
 
     my @sample_resultsets = grep {
-      $_->data_object->get_avu($self->dcterms_identifier_attr,
+      $_->data_object->get_avu($DCTERMS_IDENTIFIER,
                                $sample_identifier) } @resultsets;
 
     $self->debug("Found ", scalar @sample_resultsets, " resultsets for ",
