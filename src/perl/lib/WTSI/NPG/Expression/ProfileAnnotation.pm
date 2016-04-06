@@ -6,8 +6,7 @@ use Moose;
 
 our $VERSION = '';
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
-  'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
