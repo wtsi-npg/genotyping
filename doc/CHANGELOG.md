@@ -10,16 +10,26 @@ Unreleased
 Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
+
+
+Release 1.12.0: 2016-04-07
+--------------------------
+
+Added:
 - New ready_workflow.pl script to query iRODS for QC plex data, write VCF,
-and set up an analysis directory, including config YML
+generate config YML, and set up an analysis directory
 - Ruby workflows can read multiple VCF and plex manifest paths from
 YML, and input them to the quality_control pipeline task
+- Revised default pass threshold for Bayesian identity check
 
 Removed:
 - genotyping_yml.pl and tests; functionality replaced by ready_workflow.pl
+- Annotation modules exporting constants for irods metadata; constants have
+been relocated to Metadata.pm in wtsi-npg/perl-irods-wrap
 
 Fixed:
 - Refactored run_qc.pl for better handling of command-line arguments
+- Updated for compatibility with latest dependency versions
 
 
 Release 1.11.6: 2016-02-08

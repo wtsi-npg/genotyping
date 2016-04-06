@@ -20,6 +20,7 @@ my $data_path = './t/qc/check/identity';
 my $snpset_file = "$data_path/W30467_snp_set_info_1000Genomes.tsv";
 my $sample_name  = 'urn:wtsi:249442_C09_HELIC5102247';
 my $pass_threshold = 0.9;
+my $sample_mismatch_prior = 0.01;
 my ($qc_calls, $production_calls, $qc_calls_small, $production_calls_small);
 
 our @CALLSET_NAMES = qw/callset_bar callset_foo/;
@@ -172,11 +173,13 @@ sub construct : Test(1) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
 
-    my @args = (sample_name      => $sample_name,
-                snpset           => $snpset,
-                production_calls => $production_calls,
-                qc_calls         => $qc_calls,
-                pass_threshold   => $pass_threshold);
+    my @args = (sample_name           => $sample_name,
+                snpset                => $snpset,
+                production_calls      => $production_calls,
+                qc_calls              => $qc_calls,
+                pass_threshold        => $pass_threshold,
+                sample_mismatch_prior => $sample_mismatch_prior,
+            );
 
     new_ok('WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian'
                => \@args);
@@ -191,7 +194,8 @@ sub output : Test(5) {
             snpset           => $snpset,
             production_calls => $production_calls,
             qc_calls         => $qc_calls,
-            pass_threshold   => $pass_threshold);
+            pass_threshold   => $pass_threshold,
+            sample_mismatch_prior => $sample_mismatch_prior);
     is_deeply($sib->qc_callset_names, \@CALLSET_NAMES,
               "QC callset names match");
 
@@ -229,7 +233,8 @@ sub output : Test(5) {
                   snpset           => $snpset,
                   production_calls => $production_calls,
                   qc_calls         => \@anonymous_qc_calls,
-                  pass_threshold   => $pass_threshold);
+                  pass_threshold   => $pass_threshold,
+                  sample_mismatch_prior => $sample_mismatch_prior);
     is_deeply($anon_sib->qc_callset_names,
               ['_unknown_callset_', 'callset_bar'],
               "Anonymous calls assigned to 'unknown' callset name");
@@ -251,7 +256,8 @@ sub metric : Test(2) {
                 snpset           => $snpset,
                 production_calls => $production_calls,
                 qc_calls         => $qc_calls,
-                pass_threshold   => $pass_threshold);
+                pass_threshold   => $pass_threshold,
+                sample_mismatch_prior => $sample_mismatch_prior);
     my $sib = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
               new(\%args);
     ok(abs($sib->identity - $expected_big) < $delta,
@@ -261,7 +267,8 @@ sub metric : Test(2) {
                 snpset           => $snpset,
                 production_calls => $production_calls_small,
                 qc_calls         => $qc_calls_small,
-                pass_threshold   => $pass_threshold);
+                pass_threshold   => $pass_threshold,
+                sample_mismatch_prior => $sample_mismatch_prior);
     my $sib_small =
         WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
               new(\%args);

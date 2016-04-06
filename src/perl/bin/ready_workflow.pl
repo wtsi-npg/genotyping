@@ -48,7 +48,7 @@ chomp($uid);
 my $session_log = user_session_log($uid, 'ready_workflow');
 
 my $embedded_conf = "
-   log4perl.logger.npg.ready_workflow = ERROR, A1, A2
+   log4perl.logger.npg.genotyping.ready_workflow = ERROR, A1, A2
 
    log4perl.appender.A1           = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.utf8      = 1
@@ -102,7 +102,7 @@ sub run {
 	       'zstart=i'        => \$zstart,
 	       'ztotal=i'        => \$ztotal,
                'logconf=s'       => \$log4perl_config,
-               'debug=s'         => \$debug,
+               'debug'           => \$debug,
 	       'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
 	);
 
@@ -233,7 +233,7 @@ sub make_working_directory {
     my ($workdir) = @_;
     if (-e $workdir) {
         if (-d $workdir) {
-            $log->info("Directory '", $workdir, "' already exists");
+            $log->info("Working directory '", $workdir, "' already exists");
         } else {
             $log->logcroak("--workdir argument '", $workdir,
                            "' exists and is not a directory");
@@ -241,6 +241,7 @@ sub make_working_directory {
     } else {
         mkdir $workdir || $log->logcroak("Cannot create directory '",
                                          $workdir, "'");
+        $log->info("Created working directory '", $workdir, "'");
     }
     # create subdirectories
     my @names = ('in', 'pass', 'fail', $VCF_SUBDIRECTORY,
@@ -249,7 +250,7 @@ sub make_working_directory {
         my $subdir = catfile($workdir, $name);
         if (-e $subdir) {
             if (-d $subdir) {
-                $log->info("Subdirectory '", $subdir, "' already exists");
+                $log->debug("Subdirectory '", $subdir, "' already exists");
             } else {
                 $log->logcroak("Expected subdirectory path '", $subdir,
                                "' exists and is not a directory");
@@ -257,7 +258,7 @@ sub make_working_directory {
         } else {
             mkdir($subdir) || $log->logcroak("Cannot create subdirectory '",
                                              $subdir, "'");
-            $log->info("Created subdirectory '", $subdir, "'");
+            $log->debug("Created subdirectory '", $subdir, "'");
         }
     }
 }
@@ -274,6 +275,7 @@ sub write_config_yml {
 	'max_processes' => '250'
     );
     my $config_path = catfile($workdir, 'config.yml');
+    $log->info("Wrote config YML to '", $config_path, "'");
     DumpFile($config_path, (\%config));
     return $config_path;
 }
@@ -315,6 +317,7 @@ sub write_workflow_yml {
 	'arguments' => \@args,
     );
     my $out = catfile($workdir, "in", "genotype_".$workflow.".yml");
+    $log->info("Wrote workflow YML to '", $out, "'");
     DumpFile($out, (\%params));
 }
 
@@ -355,7 +358,7 @@ Options:
   --verbose       Print messages while processing. Optional.
   --workdir       Working directory for pipeline run. Required.
   --workflow      Pipeline workflow for which to create a .yml file. If
-                  supplied, must be one of: illuminus, genosnp, zcall.
+                  supplied, must be 'illuminus' or 'zcall'.
                   If absent, only config.yml will be generated.
   --zstart        Start of zscore range, used for zCall only. Default = 7.
   --ztotal        Number of zscores in range, for zCall only. Default = 1.

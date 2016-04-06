@@ -30,6 +30,14 @@ has 'snpset' =>
      documentation => 'SNPSet for creation of SampleIdentityBayesian '.
          'objects. Must include all SNPs in the "calls" attribute.');
 
+# optional argument
+
+has 'pass_threshold' =>
+    (is            => 'ro',
+     isa           => 'Maybe[Num]',
+     documentation => 'Minimum posterior probability of identity for '.
+         'sample pass');
+
 # optional params for identity calculation
 # passed to SampleIdentityBayesian constructor
 # no default values; instead use defaults of SampleIdentityBayesian class
@@ -298,6 +306,9 @@ sub _build_identity_params {
     my ($self) = @_;
     my %params;
     $params{'sample_name'} = $DUMMY_SAMPLE_NAME;
+    if (defined($self->pass_threshold)) {
+        args{'pass_threshold'} = $self->pass_threshold;
+    }
     if (defined($self->equivalent_calls_probability)) {
         $params{'equivalent_calls_probability'} =
             $self->equivalent_calls_probability;
