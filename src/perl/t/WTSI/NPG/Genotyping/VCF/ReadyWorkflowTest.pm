@@ -7,7 +7,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use Cwd qw/abs_path/;
-use Test::More tests => 50;
+use Test::More tests => 66;
 use Test::Exception;
 use File::Basename qw(fileparse);
 use File::Path qw/make_path/;
@@ -39,6 +39,8 @@ my $tmp;
 
 my $db_file_name = "4_samples.db";
 my $dbfile = catfile($data_path, $db_file_name);
+
+$ENV{'GENOTYPE_TEST_DATA'} = '/nfs/gapi/data/genotype/pipeline_test/';
 
 my $manifest = catfile($ENV{'GENOTYPE_TEST_DATA'},
                        "Human670-QuadCustom_v1_A.bpm.csv");
@@ -83,9 +85,12 @@ sub require : Test(1) {
 
 sub construct : Test(1) {
 
+    my $fluidigm_params = setup_fluidigm();
     new_ok('WTSI::NPG::Genotyping::VCF::PlexResultFinder',
            [irods => $irods,
-            sample_ids => ['sample_1', 'sample_2']]);
+            sample_ids => ['sample_1', 'sample_2'],
+            subscriber_config => [$fluidigm_params, ],
+            ]);
 
 }
 
@@ -113,6 +118,9 @@ sub make_fixture : Test(setup) {
 sub setup_fluidigm {
     # add some dummy fluidigm CSV files to the temporary collection
     # add sample and snpset names to metadata
+    # optionally, use a different reference name
+    my ($reference_name, ) = @_;
+    $reference_name ||= $f_reference_name;
     for (my $i=0;$i<@f_input_files;$i++) {
         my $input = $f_input_files[$i];
         my $ipath = $irods_tmp_coll."/".$input;
@@ -127,11 +135,12 @@ sub setup_fluidigm {
     $irods->add_object_avu($snpset_path, 'reference_name', $f_reference_name);
     # write JSON config file with test params
     my %params = (
-        "irods_data_path"      => $irods_tmp_coll,
+        "data_path"            => $irods_tmp_coll,
         "platform"             => "fluidigm",
-        "reference_name"       => $f_reference_name,
+        "reference_name"       => $reference_name,
         "reference_path"       => $irods_tmp_coll,
         "snpset_name"          => $f_snpset_id,
+        "callset"              => "fluidigm_".$f_snpset_id,
     );
     my $params_path_fluidigm = $tmp."/".$f_params_name;
     open my $out, ">", $params_path_fluidigm ||
@@ -192,13 +201,14 @@ sub setup_sequenom {
     $irods->add_object_avu($snpset_path, 'snpset_version', $snpset_v2);
     # write JSON config file with test params
     my %params = (
-        irods_data_path      => $irods_tmp_coll,
+        data_path            => $irods_tmp_coll,
         platform             => "sequenom",
         reference_name       => $s_reference_name,
         reference_path       => $irods_tmp_coll,
         snpset_name          => $s_snpset_id,
         read_snpset_version  => $snpset_v2,
         write_snpset_version => $snpset_v2,
+        callset              => "sequenom_".$s_snpset_id,
     );
     my $config_path = $tmp."/".$s_params_name;
     my $out;
@@ -231,6 +241,27 @@ sub teardown : Test(teardown) {
 }
 
 sub test_ready_calls_fluidigm : Test(2) {
+    setup_chromosome_json();
+    my $fluidigm_params = setup_fluidigm();
+    my $vcf_out = "$tmp/fluidigm_qc.vcf";
+    my $cmd = join q{ }, "$READY_QC_CALLS",
+                         "--config $fluidigm_params",
+                         "--dbfile $dbfile",
+                         "--logconf $LOG_TEST_CONF",
+                         "--verbose",
+                         "--out $tmp";
+    ok(system($cmd) == 0, 'Wrote Fluidigm calls to VCF');
+    my @got_lines = read_file($vcf_out);
+    @got_lines = grep !/^[#]{2}(fileDate|reference)=/, @got_lines;
+    my @expected_lines = read_file($f_expected_vcf);
+    @expected_lines = grep !/^[#]{2}(fileDate|reference)=/, @expected_lines;
+    is_deeply(\@got_lines, \@expected_lines,
+              "Fluidigm VCF output matches expected values");
+
+}
+
+sub test_ready_calls_fluidigm_bad_reference : Test(2) {
+    # test 
     setup_chromosome_json();
     my $fluidigm_params = setup_fluidigm();
     my $vcf_out = "$tmp/fluidigm_qc.vcf";
@@ -317,50 +348,23 @@ sub test_ready_calls_both : Test(3) {
 
 }
 
-sub test_result_finder : Test(7) {
+sub test_result_finder : Test(9) {
     setup_chromosome_json();
-    setup_fluidigm();
-    setup_sequenom_default();
-
-    # test for single query
+    my $fluidigm_config = setup_fluidigm();
+    my $sequenom_config = setup_sequenom_default();
     my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
         irods      => $irods,
-        sample_ids => \@sample_ids
+        sample_ids => \@sample_ids,
+        subscriber_config => [$fluidigm_config, $sequenom_config],
     );
-    my $params_f = {
-        irods_data_path      => $irods_tmp_coll,
-        platform             => "fluidigm",
-        reference_name       => $f_reference_name,
-        reference_path       => $irods_tmp_coll,
-        snpset_name          => $f_snpset_id,
-    };
-    my $out_fluidigm_0 = "$tmp/class_test_fluidigm_0.vcf";
-    my $total = $finder->read_write_single($params_f,
-                                           $out_fluidigm_0,
-                                           'class_test_fluidigm');
-    ok($total==4, "Results found for 4 Fluidigm samples");
-    ok(-e $out_fluidigm_0, "Fluidigm output found");
-
-    # test for more than one query
-    my $snpset_v2 = '2.0';
-    my $params_s = {
-        irods_data_path      => $irods_tmp_coll,
-        platform             => "sequenom",
-        reference_name       => $s_reference_name,
-        reference_path       => $irods_tmp_coll,
-        snpset_name          => $s_snpset_id,
-        read_snpset_version  => $snpset_v2,
-        write_snpset_version => $snpset_v2,
-    };
-
-    my $paths = $finder->read_write_all([$params_f, $params_s], $tmp);
+    # test the write_vcf function
+    my $paths = $finder->write_vcf($tmp);
     my $f_out_vcf = "$tmp/fluidigm_qc.vcf";
     my $s_out_vcf = "$tmp/sequenom_W30467.vcf";
     my $out_paths = [$f_out_vcf, $s_out_vcf];
     is_deeply($paths, $out_paths, "Fluidigm & Sequenom outputs returned");
     ok(-e $f_out_vcf, "Fluidigm output found");
     ok(-e $s_out_vcf, "Sequenom output found");
-
     my @got_f = read_file($f_out_vcf);
     @got_f = grep !/^[#]{2}(fileDate|reference)=/, @got_f;
     my @expected_f = read_file($f_expected_vcf);
@@ -373,26 +377,39 @@ sub test_result_finder : Test(7) {
     @expected_s = grep !/^[#]{2}(fileDate|reference)=/, @expected_s;
     is_deeply(\@got_s, \@expected_s,
               "Sequenom VCF output matches expected values");
+    # test the write_manifests function
+    my $manifests = $finder->write_manifests($tmp);
+    my $f_manifest = "$tmp/fluidigm_qc.tsv";
+    my $s_manifest = "$tmp/sequenom_W30467.tsv";
+    ok(-e $f_manifest, "Fluidigm manifest found");
+    ok(-e $s_manifest, "Sequenom manifest found");
+    my @got_f_manifest = read_file($f_manifest);
+    my @expected_f_manifest = read_file(catfile($data_path,
+                                                $f_snpset_filename));
+    is_deeply(\@got_f_manifest, \@expected_f_manifest,
+              'Fluidigm manifest contents OK');
+    my @got_s_manifest = read_file($s_manifest);
+    my @expected_s_manifest = read_file(catfile($data_path,
+                                                $s_snpset_filename));
+    is_deeply(\@got_s_manifest, \@expected_s_manifest,
+              'Sequenom manifest contents OK');
 }
 
 sub test_workflow_script_illuminus: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
-    my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
-    my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
     my $workdir = abs_path(catfile($tmp, "genotype_workdir_illuminus"));
     my $config_path = catfile($workdir, "config.yml");
     my $working_db = catfile($workdir, $db_file_name);
     my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
                          "--run run1",
                          "--verbose",
                          "--plex_config $f_config",
                          "--plex_config $s_config",
-                         "--plex_manifest $plex_manifest_fluidigm",
-                         "--plex_manifest $plex_manifest_sequenom",
                          "--workdir $workdir",
                          "--workflow illuminus";
     is(0, system($cmd), "illuminus setup exit status is zero");
@@ -439,8 +456,8 @@ sub test_workflow_script_illuminus: Test(16) {
     my $params = LoadFile($params_path);
     ok($params, "Workflow parameter data structure loaded from YML");
     my $manifest_name = fileparse($manifest);
-    my $fluidigm_manifest_name = fileparse($plex_manifest_fluidigm);
-    my $sequenom_manifest_name = fileparse($plex_manifest_sequenom);
+    my $fluidigm_manifest_name = 'fluidigm_qc.tsv';
+    my $sequenom_manifest_name = 'sequenom_W30467.tsv';
     my $expected_params = {
         'workflow' => 'Genotyping::Workflows::GenotypeIlluminus',
         'library' => 'genotyping',
@@ -453,8 +470,10 @@ sub test_workflow_script_illuminus: Test(16) {
                 'manifest' => catfile($workdir, $manifest_name),
                 'chunk_size' => '4000',
                 'plex_manifest' => [
-                    catfile($workdir, $fluidigm_manifest_name),
-                    catfile($workdir, $sequenom_manifest_name),
+                    catfile($workdir, 'plex_manifests',
+                            $fluidigm_manifest_name),
+                    catfile($workdir, 'plex_manifests',
+                            $sequenom_manifest_name),
                 ],
                 'vcf' => [
                     $vcf_path_fluidigm,
@@ -468,24 +487,92 @@ sub test_workflow_script_illuminus: Test(16) {
               "YML Illuminus workflow params match expected values");
 }
 
+sub test_workflow_script_illuminus_bad_plex_reference: Test(12) {
+    # use a bad reference name
+    # Subscriber object creation fails
+    # VCF and plex manifest outputs are empty
+    setup_chromosome_json();
+    my $f_config = setup_fluidigm('jabberwocky');
+    my $workdir = abs_path(catfile($tmp,
+                                   "genotype_workdir_illuminus_no_plex"));
+    my $config_path = catfile($workdir, "config.yml");
+    my $working_db = catfile($workdir, $db_file_name);
+    my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
+                         "--dbfile $dbfile",
+                         "--manifest $manifest",
+                         "--run run1",
+                         "--verbose",
+                         "--plex_config $f_config",
+                         "--workdir $workdir",
+                         "--workflow illuminus",
+                         "2> /dev/null"; # suppress chatter to stderr
+    is(0, system($cmd), "illuminus setup exit status is zero");
+    # check presence of required files and subfolders for workflow
+    ok(-e $workdir, "Workflow directory found");
+    ok(-e $config_path, "config.yml found");
+    ok(-e $working_db, "genotyping SQLite database found");
+    foreach my $name (qw/in pass fail/) {
+        my $subdir = catfile($workdir, $name);
+        ok(-e $subdir && -d $subdir, "Subdirectory '$name' found");
+    }
+    my $params_path = catfile($workdir, "in", "genotype_illuminus.yml");
+    ok(-e $params_path, "genotype_illuminus.yml found");
+    # check contents of YML files
+    my $config = LoadFile($config_path);
+    ok($config, "Config data structure loaded from YML");
+    my $expected_config =  {
+          'msg_port' => '11300',
+          'max_processes' => '250',
+          'root_dir' => $workdir,
+          'log_level' => 'DEBUG',
+          'async' => 'lsf',
+          'msg_host' => 'farm3-head2',
+          'log' => catfile($workdir, 'percolate.log')
+        };
+    is_deeply($config, $expected_config,
+              "YML Illuminus config matches expected values");
+
+    my $params = LoadFile($params_path);
+    ok($params, "Workflow parameter data structure loaded from YML");
+    my $manifest_name = fileparse($manifest);
+    my $expected_params = {
+        'workflow' => 'Genotyping::Workflows::GenotypeIlluminus',
+        'library' => 'genotyping',
+        'arguments' => [
+            $working_db,
+            'run1',
+            $workdir,
+            {
+                'memory' => '2048',
+                'manifest' => catfile($workdir, $manifest_name),
+                'chunk_size' => '4000',
+                'plex_manifest' => [],
+                'vcf' => [],
+                'gender_method' => 'Supplied'
+            }
+        ]
+    };
+    is_deeply($params, $expected_params,
+              "YML Illuminus workflow params match expected values");
+
+}
+
 sub test_workflow_script_zcall: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
     my $s_config = setup_sequenom_default();
-    my $plex_manifest_fluidigm = catfile($data_path, $f_snpset_filename);
-    my $plex_manifest_sequenom = catfile($data_path, $s_snpset_filename);
     my $workdir = abs_path(catfile($tmp, "genotype_workdir_zcall"));
     my $working_db = catfile($workdir, $db_file_name);
     my $params_path = catfile($workdir, "in", "genotype_zcall.yml");
     my $cmd = join q{ }, "$READY_WORKFLOW",
+                         "--logconf $LOG_TEST_CONF",
                          "--dbfile $dbfile",
                          "--manifest $manifest",
                          "--run run1",
                          "--verbose",
                          "--plex_config $f_config",
                          "--plex_config $s_config",
-                         "--plex_manifest $plex_manifest_fluidigm",
-                         "--plex_manifest $plex_manifest_sequenom",
                          "--egt $egt",
                          "--zstart 6",
                          "--ztotal 3",
@@ -532,8 +619,8 @@ sub test_workflow_script_zcall: Test(16) {
     my $params = LoadFile($params_path);
     ok($params, "Workflow parameter data structure loaded from YML");
     my $manifest_name = fileparse($manifest);
-    my $fluidigm_manifest_name = fileparse($plex_manifest_fluidigm);
-    my $sequenom_manifest_name = fileparse($plex_manifest_sequenom);
+    my $fluidigm_manifest_name = 'fluidigm_qc.tsv';
+    my $sequenom_manifest_name = 'sequenom_W30467.tsv';
     my $egt_name = fileparse($egt);
     my $expected_params = {
         'workflow' => 'Genotyping::Workflows::GenotypeZCall',
@@ -554,8 +641,10 @@ sub test_workflow_script_zcall: Test(16) {
                 'ztotal' => '3',
                 'manifest' => catfile($workdir, $manifest_name),
                 'plex_manifest' => [
-                    catfile($workdir, $fluidigm_manifest_name),
-                    catfile($workdir, $sequenom_manifest_name),
+                    catfile($workdir, 'plex_manifests',
+                            $fluidigm_manifest_name),
+                    catfile($workdir, 'plex_manifests',
+                            $sequenom_manifest_name),
                 ]
             }
         ]

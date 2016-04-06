@@ -1,7 +1,7 @@
 {
-    "irods_data_path": "/seq/sequenom",
+    "data_path": "/seq/sequenom",
     "platform": "sequenom",
-    "reference_name": "Homo_sapiens (1000Genomes)",
+    "reference_name": "Homo_sapiens (GRCh37_53)",
     "reference_path": "/seq/sequenom/multiplexes",
     "snpset_name": "W30467",
     "read_snpset_version": "1.0",

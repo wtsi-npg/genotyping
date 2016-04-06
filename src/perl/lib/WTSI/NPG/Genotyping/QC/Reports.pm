@@ -11,6 +11,7 @@ use warnings;
 use Carp;
 use Cwd qw/getcwd abs_path/;
 use File::Basename;
+use File::Slurp qw/read_file/;
 use JSON;
 use POSIX qw/strftime/;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig getDatabaseObject getSummaryStats meanSd median readQCNameArray readQCShortNameHash plateLabel/; 
@@ -336,14 +337,6 @@ sub readJson {
     return $ref;
 }
 
-sub readFileToString {
-    my $inPath = shift;
-    open my $in, "<", $inPath || croak "Cannot open input path $inPath";
-    my $string = join("", <$in>);
-    close $in || croak "Cannot close input path $inPath";
-    return $string;
-}
-
 sub textForDatasets {
     # text for dataset identification; includes optional directory name
     # fields: run project data_supplier snpset directory
@@ -539,7 +532,7 @@ sub writeSummaryLatex {
     open my $out, ">", $texPath || croak "Cannot open output path $texPath";
     print $out latexHeader($title, $author);
     print $out latexSectionInput($qcName, $dbPath);
-    print $out readFileToString($introPath); # new section = Preface
+    print $out read_file($introPath); # new section = Preface
     print $out latexSectionMetrics($config, $genderThresholdPath);
     print $out latexSectionResults($config, $qcDir, $resultPath, $idPath);
     print $out latexFooter();

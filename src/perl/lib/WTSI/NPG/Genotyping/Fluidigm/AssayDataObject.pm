@@ -5,13 +5,14 @@ use Data::Dump qw(dump);
 use Moose;
 use Try::Tiny;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 use WTSI::NPG::Genotyping::Fluidigm::AssayResultSet;
 
 our $VERSION = '';
 
-with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
-
 extends 'WTSI::NPG::iRODS::DataObject';
+
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Genotyping::Annotator';
 
 =head2 assay_resultset
 
@@ -36,12 +37,12 @@ sub update_secondary_metadata {
   my $fluidigm_barcode;
   my $well;
 
-  my $fluidigm_barcode_avu = $self->get_avu($self->fluidigm_plate_name_attr);
+  my $fluidigm_barcode_avu = $self->get_avu($FLUIDIGM_PLATE_NAME);
   if ($fluidigm_barcode_avu) {
     $fluidigm_barcode = $fluidigm_barcode_avu->{value};
   }
 
-  my $well_avu = $self->get_avu($self->fluidigm_plate_well_attr);
+  my $well_avu = $self->get_avu($FLUIDIGM_PLATE_WELL);
   if ($well_avu) {
     $well = $well_avu->{value};
   }

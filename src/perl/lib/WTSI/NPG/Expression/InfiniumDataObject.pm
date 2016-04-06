@@ -7,11 +7,13 @@ use Data::Dump qw(dump);
 use Moose;
 use Try::Tiny;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
 our $VERSION = '';
 
-with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
-
 extends 'WTSI::NPG::iRODS::DataObject';
+
+with 'WTSI::NPG::Annotator', 'WTSI::NPG::Expression::Annotator';
 
 sub update_secondary_metadata {
   my ($self, $ssdb) = @_;
@@ -20,17 +22,17 @@ sub update_secondary_metadata {
   my $well;
   my $sample_id;
 
-  my $plate_avu = $self->get_avu($self->expression_plate_name_attr);
+  my $plate_avu = $self->get_avu($EXPRESSION_PLATE_NAME);
   if ($plate_avu) {
     $plate = $plate_avu->{value};
   }
 
-  my $well_avu = $self->get_avu($self->expression_plate_well_attr);
+  my $well_avu = $self->get_avu($EXPRESSION_PLATE_WELL);
   if ($well_avu) {
     $well = $well_avu->{value};
   }
 
-  my $sample_id_avu = $self->get_avu($self->dcterms_identifier_attr);
+  my $sample_id_avu = $self->get_avu($DCTERMS_IDENTIFIER);
   if ($sample_id_avu) {
     $sample_id = $sample_id_avu->{value};
   }

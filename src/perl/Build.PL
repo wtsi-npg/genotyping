@@ -57,6 +57,8 @@ my $build = Build->new
                  'etc/states.ini'    => 'etc/states.ini' },
    conf_files => {'etc/log4perl.conf'            => 'etc/log4perl.conf',
                   'etc/qc_config.json'           => 'etc/qc_config.json',
+                  'etc/ready_qc_fluidigm.json'   => 'etc/ready_qc_fluidigm.json',
+                  'etc/ready_qc_sequenom.json'   => 'etc/ready_qc_sequenom.json',
                   'etc/illuminus_prefilter.json' => 'etc/illuminus_prefilter.json',
                   'etc/zcall_prefilter.json'  => 'etc/zcall_prefilter.json',
                   'etc/reportIntro.tex'       => 'etc/reportIntro.tex',

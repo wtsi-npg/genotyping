@@ -9,6 +9,7 @@ use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Genotyping::VCF::ReferenceFinder;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
 our $VERSION = '';
 
@@ -22,13 +23,27 @@ our $BATCH_QUERY_CHUNK_SIZE = 100;
 
 with 'WTSI::DNAP::Utilities::Loggable';
 
+requires 'platform_name'; # subclasses must implement this method
+
+has 'callset' =>
+  (is             => 'ro',
+   isa            => 'Str',
+   documentation  => 'Identifier for the callset read by the Subscriber; '.
+                     'used to disambiguate results from multiple subscribers',
+   lazy           => 1,
+   default        => sub {
+       my ($self) = @_;
+       return $self->platform_name().'_'.$self->snpset_name;
+   },
+);
+
 has 'data_path' =>
   (is            => 'ro',
    isa           => 'Str',
    required      => 1,
    default       => sub { return '/' },
    writer        => '_set_data_path',
-   documentation => 'The iRODS path under which the raw data are found');
+   documentation => 'The iRODS path under which the input data are found');
 
 has 'irods'      =>
   (is            => 'ro',
@@ -60,26 +75,66 @@ has 'repository' =>
    documentation  => 'Root directory containing NPG genome references',
 );
 
-has 'snpset' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::Genotyping::SNPSet',
-   required => 1,
-   builder  => '_build_snpset',
-   lazy     => 1,
-   init_arg => undef);
-
 has 'snpset_name' =>
   (is            => 'ro',
    isa           => 'Str',
    required      => 1,
    documentation => 'The name of the SNP set e.g. "W35961"');
 
-
-has 'snpset_version' =>
+has 'read_snpset_version' =>
   (is            => 'ro',
-   isa           => 'Str',
-   required      => 0,
-   documentation => 'SNP set version used for assay results');
+   isa           => 'Maybe[Str]',
+   documentation => 'SNP set version used to read assay results');
+
+has 'write_snpset_version' =>
+  (is            => 'ro',
+   isa           => 'Maybe[Str]',
+   lazy          => 1,
+   default       => sub {
+       my ($self) = @_;
+       return $self->read_snpset_version;
+   },
+   documentation => 'SNP set version used to write VCF output');
+
+# non-input attributes
+
+has 'read_snpset' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::SNPSet',
+   required => 1,
+   builder  => '_build_read_snpset',
+   lazy     => 1,
+   init_arg => undef,
+   documentation => 'SNPSet for plex results input');
+
+has 'write_snpset' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::Genotyping::SNPSet',
+   required => 1,
+   builder  => '_build_write_snpset',
+   lazy     => 1,
+   init_arg => undef,
+   documentation => 'SNPSet for VCF output');
+
+has 'read_snpset_data_object' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::DataObject',
+   required => 1,
+   builder  => '_build_read_snpset_data_object',
+   lazy     => 1,
+   init_arg => undef,
+   documentation => 'Data object to use for generating SNPSet '.
+                    'and chromosome lengths');
+
+has 'write_snpset_data_object' =>
+  (is       => 'ro',
+   isa      => 'WTSI::NPG::iRODS::DataObject',
+   required => 1,
+   builder  => '_build_write_snpset_data_object',
+   lazy     => 1,
+   init_arg => undef,
+   documentation => 'Data object to use for VCF output; may or may not '.
+                    'differ from input snpset data object');
 
 has '_chromosome_lengths' =>
   (is       => 'ro',
@@ -97,15 +152,6 @@ has '_plex_name_attr' =>
    init_arg      => undef,
    documentation => 'iRODS attribute for QC plex name; varies by plex type');
 
-has '_snpset_data_object' =>
-  (is       => 'ro',
-   isa      => 'WTSI::NPG::iRODS::DataObject',
-   required => 1,
-   builder  => '_build_snpset_data_object',
-   lazy     => 1,
-   init_arg => undef,
-   documentation => 'Data object to use for generating SNPSet '.
-                    'and chromosome lengths');
 
 sub BUILD {
   my ($self) = @_;
@@ -145,33 +191,12 @@ sub BUILD {
                       "' does not exist or is not a directory");
   }
 
-}
+  # ensure that snpset attributes are valid
+  # attributes are lazy; want to die at object creation time, not in a
+  # subsequent method call
+  my $read_data_obj = $self->read_snpset_data_object;
+  my $write_data_obj = $self->write_snpset_data_object;
 
-
-=head2 find_irods_snpset
-
-  Arg [1]    : Str reference path to search under
-  Arg [2]    : Str reference name in irods metadata
-  Arg [3]    : Str snpset name in irods metadata
-  Arg [4]    : Maybe[Str] snpset version in irods metadata
-  Example    : my $snpset = $sub->find_irods_snpset(@args);
-  Description: Method to query iRODS and find a snpset object. Optional
-               version string is used to find the correct SNPSet version for
-               VCF input/output.
-  Returntype : WTSI::NPG::Genotyping::SNPSet
-
-=cut
-
-sub find_irods_snpset {
-    my ($self, $ref_path, $ref_name, $snpset_name, $snpset_version) = @_;
-    unless ($ref_path && $ref_name && $snpset_name) {
-        $self->logcroak("Missing argument(s) to find_irods_snpset");
-    }
-    my $data_obj = $self->_find_snpset_data_object($ref_path,
-                                                   $ref_name,
-                                                   $snpset_name,
-                                                   $snpset_version);
-    return WTSI::NPG::Genotyping::SNPSet->new($data_obj);
 }
 
 
@@ -228,7 +253,7 @@ sub find_object_paths {
         my @id_obj_paths = $self->irods->find_objects_by_meta
             ($self->data_path,
              [$self->_plex_name_attr => $self->snpset_name],
-             [$self->dcterms_identifier_attr => \@ids, 'in'], @query_specs);
+             [$DCTERMS_IDENTIFIER => \@ids, 'in'], @query_specs);
         push @obj_paths, @id_obj_paths;
     }
     return @obj_paths;
@@ -257,7 +282,7 @@ sub find_resultsets_index {
             $resultsets_index{$sample_identifier} = [];
         }
         my @sample_resultsets = grep {
-            $_->data_object->get_avu($self->dcterms_identifier_attr,
+            $_->data_object->get_avu($DCTERMS_IDENTIFIER,
                                      $sample_identifier) } @{$resultsets};
         $self->debug("Found ", scalar @sample_resultsets, " resultsets for ",
                      "sample '$sample_identifier'");
@@ -289,6 +314,7 @@ sub find_resultsets_index {
 sub vcf_metadata_from_irods {
     my ($self, $data_objects) = @_;
     my %vcf_meta;
+    $vcf_meta{'callset_name'} = [$self->callset, ];
     foreach my $obj (@{$data_objects}) { # check iRODS metadata
         my @obj_meta = @{$obj->metadata};
         foreach my $pair (@obj_meta) {
@@ -326,11 +352,11 @@ sub _are_unique {
 
 sub _build_chromosome_lengths {
     my ($self) = @_;
-    my $snp_obj = $self->_snpset_data_object;
+    my $snp_obj = $self->read_snpset_data_object;
     my $chromosome_lengths;
     my @avus = $snp_obj->find_in_metadata($CHROMOSOME_JSON_ATTR);
     if (scalar(@avus)==0) {
-        $self->logwarn("No value found for snpset attribute ",
+        $self->logwarn("Snpset iRODS data object has no value for attribute ",
                       "$CHROMOSOME_JSON_ATTR, returning undef");
     } elsif (scalar(@avus)==1) {
         my %avu = %{ shift(@avus) };
@@ -345,20 +371,44 @@ sub _build_chromosome_lengths {
     return $chromosome_lengths;
 }
 
-sub _build_snpset {
+sub _build_read_snpset {
     my ($self) = @_;
-    return WTSI::NPG::Genotyping::SNPSet->new($self->_snpset_data_object);
-
+    return WTSI::NPG::Genotyping::SNPSet->new(
+        $self->read_snpset_data_object);
 }
 
-sub _build_snpset_data_object {
+sub _build_write_snpset {
+    my ($self) = @_;
+    return WTSI::NPG::Genotyping::SNPSet->new(
+        $self->write_snpset_data_object);
+}
+
+sub _build_read_snpset_data_object {
    my ($self) = @_;
    return $self->_find_snpset_data_object(
        $self->reference_path,
        $self->reference_name,
        $self->snpset_name,
-       $self->snpset_version
+       $self->read_snpset_version
    );
+}
+
+sub _build_write_snpset_data_object {
+   my ($self) = @_;
+   my $write_data_obj;
+   if (defined($self->read_snpset_version) &&
+           defined($self->write_snpset_version) &&
+           $self->read_snpset_version ne $self->write_snpset_version) {
+       $write_data_obj = $self->_find_snpset_data_object(
+           $self->reference_path,
+           $self->reference_name,
+           $self->snpset_name,
+           $self->write_snpset_version
+       );
+   } else {
+       $write_data_obj = $self->read_snpset_data_object;
+   }
+   return $write_data_obj;
 }
 
 sub _find_snpset_data_object {
@@ -397,7 +447,6 @@ sub _find_snpset_data_object {
     return WTSI::NPG::iRODS::DataObject->new($self->irods, $path);
 }
 
-
 no Moose;
 
 1;
@@ -419,7 +468,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
