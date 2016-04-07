@@ -438,6 +438,9 @@ t/publisher.t
 t/publisher/lorem.txt
 t/publisher/update/lorem.txt
 t/qc/.gitattributes
+t/qc/check/identity/combined_identity_expected.json
+t/qc/check/identity/expected_identity_results.json
+t/qc/check/identity/expected_omit_results.json
 t/qc/check/identity/fake_genotyping.db
 t/qc/check/identity/fake_qc_genotypes.bed
 t/qc/check/identity/fake_qc_genotypes.bim
@@ -449,6 +452,9 @@ t/qc/check/identity/fake_swap_genotypes.bim
 t/qc/check/identity/fake_swap_genotypes.fam
 t/qc/check/identity/fake_swap_genotypes.map
 t/qc/check/identity/fake_swap_genotypes.ped
+t/qc/check/identity/identity_script_output.csv
+t/qc/check/identity/identity_script_output.json
+t/qc/check/identity/identity_script_output_alternate_prior.json
 t/qc/check/identity/qc_plex_calls.vcf
 t/qc/check/identity/qc_plex_calls_1.vcf
 t/qc/check/identity/qc_plex_calls_2.vcf
