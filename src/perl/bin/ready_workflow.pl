@@ -32,6 +32,8 @@ our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
 our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
 our $MODULE_ZCALL = 'Genotyping::Workflows::GenotypeZCall';
+our $ILLUMINUS = 'illuminus';
+our $ZCALL = 'zcall';
 
 our $DEFAULT_HOST = 'farm3-head2';
 our $DEFAULT_CHUNK_SIZE_SNP = 4000;
@@ -146,6 +148,12 @@ sub run {
     } elsif (! -e $manifest) {
         $log->logcroak("--manifest argument '", $manifest,
                        "' does not exist");
+    }
+    if (!$workflow) {
+        $log->logcroak("--workflow argument is required");
+    } elsif (!($workflow eq $ILLUMINUS || $workflow eq $ZCALL)) {
+        $log->logcroak("Invalid workflow argument; must be '",
+                       $ILLUMINUS, "' or '", $ZCALL, "'");
     }
     if (defined($egt) && !(-e $egt)) {
         $log->logcroak("--egt argument '", $egt, "' does not exist");
@@ -291,10 +299,10 @@ sub write_workflow_yml {
         'vcf' => $vcf,
     );
     my $workflow_module;
-    if ($workflow eq 'illuminus') {
+    if ($workflow eq $ILLUMINUS) {
         $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
-    } elsif ($workflow eq 'zcall') {
+    } elsif ($workflow eq $ZCALL) {
         if (!($egt && $zstart && $ztotal)) {
             $log->logcroak("Must specify EGT, zstart, and ztotal for ",
                            "zcall workflow");
@@ -308,7 +316,7 @@ sub write_workflow_yml {
         }
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
-                       "'; must be one of illuminus, zcall");
+                       "'; must be one of $ILLUMINUS, $ZCALL");
     }
     my @args = ($dbpath, $run, $workdir, \%workflow_args);
     my %params = (
@@ -357,8 +365,8 @@ Options:
                   analysis directory less self-contained.
   --verbose       Print messages while processing. Optional.
   --workdir       Working directory for pipeline run. Required.
-  --workflow      Pipeline workflow for which to create a .yml file. If
-                  supplied, must be 'illuminus' or 'zcall'.
+  --workflow      Pipeline workflow for which to create a .yml file.
+                  Required; must be 'illuminus' or 'zcall'.
                   If absent, only config.yml will be generated.
   --zstart        Start of zscore range, used for zCall only. Default = 7.
   --ztotal        Number of zscores in range, for zCall only. Default = 1.
