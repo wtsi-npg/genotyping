@@ -32,6 +32,8 @@ our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
 our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
 our $MODULE_ZCALL = 'Genotyping::Workflows::GenotypeZCall';
+our $ILLUMINUS = 'illuminus';
+our $ZCALL = 'zcall';
 
 our $DEFAULT_HOST = 'farm3-head2';
 our $DEFAULT_CHUNK_SIZE_SNP = 4000;
@@ -48,7 +50,7 @@ chomp($uid);
 my $session_log = user_session_log($uid, 'ready_workflow');
 
 my $embedded_conf = "
-   log4perl.logger.npg.ready_workflow = ERROR, A1, A2
+   log4perl.logger.npg.genotyping.ready_workflow = ERROR, A1, A2
 
    log4perl.appender.A1           = Log::Log4perl::Appender::Screen
    log4perl.appender.A1.utf8      = 1
@@ -102,7 +104,7 @@ sub run {
 	       'zstart=i'        => \$zstart,
 	       'ztotal=i'        => \$ztotal,
                'logconf=s'       => \$log4perl_config,
-               'debug=s'         => \$debug,
+               'debug'           => \$debug,
 	       'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
 	);
 
@@ -146,6 +148,12 @@ sub run {
     } elsif (! -e $manifest) {
         $log->logcroak("--manifest argument '", $manifest,
                        "' does not exist");
+    }
+    if (!$workflow) {
+        $log->logcroak("--workflow argument is required");
+    } elsif (!($workflow eq $ILLUMINUS || $workflow eq $ZCALL)) {
+        $log->logcroak("Invalid workflow argument; must be '",
+                       $ILLUMINUS, "' or '", $ZCALL, "'");
     }
     if (defined($egt) && !(-e $egt)) {
         $log->logcroak("--egt argument '", $egt, "' does not exist");
@@ -233,7 +241,7 @@ sub make_working_directory {
     my ($workdir) = @_;
     if (-e $workdir) {
         if (-d $workdir) {
-            $log->info("Directory '", $workdir, "' already exists");
+            $log->info("Working directory '", $workdir, "' already exists");
         } else {
             $log->logcroak("--workdir argument '", $workdir,
                            "' exists and is not a directory");
@@ -241,6 +249,7 @@ sub make_working_directory {
     } else {
         mkdir $workdir || $log->logcroak("Cannot create directory '",
                                          $workdir, "'");
+        $log->info("Created working directory '", $workdir, "'");
     }
     # create subdirectories
     my @names = ('in', 'pass', 'fail', $VCF_SUBDIRECTORY,
@@ -249,7 +258,7 @@ sub make_working_directory {
         my $subdir = catfile($workdir, $name);
         if (-e $subdir) {
             if (-d $subdir) {
-                $log->info("Subdirectory '", $subdir, "' already exists");
+                $log->debug("Subdirectory '", $subdir, "' already exists");
             } else {
                 $log->logcroak("Expected subdirectory path '", $subdir,
                                "' exists and is not a directory");
@@ -257,7 +266,7 @@ sub make_working_directory {
         } else {
             mkdir($subdir) || $log->logcroak("Cannot create subdirectory '",
                                              $subdir, "'");
-            $log->info("Created subdirectory '", $subdir, "'");
+            $log->debug("Created subdirectory '", $subdir, "'");
         }
     }
 }
@@ -274,6 +283,7 @@ sub write_config_yml {
 	'max_processes' => '250'
     );
     my $config_path = catfile($workdir, 'config.yml');
+    $log->info("Wrote config YML to '", $config_path, "'");
     DumpFile($config_path, (\%config));
     return $config_path;
 }
@@ -289,10 +299,10 @@ sub write_workflow_yml {
         'vcf' => $vcf,
     );
     my $workflow_module;
-    if ($workflow eq 'illuminus') {
+    if ($workflow eq $ILLUMINUS) {
         $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
-    } elsif ($workflow eq 'zcall') {
+    } elsif ($workflow eq $ZCALL) {
         if (!($egt && $zstart && $ztotal)) {
             $log->logcroak("Must specify EGT, zstart, and ztotal for ",
                            "zcall workflow");
@@ -306,7 +316,7 @@ sub write_workflow_yml {
         }
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
-                       "'; must be one of illuminus, zcall");
+                       "'; must be one of $ILLUMINUS, $ZCALL");
     }
     my @args = ($dbpath, $run, $workdir, \%workflow_args);
     my %params = (
@@ -315,6 +325,7 @@ sub write_workflow_yml {
 	'arguments' => \@args,
     );
     my $out = catfile($workdir, "in", "genotype_".$workflow.".yml");
+    $log->info("Wrote workflow YML to '", $out, "'");
     DumpFile($out, (\%params));
 }
 
@@ -354,8 +365,8 @@ Options:
                   analysis directory less self-contained.
   --verbose       Print messages while processing. Optional.
   --workdir       Working directory for pipeline run. Required.
-  --workflow      Pipeline workflow for which to create a .yml file. If
-                  supplied, must be one of: illuminus, genosnp, zcall.
+  --workflow      Pipeline workflow for which to create a .yml file.
+                  Required; must be 'illuminus' or 'zcall'.
                   If absent, only config.yml will be generated.
   --zstart        Start of zscore range, used for zCall only. Default = 7.
   --ztotal        Number of zscores in range, for zCall only. Default = 1.

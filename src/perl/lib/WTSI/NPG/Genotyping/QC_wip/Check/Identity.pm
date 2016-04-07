@@ -41,9 +41,7 @@ has 'swap_threshold' =>
 
 has 'pass_threshold' =>
   (is            => 'ro',
-   isa           => 'Num',
-   required      => 1,
-   default       => 0.85,
+   isa           => 'Maybe[Num]',
    documentation => 'Minimum identity for metric pass');
 
 # Bayesian model parameters, for SampleIdentityBayseian object
@@ -68,7 +66,6 @@ has 'sample_mismatch_prior' => # SMP
 has 'ecp_default' =>
     (is       => 'ro',
      isa      => 'Maybe[Num]',
-     default => 0.40625, # het 50%, maf 25%
      documentation => 'Default probability of equivalent calls for a '.
          'given SNP on distinct samples',
     );
@@ -141,18 +138,13 @@ sub find_identity {
     # now construct empty results for any samples missing from QC data
     # by convention, these are appended at the end of the results array
     $self->debug("Inserting empty results for missing samples");
+    my $smp = $self->sample_mismatch_prior;
     foreach my $sample_name (@{$self->sample_names}) {
         if ($missing{$sample_name}) {
-            my $calls_p = $self->production_calls->{$sample_name};
+            my $args = $self->_get_sample_args($sample_name);
             my $result =
                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
-                      new(
-                          sample_name      => $sample_name,
-                          snpset           => $self->snpset,
-                          production_calls => $calls_p,
-                          qc_calls         => [],
-                          pass_threshold   => $self->pass_threshold,
-                      );
+                      new($args);
             push @id_results, $result;
         }
       }
@@ -488,6 +480,8 @@ sub _results_to_json_spec {
     $summary{'assayed_pass_rate'} = sprintf "%.4f", $pass_rate;
     # get params (may be using default values from sample ID object)
     my $result = $identity_results->[0];
+    my $pass_threshold = $self->pass_threshold ||
+        $result->pass_threshold;
     my $ecp = $self->equivalent_calls_probability ||
         $result->equivalent_calls_probability;
     my $xer = $self->expected_error_rate ||
@@ -508,7 +502,7 @@ sub _results_to_json_spec {
     $spec{'swap'} = $swap_evaluation;
     $spec{'summary'} = \%summary; # id total/failed/missing
     $spec{'params'} = {
-        pass_threshold => $self->pass_threshold,
+        pass_threshold => $pass_threshold,
         swap_threshold => $self->swap_threshold,
         equivalent_calls_probability => $ecp,
         consensus_ecp => $consensus_ecp,
@@ -539,19 +533,23 @@ sub _get_failed_results {
   return \@failed;
 }
 
-# get arguments to construct a SampleIdentityBayesian object
-
 sub _get_sample_args {
+    # get arguments to construct a SampleIdentityBayesian object
+    # QC calls may be omitted, eg. for a sample missing from QC data
     my ($self, $sample_name, $qc_calls) = @_;
+    $qc_calls ||= [];
     my $production_calls = $self->production_calls->{$sample_name};
     my %args = (
-        logger           => $self->logger,
-        sample_name      => $sample_name,
-        snpset           => $self->snpset,
-        production_calls => $production_calls,
-        qc_calls         => $qc_calls,
-        pass_threshold   => $self->pass_threshold,
+        logger                => $self->logger,
+        sample_name           => $sample_name,
+        snpset                => $self->snpset,
+        production_calls      => $production_calls,
+        qc_calls              => $qc_calls
     );
+    # update with optional attributes (if any)
+    if (defined($self->pass_threshold)) {
+        $args{'pass_threshold'} = $self->pass_threshold;
+    }
     if (defined($self->equivalent_calls_probability)) {
         $args{'equivalent_calls_probability'} =
             $self->equivalent_calls_probability;
@@ -567,6 +565,7 @@ sub _get_sample_args {
     }
     return \%args;
 }
+
 
 no Moose;
 
