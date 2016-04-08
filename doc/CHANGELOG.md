@@ -11,6 +11,27 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
+
+Release 1.12.0: 2016-04-07
+--------------------------
+
+Added:
+- New ready_workflow.pl script to query iRODS for QC plex data, write VCF,
+generate config YML, and set up an analysis directory
+- Ruby workflows can read multiple VCF and plex manifest paths from
+YML, and input them to the quality_control pipeline task
+- Revised default pass threshold for Bayesian identity check
+
+Removed:
+- genotyping_yml.pl and tests; functionality replaced by ready_workflow.pl
+- Annotation modules exporting constants for irods metadata; constants have
+been relocated to Metadata.pm in wtsi-npg/perl-irods-wrap
+
+Fixed:
+- Refactored run_qc.pl for better handling of command-line arguments
+- Updated for compatibility with latest dependency versions
+
+
 Release 1.11.6: 2016-02-08
 --------------------------
 
@@ -18,6 +39,7 @@ Fixed:
 - Bug in WTSI::NPG::Expression::Publisher where it used a query against
 the SequenceScape warehouse that was not specific enough to allow it
 to proceed when a sample had been analysed more than once.
+
 
 Release 1.11.5: 2015-12-15
 --------------------------
@@ -34,12 +56,14 @@ Added:
 - Find genome reference path from iRODS metadata for VCF header; adds
   dependency on wtsi-npg/npg_tracking
 
+
 Release 1.11.4: 2015-10-09
 --------------------------
 
 Fixed:
 - Bug in publish_infinium_genotypes.pl which caused it to exit when it
   detected bad or missing data. It now detects these files and skips them.
+
 
 Release 1.11.3: 2015-09-18
 --------------------------
@@ -52,6 +76,7 @@ Fixed:
 
 Changed:
 - bcftools version upgraded to 1.2
+
 
 Release 1.11.2: 2015-08-24
 --------------------------

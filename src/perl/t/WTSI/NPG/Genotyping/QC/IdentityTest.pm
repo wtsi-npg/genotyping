@@ -1,20 +1,21 @@
 use utf8;
 
-package WTSI::NPG::Genotyping::IdentityTest;
+package WTSI::NPG::Genotyping::QC::IdentityTest;
 
 use strict;
 use warnings;
+use File::Slurp qw(read_file);
 use File::Temp qw(tempdir);
 use JSON;
 use Log::Log4perl;
 use Log::Log4perl::Level;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 28;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC::Identity;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw/readFileToString defaultJsonConfig/;
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw/defaultJsonConfig/;
 use WTSI::NPG::Genotyping::QC::SnpID qw/convertFromIlluminaExomeSNP convertToIlluminaExomeSNP/;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -40,7 +41,7 @@ my $iniPath = $ENV{HOME} . "/.npg/genotyping.ini";
 sub setup : Test(setup) {
     $workdir = tempdir("identity_test_XXXXXX", CLEANUP => 1);
     $jsonOutPath = $workdir.'/'.$jsonName;
-    $jsonRef = decode_json(readFileToString($dataDir.'/'.$jsonName));
+    $jsonRef = decode_json(read_file($dataDir.'/'.$jsonName));
 }
 
 sub teardown : Test(teardown) {
@@ -101,8 +102,8 @@ sub test_insufficient_snps : Test(2) {
     )->run_identity_check();
     ok(-e $jsonOutPath, "JSON output exists for insufficient SNPs");
     my $failJson = $dataDir.'/identity_check_fail.json';
-    my $failDataRef = decode_json(readFileToString($failJson));
-    my $jsonOut = decode_json(readFileToString($jsonOutPath));
+    my $failDataRef = decode_json(read_file($failJson));
+    my $jsonOut = decode_json(read_file($jsonOutPath));
     is_deeply($jsonOut, $failDataRef, "JSON output is equivalent to reference");
 }
 
@@ -136,7 +137,7 @@ sub validate_outputs {
     # check for output files and validate contents of JSON
     # expects output files for the 'standard' test dataset and parameters
     ok(-e $jsonOutPath, "JSON output exists");
-    my $jsonOut = decode_json(readFileToString($jsonOutPath));
+    my $jsonOut = decode_json(read_file($jsonOutPath));
     is_deeply($jsonOut, $jsonRef, "JSON output is equivalent to reference");
     ok(-e $workdir.'/'.$textName, "Text summary exists");
     ok(-e $workdir.'/'.$failPairsName, "Failed pairs comparison exists");

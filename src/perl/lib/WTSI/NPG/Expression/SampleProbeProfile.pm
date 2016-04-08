@@ -8,8 +8,7 @@ use WTSI::NPG::Utilities qw(trim);
 
 our $VERSION = '';
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation',
-  'WTSI::NPG::iRODS::Storable';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 our $NORMALISATION_HEADER_PROPERTY = 'Normalization';
 

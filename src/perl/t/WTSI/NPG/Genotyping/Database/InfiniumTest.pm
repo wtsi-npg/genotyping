@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::Database::InfiniumTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 13;
 use Test::Exception;
 

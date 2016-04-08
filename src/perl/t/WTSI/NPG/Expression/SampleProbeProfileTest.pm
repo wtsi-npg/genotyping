@@ -3,9 +3,9 @@ package WTSI::NPG::Expression::SampleProbeProfileTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
-use Test::More tests => 16;
+use Test::More tests => 15;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -28,7 +28,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Expression::SampleProbeProfile');
 }
 
-sub constructor : Test(4) {
+sub constructor : Test(3) {
   new_ok('WTSI::NPG::Expression::SampleProbeProfile',
          [file_name => "$data_path/$no_norm_file"]);
 

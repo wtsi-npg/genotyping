@@ -54,7 +54,7 @@ use strict;
 use warnings;
 use DateTime;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 86;
 use Test::Exception;
 
@@ -99,7 +99,6 @@ sub make_fixture : Test(setup) {
 sub teardown : Test(teardown) {
   my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
-
   undef $resultset;
 }
 
@@ -453,7 +452,8 @@ sub test_metadata {
     ok($data_object->get_avu('dcterms:modified'), 'Has dcterms:modified');
   }
   else {
-    ok(!$data_object->get_avu('dcterms:modified'), 'Has no dcterms:modified');
+    my @exists = $data_object->find_in_metadata('dcterms:modified');
+    ok(scalar(@exists)==0, 'Has no dcterms:modified');
   }
 
   foreach my $avu (@$expected_metadata) {

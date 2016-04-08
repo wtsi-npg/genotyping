@@ -6,7 +6,7 @@ package WTSI::NPG::Database::WarehouseTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Test::More tests => 439;
 use Test::Exception;
 

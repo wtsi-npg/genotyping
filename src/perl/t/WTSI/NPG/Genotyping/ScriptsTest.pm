@@ -10,13 +10,14 @@ use File::Temp qw(tempdir);
 use Log::Log4perl;
 use JSON;
 
-use base qw(Test::Class);
-use Test::More tests => 33;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 32;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
 
-Log::Log4perl::init('./etc/log4perl_tests.conf');
+my $logconf = './etc/log4perl_tests.conf';
+Log::Log4perl::init($logconf);
 
 our $PUBLISH_SNPSET              = './bin/publish_snpset.pl';
 our $PUBLISH_FLUIDIGM_GENOTYPES  = './bin/publish_fluidigm_genotypes.pl';
@@ -60,6 +61,7 @@ sub test_publish_snpset : Test(1) {
 
   ok(system(join q{ }, "$PUBLISH_SNPSET",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "--reference-name '$reference_name'",
             "--snpset-name $snpset_name",
             "--snpset-platform $snpset_platform",
@@ -76,10 +78,11 @@ sub test_publish_fluidigm_genotypes : Test(2) {
 
   ok(system(join q{ }, "$PUBLISH_SNPSET",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "--reference-name '$reference_name'",
             "--snpset-name $snpset_name",
             "--snpset-platform $snpset_platform",
-            "--source $snpset_file") == 0, 'Published SNPSet');
+            "--source $snpset_file") == 0, 'Published SNPSet for Fluidigm');
 
   # Includes a directory with a missing CSV file to check that the
   # script exits successfully when ths happens.
@@ -87,6 +90,7 @@ sub test_publish_fluidigm_genotypes : Test(2) {
             "--days-ago 0",
             "--days 1000000",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "--reference-path $irods_tmp_coll",
             "--source $raw_data_path",
             "2>/dev/null") == 0,
@@ -103,15 +107,18 @@ sub test_publish_infinium_genotypes : Test(3) {
             "--days 1",
             "--project foo",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "2>/dev/null") != 0, '--project conflicts with --days');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--days-ago 0",
             "--days 0",
+            "--logconf $logconf",
             "2>/dev/null") != 0, 'Requires --dest');
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 }
@@ -155,6 +162,7 @@ sub test_query_project_samples : Test(2) {
   ok(system(join q{ }, "$QUERY_PROJECT_SAMPLES",
             "--project coreex_bbgahs",
             "--limit 2",
+            "--logconf $logconf",
             "--header",
             "--root $irods_tmp_coll",
             "--out $outpath") == 0,
@@ -182,6 +190,7 @@ sub test_update_infinium_metadata : Test(2) {
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $irods_tmp_coll",
+            "--logconf $logconf",
             "- < $raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 
@@ -212,6 +221,7 @@ sub test_publish_infinium_analysis : Test(7) {
 
   ok(system(join q{ }, "$PUBLISH_INFINIUM_GENOTYPES",
             "--dest $archive_coll",
+            "--logconf $logconf",
             "-", "<", "$raw_data_list") == 0,
      'Published Infinium genotypes from a file list');
 
@@ -221,8 +231,7 @@ sub test_publish_infinium_analysis : Test(7) {
   ok(system("$READY_PIPE --dbfile $dbfile") == 0);
 
   ok(system(join q{ }, "$READY_INFINIUM",
-            "--dbfile $dbfile",
-            "--run $run",
+            "--dbfile $dbfile",            "--run $run",
             "--supplier $supplier",
             "--project '$project'") == 0, 'Ready infinium');
 
@@ -245,6 +254,7 @@ sub test_publish_infinium_analysis : Test(7) {
             "--dbfile $dbfile",
             "--source $analysis_path",
             "--dest $analysis_coll",
+            "--logconf $logconf",
             "--archive $archive_coll",
             "--run $run") == 0, 'Published analysis');
 }
@@ -257,7 +267,7 @@ sub test_ready_pipe : Test(2) {
   ok(-e "$dbfile");
 }
 
-sub test_ready_infinium : Test(8) {
+sub test_ready_infinium : Test(7) {
   my $tmpdir = tempdir(CLEANUP => 1);
   my $dbfile = "$tmpdir/test_ready_infinium.db";
 
@@ -330,6 +340,7 @@ sub test_publish_expression_analysis : Test(1) {
             "--sample-source $idat_path",
             "--analysis-dest $analysis_coll",
             "--sample-dest $archive_coll",
+            "--logconf $logconf",
             "--manifest $manifest_path/hipsci_12samples_2014-02-12.txt",
             "2>/dev/null") == 0, 'Published expression analysis');
 }
@@ -347,10 +358,12 @@ sub test_update_expression_metadata : Test(2) {
             "--sample-source $idat_path",
             "--analysis-dest $analysis_coll",
             "--sample-dest $archive_coll",
+            "--logconf $logconf",
             "--manifest $manifest_path/hipsci_12samples_2014-02-12.txt",
             "2>/dev/null") == 0, 'Published expression analysis');
 
   ok(system(join q{ }, "$UPDATE_EXPRESSION_METADATA",
+            "--logconf $logconf",
             "--dest $irods_tmp_coll") == 0, 'Updated expression metadata');
 }
 

@@ -46,8 +46,10 @@ has 'qc_calls' =>
 has 'pass_threshold' =>
     (is       => 'ro',
      isa      => 'Num',
-     required => 1,
-     default  => 0.85);
+     lazy     => 1,
+     builder  => '_build_pass_threshold',
+     documentation  => 'Minimum identity for sample pass. Defaults to '.
+         '(1 - prior probability of sample mismatch).');
 
 # Bayesian model parameters
 
@@ -67,11 +69,10 @@ has 'expected_error_rate' => # XER
          'probability of non-equivalent calls on identical samples');
 
 has 'sample_mismatch_prior' => # SMP
-   (is            => 'ro',
-    isa           => 'Num',
-    default       => 0.01,
-    documentation => 'Prior probability of a non-identical sample');
-
+    (is            => 'ro',
+     isa           => 'Num',
+     default       => 0.01,
+     documentation => 'Prior probability of a non-identical sample');
 
 has 'ecp_default' =>
     (is       => 'ro',
@@ -476,6 +477,11 @@ sub _build_ecp {
         $ecp{$snp->name} = $self->ecp_default;
     }
     return \%ecp;
+}
+
+sub _build_pass_threshold {
+    my ($self) = @_;
+    return 1 - $self->sample_mismatch_prior;
 }
 
 sub _build_total_equivalent_calls {

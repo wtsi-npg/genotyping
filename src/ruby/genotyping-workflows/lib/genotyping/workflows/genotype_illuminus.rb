@@ -1,6 +1,6 @@
 #-- encoding: UTF-8
 #
-# Copyright (c) 2012, 2015 Genome Research Ltd. All rights reserved.
+# Copyright (c) 2012, 2015, 2016 Genome Research Ltd. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,14 +41,14 @@ GenotypeIlluminus args
 
 Arguments:
 
-- db_file (String): The SQLite pipeline database file.
-- run_name (String): The name of a pipeline run defined in the pipeline database.
-- work_dir (String): The working directory, an absolute path.
+- db_file <String>: The SQLite pipeline database file.
+- run_name <String>: The name of a pipeline run defined in the pipeline database.
+- work_dir <String>: The working directory, an absolute path.
 - other arguments (keys and values):
 
     - config: <path> of custom pipeline database .ini file. Optional.
     - manifest: <path> of the chip manifest file. Required.
-    - plex_manifest: <path> of the qc plex manifest file. Required.
+    - plex_manifest: <Array> containing paths to one or more qc plex manifest files. Required.
     - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
@@ -62,8 +62,8 @@ Arguments:
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
     - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
-    - vcf: <path> Path to VCF file for identity QC
-    - plex_manifest: <path> Path to plex manifest file for identity QC
+    - vcf: <Array> containing paths to one or more VCF files for identity QC
+    - plex_manifest: <Array> containing paths to one or more plex manifest files for identity QC
 
 e.g.
 
@@ -76,8 +76,12 @@ e.g.
      - config: /work/my_project/pipeline/pipedb.ini
        queue: small
        manifest: /genotyping/manifests/Human670-QuadCustom_v1_A.bpm.csv
-       vcf: /work/my_project/qc_calls.vcf
-       plex_manifest: /genotyping/manifests/qc.tsv
+       vcf:
+           - /work/my_project/qc_calls_foo.vcf
+           - /work/my_project/qc_calls_bar.vcf
+       plex_manifest:
+           -/genotyping/manifests/qc_foo.tsv
+           -/genotyping/manifests/qc_bar.tsv
 
 Returns:
 
@@ -106,7 +110,7 @@ Returns:
       gtconfig = args.delete(:config)
       fconfig = args.delete(:filterconfig) || nil
       nofilter = args.delete(:nofilter) || nil
-      vcf = args.delete(:vcf) || nil
+      vcf = args.delete(:vcf) || Array.new()
 
       args.delete(:memory)
       args.delete(:queue)
@@ -121,7 +125,7 @@ Returns:
               :log_dir => log_dir}.merge(args)
       maybe_version_log(log_dir)
 
-      run_name = run_name.to_s;
+      run_name = run_name.to_s
       gcsjname = run_name + '.gencall.sample.json'
       sjname = run_name + '.illuminus.sample.json'
       njname = run_name + '.snp.json'
@@ -143,19 +147,19 @@ Returns:
         gcquality = true
       else
         ## run gencall QC to apply gencall CR filter and find genders
-        gcqcargs = {:run => run_name, 
-                    :plex_manifest => plex_manifest}.merge(args)
+        gcqcargs = {:run => run_name}.merge(args)
         if fconfig
           gcqcargs = {:filter => fconfig}.merge(gcqcargs)
         else
           gcqcargs = {:illuminus_filter => true}.merge(gcqcargs)
         end
-        if vcf and plex_manifest
-          gcqcargs = {
-            :vcf => vcf,
-            :plex_manifest => plex_manifest,
-            :sample_json => gcsjson
-          }.merge(gcqcargs)
+        if (not vcf.empty?) and (not plex_manifest.empty?)
+          # use comma-separated lists of VCF/plex files in QC args
+          gcqcargs = gcqcargs.merge({
+              :vcf => vcf.join(","),
+              :plex_manifest => plex_manifest.join(","),
+              :sample_json => gcsjson
+          }) # overwrites original values in gcqcargs
         end
 
         gcqcdir = File.join(work_dir, 'gencall_qc')
@@ -207,12 +211,13 @@ Returns:
         :run => run_name,
         :sim => smfile
       }.merge(args)
-      if vcf and plex_manifest
-        qcargs = {
-          :vcf => vcf,
-          :plex_manifest => plex_manifest,
+      if (not vcf.empty?) and (not plex_manifest.empty?)
+        # use comma-separated lists of VCF/plex files in QC args
+        qcargs = qcargs.merge({
+          :vcf => vcf.join(","),
+          :plex_manifest => plex_manifest.join(","),
           :sample_json => sjson
-        }.merge(qcargs)
+        }) # overwrites original values in qcargs
       end
 
       ilquality = quality_control(dbfile, ilfile, output, qcargs, async)

@@ -6,10 +6,10 @@ use List::AllUtils qw(uniq);
 use Moose;
 use Text::CSV;
 
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 use WTSI::NPG::Genotyping::Sequenom::AssayResult;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable',
-  'WTSI::NPG::Genotyping::Annotation';
+with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::iRODS::Storable';
 
 our $VERSION = '';
 
@@ -83,7 +83,7 @@ sub snpset_name {
                       "' is not in iRODS");
 
   my @snpset_names = $self->data_object->find_in_metadata
-    ($self->sequenom_plex_name_attr);
+    ($SEQUENOM_PLEX_NAME);
   my $num_names = scalar @snpset_names;
 
   $num_names > 0 or

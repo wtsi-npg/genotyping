@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::Sequenom::PublisherTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::Sequenom::PublisherTest->runtests;

@@ -8,8 +8,8 @@ use File::Slurp qw(read_file);
 use JSON;
 use List::AllUtils qw(each_array);
 
-use base qw(Test::Class);
-use Test::More tests => 51;
+use base qw(WTSI::NPG::Test);
+use Test::More tests => 57;
 use Test::Exception;
 
 use plink_binary;
@@ -31,6 +31,7 @@ my $expected_json_path = "$data_path/expected_identity_results.json";
 my $expected_all_json_path = "$data_path/combined_identity_expected.json";
 my $expected_omit_path = "$data_path/expected_omit_results.json";
 my $pass_threshold = 0.9;
+my $sample_mismatch_prior = 0.01,
 my $snp_threshold = 8;
 
 # sample names with fake QC data
@@ -255,10 +256,9 @@ sub sample_swap_evaluation : Test(14) {
     }
 }
 
-sub script : Test(7) {
+sub script : Test(13) {
     # test of command-line script
     # Could move this into Scripts.pm (which is slow to run, ~10 minutes)
-
     my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
     my $tempdir = tempdir("IdentityTest.script.$pid.XXXXXX", CLEANUP => 1);
     my $jsonPath = "$tempdir/identity.json";
@@ -266,6 +266,8 @@ sub script : Test(7) {
     my $plexDir = "/nfs/srpipe_references/genotypes";
     my $plexFile = "$plexDir/W30467_snp_set_info_1000Genomes.tsv";
     my $refPath = "$data_path/identity_script_output.json";
+    my $refPathAlternate =
+        "$data_path/identity_script_output_alternate_prior.json";
     my $expectedCsvPath = "$data_path/identity_script_output.csv";
     my $sampleJson = "$data_path/fake_sample.json";
 
@@ -301,15 +303,34 @@ sub script : Test(7) {
               "--plink $data_path/fake_qc_genotypes",
               "--json $jsonPath",
               "--csv $csvPath",
-              "--plex $plexFile1",
-              "--plex $plexFile2",
+              "--plex ".$plexFile1.",".$plexFile2,
               "--sample_json $sampleJson",
-              "--vcf $vcf1",
-              "--vcf $vcf2",
+              "--vcf ".$vcf1.","."$vcf2",
           ) == 0, 'Script identity check');
+    ok(-e $jsonPath, "JSON output written by script, 2 inputs");
+    ok(-e $csvPath, "CSV output written by script, 2 inputs");
     $outData = from_json(read_file($jsonPath));
     is_deeply($outData, $refData,
               "Script JSON output matches reference file, 2 inputs");
+
+    # test with alternate prior as a command line argument
+    $jsonPath = "$tempdir/identity_3.json";
+    $csvPath = "$tempdir/identity_3.csv";
+    ok(system(join q{ }, "$identity_script_wip",
+              "--plink $data_path/fake_qc_genotypes",
+              "--json $jsonPath",
+              "--csv $csvPath",
+              "--plex $plexFile",
+              "--sample_json $sampleJson",
+              "--vcf $data_path/qc_plex_calls.vcf",
+              "--prior 0.1"
+          ) == 0, 'Script identity check');
+    ok(-e $jsonPath, "JSON output written by script, alternate prior");
+    ok(-e $csvPath, "CSV output written by script, alternate prior");
+    my $refDataAlternatePrior = from_json(read_file($refPathAlternate));
+    $outData = from_json(read_file($jsonPath));
+    is_deeply($outData, $refDataAlternatePrior,
+              "Script JSON output matches reference file, alternate prior");
 }
 
 sub _get_swap_sample_identities {
@@ -333,7 +354,8 @@ sub _get_swap_sample_identities {
                     snpset           => $snpset,
                     production_calls => $production_calls->{$sample_name},
                     qc_calls         => $qc_calls->{$sample_name},
-                    pass_threshold   => $pass_threshold);
+                    pass_threshold   => $pass_threshold,
+                    sample_mismatch_prior => $sample_mismatch_prior);
         my $sample_id =
             WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
                   new(\%args);

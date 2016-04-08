@@ -6,7 +6,9 @@ use List::AllUtils qw(any);
 use Moose::Role;
 use UUID;
 
-with 'WTSI::DNAP::Utilities::Loggable', 'WTSI::NPG::Expression::Annotation';
+use WTSI::NPG::iRODS::Metadata; # has attribute name constants
+
+with 'WTSI::DNAP::Utilities::Loggable';
 
 our $VERSION = '';
 
@@ -28,15 +30,15 @@ sub make_infinium_metadata {
   my ($self, $resultset) = @_;
 
   my @meta =
-    ([$self->dcterms_identifier_attr          => $resultset->sample_id],
-     [$self->expression_beadchip_attr         => $resultset->beadchip],
-     [$self->expression_beadchip_section_attr => $resultset->beadchip_section]);
+    ([$DCTERMS_IDENTIFIER          => $resultset->sample_id],
+     [$EXPRESSION_BEADCHIP         => $resultset->beadchip],
+     [$EXPRESSION_BEADCHIP_SECTION => $resultset->beadchip_section]);
 
   if ($resultset->plate_id) {
-    push @meta, [$self->expression_plate_name_attr => $resultset->plate_id];
+    push @meta, [$EXPRESSION_PLATE_NAME => $resultset->plate_id];
   }
   if ($resultset->well_id) {
-    push @meta, [$self->expression_plate_well_attr => $resultset->well_id];
+    push @meta, [$EXPRESSION_PLATE_WELL => $resultset->well_id];
   }
 
   return @meta;
@@ -51,9 +53,9 @@ sub make_profile_metadata {
      or $self->logconfess("Invalid summary type '$type'");
 
    my @meta =
-     ([$self->expression_summary_group_attr => $grouping],
-      [$self->expression_summary_type_attr  => $type],
-      [$self->expression_norm_method_attr   => $normalisation_method]);
+     ([$EXPRESSION_SUMMARY_GROUP => $grouping],
+      [$EXPRESSION_SUMMARY_TYPE  => $type],
+      [$EXPRESSION_NORM_METHOD   => $normalisation_method]);
 
    return @meta;
 }
@@ -64,12 +66,12 @@ sub make_profile_annotation_metadata {
   any { $type eq $_ } @VALID_SUMMARY_TYPES
     or $self->logconfess("Invalid summary type '$type'");
 
-  return ([$self->expression_summary_type_attr => $type]);
+  return ([$EXPRESSION_SUMMARY_TYPE => $type]);
 }
 
 =head2 make_analysis_metadata
 
-  Arg [1]    : UUID to use instead of gereating a new one. Optional.
+  Arg [1]    : UUID to use instead of generating a new one. Optional.
   Example    : my @meta = $obj->make_analysis_metadata()
   Description: Return a list of metadata key/value pairs describing an analysis.
   Returntype : array of arrayrefs
@@ -90,7 +92,7 @@ sub make_analysis_metadata {
     UUID::unparse($uuid_bin, $uuid_str);
   }
 
-  my @meta = ([$self->analysis_uuid_attr => $uuid_str]);
+  my @meta = ([$ANALYSIS_UUID => $uuid_str]);
 
   return @meta;
 }
@@ -98,10 +100,10 @@ sub make_analysis_metadata {
 sub infinium_fingerprint {
   my ($self, @meta) = @_;
 
-  return $self->make_fingerprint([$self->expression_beadchip_attr,
-                                  $self->expression_beadchip_section_attr,
-                                  $self->expression_plate_name_attr,
-                                  $self->expression_plate_well_attr],
+  return $self->make_fingerprint([$EXPRESSION_BEADCHIP,
+                                  $EXPRESSION_BEADCHIP_SECTION,
+                                  $EXPRESSION_PLATE_NAME,
+                                  $EXPRESSION_PLATE_WELL],
                                  \@meta);
 }
 

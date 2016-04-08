@@ -58,10 +58,10 @@ package WTSI::NPG::Genotyping::Infinium::InfiniumDataObjectTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use List::AllUtils qw(none);
-use Test::More tests => 15;
+use Test::More tests => 14;
 use Test::Exception;
 
 use WTSI::NPG::iRODS;
@@ -110,7 +110,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::Infinium::InfiniumDataObject');
 }
 
-sub metadata : Test(3) {
+sub metadata : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
 
   my $gtc_irods_path = "$irods_tmp_coll/$gtc_file";
@@ -189,8 +189,14 @@ sub update_secondary_metadata_missing_value : Test(2) {
   # so this one is done first. The test ensures that an invalid AVU
   # value only causes that AVU to be skipped - all subsequent ones are
   # applied.
+  #
+  # In this instance, the update for 'dcterms:identifier' fails because of
+  # the invalid value, so the existing 'dcterms:identifier' AVU remains
+  # unchanged with a value of '9999999999'. Subsequently, the value of
+  # 'sample_supplier_name' is successfully updated from 'zzzzzzzzzz' to
+  # 'aaaaaaaaaa'.
   my $expected_meta =
-    [# {attribute => 'dcterms:identifier',      value => '0123456789'},
+    [{attribute => 'dcterms:identifier',      value => '9999999999'},
      {attribute => 'infinium_plate',          value => 'plate1'},
      {attribute => 'infinium_well',           value => 'A10'},
      {attribute => 'sample',                  value => 'sample1' },

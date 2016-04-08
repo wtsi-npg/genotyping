@@ -10,10 +10,13 @@ use Text::CSV;
 use Try::Tiny;
 use URI;
 
+use Data::Dumper; # FIXME
+
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::Genotyping::Sequenom::AssayResultSet;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::iRODS::Metadata;
 
 our $VERSION = '';
 
@@ -164,7 +167,7 @@ sub publish_samples {
 
       my $obj = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
         ($self->irods, $rods_path);
-      $obj->add_avu($self->sequenom_plex_name_attr, $snpset_name);
+      $obj->add_avu($SEQUENOM_PLEX_NAME, $snpset_name);
 
       # Now that adding the secondary metadata is fast enough, we can
       # run it inline here, so that the data are available

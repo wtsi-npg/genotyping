@@ -6,7 +6,7 @@ package WTSI::NPG::Genotyping::Fluidigm::AssayResultTest;
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use File::Spec;
 use Test::More tests => 402;
 use Test::Exception;

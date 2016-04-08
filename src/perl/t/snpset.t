@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Genotyping::SNPSetTest;
 
-Test::Class->runtests;
+WTSI::NPG::Genotyping::SNPSetTest->runtests;

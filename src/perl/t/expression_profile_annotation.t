@@ -6,4 +6,4 @@ use warnings;
 
 use WTSI::NPG::Expression::ProfileAnnotationTest;
 
-Test::Class->runtests;
+WTSI::NPG::Expression::ProfileAnnotationTest->runtests;

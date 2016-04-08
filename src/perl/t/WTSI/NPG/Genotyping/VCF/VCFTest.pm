@@ -1,9 +1,9 @@
-package WTSI::NPG::Genotyping::VCFTest;
+package WTSI::NPG::Genotyping::VCF::VCFTest;
 
 use strict;
 use warnings;
 
-use base qw(Test::Class);
+use base qw(WTSI::NPG::Test);
 use Cwd qw(abs_path);
 use File::Path qw/make_path/;
 use File::Slurp qw /read_file/;
@@ -118,7 +118,7 @@ sub data_row_parser_test : Test(5) {
 
 }
 
-sub fluidigm_file_test : Test(212) {
+sub fluidigm_file_test : Test(204) {
     my @inputs;
     foreach my $name (@fluidigm_csv) {
         push(@inputs, abs_path($data_path."/".$name));
@@ -128,7 +128,7 @@ sub fluidigm_file_test : Test(212) {
         reference    => [ $reference_vcf_meta ],
         plex_type    => [ $FLUIDIGM_TYPE ],
         plex_name    => [ 'qc' ],
-        callset_name => [ 'fluidigm' ],
+        callset_name => [ 'fluidigm_qc' ],
     );
     my @resultsets;
     foreach my $input (@inputs) {
@@ -155,7 +155,7 @@ sub fluidigm_file_test : Test(212) {
         is(scalar @calls, 24, "Correct number of calls for $sample");
         foreach my $call (@calls) {
             isa_ok($call, 'WTSI::NPG::Genotyping::Call');
-            ok($call->callset_name eq 'fluidigm', "Callset name OK");
+            ok($call->callset_name eq 'fluidigm_qc', "Callset name OK");
         }
     }
 }
@@ -176,7 +176,7 @@ sub fluidigm_irods_test : Test(7) {
         reference    => [ $reference_vcf_meta ],
         plex_type    => [ $FLUIDIGM_TYPE ],
         plex_name    => [ 'qc' ],
-        callset_name => [ 'fluidigm' ]
+        callset_name => [ 'fluidigm_qc' ]
     ); # hash of arrayrefs for compatibility with VCF header
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -272,7 +272,7 @@ sub sequenom_file_test : Test(7) {
         reference => [ $reference_vcf_meta ],
         plex_type => [ $SEQUENOM_TYPE ],
         plex_name => [ 'W30467' ],
-        callset_name => [ 'sequenom' ]
+        callset_name => [ 'sequenom_W30467' ]
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -303,7 +303,7 @@ sub sequenom_irods_test : Test(7) {
         reference    => [ $reference_vcf_meta ],
         plex_type    => [ $SEQUENOM_TYPE ],
         plex_name    => [ 'W30467' ],
-        callset_name => [ 'sequenom' ]
+        callset_name => [ 'sequenom_W30467' ]
     );
     my $parser = WTSI::NPG::Genotyping::VCF::AssayResultParser->new
         (resultsets => \@resultsets,
@@ -334,8 +334,9 @@ sub script_conversion_test : Test(3) {
     my $vcfOutput = "$tmp/vcf.txt";
     my $snpset_ipath = $irods_tmp_coll.'/'.$sequenom_snpset_name;
     my $cmd = "$script --input - --vcf $vcfOutput  --quiet ".
-        "--snpset $snpset_ipath --irods --plex_type $SEQUENOM_TYPE ".
-        "--callset $SEQUENOM_TYPE --repository $tmp < $sequenomList";
+        "--snpset $snpset_ipath --irods --plex_type ".$SEQUENOM_TYPE." ".
+        "--callset ".$SEQUENOM_TYPE."_W30467 ".
+        "--repository $tmp < $sequenomList";
     is(system($cmd), 0, "$cmd exits successfully");
     ok(-e $vcfOutput, "VCF output written");
     # read VCF output (omitting date) and compare to reference file
@@ -506,6 +507,7 @@ sub vcf_dataset_test: Test(4) {
 
 sub _read_without_filedate {
     # read a VCF file, omitting the ##fileDate and ##reference lines
+    # duplicated in ReadyWorkflowTest.pm
     my ($inPath) = @_;
     my $lines = read_file($inPath);
     return _remove_filedate_reference($lines);
