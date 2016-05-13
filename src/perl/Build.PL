@@ -22,11 +22,12 @@ my $build = Build->new
                           'Module::Build'   => 0.42
                          },
    test_requires      => {
-                          'TAP::Harness'    => '>= 3.30',
-                          'Test::Class'     => '>= 0.41',
-                          'Test::More'      => '>= 0.98',
-                          'Test::Exception' => '>= 0.32',
-                          'Test::Compile'   => 0
+                          'TAP::Harness'     => '>= 3.30',
+                          'Test::Class'      => '>= 0.41',
+                          'Test::MockObject' => 0,
+                          'Test::More'       => '>= 0.98',
+                          'Test::Exception'  => '>= 0.32',
+                          'Test::Compile'    => 0
                          },
    requires          => {
                          'Config::IniFiles'                    => '>= 2.8.6',
