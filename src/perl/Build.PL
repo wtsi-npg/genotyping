@@ -22,11 +22,12 @@ my $build = Build->new
                           'Module::Build'   => 0.42
                          },
    test_requires      => {
-                          'TAP::Harness'    => '>= 3.30',
-                          'Test::Class'     => '>= 0.41',
-                          'Test::More'      => '>= 0.98',
-                          'Test::Exception' => '>= 0.32',
-                          'Test::Compile'   => 0
+                          'TAP::Harness'     => '>= 3.30',
+                          'Test::Class'      => '>= 0.41',
+                          'Test::MockObject' => 0,
+                          'Test::More'       => '>= 0.98',
+                          'Test::Exception'  => '>= 0.32',
+                          'Test::Compile'    => 0
                          },
    requires          => {
                          'Config::IniFiles'                    => '>= 2.8.6',
@@ -44,7 +45,7 @@ my $build = Build->new
                          'Try::Tiny'                           => '>= 0.22',
                          'URI'                                 => '>= 1.67',
                          'WTSI::DNAP::Warehouse::Schema'       => '>= 1.1',
-                         'WTSI::NPG::iRODS'                    => '>= 0.15.0'
+                         'WTSI::NPG::iRODS'                    => '>= 2.1.0'
                         },
    recommends        => {
                          'UUID' => '>= 0.24',

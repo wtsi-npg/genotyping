@@ -384,7 +384,7 @@ sub find_called_file_project {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file>,
                  image_date        => <Imaging date, DB native format>,
-                 iso_image_date    => <Imaging date, ISO8601 format> }
+                 image_iso_date    => <Imaging date, ISO8601 format> }
 
                 The finds all samples in a project, even those that have
                 never been scanned. For those that have been scanned more than
@@ -520,7 +520,7 @@ sub find_project_samples {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file>,
                  image_date        => <Imaging date, DB native format>,
-                 iso_image_date    => <Imaging date, ISO8601 format>}
+                 image_iso_date    => <Imaging date, ISO8601 format>}
  Returntype : hashref
 
 =cut
@@ -625,7 +625,7 @@ sub find_project_completed_samples {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file>,
                  image_date        => <Imaging date, DB native format>,
-                 iso_image_date    => <Imaging date, ISO8601 format>}
+                 image_iso_date    => <Imaging date, ISO8601 format>}
  Returntype : hashref
 
 =cut
@@ -679,7 +679,7 @@ sub find_scanned_sample {
                  idat_grn_path     => <path string of IDAT format result file>,
                  idat_red_path     => <path string of IDAT format result file>,
                  image_date        => <Imaging date, DB native format>,
-                 iso_image_date    => <Imaging date, ISO8601 format>}
+                 image_iso_date    => <Imaging date, ISO8601 format>}
   Returntype : hashref
 
 =cut
@@ -915,10 +915,10 @@ sub _choose_from_scans {
 
   foreach my $sample (@$samples) {
     my $name = $sample->{sample};
-    push @sample_names, $name;
 
     unless (exists $samples_by_name{$name}) {
       $samples_by_name{$name} = [];
+      push @sample_names, $name;
     }
 
     push @{$samples_by_name{$name}}, $sample;

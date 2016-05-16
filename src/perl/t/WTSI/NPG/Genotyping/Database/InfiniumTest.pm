@@ -7,8 +7,9 @@ use strict;
 use warnings;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 13;
+use Test::More tests => 14;
 use Test::Exception;
+use Test::MockObject;
 
 use Log::Log4perl;
 
@@ -58,6 +59,87 @@ sub disconnect : Test(4) {
     ok($db->disconnect, 'Can disconnect');
     ok(!$db->is_connected, 'Finally, is not connected');
   }
+}
+
+sub repeat_scans : Test(1) {
+
+  my $db = WTSI::NPG::Genotyping::Database::Infinium->new
+    (name    => 'infinium',
+     inifile => $db_credentials);
+
+  # This test is fragile because it relies on knowing about the
+  # internals of the package under test. However, it's better than
+  # nothing, until we commit resources to refactoring.
+  my $sth = Test::MockObject->new;
+  $sth->set_true('execute');
+  $sth->set_series('fetchrow_hashref',
+                   {plate             => 'ABC123456-DNA',
+                    well              => 'A01',
+                    sample            => 'sample1',
+                    beadchip          => '0123456789',
+                    beadchip_section  => 'R01C01',
+                    beadchip_design   => 'test_design',
+                    beadchip_revision => '1',
+                    status            => 'Pass',
+                    gtc_file          => 'test.gtc',
+                    idat_grn_file     => 'test_Grn.idat',
+                    idat_red_file     => 'test_Red.idat',
+                    idat_grn_path     => '/test',
+                    idat_red_path     => '/test',
+                    image_date        => '',
+                    image_iso_date    => '2016-10-01'},
+                   {plate             => 'ABC123456-DNA',
+                    well              => 'A01',
+                    sample            => 'sample1',
+                    beadchip          => '0123456789',
+                    beadchip_section  => 'R01C01',
+                    beadchip_design   => 'test_design',
+                    beadchip_revision => '1',
+                    status            => 'Pass',
+                    gtc_file          => 'test.gtc',
+                    idat_grn_file     => 'test_Grn.idat',
+                    idat_red_file     => 'test_Red.idat',
+                    idat_grn_path     => '/test',
+                    idat_red_path     => '/test',
+                    image_date        => '',
+                    image_iso_date    => '2016-10-02'},
+                   {plate             => 'ABC123456-DNA',
+                    well              => 'A01',
+                    sample            => 'sample1',
+                    beadchip          => '0123456789',
+                    beadchip_section  => 'R01C01',
+                    beadchip_design   => 'test_design',
+                    beadchip_revision => '1',
+                    status            => 'Pass',
+                    gtc_file          => 'test.gtc',
+                    idat_grn_file     => 'test_Grn.idat',
+                    idat_red_file     => 'test_Red.idat',
+                    idat_grn_path     => '/test',
+                    idat_red_path     => '/test',
+                    image_date        => '',
+                    image_iso_date    => '2016-10-03'});
+
+  my $dbh = Test::MockObject->new;
+  $dbh->set_always('prepare', $sth);
+  $db->dbh($dbh);
+
+  is_deeply($db->find_project_samples('test'),
+            [{plate             => 'ABC123456-DNA',
+              well              => 'A01',
+              sample            => 'sample1',
+              beadchip          => '0123456789',
+              beadchip_section  => 'R01C01',
+              beadchip_design   => 'test_design',
+              beadchip_revision => '1',
+              status            => 'Pass',
+              gtc_file          => 'test.gtc',
+              idat_grn_file     => 'test_Grn.idat',
+              idat_red_file     => 'test_Red.idat',
+              idat_grn_path     => '/test',
+               idat_red_path     => '/test',
+              image_date        => '',
+              image_iso_date    => '2016-10-03'}],
+             'Repeat scans resolved to latest');
 }
 
 1;
