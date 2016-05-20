@@ -14,6 +14,7 @@ use List::AllUtils qw(uniq);
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Pod::Usage;
+use Try::Tiny;
 
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
@@ -71,6 +72,7 @@ sub run {
     my $debug;
     my $inifile;
     my $log4perl_config;
+    my $manifest_dir;
     my $output_dir;
     my $verbose;
 
@@ -82,6 +84,7 @@ sub run {
                                                      -exitval => 0) },
                'inifile=s'        => \$inifile,
                'logconf=s'        => \$log4perl_config,
+               'manifest_dir=s'   => \$manifest_dir,
                'out=s'            => \$output_dir,
                'verbose'          => \$verbose);
 
@@ -125,6 +128,12 @@ sub run {
         $log->logcroak("--out argument '", $output_dir,
                        "' is not a directory");
     }
+    if (defined($manifest_dir) && !(-d $manifest_dir)) {
+        $log->logcroak("--manifest_dir argument '", $manifest_dir,
+                       "' is not a directory");
+    }
+    $manifest_dir ||= $output_dir;
+
     if (!$dbfile) {
         $log->logcroak("--dbfile argument is required");
     } elsif (! -e $dbfile) {
@@ -144,15 +153,22 @@ sub run {
     my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
 
     ### create PlexResultFinder and write VCF ###
-    my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
-        sample_ids => \@sample_ids,
-        subscriber_config => \@config,
-        logger     => $log,
-    );
-    my $vcf_paths = $finder->write_vcf($output_dir);
+    try {
+        my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
+            sample_ids => \@sample_ids,
+            subscriber_config => \@config,
+            logger     => $log,
+        );
+        my $plex_manifests = $finder->write_manifests($manifest_dir);
+        $log->info("Wrote plex manifests: ", join(', ', @{$plex_manifests}));
+        my $vcf_paths = $finder->write_vcf($output_dir);
+        $log->info("Wrote VCF: ", join(', ', @{$vcf_paths}));
+    } catch {
+         $log->logwarn("Unexpected error finding QC plex data in ",
+                       "iRODS; run with --verbose for details");
+         $log->info("Caught PlexResultFinder error: $_");
+    }
 }
-
-## TODO Retrieve results for multiple plex types / experiments and record in the same VCF file
 
 
 __END__
@@ -163,7 +179,7 @@ ready_qc_calls
 
 =head1 SYNOPSIS
 
-ready_qc_calls --dbfile <path to SQLite DB>  --vcf <output path>
+ready_qc_calls --dbfile <path to SQLite DB>  --out <output directory>
 
 Options:
 
@@ -180,7 +196,9 @@ Options:
   --help           Display help.
   --inifile        Path to .ini file to configure pipeline SQLite database
                    connection. Optional. Only relevant if --dbfile is given.
-  --out            Path to directory for VCF output. Required.
+  --manifest_dir   Directory for output of QC plex manifests retrieved from
+                   iRODS. Optional, defaults to the --out argument.
+  --out            Directory for VCF output. Required.
 
 
 =head1 DESCRIPTION
