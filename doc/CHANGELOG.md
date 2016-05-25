@@ -12,6 +12,23 @@ Added:
 and plots
 
 
+Release 1.12.1: 2016-05-25
+--------------------------
+
+Added:
+- Documentation for Bayesian identity check
+
+Changed:
+- Modified ready_workflow.pl to better align with user SOP
+- Use try/catch to handle unexpected errors in retrieving QC plex results from iRODS
+- Updated reference genome for Sequenom iRODS query
+
+Removed:
+- Script publish_infinium_file_list.pl; superseded by other publish scripts
+
+Fixed:
+- Support repeat scans from Infinium database
+
 Release 1.12.0: 2016-04-07
 --------------------------
 

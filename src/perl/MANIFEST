@@ -19,7 +19,6 @@ bin/plot_metric_scatter.pl
 bin/publish_expression_analysis.pl
 bin/publish_fluidigm_genotypes.pl
 bin/publish_infinium_analysis.pl
-bin/publish_infinium_file_list.pl
 bin/publish_infinium_genotypes.pl
 bin/publish_sequenom_genotypes.pl
 bin/publish_snpset.pl
