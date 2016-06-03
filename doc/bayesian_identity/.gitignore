@@ -1,0 +1,7 @@
+# patterns to ignore for git updates
+\.*
+*~
+*.aux
+*.dvi
+*.ps
+*.log
