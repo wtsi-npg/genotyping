@@ -12,7 +12,7 @@ Added:
 and plots
 
 
-Release 1.12.1: 2016-05-25
+Release 1.12.1: 2016-06-06
 --------------------------
 
 Added:
@@ -20,8 +20,11 @@ Added:
 
 Changed:
 - Modified ready_workflow.pl to better align with user SOP
-- Use try/catch to handle unexpected errors in retrieving QC plex results from iRODS
+- Use try/catch to handle unexpected errors in retrieving QC plex results
+from iRODS
 - Updated reference genome for Sequenom iRODS query
+- Update perl-irods-wrap dependency to 2.4.0; removes unhelpful warning
+messages to STDERR. This in turn requires baton version >= 0.16.4.
 
 Removed:
 - Script publish_infinium_file_list.pl; superseded by other publish scripts
