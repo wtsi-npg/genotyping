@@ -101,11 +101,10 @@ fi
 export RUBY_HOME=/software/gapi/pkg/ruby/$RUBY_VERSION
 export PATH=$RUBY_HOME/bin:$PATH
 export MANPATH=$RUBY_HOME/share/man:$MANPATH
-export GEM_HOME=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
+export GEM_HOME=$INSTALL_ROOT
 export GEM_PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
-export PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION/bin:$PATH
-export GEM_HOME=$INSTALL_ROOT:$GEM_HOME
 export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
+export PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION/bin:$PATH
 
 cd ../ruby/genotyping-workflows/
 rake gem
