@@ -48,32 +48,32 @@ our $VERSION = '';
 
 subtype HsapiensChromosome,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
+  where { m{(^[Cc]hr)?[\d+|MT|X|Y]$}msx },
   message { "'$_' is not a valid H. sapiens chromosome name" };
 
 subtype HsapiensX,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?X$}msx },
+  where { m{(^[Cc]hr)?X$}msx },
   message { "'$_' is not a valid H. sapiens X chromosome" };
 
 subtype HsapiensY,
   as Str,
-  where { $_ =~ m{(^[Cc]hr)?Y$}msx },
+  where { m{(^[Cc]hr)?Y$}msx },
   message { "'$_' is not a valid H. sapiens Y chromosome" };
 
 subtype InfiniumBeadchipBarcode,
   as Str,
-  where { $_ =~ m{^\d{10,12}$}msx },
+  where { m{^\d{10,12}$}msx },
   message { "'$_' is not a valid Infinium beadchip barcode" };
 
 subtype InfiniumBeadchipSection,
   as Str,
-  where { $_ =~ m{^R\d+C\d+$}msx },
+  where { m{^R\d+C\d+$}msx },
   message { "'$_' is not a valid Infinium beadchip section" };
 
 subtype DNABase,
   as Str,
-  where { $_ =~ m{^[ACGTNacgtn]$}msx },
+  where { m{^[ACGTNacgtn]$}msx },
   message { "'$_' is not a valid DNA base" };
 
 subtype DNAStrand,
@@ -84,7 +84,7 @@ subtype DNAStrand,
 # A genotype call represented as a 2 allele string.
 subtype SNPGenotype,
   as Str,
-  where { length($_) == 2              &&
+  where { length == 2              &&
           is_DNABase(substr($_, 0, 1)) &&
           is_DNABase(substr($_, 1, 1)) },
   message { "'$_' is not a valid SNP call"};

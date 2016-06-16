@@ -12,10 +12,11 @@ Added:
 and plots
 
 
-Release 1.12.1: 2016-06-06
+Release 1.12.1: 2016-06-15
 --------------------------
 
 Added:
+- install.sh script to install pipeline and its Perl dependencies
 - Documentation for Bayesian identity check
 
 Changed:

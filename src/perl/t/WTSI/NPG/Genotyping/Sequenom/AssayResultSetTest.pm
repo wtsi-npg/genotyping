@@ -22,8 +22,6 @@ my $data_path = './t/sequenom_assay_data_object';
 my $data_file = 'plate1_A01.csv';
 my $irods_tmp_coll;
 
-my $resultset;
-
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
@@ -41,16 +39,9 @@ sub make_fixture : Test(setup) {
   $irods->add_object_avu($irods_path, 'study_id',             '10');
   $irods->add_object_avu($irods_path, 'sample_consent',       '1');
   $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
-
-  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
-    ($irods, "$irods_tmp_coll/$data_file");
-  $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
-    ($data_object);
 }
 
 sub teardown : Test(teardown) {
-  undef $resultset;
-
   my $irods = WTSI::NPG::iRODS->new;
   $irods->remove_collection($irods_tmp_coll);
 }
@@ -84,23 +75,38 @@ sub constructor : Test(5) {
 }
 
 sub size : Test(1) {
+  my $resultset = _get_resultset(WTSI::NPG::iRODS->new);
   cmp_ok($resultset->size, '==', 1, 'Expected size');
 }
 
 sub assay_results : Test(1) {
+  my $resultset = _get_resultset(WTSI::NPG::iRODS->new);
   cmp_ok(scalar @{$resultset->assay_results}, '==', 1,
          'Contains expected number of assay results');
 }
 
 sub snpset_name : Test(2) {
   my $irods = WTSI::NPG::iRODS->new;
+  my $resultset = _get_resultset($irods);
   is($resultset->snpset_name, 'qc', 'Correct SNP set name');
-
   $irods->add_object_avu($resultset->data_object->str,
                          'sequenom_plex', 'test');
   $resultset->data_object->clear_metadata; # Clear metadata cache
-
   dies_ok { $resultset->snpset_name }, 'Cannot have multiple names';
+}
+
+sub _get_resultset {
+  # Each resultset contains a data object, which in turn has an iRODS object.
+  # Need to be careful about working with multiple iRODS objects, because
+  # out-of-date caches in different objects can lead to unexpected
+  # results/errors. This is why $irods is supplied as an argument instead
+  # of created on the fly.
+  my ($irods, ) = @_;
+  my $data_object = WTSI::NPG::Genotyping::Sequenom::AssayDataObject->new
+    ($irods, "$irods_tmp_coll/$data_file");
+  my $resultset = WTSI::NPG::Genotyping::Sequenom::AssayResultSet->new
+    ($data_object);
+  return $resultset;
 }
 
 1;
