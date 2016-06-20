@@ -12,7 +12,7 @@ Added:
 and plots
 
 
-Release 1.12.1: 2016-06-15
+Release 1.13.0: 2016-06-20
 --------------------------
 
 Added:
@@ -30,8 +30,13 @@ messages to STDERR. This in turn requires baton version >= 0.16.4.
 Removed:
 - Script publish_infinium_file_list.pl; superseded by other publish scripts
 
+
+Release 1.12.1: 2016-05-13
+--------------------------
+
 Fixed:
 - Support repeat scans from Infinium database
+
 
 Release 1.12.0: 2016-04-07
 --------------------------
