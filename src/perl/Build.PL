@@ -16,7 +16,7 @@ my $build = Build->new
    dist_author     => ['Iain Bancarz <ib5@sanger.ac.uk>',
                        'Keith James <kdj@sanger.ac.uk>'],
    dist_abstract   => 'WTSI genotyping data management tools',
-   dist_version    => Build->report_version,,
+   dist_version    => $ENV{'GENOTYPING_VERSION'} || Build->report_version,
    license         => 'gpl',
    configure_requires => {
                           'Module::Build'   => 0.42

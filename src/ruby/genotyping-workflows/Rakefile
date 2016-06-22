@@ -15,13 +15,13 @@ BUILD_DATE = DateTime.now
 # a default of 0.0.0 where the version tag cannot be represented.
 def maybe_git_version(raw_git_version)
   default = '0.0.0'
-  version = raw_git_version.strip
+  version = ENV['GENOTYPING_VERSION'] || raw_git_version.strip
 
   if (/^(\d+\.\d+\.\d+)$/.match(version))
-    $1
+    return version
   else
-    warn "git version string #{version} not in canonical format, defaulting to #{default}"
-    default
+    warn "version string #{version} not in canonical format, defaulting to #{default}"
+    return default
   end
 end
 
