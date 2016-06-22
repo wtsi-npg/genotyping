@@ -29,10 +29,25 @@ NPG_IRODS_VERSION="2.4.0"
 RUBY_VERSION="1.8.7-p330"
 LIB_RUBY_VERSION="0.3.0"
 
+START_DIR=$PWD
+
+# look for pipeline source code, relative to location of install script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PERL_DIR="$SCRIPT_DIR/../perl/"
+RUBY_DIR="$SCRIPT_DIR/../ruby/genotyping-workflows/"
+SRC_DIRS=($PERL_DIR $RUBY_DIR)
+for DIR in ${SRC_DIRS[@]}; do
+    if [ ! -d $DIR ]; then
+        echo -n "Genotyping source code directory $DIR not found; "
+        echo "install halted" >&2 
+        exit 1
+    fi
+done
+
+# create and cd to temp directory
 TEMP_NAME=`mktemp -d genotyping_temp.XXXXXXXX`
 TEMP=`readlink -f $TEMP_NAME` # full path to temp directory
 export PATH=$TEMP:$PATH # ensure cpanm download is on PATH
-START_DIR=$PWD
 cd $TEMP
 
 # use wget to download tarballs to install
@@ -45,18 +60,11 @@ https://github.com/wtsi-npg/perl-irods-wrap/releases/download/$NPG_IRODS_VERSION
 for URL in ${URLS[@]}; do
     wget $URL
     if [ $? -ne 0 ]; then
-        echo "Failed to download $URL; non-zero exit status from wget; install halted" >&2
+        echo -n "Failed to download $URL; non-zero exit status " >&2
+        echo " from wget; install halted" >&2
         exit 1
     fi
 done
-
-# clone genotyping to access src/perl 
-git clone https://github.com/wtsi-npg/genotyping.git
-if [ $? -ne 0 ]; then
-    echo "Failed to clone genotyping repository; install halted" >&2
-    exit 1
-fi
-
 eval $(perl -Mlocal::lib=$INSTALL_ROOT) # set environment variables
 
 # use local installation of cpanm
@@ -82,18 +90,28 @@ for FILE in ${TARFILES[@]}; do
     fi
 done
 
-# install pipeline Perl
-# first ensure we are on 'master' branch and find pipeline version
-cd genotyping/src/perl
-git checkout master
+cd $PERL_DIR
+# need a version string acceptable to cpanm, eg. 1.12.1 or 1.13.0-rc
+# version strings containing underscores _ won't work
+if [ -z $GENOTYPING_VERSION ] ; then
+    GIT_VERSION=`git describe --dirty --always`
+    echo "GENOTYPING_VERSION environment variable not set." >&2
+    echo "Using default version string '$GIT_VERSION'" >&2
+else
+    echo "GENOTYPING_VERSION environment variable found." >&2
+    echo "Installing with version string '$GENOTYPING_VERSION'" >&2
+fi
+
 cpanm --installdeps . --self-contained --notest 
 if [ $? -ne 0 ]; then
     echo "cpanm --installdeps failed for genotyping; install halted" >&2
     exit 1
 fi
-cpanm --install . --notest
+
+perl Build.PL
+./Build install --install_base $INSTALL_ROOT
 if [ $? -ne 0 ]; then
-    echo "cpanm --install failed for genotyping; install halted" >&2
+    echo "Genotyping pipeline Perl installation failed; install halted " >&2
     exit 1
 fi
 
@@ -106,19 +124,15 @@ export GEM_PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
 export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
 export PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION/bin:$PATH
 
-cd ../ruby/genotyping-workflows/
+cd $RUBY_DIR
 rake gem
 if [ $? -ne 0 ]; then
     echo "'rake gem' failed for genotyping; install halted" >&2
     exit 1
 fi
-GENOTYPING_VERSION=`git describe --dirty --always`
-GENOTYPING_GEM="pkg/genotyping-workflows-$GENOTYPING_VERSION.gem"
-if [ ! -f $GENOTYPING_GEM ]; then
-    echo "Expected Ruby gem $GENOTYPING_GEM not found; install halted" >&2
-    exit 1
-fi
-gem install $GENOTYPING_GEM
+
+GENOTYPING_GEM=`ls -t pkg | head -n 1`
+gem install pkg/$GENOTYPING_GEM
 if [ $? -ne 0 ]; then
     echo "'gem install' failed for genotyping; install halted" >&2
     exit 1
