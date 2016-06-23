@@ -91,7 +91,7 @@ sub in_transaction {
       $self->logcroak("Attempted to use a closed connection")
     }
   } catch {
-    if ($_ =~ m{Rollback failed}msx) {
+    if (m{Rollback failed}msx) {
       $self->logconfess("$_. Rollback failed! ",
                         "WARNING: data may be inconsistent.");
     } else {

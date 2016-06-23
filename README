@@ -7,6 +7,12 @@ genotyping microarrays, supplemented with Sequenom genotyping.
 
 Change log is located in: doc/CHANGELOG.md
 
+To install, set the $INSTALL_ROOT environment variable to the path of the
+desired installation directory, and run src/bash/install.sh. This installs
+the Perl and Ruby components of the pipeline. It recursively installs
+non-core Perl dependencies from CPAN, and requires approximately 120 MB of
+disk space.
+
 The gender check used as a QC metric is also available as a standalone
 application; see below.
 
@@ -22,9 +28,13 @@ Pipeline:
  Bcftools               https://github.com/samtools/bcftools
 
 
+Install script:
+ cpanm >= 1.7042        http://search.cpan.org/~miyagawa/Menlo-1.9003/script/cpanm-menlo
+
+
 QC scripts:
 
- Simtools >= 1.5	https://github.com/wtsi-npg/simtools
+ Simtools >= 2.2	https://github.com/wtsi-npg/simtools
  R >= 2.11.1
  R mixtools library	http://cran.r-project.org/web/packages/mixtools/index.html
 

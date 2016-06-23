@@ -120,7 +120,7 @@ sub splitManifest {
         $i++;
         if ($verbose && $i % 100_000 == 0) { print "$i lines read.\n"; }
 	if ($i == 1) { next; } # first line is header
-	$_ =~ s/\s+$//msxg; # remove whitespace (including \r) from end of line
+	s/\s+$//msxg; # remove whitespace (including \r) from end of line
 	my @fields = split /,/msx;
 	my $fields_found = @fields;
 	if ($fields_found != $EXPECTED_FIELDS) {

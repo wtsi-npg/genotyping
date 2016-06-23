@@ -141,4 +141,5 @@ sub repeat_scans : Test(1) {
               image_iso_date    => '2016-10-03'}],
              'Repeat scans resolved to latest');
 }
+
 1;

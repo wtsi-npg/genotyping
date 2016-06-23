@@ -45,7 +45,7 @@ my $build = Build->new
                          'Try::Tiny'                           => '>= 0.22',
                          'URI'                                 => '>= 1.67',
                          'WTSI::DNAP::Warehouse::Schema'       => '>= 1.1',
-                         'WTSI::NPG::iRODS'                    => '>= 0.15.0'
+                         'WTSI::NPG::iRODS'                    => '>= 2.1.0'
                         },
    recommends        => {
                          'UUID' => '>= 0.24',
