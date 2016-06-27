@@ -67,8 +67,7 @@ Arguments:
                    in Plink .fam output. Must be equal to 0 or -9. Optional,
                    defaults to -9.
     memory:        <integer> number of Mb to request for jobs.
-    queue:         <normal | long etc.> An LSF queue hint. Optional, 
-                   defaults to'normal'.
+    queue:         <normal | long etc.> An LSF queue hint. Optional.
     vcf:           <Array> containing paths to one or more VCF files for
                    identity QC
     plex_manifest: <Array> containing paths to one or more plex manifest
