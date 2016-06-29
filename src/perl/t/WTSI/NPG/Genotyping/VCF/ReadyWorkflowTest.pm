@@ -557,7 +557,7 @@ sub test_workflow_script_illuminus_bad_plex_reference: Test(12) {
                 'manifest' => catfile($workdir, $manifest_name),
                 'chunk_size' => '4000',
                 'nofilter' => 'false',
-                'queue' => 'normal',
+                'queue' => undef,
                 'plex_manifest' => [],
                 'vcf' => [],
                 'gender_method' => 'Supplied'
@@ -616,7 +616,7 @@ sub test_workflow_script_illuminus_nonlocal: Test(9) {
                 'manifest' => catfile($workdir, $manifest_name),
                 'chunk_size' => '4000',
                 'nofilter' => 'false',
-                'queue' => 'normal', # default value
+                'queue' => undef, # default value
                 'plex_manifest' => [
                     catfile($workdir, 'plex_manifests',
                             $fluidigm_manifest_name),
@@ -713,7 +713,7 @@ sub test_workflow_script_zcall: Test(16) {
                 'zstart' => '6',
                 'chunk_size' => '40',
                 'nofilter' => 'false',
-                'queue' => 'normal',
+                'queue' => undef,
                 'egt' => catfile($workdir, $egt_name),
                 'vcf' => [
                     $vcf_path_fluidigm,

@@ -54,8 +54,7 @@ Arguments:
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
     Optional, defaults to 2000.
     - memory: <integer> number of Mb to request for jobs.
-    - queue: <normal | long etc.> An LSF queue hint. Optional, defaults to
-    'normal'.
+    - queue: <normal | long etc.> An LSF queue hint. Optional.
     - filterconfig: <path> to .json file with thresholds for prefilter on 
     GenCall QC. Optional; if absent, uses default illuminus thresholds 
     (requires config argument to be specified).
