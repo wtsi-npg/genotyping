@@ -47,6 +47,9 @@ done
 # create and cd to temp directory
 TEMP_NAME=`mktemp -d genotyping_temp.XXXXXXXX`
 TEMP=`readlink -f $TEMP_NAME` # full path to temp directory
+CPANM_TEMP="$TEMP/cpanm"
+mkdir $CPANM_TEMP
+export PERL_CPANM_HOME=$CPANM_TEMP
 export PATH=$TEMP:$PATH # ensure cpanm download is on PATH
 cd $TEMP
 
@@ -106,13 +109,19 @@ if [ $? -ne 0 ]; then
 fi
 
 # now set Ruby environment variables and install
-export RUBY_HOME=/software/gapi/pkg/ruby/$RUBY_VERSION
+if [ -z $RUBY_HOME ]; then
+    export RUBY_HOME=/software/gapi/pkg/ruby/$RUBY_VERSION
+fi
 export PATH=$RUBY_HOME/bin:$PATH
 export MANPATH=$RUBY_HOME/share/man:$MANPATH
-export GEM_HOME=$INSTALL_ROOT
-export GEM_PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
+if [ -z $GEM_HOME ]; then
+    export GEM_HOME=$INSTALL_ROOT
+fi
+if [ -z $GEM_PATH ]; then
+    export GEM_PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
+fi
 export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
-export PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION/bin:$PATH
+export PATH=$GEM_PATH/bin:$PATH
 
 cd $RUBY_DIR
 GENOTYPING_GEM=`rake gem | grep File | cut -f 4 -d " "`
