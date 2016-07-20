@@ -11,6 +11,16 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
+Release 1.13.1: 2016-07-21
+--------------------------
+
+Changed:
+- Made install.sh more transparent and portable.
+- Updated WTSI-DNAP-Utilities and perl-irods-wrap versions in install.sh.
+
+Fixed:
+- Default LSF queue for Ruby workflows
+
 
 Release 1.13.0: 2016-06-20
 --------------------------
