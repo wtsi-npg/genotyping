@@ -162,7 +162,6 @@ sub run {
     }
     if (defined($no_filter)) { $no_filter = 'true'; } # Boolean value for Ruby
     else { $no_filter = 'false'; }
-    if (!defined($queue)) { $queue = 'normal'; }
     if (!$workflow) {
         $log->logcroak("--workflow argument is required");
     } elsif (!($workflow eq $ILLUMINUS || $workflow eq $ZCALL)) {
@@ -407,8 +406,8 @@ Options:
                   write QC plex data as VCF. May be supplied more than once
                   to specify multiple files. Optional, defaults to a standard
                   set of config files.
-  --queue         LSF queue hint for workflow config YML. Optional, defaults
-                  to 'normal'.
+  --queue         LSF queue hint for workflow config YML. Optional; if not
+                  supplied, LSF will use its default queue.
   --run           The pipeline run name in the database. Required.
   --smaller       Do not copy the .egt, manifest, and plex manifest files to
                   the workflow directory. Uses less space, but makes the

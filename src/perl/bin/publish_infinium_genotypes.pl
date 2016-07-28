@@ -223,6 +223,8 @@ sub find_files_to_publish {
             # If a file with the same chip details and matching MD5
             # metadata is present in iRODS, we do not need to publish
 
+            $suffix =~ s/^[.]//msx;
+
             my $md5 = $irods->md5sum($file);
             my @matches = $irods->find_objects_by_meta
               ($publish_dest,

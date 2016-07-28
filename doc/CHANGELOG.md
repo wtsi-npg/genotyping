@@ -11,6 +11,42 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
+Release 1.13.1: 2016-07-28
+--------------------------
+
+Changed:
+- Made install.sh more transparent and portable.
+- Updated WTSI-DNAP-Utilities and perl-irods-wrap versions in install.sh.
+
+Fixed:
+- Default LSF queue for Ruby workflows
+
+
+Release 1.13.0: 2016-06-20
+--------------------------
+
+Added:
+- install.sh script to install pipeline and its Perl dependencies
+- Documentation for Bayesian identity check
+
+Changed:
+- Modified ready_workflow.pl to better align with user SOP
+- Use try/catch to handle unexpected errors in retrieving QC plex results
+from iRODS
+- Updated reference genome for Sequenom iRODS query
+- Update perl-irods-wrap dependency to 2.4.0; removes unhelpful warning
+messages to STDERR. This in turn requires baton version >= 0.16.4.
+
+Removed:
+- Script publish_infinium_file_list.pl; superseded by other publish scripts
+
+
+Release 1.12.1: 2016-05-13
+--------------------------
+
+Fixed:
+- Support repeat scans from Infinium database
+
 
 Release 1.13.0: 2016-06-20
 --------------------------
