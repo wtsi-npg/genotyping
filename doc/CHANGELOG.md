@@ -11,7 +11,7 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
-Release 1.13.1: 2016-07-21
+Release 1.13.1: 2016-07-28
 --------------------------
 
 Changed:
