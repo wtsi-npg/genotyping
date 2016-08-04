@@ -75,11 +75,11 @@ sub run {
 
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.vcf_from_plink');
+        $log = Log::Log4perl->get_logger();
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.vcf_from_plink');
+        $log = Log::Log4perl->get_logger();
         if ($verbose) {
             $log->level($INFO);
         }

@@ -159,8 +159,7 @@ sub _publish_file {
 
   my $publisher =
     WTSI::NPG::Publisher->new(irods         => $self->irods,
-                              accountee_uid => $self->accountee_uid,
-                              logger        => $self->logger);
+                              accountee_uid => $self->accountee_uid);
 
   my @meta = $self->make_infinium_metadata($if_sample);
   my @fingerprint = $self->infinium_fingerprint(@meta);

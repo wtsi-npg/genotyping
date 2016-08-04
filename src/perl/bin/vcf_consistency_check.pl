@@ -57,7 +57,7 @@ if ($logConfig) {
 } else {
     Log::Log4perl::init(\$embedded_conf);
 }
-$log = Log::Log4perl->get_logger('npg.vcf.consistency');
+$log = Log::Log4perl->get_logger();
 if ($verbose) {
     $log->level($INFO);
 }

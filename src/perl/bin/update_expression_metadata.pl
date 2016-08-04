@@ -82,11 +82,11 @@ sub run {
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
 
     if ($verbose) {
       $log->level($INFO);

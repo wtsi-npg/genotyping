@@ -122,11 +122,11 @@ sub run {
     ### set up logging ###
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.ready_workflow');
+        $log = Log::Log4perl->get_logger();
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.ready_workflow');
+        $log = Log::Log4perl->get_logger();
         if ($verbose) {
             $log->level($INFO);
         }
@@ -345,7 +345,6 @@ sub write_plex_results {
         try {
             my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
                 sample_ids => \@sample_ids,
-                logger     => $log,
                 subscriber_config => $plex_config,
             );
             my $manifest_dir = catfile($workdir, $PLEX_MANIFEST_SUBDIRECTORY);

@@ -86,11 +86,11 @@ sub run {
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
 
     if ($verbose) {
       $log->level($INFO);
@@ -102,17 +102,15 @@ sub run {
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError           => 1,
-                               mysql_enable_utf8    => 1,
-                               mysql_auto_reconnect => 1);
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
+                                  mysql_auto_reconnect => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name    => 'snp',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
-  my $irods = WTSI::NPG::iRODS->new(logger => $log);
+  my $irods = WTSI::NPG::iRODS->new();
 
   my @sequenom_data;
   if ($stdio) {

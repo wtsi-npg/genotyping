@@ -79,11 +79,11 @@ sub run {
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
 
     if ($verbose) {
       $log->level($INFO);
@@ -108,13 +108,11 @@ sub run {
 
   my $sqdb = WTSI::NPG::Genotyping::Database::Sequenom->new
     (name    => 'mspec2',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name    => 'snp',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
@@ -130,7 +128,7 @@ sub run {
     }
   }
   else {
-    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    my $irods = WTSI::NPG::iRODS->new();
     @plate_names = find_plates_to_publish($sqdb, $begin, $end, $irods,
                                           $publish_dest, $force, $log);
   }
@@ -158,8 +156,7 @@ sub run {
        plate_name       => $plate_name,
        sequenom_db      => $sqdb,
        snp_db           => $snpdb,
-       ss_warehouse_db  => $ssdb,
-       logger           => $log);
+       ss_warehouse_db  => $ssdb);
 
     $publisher->publish($publish_dest);
     $published++;

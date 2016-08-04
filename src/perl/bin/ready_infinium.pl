@@ -135,11 +135,11 @@ sub run {
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
 
     if ($verbose) {
       $log->level($INFO);
@@ -189,15 +189,13 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError           => 1,
-                               mysql_enable_utf8    => 1,
-                               mysql_auto_reconnect => 1);
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
+                                  mysql_auto_reconnect => 1);
 
   my @chip_designs = @{$ifdb->find_project_chip_design($project_title)};
   unless (@chip_designs) {
@@ -426,8 +424,7 @@ sub run {
 
                my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
                    (name    => 'snp',
-                    inifile => $config,
-                    logger  => $log)->connect(RaiseError => 1);
+                    inifile => $config)->connect(RaiseError => 1);
 
                $inserted = insert_sequenom_calls($pipedb, $snpdb,
                                                  \@samples, $qc_plex);
@@ -436,7 +433,7 @@ sub run {
                my $irods = WTSI::NPG::iRODS->new;
                $inserted = insert_fluidigm_calls($pipedb, $irods,
                                                  \@samples, $qc_plex,
-                                                 $reference_path, $log);
+                                                 $reference_path);
            } else {
                $log->logcroak("Unexpected QC platform '$qc_platform'");
            }
@@ -466,7 +463,7 @@ sub validate_snpset {
 
 sub insert_fluidigm_calls {
   # returns the number of samples for which calls were inserted
-  my ($pipedb, $irods, $samples, $qc_plex, $reference_path, $log) = @_;
+  my ($pipedb, $irods, $samples, $qc_plex, $reference_path) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   $method or $log->logcroak("The genotyping method 'Fluidigm' is ",
@@ -483,8 +480,7 @@ sub insert_fluidigm_calls {
      data_path      => $DEFAULT_DATA_PATH,
      reference_path => $reference_path,
      reference_name => $reference_name,
-     snpset_name    => $snpset->name,
-     logger         => $log);
+     snpset_name    => $snpset->name);
   my ($resultsets, $vcf_meta) =
       $subscriber->get_assay_resultsets_and_vcf_metadata(\@sample_ids);
 

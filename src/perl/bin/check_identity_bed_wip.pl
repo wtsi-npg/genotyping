@@ -85,11 +85,11 @@ sub run {
 
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
+        $log = Log::Log4perl->get_logger();
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
+        $log = Log::Log4perl->get_logger();
         if ($verbose) {
             $log->level($INFO);
         }
@@ -100,7 +100,7 @@ sub run {
 
     ### set up iRODS connection and make it use same logger as script ###
     my $irods = WTSI::NPG::iRODS->new;
-    $irods->logger($log);
+    $irods->logger();
 
     ### read equivalent calls probability by SNP from JSON, if given
     my $ecp;
@@ -190,8 +190,7 @@ sub run {
 
     ### create identity check object ###
     my %args = (plink_path         => $plink,
-                snpset             => $snpset,
-                logger             => $log);
+                snpset             => $snpset);
     if (defined($swap_threshold)) {$args{'swap_threshold'} = $swap_threshold;}
     if (defined($pass_threshold)) {$args{'pass_threshold'} = $pass_threshold;}
     if (defined($ecp)) { $args{'equivalent_calls_probability'} = $ecp;  }

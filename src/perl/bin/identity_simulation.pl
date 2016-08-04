@@ -89,11 +89,11 @@ sub run {
 
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
+        $log = Log::Log4perl->get_logger();
     }
     else {
         Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
+        $log = Log::Log4perl->get_logger();
         if ($verbose) {
             $log->level($INFO);
         }
@@ -110,8 +110,7 @@ sub run {
 
     my $idsim = WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator->new(
         calls  => $calls,
-        snpset => $snpset,
-        logger => $log,
+        snpset => $snpset
     );
 
     my $results;

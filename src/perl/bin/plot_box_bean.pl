@@ -24,7 +24,7 @@ use WTSI::NPG::Genotyping::QC::QCPlotTests;
 our $VERSION = '';
 
 Log::Log4perl->easy_init($ERROR);
-my $log = Log::Log4perl->get_logger("genotyping");
+my $log = Log::Log4perl->get_logger();
 
 my ($mode, $type, $outDir, $title, $help, $dbpath, $inipath);
 

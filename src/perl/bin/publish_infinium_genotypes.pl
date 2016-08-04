@@ -94,11 +94,11 @@ sub run {
 
   if ($log4perl_config) {
     Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
   }
   else {
     Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
+    $log = Log::Log4perl->get_logger();
 
     if ($verbose) {
       $log->level($INFO);
@@ -123,15 +123,13 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError           => 1,
-                               mysql_enable_utf8    => 1,
-                               mysql_auto_reconnect => 1);
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
+                                  mysql_auto_reconnect => 1);
 
   my @files;
   if ($stdio) {
@@ -141,7 +139,8 @@ sub run {
     }
   }
   else {
-    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    my $irods = WTSI::NPG::iRODS->new();
+    $log->info("Finding files to publish in Infinium LIMS");
     @files = find_files_to_publish($ifdb, $begin, $end, $project, $irods,
                                    $publish_dest, $force, $log);
   }
@@ -154,22 +153,22 @@ sub run {
   }
   elsif ($project) {
     $log->info("Publishing to '$publish_dest' Infinium results in project ",
-               "'$project'");
+               "'$project', $total files in total");
   }
   else {
     $log->info("Publishing to '$publish_dest' Infinium results ",
-               "scanned between ", $begin->iso8601, " and ", $end->iso8601);
-
-    $log->debug("Publishing $total files");
+               "scanned between ", $begin->iso8601, " and ", $end->iso8601,
+               ", $total files in total");
   }
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
      infinium_db      => $ifdb,
-     ss_warehouse_db  => $ssdb,
-     logger           => $log);
+     ss_warehouse_db  => $ssdb);
   $publisher->publish($publish_dest);
+
+  $log->info("Finished publishing $total files");
 
   return 0;
 }
@@ -239,7 +238,7 @@ sub find_files_to_publish {
             }
             elsif ($num_matches == 1) {
               push @data_objects, @matches;
-              $log->info("Found a match for '$file' with MD5 '$md5'");
+              $log->debug("Found a match for '$file' with MD5 '$md5'");
             }
             else {
               push @data_objects, $matches[0];
@@ -254,8 +253,8 @@ sub find_files_to_publish {
       my $num_files        = scalar @candidate_files;
       my $num_data_objects = scalar @data_objects;
 
-      $log->info("Beadchip '$chip' section '$section' data objects published ",
-                 "previously: $num_data_objects/$num_files");
+      $log->debug("Beadchip '$chip' section '$section' data objects ",
+                  "published previously: $num_data_objects/$num_files");
 
       if ($num_data_objects < $num_files || $force) {
         push @to_publish, @candidate_files;
