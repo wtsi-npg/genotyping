@@ -102,7 +102,7 @@ sub run {
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $irods = WTSI::NPG::iRODS->new(logger => $log);
+  my $irods = WTSI::NPG::iRODS->new();
   my @gex_data;
 
   if ($stdio) {
