@@ -76,7 +76,7 @@ GetOptions('callset=s'         => \$callset_name,
 ### set up logging ###
 if ($logConfig) { Log::Log4perl::init($logConfig); }
 else { Log::Log4perl::init(\$embedded_conf); }
-$log = Log::Log4perl->get_logger('npg.vcf.plex');
+$log = Log::Log4perl->get_logger();
 if ($quiet) { $log->level($WARN); }
 elsif ($debug) { $log->level($DEBUG); }
 else { $log->level($INFO); }
@@ -102,7 +102,6 @@ unless (-d $repository) {
 my ($snpset, $chromosome_lengths);
 if ($use_irods) {
     $irods = WTSI::NPG::iRODS->new();
-    $irods->logger($log);
     my $snpset_obj = WTSI::NPG::iRODS::DataObject->new
         ($irods, $snpset_path);
     $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_obj);

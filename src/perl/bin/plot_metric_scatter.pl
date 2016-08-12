@@ -19,7 +19,7 @@ use WTSI::NPG::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 our $VERSION = '';
 
 Log::Log4perl->easy_init($ERROR);
-my $log = Log::Log4perl->get_logger("genotyping");
+my $log = Log::Log4perl->get_logger();
 
 my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath, 
     $resultpath, $maxBatch, $noIntensity);
