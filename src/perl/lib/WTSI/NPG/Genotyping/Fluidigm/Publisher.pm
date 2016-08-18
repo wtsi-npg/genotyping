@@ -172,8 +172,8 @@ sub publish_samples {
 
   foreach my $address (@addresses) {
     try {
-      my $file = sprintf("%s/%s_%s.csv", $tmpdir, $address,
-                         $export_file->fluidigm_barcode);
+      my $filename = $export_file->fluidigm_filename($address);
+      my $file = File::Spec->catfile($tmpdir, $filename);
       $current_file = $file;
 
       my $record_count = $export_file->write_assay_result_data($address, $file);
