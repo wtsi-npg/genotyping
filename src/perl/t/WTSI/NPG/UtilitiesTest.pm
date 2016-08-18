@@ -8,7 +8,7 @@ use warnings;
 use File::Temp qw(tempfile);
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 810;
+use Test::More tests => 811;
 use Test::Exception;
 
 use Log::Log4perl;
@@ -112,7 +112,7 @@ sub test_collect_files : Test(4) {
              "$collect_path/c/z/3.txt"]);
 }
 
-sub test_collect_dirs : Test(4) {
+sub test_collect_dirs : Test(5) {
 
   # Accept all dirs
   my $dir_test = sub {
@@ -148,6 +148,12 @@ sub test_collect_dirs : Test(4) {
              "$collect_path/b/y",
              "$collect_path/c",
              "$collect_path/c/z"]);
+
+  # collect with regex
+  is_deeply([collect_dirs($collect_path, $dir_test, 2, qr/^[ab]$/msx)],
+            ["$collect_path/a",
+             "$collect_path/b"]);
+
 }
 
 sub test_modified_between : Test(1) {

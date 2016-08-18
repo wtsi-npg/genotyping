@@ -1,3 +1,4 @@
+bin/archive_fluidigm_genotypes.pl
 bin/check_duplicates_bed.pl
 bin/check_identity_bed.pl
 bin/check_identity_bed_wip.pl
@@ -107,6 +108,7 @@ lib/WTSI/NPG/Genotyping/Database/Pipeline/Schema/Result/State.pm
 lib/WTSI/NPG/Genotyping/Database/Pipeline/Schema/Result/Well.pm
 lib/WTSI/NPG/Genotyping/Database/Sequenom.pm
 lib/WTSI/NPG/Genotyping/Database/SNP.pm
+lib/WTSI/NPG/Genotyping/Fluidigm/Archiver.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/AssayDataObject.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/AssayResult.pm
 lib/WTSI/NPG/Genotyping/Fluidigm/AssayResultSet.pm
@@ -163,9 +165,11 @@ lib/WTSI/NPG/GenotypingReduced
 lib/WTSI/NPG/Publisher.pm
 lib/WTSI/NPG/SimplePublisher.pm
 lib/WTSI/NPG/Utilities.pm
+lib/WTSI/NPG/Utilities/Archivable.pm
 lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 MANIFEST			This list of files
 README
+t/archivable.t
 t/call.t
 t/collation.t
 t/compile_scripts.t
@@ -218,6 +222,12 @@ t/filter_illuminus_output.t
 t/filter_illuminus_output/columns.txt
 t/filter_illuminus_output/illuminus_genotypes_1.txt
 t/filter_illuminus_output/illuminus_probabilities_1.txt
+t/fluidigm_archiver.t
+t/fluidigm_archiver/0123456789/0123456789.csv
+t/fluidigm_archiver/0123456789/Data/aramis.tif
+t/fluidigm_archiver/0123456789/Data/athos.tif
+t/fluidigm_archiver/0123456789/Data/porthos.tif
+t/fluidigm_archiver/qc.tsv
 t/fluidigm_assay_data_object.t
 t/fluidigm_assay_data_object/1381735059/S01_1381735059.csv
 t/fluidigm_assay_data_object/1381735059/S02_1381735059.csv
@@ -677,6 +687,7 @@ t/vcf/sequenom_alternate_snp_004.csv
 t/vcf/sequenom_inputs.txt
 t/vcf/W30467_snp_set_info_GRCh37.tsv
 t/vcf/W30467_snp_set_info_GRCh37_1.tsv
+t/WTSI/NPG/ArchivableTest.pm
 t/WTSI/NPG/Database/MLWarehouseTest.pm
 t/WTSI/NPG/Database/WarehouseTest.pm
 t/WTSI/NPG/DatabaseTest.pm
@@ -692,6 +703,7 @@ t/WTSI/NPG/Genotyping/Database/InfiniumTest.pm
 t/WTSI/NPG/Genotyping/Database/PipelineTest.pm
 t/WTSI/NPG/Genotyping/Database/SequenomTest.pm
 t/WTSI/NPG/Genotyping/Database/SNPTest.pm
+t/WTSI/NPG/Genotyping/Fluidigm/ArchiverTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/AssayDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/AssayResultSetTest.pm
 t/WTSI/NPG/Genotyping/Fluidigm/AssayResultTest.pm

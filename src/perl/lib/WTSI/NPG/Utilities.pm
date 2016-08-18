@@ -16,7 +16,9 @@ our @EXPORT_OK = qw(collect_dirs
                     common_stem
                     make_collector
                     md5sum
+		    last_modified_before
                     modified_between
+		    stat_mtime
                     trim
                     depad_well
                     user_session_log);
@@ -340,17 +342,54 @@ sub modified_between {
 
   return sub {
     my ($file) = @_;
+    my $mtime = stat_mtime($file);
+    return ($start <= $mtime) && ($mtime <= $finish);
+  }
+}
 
+
+=head2 last_modified_before
+
+  Arg [1]    : time in seconds since the epoch
+
+  Example    : $test = last_modified_before($time)
+  Description: Return a function that accepts a single argument (a
+               file name string) and returns true if that file was
+               last modified before (ie. is older than) the specified
+               time in seconds.
+  Returntype : coderef
+
+=cut
+
+sub last_modified_before {
+  my ($threshold) = @_;
+
+  return sub {
+    my ($file) = @_;
+    my $mtime = stat_mtime($file);
+    return $mtime <= $threshold;
+  }
+}
+
+=head2 stat_mtime
+
+  Arg [1]    : file path
+
+  Example    : $time = stat_mtime($file);
+  Description: Safely stat the given file and return its mtime.
+  Returntype : Int
+
+=cut
+
+sub stat_mtime {
+    my ($file) = @_;
     my $stat = stat($file);
     unless (defined $stat) {
       my $wd = `pwd`;
       croak "Failed to stat file '$file' in $wd: $!";
     }
-
     my $mtime = $stat->mtime;
-
-    return ($start <= $mtime) && ($mtime <= $finish);
-  }
+    return $mtime;
 }
 
 1;
@@ -359,11 +398,11 @@ __END__
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
