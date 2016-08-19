@@ -10,7 +10,7 @@ use Log::Log4perl::Level;
 use Pod::Usage;
 use Try::Tiny;
 
-use WTSI::NPG::Database::Warehouse;
+use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::iRODS;
 
@@ -95,7 +95,7 @@ sub run {
     }
   }
 
-  my $ssdb = WTSI::NPG::Database::Warehouse->new
+  my $ssdb = WTSI::NPG::Database::MLWarehouse->new
     (name   => 'sequencescape_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
