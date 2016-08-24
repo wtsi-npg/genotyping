@@ -169,6 +169,24 @@ sub fluidigm_metadata {
           [$FLUIDIGM_PLATE_WELL => $address]);
 }
 
+=head2 fluidigm_filename
+
+  Arg [1]    : Sample address i.e. S01, S02 etc.
+
+  Example    : $export->fluidigm_filename('S01')
+  Description: Return the name for a CSV file, to contain data for the
+               given address.
+  Returntype : Str
+
+=cut
+
+sub fluidigm_filename {
+  my ($self, $address) = @_;
+
+  return sprintf("%s_%s.csv", $address, $self->fluidigm_barcode);
+}
+
+
 =head2 fluidigm_fingerprint
 
   Arg [1]    : Sample address i.e. S01, S02 etc.

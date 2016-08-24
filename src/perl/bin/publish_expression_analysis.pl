@@ -25,7 +25,8 @@ use WTSI::NPG::Expression::AnalysisPublisher;
 use WTSI::NPG::Expression::ChipLoadingManifestV1;
 use WTSI::NPG::Expression::ChipLoadingManifestV2;
 use WTSI::NPG::Expression::Publisher;
-use WTSI::NPG::Utilities qw(collect_files trim user_session_log);
+use WTSI::NPG::Utilities qw(trim user_session_log);
+use WTSI::NPG::Utilities::Collector;
 
 our $VERSION = '';
 
@@ -249,11 +250,12 @@ sub find_data_files {
 
   $log->debug("Finding sample data files matching regex '$filename_regex'");
 
-  my $sample_dir = abs_path($sample_source);
-  my $file_test = sub { return $_[0] =~ $filename_regex };
-  my $relative_depth = 3;
-
-  return collect_files($sample_dir, $file_test, $relative_depth);
+  my $collector = WTSI::NPG::Utilities::Collector->new(
+      root => abs_path($sample_source),
+      depth => 3,
+      regex => $filename_regex,
+  );
+  return $collector->collect_files_simple();
 }
 
 __END__

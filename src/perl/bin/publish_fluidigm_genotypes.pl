@@ -16,9 +16,7 @@ use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
-use WTSI::NPG::Utilities qw(collect_files
-                            collect_dirs
-                            modified_between);
+use WTSI::NPG::Utilities::Collector;
 
 my $embedded_conf = q(
    log4perl.logger.npg.irods.publish = ERROR, A1
@@ -106,21 +104,22 @@ sub run {
   else {
     $end = $now;
   }
-
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
 
-  my $dir_test = modified_between($begin->epoch, $end->epoch);
-  my $dir_regex = qr{^\d{10}$}msxi;
   my $source_dir = abs_path($source);
-  my $relative_depth = 2;
-
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              "results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
   $log->info("Using reference path '$reference_path'");
 
-  my @dirs = collect_dirs($source_dir, $dir_test, $relative_depth, $dir_regex);
+  my $collector = WTSI::NPG::Utilities::Collector->new(
+      root  => $source_dir,
+      depth => 2,
+      regex => qr{^\d{10}$}msxi,
+  );
+  my @dirs = $collector->collect_dirs_modified_between($begin->epoch,
+                                                       $end->epoch);
   my $total = scalar @dirs;
   my $num_published = 0;
 
