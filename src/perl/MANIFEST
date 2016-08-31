@@ -6,7 +6,6 @@ bin/check_xhet_gender.pl
 bin/collate_qc_results.pl
 bin/create_test_database.pl
 bin/filter_illuminus_output.pl
-bin/find_modified_files.pl
 bin/gendermix_standalone.pl
 bin/identity_simulation.pl
 bin/illuminus.pl
