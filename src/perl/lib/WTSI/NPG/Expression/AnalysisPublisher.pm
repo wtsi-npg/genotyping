@@ -12,7 +12,7 @@ use WTSI::NPG::Expression::ResultSet;
 use WTSI::NPG::Expression::SampleProbeProfile;
 use WTSI::NPG::Publisher;
 use WTSI::NPG::SimplePublisher;
-use WTSI::NPG::Utilities qw(collect_files);
+use WTSI::NPG::Utilities::Collector;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::Metadata; # has attribute name constants
 
@@ -217,8 +217,10 @@ sub ensure_analysis_collection {
 
 sub find_analysis_files {
   my ($self) = @_;
-
-  return collect_files($self->analysis_directory, sub { return 1;});
+  my $collector = WTSI::NPG::Utilities::Collector->new(
+      root => $self->analysis_directory
+  );
+  return $collector->collect_files_simple();
 }
 
 sub publish_analysis_file {
