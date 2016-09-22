@@ -22,12 +22,12 @@ my ($dbPath, $iniPath, $mode, $outDir, $help);
 
 GetOptions("dbpath=s"  => \$dbPath,
 	   "inipath=s" => \$iniPath,
-	   "mode=s"    => \$mode,    
+	   "mode=s"    => \$mode,
 	   "out_dir=s" => \$outDir,
 	   "h|help"    => \$help);
 
 if ($help) {
-    print STDERR "Usage: $0 [ options ] 
+    print STDERR "Usage: $0 [ options ]
 Script to generate heatmap plots for each sample on a plate surface.
 Plots include call rate, autosome heterozygosity, and xy intensity difference.
 Appropriate input data must be supplied to STDIN: either sample_cr_het.txt or the *XYdiff.txt file.
@@ -51,13 +51,13 @@ $mode ||= "cr";
 $outDir ||= 'platePlots';
 
 if ((!$dbPath) && (!$iniPath)) {
-  die "Must supply at least one of pipeline database path and .ini path!\n";
+    croak("Must supply at least one of pipeline database path and .ini path!");
 }
 if ($dbPath && !(-r $dbPath)) {
-  die "Cannot read pipeline database path $dbPath\n";
+    croak("Cannot read pipeline database path '", $dbPath, "'");
 }
 if ($iniPath && !(-r $iniPath)) {
-  die "Cannot read .ini path $iniPath\n";
+    croak("Cannot read .ini path '", $iniPath, "'");
 }
 
 sub getXYdiffMinMax {
@@ -86,7 +86,7 @@ sub makePlots {
 	my $plate = $comments{'PLATE_NAME'};
 	# TODO fail silently for reserved filenames, eg. xydiff_boxplot.txt
 	if (not(defined($plate))) {
-	    print STDERR "WARNING: Cannot read plate name from $path. Skipping.\n";
+	    carp("Cannot read plate name from '", $path, "'. Skipping.");
 	    next;
 	}
 	$plate =~ s/\s+/_/msx; # get rid of spaces in plate name (if any)
@@ -153,7 +153,7 @@ sub readData {
     }
     @allResults = sort {$a<=>$b} @allResults; # sort numerically
     if ($mode eq 'xydiff') { # special plot range for xydiff
-        ($plotMin, $plotMax) = getXYdiffMinMax(\@allResults); 
+        ($plotMin, $plotMax) = getXYdiffMinMax(\@allResults);
     } else { # default to plot range = data range
         $plotMin = $allResults[0];
         $plotMax = $allResults[-1];
@@ -167,14 +167,15 @@ sub readComments {
     # header lines of the form '# KEY VALUE' ; VALUE may contain spaces!
     my $inPath = shift;
     my %comments = ();
-    open my $in, "<", $inPath || die "Cannot open input path $inPath: $!\n";
+    open my $in, "<", $inPath || croak("Cannot open input path '",
+                                       $inPath, "'");
     while (<$in>) {
 	chomp;
 	unless (m{^\#}msx) { next; }
 	my @words = split /\s/msx;
 	$comments{$words[1]} = join(' ', @words[2..$#words]); # value may contain spaces!
     }
-    close $in;
+    close $in || croak("Cannot close input path '", $inPath, "'");
     return %comments;
 }
 
@@ -188,7 +189,8 @@ sub writeGrid {
     my $outPath = $outDir."/".$outPrefix.$plate.".txt";
     my @keyList = keys(%comments);
     @keyList = sort(@keyList);
-    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
+    open my $out, ">", $outPath || croak("Cannot open output path '",
+                                         $outPath, "'");
     foreach my $key (@keyList) { print $out "# $key $comments{$key}\n"; }
     for (my $y=1; $y<=$yMax; $y++) { # x, y counts start at 1
         my @row = ();
@@ -199,7 +201,7 @@ sub writeGrid {
         }
         print $out join("\t", @row)."\n";
     }
-    close $out;
+    close $out || croak("Cannot close output path '", $outPath, "'");
     return 1;
 }
 
@@ -210,17 +212,19 @@ sub writePlateData {
     my ($dataRef, $prefix, $xMax, $yMax, $outDir, $min, $max) = @_; # will append plate name to prefix
     my %data = %$dataRef;
     if (not -e $outDir) {
-      mkdir($outDir) || die "Failed to create output directory $outDir : $!\n";
+      mkdir($outDir) || croak("Failed to create output directory '",
+                              $outDir, "'");
     }
-    elsif (not -d $outDir) { die "$outDir is not a directory: $!\n"; }
-    elsif (not -w $outDir) { die "Directory $outDir is not writable: $!\n"; }
-    foreach my $plate (keys(%data)) { 
+    elsif (not -d $outDir) { croak("'", $outDir, "' is not a directory"); }
+    elsif (not -w $outDir) { croak("Directory '", $outDir,
+                                   "' is not writable"); }
+    foreach my $plate (keys(%data)) {
 	my %comments = (
 	    PLATE_NAME => $plate,
 	    PLOT_MIN => $min,
 	    PLOT_MAX => $max,
 	);
-	writeGrid($data{$plate}, $outDir, $prefix, $xMax, $yMax, \%comments); 
+	writeGrid($data{$plate}, $outDir, $prefix, $xMax, $yMax, \%comments);
     }
     return 1;
 }
@@ -231,34 +235,34 @@ sub run {
     my $test = 1; # keep tests on by default, since they are very quick to run
     my %plotScripts = ( # R plotting scripts for each mode
                         cr        => 'plotCrPlate.R',
-                        het       => 'plotHetPlate.R', 
-                        xydiff    => 'plotXYdiffPlate.R', 
+                        het       => 'plotHetPlate.R',
+                        xydiff    => 'plotXYdiffPlate.R',
                         magnitude => 'plotMagnitudePlate.R',
         );
     my %index = ( # index in whitespace-separated input data for each mode
                   cr        => 1,
-                  het       => 2, 
-                  xydiff    => 1, 
+                  het       => 2,
+                  xydiff    => 1,
                   magnitude => 1,
         );
     my %minMaxArgs = ( # supply min/max arguments to R script?
                        cr        => 0,
-                       het       => 0, 
-                       xydiff    => 1, 
+                       het       => 0,
+                       xydiff    => 1,
                        magnitude => 0,);
-    my $inputFH = \*STDIN;  
+    my $inputFH = \*STDIN;
     # read data from STDIN; output data values by plate & useful stats
     my ($dataOK, $dataRef, $xMax, $yMax, $plotMin, $plotMax) = 
         readData($inputFH, $index{$mode}, $mode, $dbPath, $iniPath);
     my $ok = 1;
     if ($dataOK) {
-        writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir, 
-                       $plotMin, $plotMax); 
-        $ok = makePlots($outDir, $plotScripts{$mode}, $mode."_*", 
-                        "plot_${mode}_", $minMaxArgs{$mode}, $test); 
+        writePlateData($dataRef, $mode.'_', $xMax, $yMax, $outDir,
+                       $plotMin, $plotMax);
+        $ok = makePlots($outDir, $plotScripts{$mode}, $mode."_*",
+                        "plot_${mode}_", $minMaxArgs{$mode}, $test);
     } else {
-        print STDERR "Cannot parse plate/well locations; omitting ".
-            "plate heatmap plots.\n";
+        carp("Cannot parse plate/well locations; omitting ",
+             "plate heatmap plots.");
     }
     return $ok;
 }
@@ -266,3 +270,35 @@ sub run {
 my $ok = run($mode, $outDir, $dbPath, $iniPath);
 if ($ok) { exit(0); }
 else { exit(1); }
+
+
+__END__
+
+=head1 NAME
+
+plate_heatmap_plots
+
+=head1 DESCRIPTION
+
+Generate heatmap plots of QC metrics by plate
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

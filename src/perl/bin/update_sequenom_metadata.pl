@@ -19,15 +19,11 @@ use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::Sequenom::AssayDataObject;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::Utilities qw(user_session_log);
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'update_sequenom_metadata');
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -82,23 +78,25 @@ sub run {
     }
   }
 
-  my $log;
-
   if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger();
+      Log::Log4perl::init($log4perl_config);
+  } else {
+      my $level;
+      if ($debug) { $level = $DEBUG; }
+      elsif ($verbose) { $level = $INFO; }
+      else { $level = $ERROR; }
+      my @log_args = ({layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => ">>$session_log",
+                       utf8   => 1},
+                      {layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => "STDERR",
+                       utf8   => 1},
+                  );
+      Log::Log4perl->easy_init(@log_args);
   }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger();
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my $log = Log::Log4perl->get_logger('main');
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
@@ -206,11 +204,12 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

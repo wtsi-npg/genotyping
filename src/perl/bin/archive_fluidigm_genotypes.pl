@@ -10,13 +10,11 @@ use Getopt::Long;
 use Log::Log4perl qw(:levels);
 
 use WTSI::NPG::Genotyping::Fluidigm::Archiver;
+use WTSI::NPG::Utilities qw(user_session_log);
 
-my $embedded_appender = q(
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'archive_fluidigm_genotypes');
 
 our $VERSION = '';
 
@@ -52,20 +50,26 @@ sub run {
                   -exitval => 2);
     }
 
-    my $log;
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger();
-    } else {
-        # $logger->level is not propagated to objects created in the script
-        my $priority = 'ERROR';
-        if ($verbose) { $priority = 'INFO'; }
-        elsif ($debug) { $priority = 'DEBUG'; }
-        my $log_conf = "log4perl.logger = $priority, A1\n\n";
-        $log_conf .= $embedded_appender;
-        Log::Log4perl::init(\$log_conf);
-        $log = Log::Log4perl->get_logger();
     }
+    else {
+        my $level;
+        if ($debug) { $level = $DEBUG; }
+        elsif ($verbose) { $level = $INFO; }
+        else { $level = $ERROR; }
+        my @log_args = ({layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => ">>$session_log",
+                         utf8   => 1},
+                        {layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => "STDERR",
+                         utf8   => 1},
+                    );
+        Log::Log4perl->easy_init(@log_args);
+    }
+    my $log = Log::Log4perl->get_logger('main');
 
     $input_dir ||= cwd();
 

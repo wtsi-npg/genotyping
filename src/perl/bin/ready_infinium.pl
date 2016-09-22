@@ -52,23 +52,6 @@ our $DEFAULT_DATA_PATH      = '/seq/fluidigm';
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_infinium');
-
-my $embedded_conf = "
-   log4perl.logger.npg.irods.publish = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
 my $log;
 
 run() unless caller();
@@ -134,20 +117,24 @@ sub run {
   }
 
   if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger();
+      Log::Log4perl::init($log4perl_config);
+  } else {
+      my $level;
+      if ($debug) { $level = $DEBUG; }
+      elsif ($verbose) { $level = $INFO; }
+      else { $level = $ERROR; }
+      my @log_args = ({layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => ">>$session_log",
+                       utf8   => 1},
+                      {layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => "STDERR",
+                       utf8   => 1},
+                  );
+      Log::Log4perl->easy_init(@log_args);
   }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger();
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  $log = Log::Log4perl->get_logger('main');
 
   unless (-e $dbfile) {
       $log->logcroak("SQLite database file '$dbfile' does not exist");
@@ -664,11 +651,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2013, 2014, 2015 Genome Research Limited. All
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited. All
 Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify

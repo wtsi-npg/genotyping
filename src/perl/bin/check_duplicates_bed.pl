@@ -93,17 +93,17 @@ if ($help) {
 }
 
 # generate hashes of chromosome and position for each SNP in .bim file
-open my $bim, "<", $bfile.".bim" or die "Unable to open $bfile.bim\n";
+open my $bim, "<", $bfile.".bim" or croak("Unable to open '$bfile.bim'");
 while (<$bim>) {
     my ($chr, $snp, $pos) = (split)[0, 1, 3];
     $chr{$snp} = $chr;
     $pos{$snp} = $pos;
 }
-close $bim;
+close $bim or croak("Failed to close '$bfile.bim'");
 
 # open genotyping SNP results file (defaults to snp_cr_af.txt) and filter on MAF and CR
 # populate a hash %snps: Keys=chromosomes, values = lists of (snp_name, snp_position) pairs
-open my $snpfile, "<", $af or die "Cannot read SNP file '$af': $!\n";
+open my $snpfile, "<", $af or croak("Cannot read SNP file '$af': $!");
 while (<$snpfile>) {
     my ($snp, $cr, $maf) = (split)[0, 1, 5];
     next unless $chr{$snp};
@@ -111,7 +111,7 @@ while (<$snpfile>) {
     next if $maf < $maf_min || $maf > $maf_max;
     push @{$snps{$chr{$snp}}}, [ $snp, $pos{$snp} ];
 }
-close $snpfile or die "Failed to close $snpfile: $!\n";
+close $snpfile or croak("Failed to close $snpfile: $!");
 
 # filter to ensure minimum distance between SNPs; generates @use_snps array
 foreach my $chr (keys %snps) {
@@ -126,25 +126,57 @@ foreach my $chr (keys %snps) {
 	}
     }
 }
-open my $logfile, ">", $log or die "Failed to open $log for writing: $!\n";
+open my $logfile, ">", $log or croak("Failed to open '$log' for writing");
 print $logfile scalar(@use_snps), " available SNPs found for duplicate check\n";
 if (@use_snps > $max_snps) {
     @use_snps = @use_snps[0 .. $max_snps - 1]; # truncate @use_snps if too large
 }
 print $logfile "Using ", scalar(@use_snps), " SNPs\n";
-close $logfile;
+close $logfile or croak("Failed to close '$log' for writing");
 
 # write @use_snps to temp file
-my $snp_file = new File::Temp; 
+my $snp_file = new File::Temp;
 $snp_file->autoflush(1);
 print $snp_file map { $_ . "\n" } @use_snps;
 
-# execute binary to write pairwise concordance 
+# execute binary to write pairwise concordance
 my $full = $dir.'/duplicate_full.txt';
 my $summary = $dir.'/duplicate_summary.txt';
 my $cmd = "pairwise_concordance_bed -n $snp_file -f $full -m $summary $bfile";
-system($cmd) && die qq(Error running command "$cmd": $!\n);
+system($cmd) && croak("Error running command '$cmd'");
 
 # gzip pairwise output file; can be quite large, >> 1 GB
 $cmd = "gzip -f $full";
-system($cmd) && die qq(Error running command "$cmd": $!\n);;
+system($cmd) && croak("Error running command '$cmd'");
+
+
+__END__
+
+=head1 NAME
+
+check_duplicates_bed
+
+=head1 DESCRIPTION
+
+Compare genotype calls to check for duplicate samples
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

@@ -70,19 +70,19 @@ Options:
     exit(0);
 }
 
-$plink or die "Must supply a Plink binary input prefix\n";
+$plink or croak("Must supply a Plink binary input prefix");
 foreach my $part (map { $plink . $_ } qw(.bed .bim .fam)) {
-  -e $part or die "Prefix '$plink' is not a valid Plink binary dataset; " .
-    "'$part' is missing\n";
+  -e $part or croak("Prefix '$plink' is not a valid Plink binary dataset; ",
+                    "'", $part, "' is missing");
 }
 
 if ($outDir) {
-  -e $outDir or die "Output '$outDir' does not exist\n";
-  -d $outDir or die "Output '$outDir' is not a directory\n";
+  -e $outDir or croak("Output '", $outDir, "' does not exist");
+  -d $outDir or croak("Output '", $outDir, "' is not a directory");
 }
 
-$dbPath or die "Must supply an SQLite pipeline database path\n";
--e $dbPath or die "Database path '$dbPath' does not exist\n";
+$dbPath or croak("Must supply an SQLite pipeline database path");
+-e $dbPath or croak("Database path '", $dbPath, "' does not exist");
 
 $outDir ||= getcwd();
 $minSNPs ||= 8;
@@ -91,14 +91,14 @@ if (!$minIdent) {
         my %thresholds = readThresholds($configPath);
         $minIdent = $thresholds{'identity'};
     } else {
-        die "Must supply a value for either --min_ident or --config\n";
+        croak("Must supply a value for either --min_ident or --config");
     }
 }
 if ($minIdent < 0 || $minIdent > 1) {
-    die "Minimum identity value must be a number between 0 and 1\n";
+    croak("Minimum identity value must be a number between 0 and 1");
 }
 if ($swap && ($swap < 0 || $swap > 1)) {
-    die "Swap threshold must be a number between 0 and 1\n";
+    croak("Swap threshold must be a number between 0 and 1");
 }
 $swap ||= $swapDefault;
 
@@ -113,3 +113,35 @@ WTSI::NPG::Genotyping::QC::Identity->new(
     plink_path => $plink,
     swap_threshold => $swap
 )->run_identity_check();
+
+
+__END__
+
+=head1 NAME
+
+check_identity_bed
+
+=head1 DESCRIPTION
+
+Compare genotype calls to check identity with a QC plex
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

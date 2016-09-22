@@ -45,24 +45,6 @@ my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_qc_calls');
 
-my $embedded_conf = "
-   log4perl.logger.npg.ready_qc_calls = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
-
 run() unless caller();
 
 sub run {
@@ -90,21 +72,25 @@ sub run {
 
     $inifile ||= $DEFAULT_INI;
 
-    ### set up logging ###
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger();
+    } else {
+        my $level;
+        if ($debug) { $level = $DEBUG; }
+        elsif ($verbose) { $level = $INFO; }
+        else { $level = $ERROR; }
+        my @log_args = ({layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => ">>$session_log",
+                         utf8   => 1},
+                        {layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => "STDERR",
+                         utf8   => 1},
+                    );
+        Log::Log4perl->easy_init(@log_args);
     }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger();
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my $log = Log::Log4perl->get_logger('main');
 
     ### validate command-line arguments ###
     my @config = split(/,/msx, $config);

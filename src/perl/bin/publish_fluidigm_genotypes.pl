@@ -16,6 +16,7 @@ use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
+<<<<<<< HEAD
 use WTSI::NPG::Utilities::Collector;
 
 my $embedded_conf = q(
@@ -26,11 +27,19 @@ my $embedded_conf = q(
    log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
    log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
 );
+=======
+use WTSI::NPG::Utilities qw(user_session_log);
+use WTSI::NPG::Utilities::Collector;
+>>>>>>> logger_init
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
 our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_fluidigm_genotypes');
 
 run() unless caller();
 sub run {
@@ -71,23 +80,26 @@ sub run {
   $days_ago       ||= 0;
   $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
-  my $log;
-
   if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger();
+      Log::Log4perl::init($log4perl_config);
   }
   else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger();
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
+      my $level;
+      if ($debug) { $level = $DEBUG; }
+      elsif ($verbose) { $level = $INFO; }
+      else { $level = $ERROR; }
+      my @log_args = ({layout => '%d %p %m %n',
+                       level  => $level,
+                       file     => ">>$session_log",
+                       utf8   => 1},
+                      {layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => "STDERR",
+                       utf8   => 1},
+                  );
+      Log::Log4perl->easy_init(@log_args);
   }
+  my $log = Log::Log4perl->get_logger('main');
 
   my $whdb = WTSI::NPG::Database::MLWarehouse->new
     (name    => 'multi_lims_warehouse',
@@ -191,11 +203,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Copyright (C) 2013, 2014, 2015, 2016 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify

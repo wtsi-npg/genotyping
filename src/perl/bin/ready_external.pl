@@ -15,12 +15,16 @@ use Pod::Usage;
 use WTSI::DNAP::Utilities::IO qw(maybe_stdin maybe_stdout);
 use WTSI::NPG::Utilities qw(common_stem);
 use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Utilities qw(user_session_log);
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'ready_external');
+my $log;
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr{^[\w.-]{4,}$}msx;
-
-Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
@@ -28,7 +32,9 @@ sub run {
   my $chip_design;
   my $config;
   my $dbfile;
+  my $debug;
   my $input;
+  my $log4perl_config;
   my $namespace;
   my $run_name;
   my $supplier_name;
@@ -36,8 +42,10 @@ sub run {
 
   GetOptions('chip-design=s' => \$chip_design,
              'config=s'      => \$config,
+             'debug'          => \$debug,
              'dbfile=s'      => \$dbfile,
              'help'          => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'     => \$log4perl_config,
              'input=s'       => \$input,
              'run=s'         => \$run_name,
              'namespace=s'   => \$namespace,
@@ -64,11 +72,29 @@ sub run {
   unless ($namespace =~ $ID_REGEX) {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
-  if ($verbose) {
-    my $db = $dbfile;
-    $db ||= 'configured database';
-    print STDERR "Updating $db using config from $config\n";
+
+  if ($log4perl_config) {
+      Log::Log4perl::init($log4perl_config);
+  } else {
+      my $level;
+      if ($debug) { $level = $DEBUG; }
+      elsif ($verbose) { $level = $INFO; }
+      else { $level = $ERROR; }
+      my @log_args = ({layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => ">>$session_log",
+                       utf8   => 1},
+                      {layout => '%d %p %m %n',
+                       level  => $level,
+                       file   => "STDERR",
+                       utf8   => 1},
+                  );
+      Log::Log4perl->easy_init(@log_args);
   }
+  $log = Log::Log4perl->get_logger('main');
+
+  my $db = $dbfile || 'configured database';
+  $log->info("Updating '", $db, "' using config from '", $config, "'");
 
   my @initargs = (name => 'pipeline',
                   inifile => $config);
@@ -84,8 +110,9 @@ sub run {
 
   my @valid_designs = map { $_->name } $pipedb->snpset->all;
   unless (any { $chip_design eq $_ } @valid_designs ) {
-    die "Invalid chip design '$chip_design'. Valid designs are: [" .
-      join(", ", @valid_designs) . "]\n";
+    $log->logcroak("Invalid chip design '", $chip_design,
+                   "'. Valid designs are: [",
+                   join(", ", @valid_designs), "]");
   }
 
   my $snpset = $pipedb->snpset->find({name => $chip_design});
@@ -99,7 +126,7 @@ sub run {
 
   my $in = maybe_stdin($input);
   my @ex_samples = parse_manifest($in);
-  close($in) or warn "Failed to close '$input'\n";
+  close($in) or $log->logwarn("Failed to close '$input'");
 
   $pipedb->in_transaction
     (sub {
@@ -112,7 +139,9 @@ sub run {
        my $dataset = $run->add_to_datasets({datasupplier => $supplier,
                                             snpset => $snpset});
 
-       print_pre_report($supplier, $namespace, $snpset) if $verbose;
+       $log->info("Adding dataset: From supplier '", $supplier->name,
+                  "', into namespace '", $namespace, "', using snpset '",
+                  $snpset->name, "'");
 
      SAMPLE: foreach my $ex_sample (@ex_samples) {
          my $grn_path = $ex_sample->{idat_grn_path};
@@ -153,8 +182,7 @@ sub run {
          $sample->include_from_state;
        }
      });
-
-  print_post_report(\@ex_samples) if $verbose;
+  $log->info("Added dataset of ", scalar(@ex_samples), " samples");
 
   return;
 }
@@ -180,8 +208,8 @@ sub parse_manifest {
     my $num_fields = scalar @fields;
 
     unless ($num_fields == 6) {
-      die "Parse error on line $i: expected 6 fields, but found $num_fields:\n" .
-        "$line\n";
+        $log->logcroak("Parse error on line ", $i, ": expected 6 fields, ",
+                       "but found ", $num_fields, ": ", $line);
     }
 
     my $sample = {sample => $fields[0],
@@ -192,7 +220,8 @@ sub parse_manifest {
                   idat_red_path => $fields[5]};
 
     unless ($sample->{gtc_path}) {
-      die "Parse error on line $i: no GTC path was provided:\n$line\n";
+      $log->logcroak("Parse error on line ", $i, ": no GTC path was ",
+                     "provided: '", $line, "'");
     }
 
     unless ($sample->{beadchip}) {
@@ -203,17 +232,20 @@ sub parse_manifest {
         $sample->{beadchip} = $beadchip_guess;
       }
       else {
-        die "Parse error on line $i: no beadchip was supplied and unable " .
-          "to infer from GTC file name:\n$line\n";
+          $log->logcroak("Parse error on line ", $i, ": no beadchip was ",
+                         "supplied and unable to infer from GTC ",
+                         "file name: '", $line, "'");
       }
     }
 
     if ($sample->{idat_grn_path} or $sample->{idat_red_path}) {
       unless ($sample->{idat_grn_path}) {
-        die "Parse error on line $i: no green IDAT path was provided:\n$line\n";
+        $log->logcroak("Parse error on line ", $i, ": no green IDAT path ",
+                       "was provided: '", $line, "'");
       }
       unless ($sample->{idat_red_path}) {
-        die "Parse error on line $i: no red IDAT path was provided:\n$line\n";
+        $log->logcroak("Parse error on line ", $i, ": no red IDAT path ",
+                       "was provided: '", $line, "'");
       }
     }
 
@@ -227,34 +259,13 @@ sub validate_snpset {
   my ($run, $snpset) = @_;
 
   unless ($run->validate_snpset($snpset)) {
-    die "Cannot add this project to '", $run->name, "'; design mismatch: '",
-      $snpset->name, "' cannot be added to existing designs [",
-        join(", ", map { $_->snpset->name } $run->datasets), "]\n";
+    $log->logcroak("Cannot add this project to '", $run->name,
+                   "'; design mismatch: '", $snpset->name,
+                   "' cannot be added to existing designs [",
+                   join(", ", map { $_->snpset->name } $run->datasets), "]");
 
   }
-
   return $snpset;
-}
-
-sub print_pre_report {
-  my ($supplier, $namespace, $snpset) = @_;
-  print STDERR "Adding dataset:\n";
-  print STDERR "  From '", $supplier->name, "'\n";
-  print STDERR "  Into namespace '$namespace'\n";
-  print STDERR "  Using '", $snpset->name, "'\n";
-
-  return;
-}
-
-sub print_post_report {
-  my ($samples) = @_;
-
-  my $num_samples = scalar @$samples;
-
-  print STDERR "Added dataset:\n";
-  print STDERR "  $num_samples samples\n";
-
-  return;
 }
 
 
@@ -279,6 +290,7 @@ Options:
                 value given in the configuration .ini file.
   --help        Display help.
   --input       The sample manifest file. Optional, defaults to STDIN.
+  --logconf     A log4perl configuration file. Optional.
   --namespace   The namespace for the imported sample names.
   --run         The pipeline run name in the database which will be created
                  or added to.
@@ -327,11 +339,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

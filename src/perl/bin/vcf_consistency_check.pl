@@ -38,32 +38,39 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $debug, $jsonOut, $log, $logConfig, $textOut, $verbose);
+my ($input, $debug, $jsonOut, $log, $log4perl_config, $textOut, $verbose);
 
 GetOptions('help'        => sub { pod2usage(-verbose => 2,
                                             -exitval => 0) },
            'debug'     => \$debug,
            'input=s'     => \$input,
            'json=s'      => \$jsonOut,
-           'logconf=s'   => \$logConfig,
+           'logconf=s'   => \$log4perl_config,
            'text=s'      => \$textOut,
            'verbose'     => \$verbose
        );
 
 
 ### set up logging ###
-if ($logConfig) {
-    Log::Log4perl::init($logConfig);
+if ($log4perl_config) {
+    Log::Log4perl::init($log4perl_config);
 } else {
-    Log::Log4perl::init(\$embedded_conf);
+    my $level;
+    if ($debug) { $level = $DEBUG; }
+    elsif ($verbose) { $level = $INFO; }
+    else { $level = $ERROR; }
+    my @log_args = ({layout => '%d %p %m %n',
+                     level  => $level,
+                     file   => ">>$session_log",
+                     utf8   => 1},
+                    {layout => '%d %p %m %n',
+                     level  => $level,
+                     file   => "STDERR",
+                     utf8   => 1},
+                );
+    Log::Log4perl->easy_init(@log_args);
 }
-$log = Log::Log4perl->get_logger();
-if ($verbose) {
-    $log->level($INFO);
-}
-elsif ($debug) {
-    $log->level($DEBUG);
-}
+$log = Log::Log4perl->get_logger('main');
 
 ### read input and do consistency check
 
@@ -122,7 +129,7 @@ Options:
                       standard output. Optional; if not given, text is not
                       written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
-  --quiet             Suppress printing of status information.
+  --verbose           Print additional messages while processing. Optional.
 
 
 =head1 DESCRIPTION
@@ -143,7 +150,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

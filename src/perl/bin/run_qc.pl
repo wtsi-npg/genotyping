@@ -28,26 +28,9 @@ our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
 our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
-
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'run_qc');
-my $embedded_conf = "
-   log4perl.logger.npg.ready_qc_calls = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
 my $log;
 
 run() unless caller();
@@ -82,21 +65,25 @@ sub run {
                "debug"             => \$debug,
            );
 
-
-    ### set up logging
     if ($log4perl_config) {
         Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger();
     } else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger();
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
+        my $level;
+        if ($debug) { $level = $DEBUG; }
+        elsif ($verbose) { $level = $INFO; }
+        else { $level = $ERROR; }
+        my @log_args = ({layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => ">>$session_log",
+                         utf8   => 1},
+                        {layout => '%d %p %m %n',
+                         level  => $level,
+                         file   => "STDERR",
+                         utf8   => 1},
+                    );
+        Log::Log4perl->easy_init(@log_args);
     }
+    $log = Log::Log4perl->get_logger('main');
 
     ### process options and validate inputs
     if (defined($plinkRaw)) {
@@ -113,7 +100,7 @@ sub run {
     $mafHet ||= 0;
     if (not -e $outDir) { mkdir($outDir); }
     elsif (not -w $outDir) {
-        die "Cannot write to output directory $outDir\n";
+        $log->logcroak("Cannot write to output directory $outDir");
     }
     $outDir = abs_path($outDir);
     $title ||= getDefaultTitle($outDir);
@@ -262,7 +249,8 @@ sub processPlinkPrefix {
     }
     my $ok = checkPlinkBinaryInputs($plinkPrefix);
     unless ($ok) {
-      die "Cannot read plink binary inputs for prefix $plinkPrefix\n";
+      $log->logcroak("Cannot read plink binary inputs for prefix '",
+                     $plinkPrefix, "'");
     }
     return $plinkPrefix;
 }
@@ -271,7 +259,8 @@ sub verifyAbsPath {
     my $path = shift;
     my $cwd = getcwd();
     unless (-e $path) { 
-      die "Path '$path' does not exist relative to current directory '$cwd'\n";
+      $log->logcroak("Path '", $path, "' does not exist relative to ",
+                     "current directory '", $cwd, "'");
     }
     $path = abs_path($path);
     return $path;
@@ -297,7 +286,8 @@ sub run_qc_wip {
   my $cmd = $script." ".join(" ", @args);
   my $result = system($cmd);
   if ($result!=0) {
-    die qq(Command finished with non-zero exit status: "$cmd"\n);
+    $log->logcroak("Command finished with non-zero exit status: '",
+                   $cmd, "'");
   }
 
 }
@@ -317,7 +307,8 @@ sub run_qc {
 	);
     my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
     if (!defined($runName)) {
-      die "Must supply pipeline run name for database gender update\n";
+      $log->logcroak("Must supply pipeline run name for database ",
+                     "gender update");
     }
     $genderCmd.=" --dbfile=".$dbPath." --run=".$runName;
     push(@cmds, $genderCmd);
@@ -339,9 +330,10 @@ sub run_qc {
     my $dbopt = "--dbpath=$dbPath "; 
     ### run QC data generation commands ###
     foreach my $cmd (@cmds) {
-        my $result = system($cmd); 
+        my $result = system($cmd);
         if ($result!=0) {
-          die qq("Command finished with non-zero exit status: "$cmd"\n);
+          $log->logcroak("Command finished with non-zero exit status: '",
+                         $cmd, "'");
         }
     }
     ### run identity check ###
@@ -353,7 +345,7 @@ sub run_qc {
     )->run_identity_check();
     my $idJson = $outDir.'/'.$fileNames{'id_json'};
     if (!(-e $idJson)) {
-      die "Identity JSON file '$idJson' does not exist!\n";
+      $log->logcroak("Identity JSON file '", $idJson, "' does not exist");
     }
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
@@ -387,7 +379,8 @@ sub run_qc {
     foreach my $cmd (@cmds) {
         my $result = system($cmd);
         if ($result!=0) {
-           die qq("Command finished with non-zero exit status: "$cmd"\n);
+           $log->logcroak("Command finished with non-zero exit status: '",
+                          $cmd, "'");
         }
     }
     ### create PDF report
