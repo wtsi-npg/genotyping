@@ -29,7 +29,7 @@ qmax <- 40
 q = -10 * log10(1-cr) # convert to phred scale
 q[q>qmax] <- qmax # truncate CR better than Q40 (!)
 qmin <-  -10 * log10(1-minCR) # minimum CR for QC pass
-categories = c("Duplicate", "Gender", "Identity (Sequenom)", "Magnitude", "Multiple/Other") # legend categories
+categories = c("Duplicate", "Gender", "Identity", "Magnitude", "Multiple/Other") # legend categories
 
 make.plot.full <- function(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, type, outPath) {
   if (type=='pdf') { pdf(outPath, paper="a4") }
@@ -96,3 +96,17 @@ make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, 
 
 make.plot.detail(hetMean, hetMaxDist, minCR, experiment, categories, names, cr, het, d.fail, g.fail, i.fail, m.fail, fail.sum, q, qmin, qmax, 'png', pngDetail)
 
+
+# Author: Iain Bancarz <ib5@sanger.ac.uk>
+
+# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.

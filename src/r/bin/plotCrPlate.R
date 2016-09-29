@@ -22,3 +22,18 @@ image(c(0:40), c(1), as.matrix(c(1:40)), col=c("#000000", rainbow(40, end=0.8)),
 axis(3, at=c(0,10,20,30,40), labels=c('No data', '90%', '99%', '99.9%', '99.99%'))
 dev.off()
 q(status=0)
+
+
+# Author: Iain Bancarz <ib5@sanger.ac.uk>
+
+# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
