@@ -65,8 +65,8 @@ sub getPlateInfo {
 
 my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/output directory, output filename
 if (@ARGV!=3) {
-    print STDERR "Usage: $0 experiment_name input/output_directory output_filename\n";
-    exit(0);
+    croak("Usage: $0 experiment_name input/output_directory ",
+          "output_filename\n");
 } elsif (!(-e $plotDir && -d $plotDir)) {
     croak("Output path '", $plotDir,
           "' does not exist or is not a directory");
@@ -79,7 +79,7 @@ my %magPlots = %{shift(@refs)};
 # must write index to given plot directory -- otherwise links are broken
 my $outPath = $plotDir.'/'.$outFileName;
 open my $out, ">", $outPath || croak("Cannot open output path '",
-                                     $outPath, "'");
+                                     $outPath, "': $!");
 print $out header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
     start_html(-title=>"$experiment: Plate heatmap index",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',

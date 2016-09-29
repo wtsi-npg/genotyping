@@ -7,9 +7,9 @@ use Config::IniFiles;
 use File::Slurp qw (read_file);
 use Getopt::Long;
 use JSON;
-use Log::Log4perl;
-use Log::Log4perl::Level;
 use Pod::Usage;
+use Log::Log4perl qw(:levels);
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
 use WTSI::NPG::Genotyping::SNPSet;
@@ -65,25 +65,12 @@ sub run {
         'verbose'           => \$verbose,
         'xer=f'             => \$expected_error_rate);
 
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-    }
-    else {
-        my $level;
-        if ($debug) { $level = $DEBUG; }
-        elsif ($verbose) { $level = $INFO; }
-        else { $level = $ERROR; }
-        my @log_args = ({layout => '%d %p %m %n',
-                         level  => $level,
-                         file   => ">>$session_log",
-                         utf8   => 1},
-                        {layout => '%d %p %m %n',
-                         level  => $level,
-                         file   => "STDERR",
-                         utf8   => 1},
-                    );
-        Log::Log4perl->easy_init(@log_args);
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
     my $log = Log::Log4perl->get_logger('main');
 
     ### set up iRODS connection and make it use same logger as script ###

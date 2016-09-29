@@ -5,11 +5,11 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::iRODS;
@@ -73,24 +73,12 @@ sub run {
     }
   }
 
-  if ($log4perl_config) {
-      Log::Log4perl::init($log4perl_config);
-  } else {
-      my $level;
-      if ($debug) { $level = $DEBUG; }
-      elsif ($verbose) { $level = $INFO; }
-      else { $level = $ERROR; }
-      my @log_args = ({layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => ">>$session_log",
-                       utf8   => 1},
-                      {layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => "STDERR",
-                       utf8   => 1},
-                  );
-      Log::Log4perl->easy_init(@log_args);
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
   my $log = Log::Log4perl->get_logger('main');
 
   my $ssdb = WTSI::NPG::Database::MLWarehouse->new

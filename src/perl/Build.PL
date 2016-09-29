@@ -44,6 +44,7 @@ my $build = Build->new
                          'Text::CSV'                           => '>= 1.33',
                          'Try::Tiny'                           => '>= 0.22',
                          'URI'                                 => '>= 1.67',
+                         'WTSI::DNAP::Utilities'               => '>= 0.5.3',
                          'WTSI::DNAP::Warehouse::Schema'       => '>= 1.1',
                          'WTSI::NPG::iRODS'                    => '>= 2.1.0'
                         },

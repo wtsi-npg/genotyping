@@ -168,7 +168,7 @@ sub readComments {
     my $inPath = shift;
     my %comments = ();
     open my $in, "<", $inPath || croak("Cannot open input path '",
-                                       $inPath, "'");
+                                       $inPath, "': $!");
     while (<$in>) {
 	chomp;
 	unless (m{^\#}msx) { next; }
@@ -190,7 +190,7 @@ sub writeGrid {
     my @keyList = keys(%comments);
     @keyList = sort(@keyList);
     open my $out, ">", $outPath || croak("Cannot open output path '",
-                                         $outPath, "'");
+                                         $outPath, "': $!");
     foreach my $key (@keyList) { print $out "# $key $comments{$key}\n"; }
     for (my $y=1; $y<=$yMax; $y++) { # x, y counts start at 1
         my @row = ();

@@ -165,7 +165,7 @@ sub writeFailCounts {
         };
     }
     open my $out, ">", $failText ||
-        croak("Cannot open output file '", $failText, "'");
+        croak("Cannot open output file '", $failText, "': $!");
     my @metrics = sort(keys(%singleFails));
     foreach my $metric (@metrics) {
         print $out $metric."\t".$singleFails{$metric}."\n";
@@ -173,11 +173,11 @@ sub writeFailCounts {
     close $out || croak("Cannot close output file '", $failText, "'");
     my @failCombos = sort(keys(%combinedFails));
     open $out, ">", $comboText ||
-        croak("Cannot open output file '", $comboText, "'");
+        croak("Cannot open output file '", $comboText, "': $!");
     foreach my $combo (@failCombos) {
         print $out $combo."\t".$combinedFails{$combo}."\n";
     }
-    close $out || croak("Cannot close output file '", $comboText, "'");
+    close $out || croak("Cannot close output file '", $comboText, "': $!");
     return @failedSamples;
 }
 
@@ -192,7 +192,7 @@ sub writeFailedCrHet {
     my @keys = qw(duplicate gender identity magnitude);
     push(@header, @keys);
     open my $out, ">", $outPath || croak("Cannot open output path '",
-                                         $outPath, "'");
+                                         $outPath, "': $!");
     print $out join("\t", @header)."\n";
     foreach my $fieldsRef (@data) {
         my @fields = splice(@$fieldsRef, 0, 3);
@@ -209,7 +209,7 @@ sub writeFailedCrHet {
         }
         print $out join("\t", @fields)."\n";
     }
-    close $out || croak("Cannot close output path '", $outPath, "'");
+    close $out || croak("Cannot close output path '", $outPath, "': $!");
     return 1;
 }
 

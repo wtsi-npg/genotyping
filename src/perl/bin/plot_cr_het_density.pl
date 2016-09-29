@@ -125,7 +125,7 @@ sub run {
     my ($xmin, $xmax, $xsteps, $ysteps) = (0, 41, 40, 40);
     my @counts = getBinCounts($coordsRef, $xmin, $xmax, $xsteps, $hetMin, $hetMax, $ysteps);
     open $output, ">", $heatText ||
-        croak("Cannot open output path '", $heatText, "'");
+        croak("Cannot open output path '", $heatText, "': $!");
     writeTable(\@counts, $output);
     close $output || croak("Cannot close output path '", $heatText, "'");;
     @args = ($heatPlotScript, $heatText, $title, $hetMin, $hetMax, $heatPdf);
@@ -134,7 +134,7 @@ sub run {
     ### do scatterplot & histograms ###
     if ($plotsOK) {
         open $output, ">", $scatterText ||
-            croak("Cannot open output path '", $scatterText, "'");
+            croak("Cannot open output path '", $scatterText, "': $!");
         writeTable($coordsRef, $output); # note that CR coordinates have been transformed to phred scale
 	close $output ||
             croak("Cannot close output path '", $scatterText, "'");

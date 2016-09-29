@@ -13,10 +13,11 @@ use File::Spec::Functions qw(catfile);
 use File::Temp qw(tempdir);
 use Getopt::Long;
 use IO::ScalarArray;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::DNAP::Utilities::IO qw(maybe_stdin  maybe_stdout);
 use WTSI::NPG::Genotyping qw(read_sample_json);
 use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
@@ -84,24 +85,12 @@ if (defined $plink && !defined $output) {
             -exitval => 2);
 }
 
-if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-} else {
-    my $level;
-    if ($debug) { $level = $DEBUG; }
-    elsif ($verbose) { $level = $INFO; }
-    else { $level = $ERROR; }
-    my @log_args = ({layout => '%d %p %m %n',
-                     level  => $level,
-                     file   => ">>$session_log",
-                     utf8   => 1},
-                    {layout => '%d %p %m %n',
-                     level  => $level,
-                     file   => "STDERR",
-                     utf8   => 1},
-                );
-    Log::Log4perl->easy_init(@log_args);
-}
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
 $log = Log::Log4perl->get_logger('main');
 
 $chromosome = uc($chromosome);
@@ -162,7 +151,7 @@ else {
 
   my $pid = fork();
   if (! defined $pid) {
-    $log->logcroak("Failed to fork");
+    $log->logcroak("Failed to fork: $!");
   }
   elsif ($pid) {
     my @calls;
@@ -173,20 +162,20 @@ else {
     # interleave reads and make this a nice stream. We have to slurp all
     # of one, then the other.
     open(my $calls, '<', "$calls_fifo")
-      or $log->logcroak("Failed to open FIFO '", $calls_fifo, "'");
+      or $log->logcroak("Failed to open FIFO '", $calls_fifo, "': $!");
     while (my $line = <$calls>) {
       push(@calls, $line);
     }
     close($calls) or $log->logwarn("Failed to close FIFO '",
-                                   $calls_fifo, "'");
+                                   $calls_fifo, "': $!");
 
     open(my $probs, '<', "$probs_fifo")
-      or $log->logcroak("Failed to open '", $probs_fifo, "'");
+      or $log->logcroak("Failed to open '", $probs_fifo, "': $!");
     while (my $line = <$probs>) {
       push(@probs, $line);
     }
     close($probs) or $log->logwarn("Failed to close FIFO '",
-                                   $probs_fifo, "'");
+                                   $probs_fifo, "': $!");
 
     # write_gt_calls requires streams, so this is a shim to pretend that
     # we have such
@@ -241,7 +230,7 @@ sub write_gender_codes {
   my ($file, $chromosome, $samples) = @_;
 
   open(my $genders, '>', "$file")
-    or $log->logcroak("Failed to open '", $file, "' for writing");
+    or $log->logcroak("Failed to open '", $file, "' for writing: $!");
   foreach my $sample (@$samples) {
     my $code = 0;
     if ($chromosome =~ m{^M}msx) {
@@ -252,13 +241,13 @@ sub write_gender_codes {
     unless (defined $code) {
       my $uri = $sample->{uri};
       $log->logcroak("Failed to find a gender code for sample ", $uri,
-                     " in '", $file, "'");
+                     " in '", $file, "': $!");
     }
 
     print $genders "$code\n";
   }
   close($genders) or $log->logwarn("Failed to close gender code file '",
-                                   $file, "'");
+                                   $file, "': $!");
 
   return $file;
 }
@@ -267,7 +256,7 @@ sub make_fifo {
   my $filename = shift;
 
   mkfifo($filename, '0400') or $log->logcroak("Failed to create FIFO '",
-                                              $filename, "'");
+                                              $filename, "': $!");
 
   return $filename;
 }

@@ -64,16 +64,16 @@ $outDir ||= '.';
 $title ||= "UNTITLED";
 
 unless ($mode eq "cr" || $mode eq "het" || $mode eq "xydiff") {
-  $log->logcroak("Illegal mode argument: ", $mode, "'");
+  $log->logcroak("Illegal mode argument: ", $mode, "': $!");
 }
 unless ($type eq "box" || $type eq "bean" || $type eq "both") {
-  $log->logcroak("Illegal type argument: '", $type, "'");
+  $log->logcroak("Illegal type argument: '", $type, "': $!");
 }
 if ((!$dbpath) && (!$inipath)) {
   $log->logcroak("Must supply at least one of pipeline database path and .ini path");
 }
 if ($dbpath && !(-r $dbpath)) {
-  $log->logcroak("Cannot read pipeline database path '", $dbpath, "'");
+  $log->logcroak("Cannot read pipeline database path '", $dbpath, "': $!");
 }
 if ($inipath && !(-r $inipath)) {
   $log->logcroak("Cannot read .ini path '", $inipath, "'");
@@ -145,7 +145,7 @@ sub run {
     my $input = \*STDIN;
     my $textOutPath = $outDir."/".$mode."_boxplot.txt";
     open my $output, ">", $textOutPath ||
-        $log->logcroak("Cannot open output file '", $textOutPath, "'");
+        $log->logcroak("Cannot open output file '", $textOutPath, "': $!");
     my $inputOK = writeBoxplotInput($input, $output, $index{$mode}, $dbpath, $inipath);
     close $output || $log->logcroak("Cannot close output file '",
                                     $textOutPath, "'");;

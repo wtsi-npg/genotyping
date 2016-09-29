@@ -126,7 +126,7 @@ foreach my $chr (keys %snps) {
 	}
     }
 }
-open my $logfile, ">", $log or croak("Failed to open '$log' for writing");
+open my $logfile, ">", $log or croak("Failed to open '$log' for writing: $!");
 print $logfile scalar(@use_snps), " available SNPs found for duplicate check\n";
 if (@use_snps > $max_snps) {
     @use_snps = @use_snps[0 .. $max_snps - 1]; # truncate @use_snps if too large
@@ -147,7 +147,7 @@ system($cmd) && croak("Error running command '$cmd'");
 
 # gzip pairwise output file; can be quite large, >> 1 GB
 $cmd = "gzip -f $full";
-system($cmd) && croak("Error running command '$cmd'");
+system($cmd) && croak("Error running command '$cmd': $!");
 
 
 __END__

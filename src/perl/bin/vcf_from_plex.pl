@@ -12,10 +12,10 @@ use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
 use List::MoreUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Genotyping::Types qw(:all);
@@ -47,7 +47,7 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $inputType, $vcfPath, $log, $log4perl_config, $use_irods,
+my ($input, $inputType, $vcfPath, $log4perl_config, $use_irods,
     $debug, $quiet, $repository, $snpset_path, $chromosome_json,
     $metadata_json, $callset_name, $verbose);
 
@@ -74,27 +74,13 @@ GetOptions('callset=s'         => \$callset_name,
            'verbose'           => \$verbose,
        );
 
-### set up logging ###
-if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-} else {
-    my $level;
-    if    ($debug)   { $level = $DEBUG; }
-    elsif ($verbose) { $level = $INFO; }
-    elsif ($quiet)   { $level = $WARN; }
-    else             { $level = $ERROR; }
-    my @log_args = ({layout => '%d %p %m %n',
-                     level  => $level,
-                     file   => ">>$session_log",
-                     utf8   => 1},
-                    {layout => '%d %p %m %n',
-                     level  => $level,
-                     file   => "STDERR",
-                     utf8   => 1},
-                );
-    Log::Log4perl->easy_init(@log_args);
-}
-$log = Log::Log4perl->get_logger('main');
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
+my $log = Log::Log4perl->get_logger('main');
 
 ### process command-line options and make sanity checks ###
 unless ($inputType eq $SEQUENOM_TYPE || $inputType eq $FLUIDIGM_TYPE) {

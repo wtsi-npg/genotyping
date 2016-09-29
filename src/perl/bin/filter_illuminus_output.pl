@@ -8,9 +8,9 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Utilities::DelimitedFiles qw(read_fon
                                             find_column_indices
@@ -72,24 +72,12 @@ sub run {
               -exitval => 2);
   }
 
-  if ($log4perl_config) {
-      Log::Log4perl::init($log4perl_config);
-  } else {
-      my $level;
-      if ($debug) { $level = $DEBUG; }
-      elsif ($verbose) { $level = $INFO; }
-      else { $level = $ERROR; }
-      my @log_args = ({layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => ">>$session_log",
-                       utf8   => 1},
-                      {layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => "STDERR",
-                       utf8   => 1},
-                  );
-      Log::Log4perl->easy_init(@log_args);
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
   my $log = Log::Log4perl->get_logger('main');
 
   my $gt_offset = 1; # 1 leading column in genotype files
@@ -112,17 +100,17 @@ sub run {
 
   open(my $col, '<', "$columns")
     or $log->logcroak("Failed to open column file '", $columns,
-                      "' for reading");
+                      "' for reading: $!");
   my $column_names = read_fon($col);
   close($col) or $log->logwarn("Failed to close column file '",
-                               $columns, "'");
+                               $columns, "': $!");
 
   open(my $gti, '<', "$gt_input")
     or $log->logcroak("Failed to open genotype file '", $gt_input,
-                      "' for reading");
+                      "' for reading: $!");
   open(my $gto, '>', "$gt_output")
     or $log->logcroak("Failed to open genotype file '", $gt_output,
-                      "' for writing");
+                      "' for writing: $!");
 
   my $headers = read_gt_column_names($gti);
   my $cols_to_use = find_column_indices($column_names, $headers);
@@ -135,24 +123,24 @@ sub run {
                       $cols_to_use, $operation);
 
   close($gto) or $log->logwarn("Failed to close genotype file '",
-                               $gt_output, "'");
+                               $gt_output, "': $!");
   close($gti) or $log->logwarn("Failed to close genotype file '",
-                               $gt_input, "'");
+                               $gt_input, "': $!");
 
   open(my $pri, '<', "$pr_input")
     or $log->logcroak("Failed to open probability file '",
-                      $pr_input, "' for reading");
+                      $pr_input, "' for reading: $!");
   open(my $pro, '>', ">pr_output")
     or $log->logcroak("Failed to open probability file '",
-                      $pr_output, "' for writing");
+                      $pr_output, "' for writing: $!");
 
   my $num_probs =
     filter_gt_columns($pri, $pro, $pr_separator, $pr_offset, $pr_col_group,
                       $cols_to_use, $operation);
   close($pro) or $log->logwarn("Failed to close probability file '",
-                               $pr_output, "'");
+                               $pr_output, "': $!");
   close($pri) or $log->logwarn("Failed to close probability file '",
-                               $pr_input, "'");
+                               $pr_input, "': $!");
 
   unless ($num_genotypes == $num_probs) {
       $log->logcroak("Number of SNP genotype records (", $num_genotypes,

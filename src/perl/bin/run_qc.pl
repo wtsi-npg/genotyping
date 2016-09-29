@@ -11,10 +11,10 @@ use Getopt::Long;
 use Cwd qw(getcwd abs_path);
 use File::Basename;
 use FindBin qw($Bin);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
 use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
 use WTSI::NPG::Genotyping::QC::Identity;
@@ -65,24 +65,13 @@ sub run {
                "debug"             => \$debug,
            );
 
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-    } else {
-        my $level;
-        if ($debug) { $level = $DEBUG; }
-        elsif ($verbose) { $level = $INFO; }
-        else { $level = $ERROR; }
-        my @log_args = ({layout => '%d %p %m %n',
-                         level  => $level,
-                         file   => ">>$session_log",
-                         utf8   => 1},
-                        {layout => '%d %p %m %n',
-                         level  => $level,
-                         file   => "STDERR",
-                         utf8   => 1},
-                    );
-        Log::Log4perl->easy_init(@log_args);
-    }
+
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
     $log = Log::Log4perl->get_logger('main');
 
     ### process options and validate inputs

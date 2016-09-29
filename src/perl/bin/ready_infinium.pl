@@ -9,10 +9,10 @@ use strict;
 use Config::IniFiles;
 use Getopt::Long;
 use List::AllUtils qw(any uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline;
@@ -116,24 +116,12 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
 
-  if ($log4perl_config) {
-      Log::Log4perl::init($log4perl_config);
-  } else {
-      my $level;
-      if ($debug) { $level = $DEBUG; }
-      elsif ($verbose) { $level = $INFO; }
-      else { $level = $ERROR; }
-      my @log_args = ({layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => ">>$session_log",
-                       utf8   => 1},
-                      {layout => '%d %p %m %n',
-                       level  => $level,
-                       file   => "STDERR",
-                       utf8   => 1},
-                  );
-      Log::Log4perl->easy_init(@log_args);
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
   $log = Log::Log4perl->get_logger('main');
 
   unless (-e $dbfile) {
