@@ -7,10 +7,10 @@ package main;
 use warnings;
 use strict;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Infinium::SampleQuery;
@@ -28,30 +28,12 @@ my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'query_project_samples');
 
-my $embedded_conf = "
-   log4perl.logger.npg.irods.publish = WARN, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
-
 run() unless caller();
 
 sub run {
 
     my $config;
-    my $debug_level;
+    my $debug;
     my $header;
     my $limit;
     my $outpath;
@@ -63,7 +45,7 @@ sub run {
 
     GetOptions(
         'config=s'         => \$config,
-        'debug'            => \$debug_level,
+        'debug'            => \$debug,
         'header'           => \$header,
         'help'             => sub { pod2usage(-verbose => 2,
                                               -exitval => 0) },
@@ -82,21 +64,14 @@ sub run {
     if (defined($limit) && $limit < 0) {
         pod2usage(-msg => "--limit argument must be >= 0\n", -exitval => 2);
     }
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger();
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger();
-        if ($debug_level) {
-            $log->level($DEBUG);
-        } elsif ($verbose) {
-            $log->level($INFO);
-        } elsif ($quiet) {
-            $log->level($ERROR);
-        }
-    }
+
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    my $log = Log::Log4perl->get_logger('main');
 
     my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
         (name    => 'infinium',
@@ -179,7 +154,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

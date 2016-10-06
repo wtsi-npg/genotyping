@@ -16,12 +16,12 @@ use FindBin qw($Bin);
 use Getopt::Long;
 use JSON;
 use List::AllUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
 use YAML qw /DumpFile/;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
@@ -49,23 +49,6 @@ our $PLEX_MANIFEST_SUBDIRECTORY = 'plex_manifests';
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_workflow');
-
-my $embedded_conf = "
-   log4perl.logger.npg.genotyping.ready_workflow = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
 my $log;
 
 run() unless caller();
@@ -119,21 +102,13 @@ sub run {
 	       'ztotal=i'        => \$ztotal,
 	);
 
-    ### set up logging ###
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger();
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger();
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    $log = Log::Log4perl->get_logger('main');
 
     ### process command-line arguments ###
     $inifile ||= $DEFAULT_INI;

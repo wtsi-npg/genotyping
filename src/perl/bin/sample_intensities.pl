@@ -6,6 +6,7 @@ package main;
 
 use warnings;
 use strict;
+use Carp;
 use Getopt::Long;
 use JSON;
 use Log::Log4perl qw(:easy);
@@ -30,7 +31,6 @@ sub run {
   my $gender_method;
   my $output;
   my $run_name;
-  my $verbose;
 
   GetOptions('all'             => \$all,
              'config=s'        => \$config,
@@ -39,11 +39,11 @@ sub run {
              'help'            => sub { pod2usage(-verbose => 2,
                                                   -exitval => 0) },
              'output=s'        => \$output,
-             'run=s'           => \$run_name,
-             'verbose'         => \$verbose);
+             'run=s'           => \$run_name);
 
   $config ||= $DEFAULT_INI;
   $gender_method ||= 'Supplied';
+  my $log = Log::Log4perl->get_logger('main');
 
   unless ($run_name) {
     pod2usage(-msg => "A --run argument is required\n", -exitval => 2);
@@ -62,8 +62,8 @@ sub run {
 
   my $run = $pipedb->piperun->find({name => $run_name});
   unless ($run) {
-    die "Run '$run_name' does not exist. Valid runs are: [" .
-      join(", ", map { $_->name } $pipedb->piperun->all) . "]\n";
+    $log->logcroak("Run '", $run_name, "' does not exist. Valid runs are: [",
+      join(", ", map { $_->name } $pipedb->piperun->all), "]");
   }
 
   my $where = {'piperun.name' => $run->name,
@@ -89,14 +89,14 @@ sub run {
     push @samples, {sanger_sample_id => $sample->sanger_sample_id,
                     uri              => $sample->uri->as_string,
                     result           => $sample->gtc,
-                    gender           =>  $gender_name,
+                    gender           => $gender_name,
                     gender_code      => $gender_code,
                     gender_method    => $gender_method};
   }
 
   my $fh = maybe_stdout($output);
   print $fh to_json(\@samples, {utf8 => 1, pretty => 1});
-  close($fh);
+  close($fh) || $log->logcroak("Cannot close output");
 
   return;
 }
@@ -111,8 +111,8 @@ sample_intensities
 =head1 SYNOPSIS
 
 sample_intensities [--config <database .ini file>] [--dbfile <SQLite file>] \
-   [--output <JSON file>] --run <analysis run name> --gender <method> \
-   [--verbose]
+   [--output <JSON file>] --run <analysis run name> --gender <method>
+
 
 Options:
 
@@ -129,7 +129,6 @@ Options:
                    defaults to STDOUT.
   --run            The name of a pipe run defined previously using the
                    ready_infinium script.
-  --verbose        Print messages while processing. Optional.
 
 =head1 DESCRIPTION
 
@@ -155,11 +154,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

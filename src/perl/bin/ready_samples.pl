@@ -18,7 +18,7 @@ use WTSI::NPG::Genotyping::Database::Pipeline;
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
-Log::Log4perl->easy_init($ERROR);
+Log::Log4perl->easy_init($WARN);
 
 run() unless caller();
 
@@ -57,6 +57,8 @@ sub run {
               -exitval => 2);
   }
 
+  my $log = Log::Log4perl->get_logger('main');
+
   my @initargs = (name    => 'pipeline',
                   inifile => $config);
   if ($dbfile) {
@@ -76,7 +78,8 @@ sub run {
     foreach my $sample ($pipedb->sample->all) {
       my $state = $pipedb->state->find({name => $select});
       unless ($state) {
-        die "Failed to select sample state '$select': invalid state\n";
+        $log->logcroak("Failed to select sample state '", $select,
+                       "': invalid state");
       }
 
       if (any { $state->name eq $_->name } $sample->states) {
@@ -93,14 +96,15 @@ sub run {
            my $sample = $pipedb->sample->find({name => $name});
 
            unless ($sample) {
-             warn "Failed to find $name\n";
+             $log->logwarn("Failed to find name '", $name, "'");
              next;
            }
 
            if ($remove) {
              my $state = $pipedb->state->find({name => $remove});
              unless ($state) {
-               die "Failed to remove sample state '$remove': invalid state\n";
+               $log->logcroak("Failed to remove sample state '", $remove,
+                              "': invalid state");
              }
 
              if (any { $state->name eq $_->name } $sample->states) {
@@ -111,7 +115,8 @@ sub run {
            if ($add) {
              my $state = $pipedb->state->find({name => $add});
              unless ($state) {
-               die "Failed to add sample state '$add': invalid state\n";
+               $log->logcroak("Failed to add sample state '", $add,
+                              "': invalid state");
              }
 
              unless (any { $state->name eq $_->name } $sample->states) {
@@ -209,11 +214,12 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

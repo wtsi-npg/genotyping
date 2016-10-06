@@ -8,12 +8,18 @@ use strict;
 use warnings;
 use File::Temp qw(tempdir tempfile);
 use Getopt::Long;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
-use WTSI::NPG::Genotyping::Plink qw(update_placeholder 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
+use WTSI::NPG::Genotyping::Plink qw(update_placeholder
                                     update_snp_locations
                                     update_sample_genders);
+use WTSI::NPG::Utilities qw(user_session_log);
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'update_plink_annotation');
 
 our $VERSION = '';
 
@@ -23,17 +29,21 @@ run() unless caller();
 
 sub run {
   my $bed_file;
+  my $debug;
+  my $log4perl_config;
   my $sample_json;
   my $snp_json;
-  my $placeholder; 
+  my $placeholder;
   my $verbose;
 
-  GetOptions('bed=s' => \$bed_file,
+  GetOptions('bed=s'         => \$bed_file,
+             'debug'         => \$debug,
              'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
-             'samples=s' => \$sample_json,
-             'snps=s' => \$snp_json,
+             'logconf=s'     => \$log4perl_config,
+             'samples=s'     => \$sample_json,
+             'snps=s'        => \$snp_json,
 	     'placeholder=i' => \$placeholder,
-             'verbose' => \$verbose);
+             'verbose'       => \$verbose);
 
   unless ($bed_file) {
     pod2usage(-msg => "A --bed argument is required\n",
@@ -45,6 +55,14 @@ sub run {
               -exitval => 2);
   }
 
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
+
   # placeholder for missing data in .fam files must be 0 or -9
   if (defined($placeholder) && $placeholder!=0 && $placeholder!=-9) {
       pod2usage(-msg => "--placeholder argument must be one of (0, -9)\n",
@@ -55,19 +73,19 @@ sub run {
   if ($sample_json) {
     my $num_updated = update_sample_genders($bed_file, $bed_file,
                                             $sample_json, $tmp_dir);
-    print STDERR "Updated the gender of $num_updated samples\n" if $verbose;
+    $log->info("Updated the gender of ", $num_updated, " samples");
   }
 
   if ($snp_json) {
     my $num_updated = update_snp_locations($bed_file, $bed_file,
                                            $snp_json, $tmp_dir);
-    print STDERR "Updated the location of $num_updated SNPs\n" if $verbose;
+    $log->info("Updated the location of ", $num_updated, " SNPs");
   }
 
   if (defined($placeholder)) {
     my $num_updated = update_placeholder($bed_file, $bed_file, 
                                          $placeholder, $tmp_dir);
-    print STDERR "Updated placeholders for $num_updated samples\n" if $verbose;
+    $log->info("Updated placeholders for ", $num_updated, " samples");
   }
 
   return;
@@ -89,6 +107,7 @@ Options:
   --bed      The file name of the Plink data to me modified. This should be
              the name of the BED file whose corresponding BIM and/or FAM
              annotation files are to be updated.
+  --logconf  A log4perl configuration file. Optional.
   --samples  A JSON file of sample annotation containing the new gender
              codes.
   --snps     A JSON file of SNP annotation containing the new chromosome
@@ -110,11 +129,12 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

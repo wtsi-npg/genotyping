@@ -8,10 +8,10 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::VCF::GtcheckWrapper;
 use WTSI::NPG::Utilities qw(user_session_log);
 
@@ -38,32 +38,25 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $debug, $jsonOut, $log, $logConfig, $textOut, $verbose);
+my ($input, $debug, $jsonOut, $log4perl_config, $textOut, $verbose);
 
 GetOptions('help'        => sub { pod2usage(-verbose => 2,
                                             -exitval => 0) },
            'debug'     => \$debug,
            'input=s'     => \$input,
            'json=s'      => \$jsonOut,
-           'logconf=s'   => \$logConfig,
+           'logconf=s'   => \$log4perl_config,
            'text=s'      => \$textOut,
            'verbose'     => \$verbose
        );
 
-
-### set up logging ###
-if ($logConfig) {
-    Log::Log4perl::init($logConfig);
-} else {
-    Log::Log4perl::init(\$embedded_conf);
-}
-$log = Log::Log4perl->get_logger();
-if ($verbose) {
-    $log->level($INFO);
-}
-elsif ($debug) {
-    $log->level($DEBUG);
-}
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
+my $log = Log::Log4perl->get_logger('main');
 
 ### read input and do consistency check
 
@@ -122,7 +115,7 @@ Options:
                       standard output. Optional; if not given, text is not
                       written.
   --logconf=PATH      Path to Log4Perl configuration file. Optional.
-  --quiet             Suppress printing of status information.
+  --verbose           Print additional messages while processing. Optional.
 
 
 =head1 DESCRIPTION
@@ -143,7 +136,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -256,10 +256,13 @@ sub get_calls : Test(31) {
   $resultset_obj->add_avu('fluidigm_well', 'S01');
   $resultset_obj->add_avu('dcterms:identifier', $sample_identifiers[0]);
   $resultset_obj->add_avu('dcterms:identifier', $non_unique_identifier);
-
-  @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
-                                        $reference_name, $snpset_name,
-                                        'ABC0123456789');
+  do {
+      local *STDERR;
+      open (STDERR, '>', '/dev/null'); # suppress warning output to STDERR
+      @calls_observed = _get_observed_calls($irods, $irods_tmp_coll,
+                                            $reference_name, $snpset_name,
+                                            'ABC0123456789');
+  };
 
   # Merging 3 un-mergable resultsets
   is (scalar @calls_expected, scalar @calls_observed,

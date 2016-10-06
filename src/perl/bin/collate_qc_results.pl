@@ -73,3 +73,34 @@ elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $t
 # assign 0 (ie. false) to the optional reference to a list of metric names
 collate($inputDir, $config, $thresholds, $dbPath, $iniPath, $statusJson, 
 	$metricJson, $csv, $exclude, 0, $verbose);
+
+__END__
+
+=head1 NAME
+
+collate_qc_results
+
+=head1 DESCRIPTION
+
+Collate genotyping QC results into a single JSON file
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

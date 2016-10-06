@@ -12,10 +12,10 @@ use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
 use List::MoreUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::iRODS::DataObject;
 use WTSI::NPG::Genotyping::Types qw(:all);
@@ -47,9 +47,9 @@ my $embedded_conf = "
 ";
 
 
-my ($input, $inputType, $vcfPath, $log, $logConfig, $use_irods,
+my ($input, $inputType, $vcfPath, $log4perl_config, $use_irods,
     $debug, $quiet, $repository, $snpset_path, $chromosome_json,
-    $metadata_json, $callset_name);
+    $metadata_json, $callset_name, $verbose);
 
 my $CHROMOSOME_JSON_KEY = 'chromosome_json';
 our $SEQUENOM_TYPE = 'sequenom';
@@ -66,20 +66,21 @@ GetOptions('callset=s'         => \$callset_name,
                                                   -exitval => 0) },
            'input=s'           => \$input,
            'irods'             => \$use_irods,
-           'logconf=s'         => \$logConfig,
+           'logconf=s'         => \$log4perl_config,
            'plex_type=s'       => \$inputType,
            'repository=s'      => \$repository,
            'vcf=s'             => \$vcfPath,
            'quiet'             => \$quiet,
+           'verbose'           => \$verbose,
        );
 
-### set up logging ###
-if ($logConfig) { Log::Log4perl::init($logConfig); }
-else { Log::Log4perl::init(\$embedded_conf); }
-$log = Log::Log4perl->get_logger();
-if ($quiet) { $log->level($WARN); }
-elsif ($debug) { $log->level($DEBUG); }
-else { $log->level($INFO); }
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
+my $log = Log::Log4perl->get_logger('main');
 
 ### process command-line options and make sanity checks ###
 unless ($inputType eq $SEQUENOM_TYPE || $inputType eq $FLUIDIGM_TYPE) {
@@ -292,7 +293,9 @@ Options:
   --irods             Indicates that inputs are in iRODS. If absent, inputs
                       are assumed to be in the local filesystem, and the
                       --snpset and --chromosomes options are required.
+  --logconf=PATH      Path to Log4Perl configuration file. Optional.
   --plex_type=NAME    Either fluidigm or sequenom. Required.
+  --quiet             Only print warning messages to the default log.
   --repository=DIR    Location of the root directory for NPG genome
                       reference repository. Defaults to the value of the
                       NPG_REPOSITORY_ROOT environment variable.
@@ -303,7 +306,7 @@ Options:
   --vcf=PATH          Path for VCF file output. Optional; if not given, VCF
                       is not written. If equal to '-', output is written to
                       STDOUT.
-  --logconf=PATH      Path to Log4Perl configuration file. Optional.
+  --verbose           Print additional messages to the default log.
 
 
 =head1 DESCRIPTION
@@ -323,7 +326,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

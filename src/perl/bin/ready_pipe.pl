@@ -7,29 +7,45 @@ package main;
 use warnings;
 use strict;
 use Getopt::Long;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Database::Pipeline;
+use WTSI::NPG::Utilities qw(user_session_log);
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'ready_pipe');
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-
-Log::Log4perl->easy_init($ERROR);
 
 run() unless caller();
 
 sub run {
   my $config;
   my $dbfile;
+  my $debug;
+  my $log4perl_config;
   my $overwrite;
   my $verbose;
 
   GetOptions('config=s'  => \$config,
              'dbfile=s'  => \$dbfile,
+             'debug'     => \$debug,
              'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s' => \$log4perl_config,
              'overwrite' => \$overwrite,
              'verbose'   => \$verbose);
+
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   $config ||= $DEFAULT_INI;
   my @initargs = (name      => 'pipeline',
@@ -74,6 +90,7 @@ Options:
   --dbfile    The SQLite database file. If not supplied, defaults to the
               value given in the configuration .ini file.
   --help      Display help.
+  --logconf   A log4perl configuration file. Optional.
   --overwrite Overwrite any existing file, otherwise data dictionaries will
               be updated with new entries only.
   --verbose   Print messages while processing. Optional.
@@ -89,11 +106,12 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

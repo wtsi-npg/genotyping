@@ -9,6 +9,7 @@
 
 use warnings;
 use strict;
+use Carp;
 use CGI qw/:standard *table/;
 use Cwd;
 use File::Basename;
@@ -64,10 +65,12 @@ sub getPlateInfo {
 
 my ($experiment, $plotDir, $outFileName) = @ARGV; # experiment name, input/output directory, output filename
 if (@ARGV!=3) {
-    die "Usage: $0 experiment_name input/output_directory output_filename\n";
+    croak("Usage: $0 experiment_name input/output_directory ",
+          "output_filename\n");
 } elsif (!(-e $plotDir && -d $plotDir)) {
-    die "Output path '$plotDir' does not exist or is not a directory\n";
-} 
+    croak("Output path '", $plotDir,
+          "' does not exist or is not a directory");
+}
 my @refs = getPlateInfo($plotDir);
 my @plates = @{shift(@refs)};
 my %crPlots = %{shift(@refs)};
@@ -75,7 +78,8 @@ my %hetPlots = %{shift(@refs)};
 my %magPlots = %{shift(@refs)};
 # must write index to given plot directory -- otherwise links are broken
 my $outPath = $plotDir.'/'.$outFileName;
-open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
+open my $out, ">", $outPath || croak("Cannot open output path '",
+                                     $outPath, "': $!");
 print $out header(-type=>''), # create the HTTP header; content-type declaration not needed for writing to file
     start_html(-title=>"$experiment: Plate heatmap index",
 	       -author=>'Iain Bancarz <ib5@sanger.ac.uk>',
@@ -100,9 +104,43 @@ foreach my $plate (@plates) {
 }
 print $out end_table();
 print $out end_html();
-close $out;
+close $out || croak("Cannot close output path '", $outPath, "'");;
 
 # test output for XML validity
-open my $fh, "<", $outPath;
-if (WTSI::NPG::Genotyping::QC::QCPlotTests::xmlOK($fh)) { close $fh; exit(0); } # no error
-else { close $fh; exit(1); } # error found
+open my $fh, "<", $outPath || croak("Cannot open '", $outPath, "'");
+my $xml_ok = WTSI::NPG::Genotyping::QC::QCPlotTests::xmlOK($fh);
+close $fh || croak("Cannot close '", $outPath, "'");
+unless ($xml_ok) { croak("Output '", $outPath, "' is not valid XML"); }
+
+
+
+__END__
+
+=head1 NAME
+
+plate_heatmap_index
+
+=head1 DESCRIPTION
+
+Generate an HTML index page for plate heatmap plots
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
