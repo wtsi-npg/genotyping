@@ -156,7 +156,17 @@ sub publish_file {
   }
   else {
     $self->info("Publishing new object '$target'");
-    $irods->add_object($file, $target_obj->str);
+
+    # This used to use just 'add_object' in order to trigger an error
+    # if an aun-annotated file were already there. However, a file may
+    # be present due to iRODS failures, which triggers an unnecessary
+    # error. Now we use 'replace_object', which forces an overwrite.
+    if ($target_obj->is_present) {
+      $irods->replace_object($file, $target_obj->str);
+    }
+    else {
+      $irods->add_object($file, $target_obj->str);
+    }
 
     my $creator_uri = $self->affiliation_uri;
     my $publisher_uri = $self->accountee_uri;
