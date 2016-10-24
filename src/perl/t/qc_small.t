@@ -61,10 +61,10 @@ if (-e $outDir) {
 print "Testing dataset $testName.\n";
 
 ## test identity check
-$status = system("$bin/check_identity_bed.pl --outdir $outDir --config $config  --plink $plink --db $dbfile");
-is($status, 0, "check_identity_bed.pl exit status");
+$status = system("$bin/check_identity_simple.pl --outdir $outDir --config $config  --plink $plink --db $dbfile");
+is($status, 0, "check_identity_simple.pl exit status");
 
-## WIP identity check script is tested in WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest
+## Bayesian identity check script is tested in WTSI::NPG::Genotyping::QC::BayesianIdentity::IdentityTest
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";

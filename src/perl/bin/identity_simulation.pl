@@ -14,8 +14,7 @@ use Pod::Usage;
 use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Utilities qw(user_session_log);
 
@@ -83,7 +82,7 @@ sub run {
 
     my $calls = generate_calls($snpset);
 
-    my $idsim = WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator->new(
+    my $idsim = WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator->new(
         calls  => $calls,
         snpset => $snpset
     );

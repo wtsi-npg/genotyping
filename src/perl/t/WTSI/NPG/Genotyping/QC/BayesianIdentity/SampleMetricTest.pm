@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesianTest;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetricTest;
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ use Test::More tests => 9;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -166,7 +166,7 @@ sub setup : Test(setup) {
 
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian');
+  require_ok('WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric');
 }
 
 sub construct : Test(1) {
@@ -181,7 +181,7 @@ sub construct : Test(1) {
                 sample_mismatch_prior => $sample_mismatch_prior,
             );
 
-    new_ok('WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian'
+    new_ok('WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric'
                => \@args);
 }
 
@@ -189,7 +189,7 @@ sub output : Test(5) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
 
-    my $sib = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+    my $sib = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->
         new(sample_name      => $sample_name,
             snpset           => $snpset,
             production_calls => $production_calls,
@@ -228,7 +228,7 @@ sub output : Test(5) {
         push @anonymous_qc_calls, $new_call;
     }
     my $anon_sib =
-        WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+        WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->
               new(sample_name      => $sample_name,
                   snpset           => $snpset,
                   production_calls => $production_calls,
@@ -258,7 +258,7 @@ sub metric : Test(2) {
                 qc_calls         => $qc_calls,
                 pass_threshold   => $pass_threshold,
                 sample_mismatch_prior => $sample_mismatch_prior);
-    my $sib = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+    my $sib = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->
               new(\%args);
     ok(abs($sib->identity - $expected_big) < $delta,
        "Identity matches expected value, large test set");
@@ -270,7 +270,7 @@ sub metric : Test(2) {
                 pass_threshold   => $pass_threshold,
                 sample_mismatch_prior => $sample_mismatch_prior);
     my $sib_small =
-        WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
+        WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->
               new(\%args);
     ok(abs($sib_small->identity - $expected_small) < $delta,
        "Identity matches expected value, small test set");

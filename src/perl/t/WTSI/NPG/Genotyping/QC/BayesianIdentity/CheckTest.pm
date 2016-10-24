@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::QC_wip::Check::IdentityTest;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::CheckTest;
 
 use strict;
 use warnings;
@@ -14,8 +14,8 @@ use Test::Exception;
 
 use plink_binary;
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Check;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -40,12 +40,12 @@ my @qc_sample_names = qw/urn:wtsi:249441_F11_HELIC5102138
                          urn:wtsi:249461_G12_HELIC5215300/;
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::QC_wip::Check::Identity');
+  require_ok('WTSI::NPG::Genotyping::QC::BayesianIdentity::Check');
 }
 
 sub find_identity : Test(2) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+  my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
     (plink_path => $plink_path,
      snpset     => $snpset);
   # get fake QC results for a few samples; others will appear as missing
@@ -67,7 +67,7 @@ sub find_identity_insufficient_snps : Test(3) {
     my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
     my $json_path = "$tempdir/identity.json";
     my $csv_path = "$tempdir/identity.csv";
-    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
         (plink_path => $plink_path,
          snpset     => $snpset);
     # get fake QC results for a few samples; others will appear as missing
@@ -84,7 +84,7 @@ sub find_identity_insufficient_snps : Test(3) {
 
 sub num_samples : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+  my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
@@ -93,7 +93,7 @@ sub num_samples : Test(1) {
 
 sub sample_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+  my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
@@ -110,7 +110,7 @@ sub sample_names : Test(1) {
 
 sub shared_snp_names : Test(1) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+  my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
@@ -141,7 +141,7 @@ sub shared_snp_names : Test(1) {
 
 sub production_calls : Test(18) {
   my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-  my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+  my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
     (plink_path => $plink_path,
      snpset     => $snpset);
 
@@ -193,7 +193,7 @@ sub run_identity_checks : Test(3) {
     my $tempdir = tempdir("IdentityTest.$pid.XXXXXX", CLEANUP => 1);
     my $json_path = $tempdir."/identity.json";
     my $csv_path = $tempdir."/identity.csv";
-    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
         (plink_path => $plink_path,
          snpset     => $snpset);
     # get fake QC results for a few samples; others will appear as missing
@@ -211,7 +211,7 @@ sub run_identity_checks : Test(3) {
 sub sample_swap_evaluation : Test(14) {
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
         (plink_path => $plink_swap,
          snpset     => $snpset);
     my $sample_ids = _get_swap_sample_identities();
@@ -259,7 +259,7 @@ sub sample_swap_evaluation : Test(14) {
 sub script : Test(13) {
     # test of command-line script
     # Could move this into Scripts.pm (which is slow to run, ~10 minutes)
-    my $identity_script_wip = "./bin/check_identity_bed_wip.pl";
+    my $identity_script_wip = "./bin/check_identity_bayesian.pl";
     my $tempdir = tempdir("IdentityTest.script.$pid.XXXXXX", CLEANUP => 1);
     my $jsonPath = "$tempdir/identity.json";
     my $csvPath = "$tempdir/identity.csv";
@@ -337,10 +337,10 @@ sub _get_swap_sample_identities {
 
     # Some fake QC data
     # - List of 3 'failed' sample names, 2 of which are swapped
-    # - Create SampleIdentityBayesian object for each sample
+    # - Create SampleMetric object for each sample
 
     my $snpset = WTSI::NPG::Genotyping::SNPSet->new($snpset_file);
-    my $check = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new
+    my $check = WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new
         (plink_path => $plink_swap,
          snpset     => $snpset);
     my $qc_calls = _get_qc_calls();
@@ -356,9 +356,7 @@ sub _get_swap_sample_identities {
                     qc_calls         => $qc_calls->{$sample_name},
                     pass_threshold   => $pass_threshold,
                     sample_mismatch_prior => $sample_mismatch_prior);
-        my $sample_id =
-            WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
-                  new(\%args);
+        my $sample_id = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->new(\%args);
         push (@sample_identities, $sample_id);
     }
     return \@sample_identities;

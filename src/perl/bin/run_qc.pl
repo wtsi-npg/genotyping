@@ -260,7 +260,7 @@ sub run_qc_wip {
   my ($plinkPrefix, $outDir, $plexManifestRef, $vcfRef, $sampleJson) = @_;
   $outDir = $outDir."/qc_wip";
   mkdir($outDir);
-  my $script = "check_identity_bed_wip.pl";
+  my $script = "check_identity_bayesian.pl";
   my $jsonPath = $outDir."/identity_wip.json";
   my $csvPath = $outDir."/identity_wip.csv";
   my $vcf = join(',', @{$vcfRef});

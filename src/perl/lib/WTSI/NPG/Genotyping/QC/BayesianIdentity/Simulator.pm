@@ -1,12 +1,12 @@
 
-package WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator;
 
 use Moose;
 
 use MooseX::Types::Moose qw(Int);
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::Types qw(:all);
 
@@ -27,7 +27,7 @@ has 'snpset' =>
     (is            => 'ro',
      isa           => 'WTSI::NPG::Genotyping::SNPSet',
      required      => 1,
-     documentation => 'SNPSet for creation of SampleIdentityBayesian '.
+     documentation => 'SNPSet for creation of SampleMetric '.
          'objects. Must include all SNPs in the "calls" attribute.');
 
 # optional argument
@@ -39,8 +39,8 @@ has 'pass_threshold' =>
          'sample pass');
 
 # optional params for identity calculation
-# passed to SampleIdentityBayesian constructor
-# no default values; instead use defaults of SampleIdentityBayesian class
+# passed to SampleMetric constructor
+# no default values; instead use defaults of SampleMetric class
 
 has 'equivalent_calls_probability' => # ECP
     (is            => 'ro',
@@ -301,7 +301,7 @@ sub find_identity_vary_xer {
 }
 
 sub _build_identity_params {
-    # build a generic params hash for SampleIdentityBayesian construction
+    # build a generic params hash for SampleMetric construction
     # production_calls and qc_calls are specified for each simulation type
     my ($self) = @_;
     my %params;
@@ -331,7 +331,7 @@ sub _build_identity_params {
 sub _find_identity {
     # 'workhorse' method to evaluate the identity metric with given inputs
     # $calls = arrayref of Call objects
-    # $params = hashref of params for SampleIdentityBayesian object creation
+    # $params = hashref of params for SampleMetric object creation
     my ($self, $calls, $params, $equivalent, $total, $qc_total, $maf) = @_;
     $qc_total ||= 1;
     $maf ||= 0.25;
@@ -347,8 +347,7 @@ sub _find_identity {
     foreach my $key (keys %{$params}) {
         $args{$key} = $params->{$key};
     }
-    my $sib = WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
-        new(\%args);
+    my $sib = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->new(\%args);
     return $sib->identity;
 }
 

@@ -11,7 +11,7 @@ use Pod::Usage;
 use Log::Log4perl qw(:levels);
 use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
-use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Check;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::VCF::Slurper;
 use WTSI::NPG::iRODS;
@@ -177,7 +177,8 @@ sub run {
         $args{'expected_error_rate'} = $expected_error_rate;
     }
     $log->debug("Creating identity check object");
-    my $checker = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new(%args);
+    my $checker =
+        WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new(%args);
 
     ### read QC plex calls from VCF file(s) ###
     my %qc_calls;
@@ -228,11 +229,11 @@ __END__
 
 =head1 NAME
 
-check_identity_bed_wip
+check_identity_bayesian
 
 =head1 SYNOPSIS
 
-check_identity_bed_wip --vcf <VCF file> --plink <path stem>
+check_identity_bayesian --vcf <VCF file> --plink <path stem>
 --sample_json <path > [--plex <path>] [--plex-irods <irods location>]
 [--pass-threshold <f>] [--swap_threshold <f>] [--help] [--verbose]
 
