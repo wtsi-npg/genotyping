@@ -8,26 +8,63 @@
 
 # similar in purpose to npg_irods/scripts/travis_install.sh
 
+# check for environment variables
 if [ -z $INSTALL_ROOT ]; then
-    echo "INSTALL_ROOT environment variable must specify the path to a directory for installation; exiting." >&2
+    echo "Environment variable INSTALL_ROOT must specify directory path for installation; exiting." >&2
     exit 1
-elif [ ! -e $INSTALL_ROOT ]; then
-    echo "INSTALL_ROOT environment variable path $INSTALL_ROOT does not exist; exiting." >&2
+fi
+if [ -z $RUBY_HOME ]; then
+    echo "Required environment variable RUBY_HOME not set; exiting." 1>&2
+    exit 1
+fi
+if [ -z $GEM_PATH ]; then
+    echo "Required environment variable GEM_PATH not set; exiting." 1>&2
+    exit 1
+fi
+if [ -n $GEM_HOME ]; then
+    echo "Warning: Existing GEM_HOME variable '$GEM_HOME' will be changed to value of INSTALL_ROOT" 1>&2
+fi
+
+# test that INSTALL_ROOT is a writable directory
+if [ ! -e $INSTALL_ROOT ]; then
+    echo "INSTALL_ROOT environment variable path $INSTALL_ROOT does not exist; exiting." 1>&2
     exit 1
 elif [ ! -d $INSTALL_ROOT ]; then
-    echo "INSTALL_ROOT environment variable path $INSTALL_ROOT is not a directory; exiting." >&2
+    echo "INSTALL_ROOT environment variable path $INSTALL_ROOT is not a directory; exiting." 1>&2
+    exit 1
+elif  [ ! -w $INSTALL_ROOT ]; then
+    echo "INSTALL_ROOT environment variable path $INSTALL_ROOT is not writable; exiting." 1>&2
     exit 1
 else
     echo "Installing pipeline to root directory $INSTALL_ROOT"
 fi
 
+# set Ruby environment variables
+export PATH=$RUBY_HOME/bin:$PATH
+export MANPATH=$RUBY_HOME/share/man:$MANPATH
+export GEM_HOME=$INSTALL_ROOT
+# split GEM_PATH to find a bin directory
+IFS=':' # IFS = Bash "Internal Field Separator"
+GEM_ARRAY=($GEM_PATH)
+unset IFS
+GEM_BIN=${GEM_ARRAY[0]}/bin
+if [ ! -e $GEM_BIN ]; then
+    echo "Expected Ruby script directory '$GEM_BIN' does not exist" 1&>2
+    exit 1
+elif  [ ! -d $GEM_BIN ]; then
+    echo "Expected Ruby script directory '$GEM_BIN' is not a directory" 1&>2
+    exit 1
+fi
+export PATH=$GEM_BIN:$PATH
+# update GEM_PATH
+export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
+
+# version numbers
 WTSI_DNAP_UTILITIES_VERSION="0.5.3"
 ML_WAREHOUSE_VERSION="2.1"
 ALIEN_TIDYP_VERSION="1.4.7"
 NPG_TRACKING_VERSION="85.3"
 NPG_IRODS_VERSION="2.5.0"
-RUBY_VERSION="1.8.7-p330"
-LIB_RUBY_VERSION="0.3.0"
 
 START_DIR=$PWD
 
@@ -39,11 +76,17 @@ SRC_DIRS=($PERL_DIR $RUBY_DIR)
 for DIR in ${SRC_DIRS[@]}; do
     if [ ! -d $DIR ]; then
         echo -n "Genotyping source code directory $DIR not found; "
-        echo "install halted" >&2 
+        echo "install halted" 1>&2 
         exit 1
     fi
 done
 
+# ensure temporary directory is cleaned up (even after unexpected exit)
+function finish {
+    cd $START_DIR
+    rm -Rf $TEMP
+}
+trap finish EXIT
 # create and cd to temp directory
 TEMP_NAME=`mktemp -d genotyping_temp.XXXXXXXX`
 TEMP=`readlink -f $TEMP_NAME` # full path to temp directory
@@ -63,15 +106,41 @@ https://github.com/wtsi-npg/perl-irods-wrap/releases/download/$NPG_IRODS_VERSION
 for URL in ${URLS[@]}; do
     wget $URL
     if [ $? -ne 0 ]; then
-        echo -n "Failed to download $URL; non-zero exit status " >&2
-        echo " from wget; install halted" >&2
+        echo -n "Failed to download $URL; non-zero exit status " 1>&2
+        echo " from wget; install halted" 1>&2
         exit 1
     fi
 done
 eval $(perl -Mlocal::lib=$INSTALL_ROOT) # set environment variables
 
-# use local installation of cpanm
-module load cpanm/1.7042
+
+# check that some version of cpanm is available
+echo -n "cpanm script: "
+which cpanm
+if [ $? -ne 0 ]; then
+    echo "cpanm not found; install halted" 1>&2
+    exit 1
+fi
+# upgrade to latest versions of cpanm and its dependencies
+cpanm --installdeps App::cpanminus
+if [ $? -ne 0 ]; then
+    echo "Failed on dependencies for cpanm upgrade; install halted" 1>&2
+    exit 1
+fi
+cpanm --install App::cpanminus
+if [ $? -ne 0 ]; then
+    echo "Failed on latest version of cpanm; install halted" 1>&2
+    exit 1
+fi
+# script location can be slow to update, so store in a variable
+CPANM_SCRIPT=$INSTALL_ROOT/bin/cpanm
+if [ ! -e $CPANM_SCRIPT ]; then
+    echo "Cannot find cpanm script '$CPANM_SCRIPT'; install halted" 1>&2
+    exit 1 
+else
+    echo -n "cpanm script is $CPANM_SCRIPT, version: "
+    $CPANM_SCRIPT --version
+fi
 
 # install prerequisites from tarfiles
 TARFILES=(WTSI-DNAP-Utilities-$WTSI_DNAP_UTILITIES_VERSION.tar.gz \
@@ -81,67 +150,48 @@ npg-tracking-$NPG_TRACKING_VERSION.tar.gz \
 WTSI-NPG-iRODS-$NPG_IRODS_VERSION.tar.gz)
 
 for FILE in ${TARFILES[@]}; do
-    cpanm --installdeps $FILE --self-contained  --notest
+    $CPANM_SCRIPT --installdeps $FILE --self-contained  --notest
     if [ $? -ne 0 ]; then
-        echo "cpanm --installdeps failed for $FILE; install halted" >&2
+        echo "$CPANM_SCRIPT --installdeps failed for $FILE; install halted" 1>&2
         exit 1
     fi
-    cpanm --install $FILE --notest
+    $CPANM_SCRIPT --install $FILE --notest
     if [ $? -ne 0 ]; then
-        echo "cpanm --install failed for $FILE; install halted" >&2
+        echo "$CPANM_SCRIPT --install failed for $FILE; install halted" 1>&2
         exit 1
     fi
 done
 
 cd $PERL_DIR
 
-cpanm --installdeps . --self-contained --notest 
+$CPANM_SCRIPT --installdeps . --self-contained --notest
 if [ $? -ne 0 ]; then
-    echo "cpanm --installdeps failed for genotyping; install halted" >&2
+    echo "$CPANM_SCRIPT --installdeps failed for genotyping; install halted" 1>&2
     exit 1
 fi
 
 perl Build.PL
 ./Build install --install_base $INSTALL_ROOT
 if [ $? -ne 0 ]; then
-    echo "Genotyping pipeline Perl installation failed; install halted " >&2
+    echo "Genotyping pipeline Perl installation failed; install halted " 1>&2
     exit 1
 fi
-
-# now set Ruby environment variables and install
-if [ -z $RUBY_HOME ]; then
-    export RUBY_HOME=/software/gapi/pkg/ruby/$RUBY_VERSION
-fi
-export PATH=$RUBY_HOME/bin:$PATH
-export MANPATH=$RUBY_HOME/share/man:$MANPATH
-if [ -z $GEM_HOME ]; then
-    export GEM_HOME=$INSTALL_ROOT
-fi
-if [ -z $GEM_PATH ]; then
-    export GEM_PATH=/software/gapi/pkg/lib-ruby/$LIB_RUBY_VERSION
-fi
-export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
-export PATH=$GEM_PATH/bin:$PATH
 
 cd $RUBY_DIR
 GENOTYPING_GEM=`rake gem | grep File | cut -f 4 -d " "`
 if [ $? -ne 0 ]; then
-    echo "'rake gem' failed for genotyping; install halted" >&2
+    echo "'rake gem' failed for genotyping; install halted" 1>&2
     exit 1
 fi
 GEM_FILE_PATH=pkg/$GENOTYPING_GEM
 if [ ! -f $GEM_FILE_PATH ]; then
-    echo "Expected gem file '$GEM_FILE_PATH' not found; install halted" >&2
+    echo "Expected gem file '$GEM_FILE_PATH' not found; install halted" 1>&2
     exit 1
 fi
 gem install $GEM_FILE_PATH
 if [ $? -ne 0 ]; then
-    echo "'gem install' failed for genotyping; install halted" >&2
+    echo "'gem install' failed for genotyping; install halted" 1>&2
     exit 1
 fi
-
-# clean up temporary directory
-cd $START_DIR
-rm -Rf $TEMP
 
 exit 0
