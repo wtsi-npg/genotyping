@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulatorTest;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::SimulatorTest;
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ use Test::Exception;
 use Text::CSV;
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator;
 use WTSI::NPG::Genotyping::SNPSet;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -63,14 +63,14 @@ sub setup : Test(setup) {
                genotype => $genotype) } @data;
     $calls = \@calls;
 
-    my $id_sim = WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator->new(
+    my $id_sim = WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator->new(
         calls  => \@calls,
         snpset => $snpset
     );
 }
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator');
+  require_ok('WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator');
 }
 
 
@@ -78,7 +78,7 @@ sub construct : Test(1) {
 
     my @args = (snpset           => $snpset,
                 calls            => $calls);
-    new_ok('WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator'
+    new_ok('WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator'
                => \@args);
 }
 
@@ -102,7 +102,7 @@ sub script : Test(11) {
 
 sub simulate : Test(5) {
 
-    my $id_sim = WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator->new(
+    my $id_sim = WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator->new(
         snpset           => $snpset,
         calls            => $calls);
     my $results;

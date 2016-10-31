@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::QC_wip::Check::Identity;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::Check;
 
 use JSON;
 use Moose;
@@ -9,7 +9,7 @@ use plink_binary;
 
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNP;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric;
 
 use WTSI::NPG::Genotyping::Types qw(:all);
 
@@ -104,7 +104,7 @@ has 'production_calls' =>
 
   Arg [1]     : HashRef[ArrayRef[WTSI::NPG::Genotyping::Call]]
 
-  Returntype  : ArrayRef[WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian]
+  Returntype  : ArrayRef[WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric]
 
   Description : Find identity results for all samples. Input is a hash of
                 arrays of Call objects, indexed by sample name.
@@ -127,9 +127,7 @@ sub find_identity {
         my $qc_calls = $qc_calls_by_sample->{$sample_name};
         if (defined($qc_calls)) {
             my %args = %{$self->_get_sample_args($sample_name, $qc_calls)};
-            my $result =
-                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
-                      new(%args);
+            my $result = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->new(%args);
             push @id_results, $result;
         } else {
             $missing{$sample_name} = 1;
@@ -142,9 +140,7 @@ sub find_identity {
     foreach my $sample_name (@{$self->sample_names}) {
         if ($missing{$sample_name}) {
             my $args = $self->_get_sample_args($sample_name);
-            my $result =
-                WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian->
-                      new($args);
+            my $result = WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric->new($args);
             push @id_results, $result;
         }
       }
@@ -155,7 +151,7 @@ sub find_identity {
 =head2 pairwise_swap_check
 
   Arg [1]    : ArrayRef[
-                 WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian
+                 WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric
                ]
   Arg [2]    : Maybe[Num]
 
@@ -521,9 +517,10 @@ sub _from_illumina_snp_name {
   return $body;
 }
 
-# get failed WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentity results
-# only returns results confirmed as failed
-# 'missing' results have undefined pass/fail status
+# - get failed WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleIdentity
+# results
+# - only returns results confirmed as failed
+# - 'missing' results have undefined pass/fail status
 
 sub _get_failed_results {
   my ($self, $id_results) = @_;
@@ -534,7 +531,7 @@ sub _get_failed_results {
 }
 
 sub _get_sample_args {
-    # get arguments to construct a SampleIdentityBayesian object
+    # get arguments to construct a SampleMetric object
     # QC calls may be omitted, eg. for a sample missing from QC data
     my ($self, $sample_name, $qc_calls) = @_;
     $qc_calls ||= [];

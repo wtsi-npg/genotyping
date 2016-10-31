@@ -72,9 +72,9 @@ sub test_alternate_snp_names : Test(5) {
 sub test_command_line : Test(6) {
     my $plink = $dataDir."/identity_test";
     my $config = defaultJsonConfig();
-    my $cmd = "check_identity_bed.pl --config $config --outdir $workdir ".
+    my $cmd = "check_identity_simple.pl --config $config --outdir $workdir ".
 	" --plink $plink --db $dbPath";
-    is(system($cmd), 0, "check_identity_bed.pl exit status, input $plink");
+    is(system($cmd), 0, "check_identity_simple.pl exit status, input $plink");
     validate_outputs();
 }
 

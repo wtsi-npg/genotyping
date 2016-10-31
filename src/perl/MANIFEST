@@ -1,7 +1,7 @@
 bin/archive_fluidigm_genotypes.pl
 bin/check_duplicates_bed.pl
-bin/check_identity_bed.pl
-bin/check_identity_bed_wip.pl
+bin/check_identity_bayesian.pl
+bin/check_identity_simple.pl
 bin/check_xhet_gender.pl
 bin/collate_qc_results.pl
 bin/create_test_database.pl
@@ -135,9 +135,9 @@ lib/WTSI/NPG/Genotyping/QC/QCPlotShared.pm
 lib/WTSI/NPG/Genotyping/QC/QCPlotTests.pm
 lib/WTSI/NPG/Genotyping/QC/Reports.pm
 lib/WTSI/NPG/Genotyping/QC/SnpID.pm
-lib/WTSI/NPG/Genotyping/QC_wip/Check/Identity.pm
-lib/WTSI/NPG/Genotyping/QC_wip/Check/IdentitySimulator.pm
-lib/WTSI/NPG/Genotyping/QC_wip/Check/SampleIdentityBayesian.pm
+lib/WTSI/NPG/Genotyping/QC/BayesianIdentity/Check.pm
+lib/WTSI/NPG/Genotyping/QC/BayesianIdentity/Simulator.pm
+lib/WTSI/NPG/Genotyping/QC/BayesianIdentity/SampleMetric.pm
 lib/WTSI/NPG/Genotyping/Reference.pm
 lib/WTSI/NPG/Genotyping/Sequenom/AssayDataObject.pm
 lib/WTSI/NPG/Genotyping/Sequenom/AssayResult.pm
@@ -171,6 +171,9 @@ lib/WTSI/NPG/Utilities/DelimitedFiles.pm
 MANIFEST			This list of files
 README
 t/archivable.t
+t/bayesian_identity.t
+t/bayesian_identity_sample.t
+t/bayesian_identity_simulator.t
 t/call.t
 t/collation.t
 t/collector.t
@@ -385,9 +388,6 @@ t/gender_marker.t
 t/gender_marker_call.t
 t/gender_standalone.t
 t/identity.t
-t/identity_check_sample_wip_bayesian.t
-t/identity_check_wip.t
-t/identity_simulation_wip.t
 t/illuminus.t
 t/illuminus/example.json
 t/illuminus/example_all.iln
@@ -723,9 +723,9 @@ t/WTSI/NPG/Genotyping/Infinium/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Infinium/SampleQueryTest.pm
 t/WTSI/NPG/Genotyping/QC/CollationTest.pm
 t/WTSI/NPG/Genotyping/QC/IdentityTest.pm
-t/WTSI/NPG/Genotyping/QC_wip/Check/IdentitySimulatorTest.pm
-t/WTSI/NPG/Genotyping/QC_wip/Check/IdentityTest.pm
-t/WTSI/NPG/Genotyping/QC_wip/Check/SampleIdentityBayesianTest.pm
+t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SimulatorTest.pm
+t/WTSI/NPG/Genotyping/QC/BayesianIdentity/CheckTest.pm
+t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SampleMetricTest.pm
 t/WTSI/NPG/Genotyping/ScriptsTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/AssayDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Sequenom/AssayResultSetTest.pm
