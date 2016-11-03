@@ -19,7 +19,7 @@
 module Genotyping::Tasks
 
   RUN_QC = 'run_qc.pl'
-  CHECK_IDENTITY_BED = 'check_identity_bed.pl'
+  CHECK_IDENTITY = 'check_identity_simple.pl'
 
   module QualityControl
     include Genotyping::Tasks
@@ -109,7 +109,7 @@ module Genotyping::Tasks
         margs = [dbfile, input, output]
         
 
-        command = [CHECK_IDENTITY_BED,
+        command = [CHECK_IDENTITY,
                    cli_arg_map(cli_args, :prefix => '--')].flatten.join(' ')
         task_id = task_identity(:check_identity, *margs)
         log = File.join(log_dir, task_id + '.log')
