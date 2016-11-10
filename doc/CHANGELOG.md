@@ -11,6 +11,14 @@ Added:
 - Replace old identity check with new Bayesian version in "main" QC output
 and plots
 
+
+Release 1.13.2: 2016-11-10
+--------------------------
+
+Changed:
+- Hotfix: Add cgp and ddd references to WTSI::NPG::Genotyping::QC::Identity
+
+
 Release 1.13.1: 2016-07-28
 --------------------------
 

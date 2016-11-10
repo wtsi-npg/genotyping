@@ -47,7 +47,9 @@ our $FLUIDIGM = 'Fluidigm';
 our $PLEX_DIR = '/nfs/srpipe_references/genotypes';
 our %PLEX_MANIFESTS = (
     $FLUIDIGM => {
-        qc => $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv',
+        cgp => $PLEX_DIR.'/cgp_fluidigm_snp_info_1000Genomes.tsv',
+        ddd => $PLEX_DIR.'/ddd_fluidigm_snp_info_1000Genomes.tsv',
+        qc  => $PLEX_DIR.'/qc_fluidigm_snp_info_1000Genomes.tsv',
     },
     $SEQUENOM => {
         W30467 => $PLEX_DIR.'/W30467_snp_set_info_1000Genomes.tsv',
