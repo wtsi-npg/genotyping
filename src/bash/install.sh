@@ -60,6 +60,7 @@ export PATH=$GEM_BIN:$PATH
 export GEM_PATH=$INSTALL_ROOT:$GEM_PATH
 
 # version numbers
+CPANM_VERSION="1.7042"
 WTSI_DNAP_UTILITIES_VERSION="0.5.3"
 ML_WAREHOUSE_VERSION="2.1"
 ALIEN_TIDYP_VERSION="1.4.7"
@@ -87,13 +88,47 @@ function finish {
     rm -Rf $TEMP
 }
 trap finish EXIT
+
 # create and cd to temp directory
 TEMP_NAME=`mktemp -d genotyping_temp.XXXXXXXX`
 TEMP=`readlink -f $TEMP_NAME` # full path to temp directory
-CPANM_TEMP="$TEMP/cpanm"
-mkdir $CPANM_TEMP
-export PERL_CPANM_HOME=$CPANM_TEMP
-export PATH=$TEMP:$PATH # ensure cpanm download is on PATH
+export PERL_CPANM_HOME="$TEMP/cpanm_home"
+mkdir $PERL_CPANM_HOME
+mkdir "$TEMP/cpanm" # cpanm installation directory
+export PATH=$TEMP/cpanm/bin:$PATH # ensure cpanm download is on PATH
+cd $TEMP
+
+# Download, verify and install cpanm
+# See checksum at http://www.cpan.org/authors/id/M/MI/MIYAGAWA/CHECKSUMS
+CPANM_TARFILE=App-cpanminus-$CPANM_VERSION.tar.gz
+CPANM_URL=http://search.cpan.org/CPAN/authors/id/M/MI/MIYAGAWA/$CPANM_TARFILE
+wget $CPANM_URL
+sha256sum -c $SCRIPT_DIR/cpanm.sha256
+if [ $? -ne 0 ]; then
+    echo "Checksum of $CPANM_TARFILE download does not match; install halted"
+    exit 1
+fi
+tar -xzf $CPANM_TARFILE
+cd App-cpanminus-$CPANM_VERSION
+perl Makefile.PL INSTALL_BASE=$TEMP/cpanm
+make
+make test
+if [ $? -ne 0 ]; then
+    echo "cpanm test failed; install halted"
+    exit 1
+fi
+make install
+if [ $? -ne 0 ]; then
+    echo "cpanm install failed; genotyping install halted"
+    exit 1
+fi
+CPANM_SCRIPT=$TEMP/cpanm/bin/cpanm
+if [ ! -e $CPANM_SCRIPT ]; then
+    echo "Cannot find cpanm script '$CPANM_SCRIPT'; install halted" 1>&2
+    exit 1 
+fi
+echo -n "cpanm script is $CPANM_SCRIPT, version: "
+$CPANM_SCRIPT --version
 cd $TEMP
 
 # use wget to download tarballs to install
@@ -112,35 +147,6 @@ for URL in ${URLS[@]}; do
     fi
 done
 eval $(perl -Mlocal::lib=$INSTALL_ROOT) # set environment variables
-
-
-# check that some version of cpanm is available
-echo -n "cpanm script: "
-which cpanm
-if [ $? -ne 0 ]; then
-    echo "cpanm not found; install halted" 1>&2
-    exit 1
-fi
-# upgrade to latest versions of cpanm and its dependencies
-cpanm --installdeps App::cpanminus
-if [ $? -ne 0 ]; then
-    echo "Failed on dependencies for cpanm upgrade; install halted" 1>&2
-    exit 1
-fi
-cpanm --install App::cpanminus
-if [ $? -ne 0 ]; then
-    echo "Failed on latest version of cpanm; install halted" 1>&2
-    exit 1
-fi
-# script location can be slow to update, so store in a variable
-CPANM_SCRIPT=$INSTALL_ROOT/bin/cpanm
-if [ ! -e $CPANM_SCRIPT ]; then
-    echo "Cannot find cpanm script '$CPANM_SCRIPT'; install halted" 1>&2
-    exit 1 
-else
-    echo -n "cpanm script is $CPANM_SCRIPT, version: "
-    $CPANM_SCRIPT --version
-fi
 
 # install prerequisites from tarfiles
 TARFILES=(WTSI-DNAP-Utilities-$WTSI_DNAP_UTILITIES_VERSION.tar.gz \
