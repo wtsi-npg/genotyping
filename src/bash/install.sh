@@ -8,6 +8,8 @@
 
 # similar in purpose to npg_irods/scripts/travis_install.sh
 
+set -e # script will exit if any command has a non-zero return value
+
 # check for environment variables
 if [ -z $INSTALL_ROOT ]; then
     echo "Environment variable INSTALL_ROOT must specify directory path for installation; exiting." >&2
@@ -103,25 +105,13 @@ cd $TEMP
 CPANM_TARFILE=App-cpanminus-$CPANM_VERSION.tar.gz
 CPANM_URL=http://search.cpan.org/CPAN/authors/id/M/MI/MIYAGAWA/$CPANM_TARFILE
 wget $CPANM_URL
-sha256sum -c $SCRIPT_DIR/cpanm.sha256
-if [ $? -ne 0 ]; then
-    echo "Checksum of $CPANM_TARFILE download does not match; install halted"
-    exit 1
-fi
+sha256sum -c $SCRIPT_DIR/cpanm.sha256 # verify checksum of the cpanm download
 tar -xzf $CPANM_TARFILE
 cd App-cpanminus-$CPANM_VERSION
 perl Makefile.PL INSTALL_BASE=$TEMP/cpanm
 make
 make test
-if [ $? -ne 0 ]; then
-    echo "cpanm test failed; install halted"
-    exit 1
-fi
 make install
-if [ $? -ne 0 ]; then
-    echo "cpanm install failed; genotyping install halted"
-    exit 1
-fi
 CPANM_SCRIPT=$TEMP/cpanm/bin/cpanm
 if [ ! -e $CPANM_SCRIPT ]; then
     echo "Cannot find cpanm script '$CPANM_SCRIPT'; install halted" 1>&2
@@ -140,11 +130,6 @@ https://github.com/wtsi-npg/perl-irods-wrap/releases/download/$NPG_IRODS_VERSION
 
 for URL in ${URLS[@]}; do
     wget $URL
-    if [ $? -ne 0 ]; then
-        echo -n "Failed to download $URL; non-zero exit status " 1>&2
-        echo " from wget; install halted" 1>&2
-        exit 1
-    fi
 done
 eval $(perl -Mlocal::lib=$INSTALL_ROOT) # set environment variables
 
@@ -157,47 +142,27 @@ WTSI-NPG-iRODS-$NPG_IRODS_VERSION.tar.gz)
 
 for FILE in ${TARFILES[@]}; do
     $CPANM_SCRIPT --installdeps $FILE --self-contained  --notest
-    if [ $? -ne 0 ]; then
-        echo "$CPANM_SCRIPT --installdeps failed for $FILE; install halted" 1>&2
-        exit 1
-    fi
     $CPANM_SCRIPT --install $FILE --notest
-    if [ $? -ne 0 ]; then
-        echo "$CPANM_SCRIPT --install failed for $FILE; install halted" 1>&2
-        exit 1
-    fi
 done
 
 cd $PERL_DIR
 
 $CPANM_SCRIPT --installdeps . --self-contained --notest
-if [ $? -ne 0 ]; then
-    echo "$CPANM_SCRIPT --installdeps failed for genotyping; install halted" 1>&2
-    exit 1
-fi
 
 perl Build.PL
 ./Build install --install_base $INSTALL_ROOT
-if [ $? -ne 0 ]; then
-    echo "Genotyping pipeline Perl installation failed; install halted " 1>&2
-    exit 1
-fi
+
+echo "Perl installation complete; now installing Ruby."
 
 cd $RUBY_DIR
 GENOTYPING_GEM=`rake gem | grep File | cut -f 4 -d " "`
-if [ $? -ne 0 ]; then
-    echo "'rake gem' failed for genotyping; install halted" 1>&2
-    exit 1
-fi
 GEM_FILE_PATH=pkg/$GENOTYPING_GEM
 if [ ! -f $GEM_FILE_PATH ]; then
     echo "Expected gem file '$GEM_FILE_PATH' not found; install halted" 1>&2
     exit 1
 fi
 gem install $GEM_FILE_PATH
-if [ $? -ne 0 ]; then
-    echo "'gem install' failed for genotyping; install halted" 1>&2
-    exit 1
-fi
+
+echo "Ruby installation complete."
 
 exit 0
