@@ -31,3 +31,18 @@ image(seq(from=global.min, to=global.max, length.out=50), c(1), as.matrix(c(1:50
 axis(3, at=c(global.min, global.max), labels=c(paste("< ", signif(global.min,3)), paste("> ", signif(global.max,3))) ) # round labels to 3 s.f.
 dev.off()
 q(status=0)
+
+
+# Author: Iain Bancarz <ib5@sanger.ac.uk>
+
+# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.

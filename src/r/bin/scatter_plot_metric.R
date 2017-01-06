@@ -120,7 +120,7 @@ ylab.name <- function(metricName) {
   } else if (metricName=='duplicate') {
     ylab.name <- "maximum similarity on test panel"
   } else if (metricName=='identity') {
-    ylab.name <- "identity with Sequenom results"
+    ylab.name <- "identity with QC plex results"
   } else if (metricName=='magnitude') {
     ylab.name <- "normalised magnitude of intensity"
   } else {
@@ -182,3 +182,18 @@ pn <- process.pn(pn)
 plot.pdf(index, metric, pass, pn, pb, metricName, metricMean,
          metricSd, metricThresh1, metricThresh2, sdThresh,
          plotNum, plotTotal, xmin, xmax, ymin, ymax, outPath)
+
+
+# Author: Iain Bancarz <ib5@sanger.ac.uk>
+
+# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
