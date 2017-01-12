@@ -331,7 +331,7 @@ sub to_csv {
             push @csv_fields, @callset_fields;
         }
     }
-    my $csv = Text::CSV->new();
+    my $csv = Text::CSV->new({ binary => 1 });
     $csv->combine(@csv_fields);
     return $csv->string;
 }

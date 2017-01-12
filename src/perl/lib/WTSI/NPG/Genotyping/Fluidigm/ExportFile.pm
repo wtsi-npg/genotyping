@@ -124,6 +124,7 @@ sub write_assay_result_data {
   my $records_written = 0;
   my $csv = Text::CSV->new({eol              => "\n",
                             sep_char         => "\t",
+                            binary           => 1,
                             allow_whitespace => undef,
                             quote_char       => undef});
 

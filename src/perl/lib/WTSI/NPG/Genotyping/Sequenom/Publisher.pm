@@ -209,6 +209,7 @@ sub _write_sequenom_csv_file {
 
   my $csv = Text::CSV->new({eol              => "\n",
                             sep_char         => "\t",
+                            binary           => 1,
                             allow_whitespace => undef,
                             quote_char       => undef});
   $csv->column_names(\@header);

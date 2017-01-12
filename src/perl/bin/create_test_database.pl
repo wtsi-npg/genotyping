@@ -101,6 +101,7 @@ sub createDummyCalls {
     my ($plexPath,) = @_;
     my $csv = Text::CSV->new({eol              => "\n",
                               sep_char         => "\t",
+                              binary           => 1,
                               allow_whitespace => undef,
                               quote_char       => undef});
     my @calls;
