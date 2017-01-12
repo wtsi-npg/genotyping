@@ -94,6 +94,8 @@ sub run {
             $log->logcroak("Cannot read sample JSON path '$sample_json'");
         }
         my $sample_data = decode_json(read_file($sample_json));
+        $log->debug("Read sample JSON data for ", scalar @{$sample_data},
+                    " samples");
         # generate a hash mapping sanger sample ID to URI
         foreach my $sample (@{$sample_data}) {
             my $ssid = $sample->{'sanger_sample_id'};
@@ -210,6 +212,8 @@ sub run {
             my $uri = $ssid_to_uri{$ssid};
             if ($uri) {
                 push @{$qc_calls{$uri}}, @{$vcf_calls{$ssid}};
+                $log->debug("Appending calls for URI '", $uri, "', SSID '",
+                            $ssid, "'");
             } else {
                 # samples in QC plex results do not necessarily appear in
                 # production, eg. sample exclusion in Illuminus/zCall

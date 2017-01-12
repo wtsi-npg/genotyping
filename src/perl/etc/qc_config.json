@@ -4,6 +4,7 @@
                  "main_index":"index.html",
                  "het_by_maf":"het_by_maf.json",
 		 "id_json":"identity_check.json",
+		 "id_csv":"identity_check.csv",
                  "magnitude":"magnitude.txt",
                  "sample_cr_het":"sample_cr_het.txt",
                  "plate_index":"index.html",
@@ -42,7 +43,7 @@
       "heterozygosity" : 3,
       "call_rate" : 0.95,
       "magnitude" : 0.90,
-      "identity" : 0.90,
+      "identity" : 0.99,
       "duplicate" : 0.98,
       "gender" : "NA",
       "xydiff" : 3

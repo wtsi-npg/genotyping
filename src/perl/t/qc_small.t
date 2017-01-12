@@ -13,7 +13,7 @@ use File::Temp qw/tempdir/;
 use FindBin qw($Bin);
 use JSON;
 
-use Test::More tests => 53;
+use Test::More tests => 52;
 
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(jsonPathOK pngPathOK xmlPathOK);
 
@@ -23,20 +23,18 @@ my $bin = "$Bin/../bin/"; # assume we are running from perl/t
 my $data_dir = $Bin."/qc_test_data/";
 my $plink = $data_dir.$testName;
 my $sim = $data_dir.$testName.".sim";
-my $outDir = "$Bin/qc/$testName/";
 my $heatMapDir = "plate_heatmaps/";
 my $iniPath = "$bin/../etc/qc_test.ini"; # contains inipath relative to test output directory (works after chdir)
 my $dbname = "small_test.db";
 my $dbfileMasterA = $data_dir.$dbname;
 my $inclusionMaster = $data_dir."sample_inclusion.json";
-my $mafhet = $data_dir."output_examples/small_test_maf_het.json";
 my $config = "$bin/../etc/qc_config.json";
 my $filterConfig = $data_dir."zcall_prefilter_test.json";
 my $vcf = $data_dir."small_test_plex.vcf";
 my $plexManifest = $data_dir."small_test_fake_manifest.tsv";
 my $sampleJson = $data_dir."small_test_sample.json";
 my $piperun = "pipeline_run"; # run name in pipeline DB
-my ($cmd, $status);
+my ($cmd, $status, $outDir);
 
 # The directories containing the R scripts and Perl scripts
 $ENV{PATH} = join(':', abs_path('../r/bin'), abs_path('../bin'), $ENV{PATH});
@@ -46,25 +44,16 @@ my $tempdir = tempdir(CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 my $dbfile = $tempdir."/".$dbname;
 
-if (-e $outDir) {
-    if (-d $outDir) {
-	system("rm -Rf $outDir/*"); # remove previous output
-    } else {
-	croak "Output path $outDir exists and is not a directory!";
-    }
-} else {
-    mkdir($outDir);
-}
-
-### test creation of QC input files ### 
+### test creation of QC input files ###
 
 print "Testing dataset $testName.\n";
+$outDir = tempdir("test_qc_components_XXXXXX", CLEANUP => 1);
 
 ## test identity check
-$status = system("$bin/check_identity_simple.pl --outdir $outDir --config $config  --plink $plink --db $dbfile");
-is($status, 0, "check_identity_simple.pl exit status");
+$status = system("$bin/check_identity_bayesian.pl --json $outDir/identity_check.json --csv $outDir/identity_check.csv --plex $plexManifest --plink $plink --vcf $vcf --sample_json $sampleJson");
+is($status, 0, "check_identity_bayesian.pl exit status");
 
-## Bayesian identity check script is tested in WTSI::NPG::Genotyping::QC::BayesianIdentity::IdentityTest
+## 'Simple' identity check script is no longer in use; can be deleted?
 
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";
@@ -130,20 +119,17 @@ is(system($cmd), 0, "plot_fail_causes.pl exit status");
 
 ## test PNG outputs in main directory
 # sample_xhet_gender.png absent for this test; no mixture model
-my @png = qw /crHetDensityScatter.png  failScatterPlot.png  
-  crHistogram.png  failsCombined.png  
+my @png = qw /crHetDensityScatter.png  failScatterPlot.png
+  crHistogram.png  failsCombined.png
   crHetDensityHeatmap.png  failScatterDetail.png
   failsIndividual.png  hetHistogram.png/;
 foreach my $png (@png) {
     ok(pngPathOK($outDir.'/'.$png), "PNG output $png in valid format");
 }
 
-
-system("rm -Rf $outDir/*"); # remove output from previous tests
-system("cp $dbfileMasterA $tempdir");
-print "\tRemoved output from previous tests; now testing main bootstrap script.\n";
-
 ## check run_qc.pl bootstrap script
+$outDir = tempdir("test_qc_script_main_XXXXXX", CLEANUP => 1);
+system("cp $dbfileMasterA $tempdir"); # fresh copy of SQLite database
 # omit --title argument, to test default title function
 my @args = ("--output-dir=$outDir",
             "--dbpath=$dbfile",
@@ -158,13 +144,6 @@ my @args = ("--output-dir=$outDir",
             "--plink=$plink");
 is(system("$bin/run_qc.pl ".join(" ", @args)), 0,
    "run_qc.pl bootstrap script exit status");
-
-## check work-in-progress output files
-my $outDirWip = $outDir."/qc_wip";
-my @output_wip = ("identity_wip.json", );
-foreach my $file (@output_wip) {
-  ok(-e $outDirWip."/".$file, "QC WIP output $file exists")
-}
 
 ## check (non-heatmap) outputs again
 foreach my $png (@png) {
@@ -188,21 +167,21 @@ ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
 
 
 ## check that run_qc.pl dies with incorrect arguments for alternate ID check
-system("rm -Rf $outDir/*"); # remove output from previous tests
+$outDir = tempdir("test_qc_script_XXXXXX", CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 my $cmd_base = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim --plink=$plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
 isnt(system($cmd_base." --vcf $vcf 2> /dev/null"), 0,
      'Non-zero exit for run_qc.pl with --vcf but not --plex-manifest');
 ok(!(-e $outDir.'/pipeline_summary.csv'), "CSV summary not found");
 
-system("rm -Rf $outDir/*"); # remove output from previous tests
+$outDir = tempdir("test_qc_script_XXXXXX", CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 isnt(system($cmd_base." --plex-manifests $plexManifest 2> /dev/null"), 0,
      'Non-zero exit for run_qc.pl with --plex-manifest but not --vcf');
 ok(!(-e $outDir.'/pipeline_summary.csv'), "CSV summary not found");
 
 ## run_qc.pl again, without the arguments for alternate identity check
-system("rm -Rf $outDir/*"); # remove output from previous tests
+$outDir = tempdir("test_qc_script_XXXXXX", CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 $cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim --plink=$plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
 

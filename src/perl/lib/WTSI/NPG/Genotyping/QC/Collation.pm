@@ -203,9 +203,13 @@ sub evaluateThresholds {
             my $value = $result{$metric};
             my $pass = metricPass($metric, $value, $thresholds{$metric});
             my @terms = ($pass, );
-            if ($metric eq $GENDER_NAME) { push (@terms, @{$value}); } 
-            elsif ($metric eq $DUP_NAME) { push (@terms, @{$value}[0]); }
-            else { push(@terms, $value); }
+            if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
+                push (@terms, @{$value});
+            } elsif ($metric eq $DUP_NAME) {
+                push (@terms, @{$value}[0]);
+            } else {
+                push(@terms, $value);
+            }
             $evaluated{$sample}{$metric} = \@terms;
         }
     }
@@ -226,10 +230,12 @@ sub excludedSampleCsv {
         push(@fields, 'Excluded'); 
         @fields = appendNull(\@fields, 3); # null plate, well, sample pass
         foreach my $name (@METRIC_NAMES) {
-            if (!$metrics{$name}) { 
+            if (!$metrics{$name}) {
                 next;
             } elsif ($name eq $GENDER_NAME) {
                 @fields = appendNull(\@fields, 4); # pass/fail, metric triple
+            } elsif ($name eq $ID_NAME) {
+                @fields = appendNull(\@fields, 3); # pass/fail, metric double
             } else {
                 @fields = appendNull(\@fields, 2); # pass/fail, metric
             }
@@ -246,29 +252,29 @@ sub findMetricResults {
     my @metricNames = @{ shift() };
     my %allResults;
     foreach my $name (@metricNames) {
-    my $resultsRef;
-    if ($name eq $CR_NAME) {
-        $resultsRef = resultsCallRate($inputDir);
-    } elsif ($name eq $DUP_NAME) {
-        $resultsRef = resultsDuplicate($inputDir);
-    } elsif ($name eq $GENDER_NAME) {
-        $resultsRef = resultsGender($inputDir);
-    } elsif ($name eq $HET_NAME) {
-        $resultsRef = resultsHet($inputDir);
-    } elsif ($name eq $HMH_NAME) {
-        $resultsRef = resultsHighMafHet($inputDir);
-    } elsif ($name eq $ID_NAME) {
-        $resultsRef = resultsIdentity($inputDir);
-    } elsif ($name eq $LMH_NAME) {
-        $resultsRef = resultsLowMafHet($inputDir);
-    } elsif ($name eq $MAG_NAME) {
-        $resultsRef = resultsMagnitude($inputDir);
-    } elsif ($name eq $XYD_NAME) {
-        $resultsRef = resultsXydiff($inputDir);
-    } else {
-        croak "Unknown metric name $name for results: $!";
-    }
-    if ($resultsRef) { $allResults{$name} = $resultsRef; }
+        my $resultsRef;
+        if ($name eq $CR_NAME) {
+            $resultsRef = resultsCallRate($inputDir);
+        } elsif ($name eq $DUP_NAME) {
+            $resultsRef = resultsDuplicate($inputDir);
+        } elsif ($name eq $GENDER_NAME) {
+            $resultsRef = resultsGender($inputDir);
+        } elsif ($name eq $HET_NAME) {
+            $resultsRef = resultsHet($inputDir);
+        } elsif ($name eq $HMH_NAME) {
+            $resultsRef = resultsHighMafHet($inputDir);
+        } elsif ($name eq $ID_NAME) {
+            $resultsRef = resultsIdentity($inputDir);
+        } elsif ($name eq $LMH_NAME) {
+            $resultsRef = resultsLowMafHet($inputDir);
+        } elsif ($name eq $MAG_NAME) {
+            $resultsRef = resultsMagnitude($inputDir);
+        } elsif ($name eq $XYD_NAME) {
+            $resultsRef = resultsXydiff($inputDir);
+        } else {
+            croak "Unknown metric name $name for results: $!";
+        }
+        if ($resultsRef) { $allResults{$name} = $resultsRef; }
     }
     return \%allResults;
 }
@@ -298,7 +304,7 @@ sub findThresholds {
 
 sub includedSampleCsv {
     # generate CSV lines for samples included in pipeline DB
-    my @sampleNames = @{ shift() }; 
+    my @sampleNames = @{ shift() };
     my %sampleInfo = %{ shift() };   # generic sample/dataset info
     my %passResult = %{ shift() }; # metric pass/fail status and values
     my %samplePass = %{ shift() }; # overall pass/fail by sample
@@ -356,7 +362,8 @@ sub metricPass {
         my ($min, $max) = @{$threshold};
         if ($value >= $min && $value <= $max) { $pass = 1; }
     } elsif ($metric eq $ID_NAME) {
-        if ($value eq 'NA' || $value > $threshold) { $pass = 1; }
+        my ($probability, $concordance) = @{$value};
+        if ($value eq 'NA' || $probability > $threshold) { $pass = 1; }
     } else {
         croak "Unknown metric name: $!";
     }
@@ -523,10 +530,24 @@ sub resultsHighMafHet {
 sub resultsIdentity {
     my $inputDir = shift;
     my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
-    my %data = %{decode_json(read_file($inPath))};
-    return $data{'results'};
+    my $resultsRef;
+    if (-e $inPath) {
+        # read identity results from JSON file
+        my %data = %{decode_json(read_file($inPath))};
+        my @sample_results = @{$data{'identity'}};
+        my %results;
+        foreach my $result (@sample_results) {
+            my $name = $result->{'sample_name'};
+            my $concordance = $result->{'concordance'};
+            my $identity = $result->{'identity'};
+            $results{$name} = [$identity, $concordance];
+        }
+        $resultsRef = \%results;
+    }
+    # if no JSON file, return an empty result
+    # TODO Use log4perl to record a debug/info message here
+    return $resultsRef;
 }
-
 
 sub resultsLowMafHet {
     my $inputDir = shift;
@@ -645,14 +666,16 @@ sub writeCsv {
     push(@lines, @{$linesRef});
     my %metrics = %{$metricsRef};
     # use %metrics to construct appropriate CSV header
-    my @headers = qw/run project data_supplier snpset rowcol beadchip_number 
+    my @headers = qw/run project data_supplier snpset rowcol beadchip_number
                      supplier_name cohort sample include plate well pass/;
     foreach my $name (@METRIC_NAMES) {
         my @suffixes;
-        if (!$metrics{$name}) { 
-            next; 
+        if (!$metrics{$name}) {
+            next;
         } elsif ($name eq $GENDER_NAME) {
             @suffixes = qw/pass xhet inferred supplied/;
+        } elsif ($name eq $ID_NAME) {
+            @suffixes = qw/pass probability concordance/;
         } else {
             @suffixes = qw/pass value/;
         }
@@ -685,8 +708,8 @@ sub collate {
     my (%config, %thresholdConfig, @metricNames);
     if ($verbose) { print STDERR "Started collating QC results.\n";    }
     %thresholdConfig = %{readMetricThresholds($thresholdPath)};
-    if ($metricsRef) { 
-        @metricNames = @{$metricsRef}; 
+    if ($metricsRef) {
+        @metricNames = @{$metricsRef};
         foreach my $name (@metricNames) {
             if (!defined($thresholdConfig{$name})) {
                 croak "No threshold defined for metric $name: $!";
