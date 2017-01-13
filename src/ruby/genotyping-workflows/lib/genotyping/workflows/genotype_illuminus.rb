@@ -48,7 +48,7 @@ Arguments:
 
     - config: <path> of custom pipeline database .ini file. Optional.
     - manifest: <path> of the chip manifest file. Required.
-    - plex_manifest: <Array> containing paths to one or more qc plex manifest files. Required.
+    - plex_manifest: <Array> containing paths to one or more qc plex manifest files. If plex_manifest is supplied, vcf must also be given.
     - gender_method: <string> name of a gender determination method described in
     methods.ini. Optional, defaults to 'Inferred'
     - chunk_size: <integer> number of SNPs to analyse in a single Illuminus job.
@@ -61,8 +61,7 @@ Arguments:
     - nofilter: <boolean> omit the prefilter on GenCall QC. Optional. If true, 
     overrides the filterconfig argument.
     - fam_dummy: <integer> Dummy value for missing paternal/maternal ID or phenotype in Plink .fam output. Must be equal to 0 or -9. Optional, defaults to -9.
-    - vcf: <Array> containing paths to one or more VCF files for identity QC
-    - plex_manifest: <Array> containing paths to one or more plex manifest files for identity QC
+    - vcf: <Array> containing paths to one or more VCF files for identity QC. If vcf is supplied, plex_manifest must also be given.
 
 e.g.
 
@@ -93,16 +92,15 @@ Returns:
       defaults = {}
       args = intern_keys(defaults.merge(args))
       args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
-                               :queue, :memory,
-                               :select, :chunk_size, :fam_dummy, 
-                               :gender_method, :filterconfig, :nofilter,
-                               :vcf, :plex_manifest)
+                               :queue, :memory, :select, :chunk_size,
+                               :fam_dummy, :gender_method,
+                               :filterconfig, :nofilter, :vcf)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest)
-      plex_manifest = args.delete(:plex_manifest)
+      plex_manifest = args.delete(:plex_manifest) || Array.new()
       chunk_size = args.delete(:chunk_size) || 2000
       fam_dummy = args.delete(:fam_dummy) || -9
       gender_method = args.delete(:gender_method)
@@ -114,6 +112,12 @@ Returns:
       args.delete(:memory)
       args.delete(:queue)
       args.delete(:select)
+
+      if vcf.empty? and (not plex_manifest.empty?)
+        raise ArgumentError, "Plex manifest must be accompanied by VCF"
+      elsif (not vcf.empty?) and plex_manifest.empty?
+        raise ArgumentError, "VCF must be accompanied by plex manifest"
+      end
 
       ENV['PERL_INLINE_DIRECTORY'] = self.inline_dir
 
