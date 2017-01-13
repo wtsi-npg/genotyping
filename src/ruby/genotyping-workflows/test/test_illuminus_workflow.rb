@@ -93,16 +93,7 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
     name = 'test_genotype_illuminus_invalid_args'
     timeout = 1400
     run_name = 'run1'
-
-    # Percolator does not necessarily close its logfile when workflow exits;
-    # causes errors when attempting to delete working directory, so as a
-    # workaround we write the log to the parent directory and then delete
-    # it separately. Percolator appends the 'log' argument to the 'root_dir'
-    # argument, so we make the 'log' argument a relative path. (Explicitly
-    # calling Percolator.log.close() will break subsequent tests.)
-    log_name = 'percolate.log'
-    log_path_rel = File.join('..', log_name)
-    log_path_abs = File.join(data_path, log_name)
+    log = 'percolate.log'
 
     pipe_ini = File.join(data_path, 'genotyping.ini')
     fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
@@ -129,12 +120,10 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       }
       args = [dbfile1, run_name, work_dir1, args_hash]
       result1 = test_workflow(name,Genotyping::Workflows::GenotypeIlluminus,
-                              timeout, work_dir1, log_path_rel, args)
+                              timeout, work_dir1, log, args)
       assert(result1 == false)
-      if result1 == false
-        remove_work_dir(work_dir1) 
-        FileUtils.rm(log_path_abs)
-      end
+      Percolate.log.close
+      remove_work_dir(work_dir1) if result1 == false
 
       ### invalid arguments: VCF without plex manifest
       work_dir2 = make_work_dir(name+'.2', data_path)
@@ -152,12 +141,10 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       }
       args = [dbfile2, run_name, work_dir2, args_hash]
       result2 = test_workflow(name,Genotyping::Workflows::GenotypeIlluminus,
-                              timeout, work_dir2, log_path_rel, args)
+                              timeout, work_dir2, log, args)
       assert(result2 == false)
-      if result2 == false
-        remove_work_dir(work_dir2) 
-        FileUtils.rm(log_path_abs)
-      end
+      Percolate.log.close
+      remove_work_dir(work_dir2) if result2 == false
 
     end
   end
