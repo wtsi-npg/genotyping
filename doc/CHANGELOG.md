@@ -8,18 +8,15 @@ Unreleased
 ----------
 
 Added:
-- Replace old identity check with new Bayesian version in "main" QC output
-and plots
-
-Release 1.13.1: 2016-07-28
---------------------------
-
-Changed:
-- Made install.sh more transparent and portable.
-- Updated WTSI-DNAP-Utilities and perl-irods-wrap versions in install.sh.
+- Gencall workflow: Writes Plink data and runs QC for Gencall only
+- Replace old identity metric with new Bayesian version, which will:
+    - Appear in main QC output and plots
+    - Contribute to sample pass/fail status
 
 Fixed:
-- Default LSF queue for Ruby workflows
+- Check for allowed combination of plex manifests and VCF files in
+workflow arguments (Issue #434) 
+- Create Text::CSV objects with binary flag enabled (Issue #406)
 
 
 Release 1.13.2: 2016-11-10
@@ -29,7 +26,7 @@ Changed:
 - Hotfix: Add cgp and ddd references to WTSI::NPG::Genotyping::QC::Identity
 
 
-Release 1.13.1: 2016-07-28
+Release 1.13.1: 2016-07-28 
 --------------------------
 
 Changed:
