@@ -8,7 +8,9 @@ Unreleased
 ----------
 
 Added:
-- Gencall workflow: Writes Plink data and runs QC for Gencall only
+- Gencall workflow:
+  - Writes Plink data and runs QC for Gencall only
+  - New option in ready_workflow.pl
 - Replace old identity metric with new Bayesian version, which will:
     - Appear in main QC output and plots
     - Contribute to sample pass/fail status
