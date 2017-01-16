@@ -15,7 +15,7 @@ use File::Spec::Functions qw(catfile);
 use FindBin qw($Bin);
 use Getopt::Long;
 use JSON;
-use List::AllUtils qw(uniq);
+use List::AllUtils qw(none uniq);
 use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
@@ -31,8 +31,11 @@ our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
+
+our $MODULE_GENCALL = 'Genotyping::Workflows::GenotypeGencall';
 our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
 our $MODULE_ZCALL = 'Genotyping::Workflows::GenotypeZCall';
+our $GENCALL = 'gencall';
 our $ILLUMINUS = 'illuminus';
 our $ZCALL = 'zcall';
 
@@ -111,46 +114,43 @@ sub run {
     $log = Log::Log4perl->get_logger('main');
 
     ### process command-line arguments ###
+
+    # required arguments for all workflows
+    my %required_args = (
+        workdir  => $workdir,
+        run      => $run,
+        workflow => $workflow,
+        dbfile   => $dbfile,
+        manifest => $manifest
+    );
+    my @required_args = sort keys %required_args;
+    my @workflows = ($GENCALL, $ILLUMINUS, $ZCALL);
+    foreach my $name (@required_args) {
+        if (! defined $required_args{$name}) {
+            $log->logcroak("Argument --$name is required");
+        }
+        if ($name eq 'workflow') {
+            if (none { $_ eq $required_args{$name} } @workflows) {
+                $log->logcroak('--$name argument must be one of: ',
+                               join(', ', @workflows));
+            }
+        } elsif ($name eq 'dbfile' || $name eq 'manifest') {
+            if (! -e $required_args{$name}) {
+                $log->logcroak("Path argument to --$name does not exist: '",
+                               $required_args{$name}, "'");
+            }
+        }
+    }
+
+    # optional arguments for all workflows
+    $memory  ||= $DEFAULT_MEMORY;
+    $host    ||= $DEFAULT_HOST;
     $inifile ||= $DEFAULT_INI;
     if (! -e $inifile) {
         $log->logcroak("--inifile argument '", $inifile, "' does not exist");
     }
-    if ($workdir) {
-        $workdir = abs_path($workdir);
-        $log->info("Working directory absolute path is '", $workdir, "'");
-    } else {
-        $log->logcroak("--workdir argument is required");
-    }
-    if (!$run) {
-        $log->logcroak("--run argument is required");
-    }
-    if (!$dbfile) {
-        $log->logcroak("--dbfile argument is required");
-    } elsif (! -e $dbfile) {
-        $log->logcroak("--dbfile argument '", $dbfile, "' does not exist");
-    }
-    if (!$manifest) {
-        $log->logcroak("--manifest argument is required");
-    } elsif (! -e $manifest) {
-        $log->logcroak("--manifest argument '", $manifest,
-                       "' does not exist");
-    }
-    if (defined($no_filter)) { $no_filter = 'true'; } # Boolean value for Ruby
-    else { $no_filter = 'false'; }
-    if (!$workflow) {
-        $log->logcroak("--workflow argument is required");
-    } elsif (!($workflow eq $ILLUMINUS || $workflow eq $ZCALL)) {
-        $log->logcroak("Invalid workflow argument; must be '",
-                       $ILLUMINUS, "' or '", $ZCALL, "'");
-    }
-    if (defined($egt) && !(-e $egt)) {
-        $log->logcroak("--egt argument '", $egt, "' does not exist");
-    }
-    if (scalar @plex_config == 0) { # get defaults from perl/etc directory
-        my $etc_dir = catfile($Bin, "..", "etc");
-        foreach my $name (qw/ready_qc_fluidigm.json ready_qc_sequenom.json/) {
-            push @plex_config, catfile($etc_dir, $name);
-        }
+    if (! defined $config_out) {
+        $config_out = workflow_config_path($workdir, $workflow, $local);
     }
     foreach my $plex_config (@plex_config) {
         if (! -e $plex_config) {
@@ -158,17 +158,49 @@ sub run {
                            "' does not exist");
         }
     }
-    $host ||= $DEFAULT_HOST;
-    # illuminus paralellizes by SNP, other callers by sample
-    if ($workflow eq 'illuminus') { $chunk_size ||= $DEFAULT_CHUNK_SIZE_SNP; }
-    else { $chunk_size ||= $DEFAULT_CHUNK_SIZE_SAMPLE; }
-    $memory ||= $DEFAULT_MEMORY;
 
-    # ensure $zstart, $ztotal are initialized before comparison
-    $zstart ||= $DEFAULT_ZSTART;
-    $ztotal ||= $DEFAULT_ZTOTAL;
-    if ($zstart <=0) { $log->logcroak("zstart must be > 0"); }
-    if ($ztotal <=0) { $log->logcroak("ztotal must be > 0"); }
+    # arguments for illuminus and zcall only
+    if (defined $no_filter) {
+        if ($workflow eq $GENCALL) {
+            $log->logcroak('--nofilter option is not compatible with the ',
+                           $GENCALL, 'workflow');
+        }
+        $no_filter = 'true';  # Boolean value for Ruby
+    } else {
+        $no_filter = 'false';
+    }
+    if (defined $chunk_size) {
+        if ($workflow eq $GENCALL) {
+            $log->logcroak('--chunk_size option is not compatible with the ',
+                           $GENCALL, 'workflow');
+        }
+    } elsif ($workflow eq $ILLUMINUS) {
+        $chunk_size = $DEFAULT_CHUNK_SIZE_SNP;
+    } else {
+        $chunk_size = $DEFAULT_CHUNK_SIZE_SAMPLE;
+    }
+
+    # arguments for zcall only
+    my $msg = " argument is only compatible with the $ZCALL workflow;".
+        " given workflow is '$workflow'";
+    if ($workflow eq $ZCALL) {
+        # check EGT & assign zstart/ztotal defaults
+        if (! defined $egt) {
+            $log->logcroak("--egt argument is required for $ZCALL workflow");
+        } elsif (! -e $egt) {
+            $log->logcroak("--egt argument '$egt' does not exist");
+        }
+        $zstart ||= $DEFAULT_ZSTART;
+        $ztotal ||= $DEFAULT_ZTOTAL;
+        if ($zstart <=0) { $log->logcroak("zstart must be > 0"); }
+        if ($ztotal <=0) { $log->logcroak("ztotal must be > 0"); }
+    } elsif (defined $egt) {
+        $log->logcroak('--egt', $msg);
+    } elsif (defined $zstart) {
+        $log->logcroak('--zstart', $msg);
+    } elsif (defined $ztotal) {
+        $log->logcroak('--ztotal', $msg);
+    }
 
     ### create and populate the working directory ###
     make_working_directory($workdir, $local);
@@ -187,9 +219,6 @@ sub run {
         }
     }
     ### generate the workflow config and write as YML ###
-    unless (defined($config_out)) {
-        $config_out = workflow_config_path($workdir, $workflow, $local);
-    }
     my %workflow_args = (
         'manifest'      => $manifest,
         'chunk_size'    => $chunk_size,
