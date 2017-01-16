@@ -223,27 +223,28 @@ sub run {
         'manifest'      => $manifest,
         'chunk_size'    => $chunk_size,
         'memory'        => $memory,
-        'nofilter'      => $no_filter,
         'queue'         => $queue,
         'vcf'           => $vcf,
         'plex_manifest' => $plex_manifests,
     );
+    if (defined $no_filter) {
+        $workflow_args{'nofilter'} = $no_filter;
+    }
+
     my $workflow_module;
-    if ($workflow eq $ILLUMINUS) {
+    if ($workflow eq $GENCALL) {
+        $workflow_module = $MODULE_GENCALL;
+    } elsif ($workflow eq $ILLUMINUS) {
         $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
     } elsif ($workflow eq $ZCALL) {
         $workflow_module = $MODULE_ZCALL;
-        if (!($egt && $zstart && $ztotal)) {
-            $log->logcroak("Must specify EGT, zstart, and ztotal for ",
-                           "zcall workflow");
-        }
         $workflow_args{'egt'} = $egt;
         $workflow_args{'zstart'} = $zstart;
         $workflow_args{'ztotal'} = $ztotal;
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
-                       "'; must be one of $ILLUMINUS, $ZCALL");
+                       "'; must be one of $GENCALL, $ILLUMINUS, $ZCALL");
     }
     my @args = ($dbfile, $run, $workdir, \%workflow_args);
     my %params = (
