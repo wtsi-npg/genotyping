@@ -221,24 +221,24 @@ sub run {
     ### generate the workflow config and write as YML ###
     my %workflow_args = (
         'manifest'      => $manifest,
-        'chunk_size'    => $chunk_size,
         'memory'        => $memory,
         'queue'         => $queue,
         'vcf'           => $vcf,
         'plex_manifest' => $plex_manifests,
     );
-    if (defined $no_filter) {
-        $workflow_args{'nofilter'} = $no_filter;
-    }
 
     my $workflow_module;
     if ($workflow eq $GENCALL) {
         $workflow_module = $MODULE_GENCALL;
     } elsif ($workflow eq $ILLUMINUS) {
+        $workflow_args{'chunk_size'} = $chunk_size;
+        $workflow_args{'nofilter'} = $no_filter;
         $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
     } elsif ($workflow eq $ZCALL) {
         $workflow_module = $MODULE_ZCALL;
+        $workflow_args{'chunk_size'} = $chunk_size;
+        $workflow_args{'nofilter'} = $no_filter;
         $workflow_args{'egt'} = $egt;
         $workflow_args{'zstart'} = $zstart;
         $workflow_args{'ztotal'} = $ztotal;
