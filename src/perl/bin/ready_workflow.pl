@@ -152,6 +152,12 @@ sub run {
     if (! defined $config_out) {
         $config_out = workflow_config_path($workdir, $workflow, $local);
     }
+    if (scalar @plex_config == 0) { # get defaults from perl/etc directory
+        my $etc_dir = catfile($Bin, "..", "etc");
+        foreach my $name (qw/ready_qc_fluidigm.json ready_qc_sequenom.json/) {
+            push @plex_config, catfile($etc_dir, $name);
+        }
+    }
     foreach my $plex_config (@plex_config) {
         if (! -e $plex_config) {
             $log->logcroak("--plex_config argument '", $plex_config,
