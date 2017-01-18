@@ -17,7 +17,6 @@ use Pod::Usage;
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
 use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
-use WTSI::NPG::Genotyping::QC::Identity;
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
