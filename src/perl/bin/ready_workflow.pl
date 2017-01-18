@@ -141,6 +141,8 @@ sub run {
             }
         }
     }
+    $workdir = abs_path($workdir);
+    $log->info("Working directory absolute path is '", $workdir, "'");
 
     # optional arguments for all workflows
     $memory  ||= $DEFAULT_MEMORY;
@@ -353,6 +355,9 @@ sub write_plex_results {
                  on_connect_do  => 'PRAGMA foreign_keys = ON');
         my @samples = $pipedb->sample->all;
         my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
+        if (scalar @sample_ids == 0) {
+            $log->logwarn("No sample IDs found in pipeline SQLite DB");
+        }
         try {
             my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
                 sample_ids => \@sample_ids,
