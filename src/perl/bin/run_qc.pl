@@ -329,15 +329,20 @@ sub run_qc {
     my $statusJson = $outDir."/qc_results.json";
     my $metricJson = "";
     # first pass -- standard thresholds, no DB update
-    my @allMetricNames = keys(%{readMetricThresholds($configPath)});
+    my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+        db_path  => $dbPath,
+        ini_path => $iniPath
+    );
+    my $thresholds = $collator->readMetricThresholds($configPath);
+    my @allMetricNames = keys(%{$thresholds});
     my @metricNames = ();
     foreach my $metric (@allMetricNames) {
 	if ($intensity || ($metric ne 'magnitude' && $metric ne 'xydiff')) {
 	    push(@metricNames, $metric);
 	}
     }
-    collate($outDir, $configPath, $configPath, $dbPath, $iniPath,
-	    $statusJson, $metricJson, $csvPath, 0, \@metricNames);
+    $collator->collate($outDir, $configPath, $configPath, $statusJson,
+                       $metricJson, $csvPath, 0, \@metricNames);
     ### plot generation ###
     @cmds = ();
     my $dbopt = "--dbpath=$dbPath ";
