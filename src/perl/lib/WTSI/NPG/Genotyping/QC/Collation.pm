@@ -1,10 +1,11 @@
+
+package WTSI::NPG::Genotyping::QC::Collation;
+
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # February 2014
 
 # Collate QC result outputs into a single JSON summary file
 # Apply thresholds to find pass/fail status
-
-package WTSI::NPG::Genotyping::QC::Collation;
 
 use strict;
 use warnings;
@@ -12,19 +13,22 @@ use Carp;
 use File::Slurp qw(read_file);
 use IO::Uncompress::Gunzip qw($GunzipError); # for duplicate_full.txt.gz
 use JSON;
+use Moose;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getDatabaseObject
                                                getPlateLocationsFromPath
                                                meanSd
                                                readQCMetricInputs
                                                readSampleData);
-use Exporter;
-our @ISA = qw/Exporter/;
-our @EXPORT_OK = qw/collate readMetricThresholds/;
+use Data::Dumper; # FIXME
+
+#use Exporter;
+#our @ISA = qw/Exporter/;
+#our @EXPORT_OK = qw/collate readMetricThresholds/;
 
 our $VERSION = '';
 
-our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
+with 'WTSI::DNAP::Utilities::Loggable';
 
 # metric names
 our $CR_NAME = 'call_rate';
@@ -42,6 +46,8 @@ our @METRIC_NAMES = ($ID_NAME, $DUP_NAME, $GENDER_NAME, $CR_NAME,
 our @GENDERS = ('Unknown', 'Male', 'Female', 'Not_Available');
 our $DUPLICATE_SUBSETS_KEY = 'SUBSETS';
 our $DUPLICATE_RESULTS_KEY = 'RESULTS';
+our $UNKNOWN_PLATE = "Unknown_plate";
+our $UNKNOWN_ADDRESS = "Unknown_address";
 our %FILENAMES; # hash for names of input files
 
 # Collate QC results from various output files into a single data structure,
@@ -50,11 +56,30 @@ our %FILENAMES; # hash for names of input files
 # Get additional information for .csv fields from pipeline DB:
 # run,project,data_supplier,snpset,supplier_name,rowcol,beadchip_number,sample,include,plate,well,pass
 
+has 'db_path' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   required   => 1);
+
+has 'ini_path' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   required   => 1,
+   default    => $ENV{HOME} . "/.npg/genotyping.ini" );
+
+has 'db'  =>
+  (is         => 'ro',
+   isa        => 'WTSI::NPG::Genotyping::Database::Pipeline',
+   lazy       => 1,
+   builder    => '_build_db');
+
+
 sub addLocations {
     # add plate/well locations to a hash indexed by sample
-    my %samples = %{ shift() };
+    my ($self, $samplesRef) = @_;
+    my %samples = %{$samplesRef};
     my ($dbPath, $iniPath) = @_;
-    my %plateLocs = getPlateLocationsFromPath($dbPath, $iniPath);
+    my %plateLocs = $self->plateLocations();
     foreach my $uri (keys %samples) {
         my %results = %{$samples{$uri}};
         my $locsRef = $plateLocs{$uri};
@@ -74,50 +99,39 @@ sub addLocations {
 
 sub appendNull {
     # append 'NA' values to given list
-    my @array = @{ shift() };
-    my $nulls = shift;
-    for (my $i=0;$i<$nulls;$i++) {
+    my ($self, $arrayRef, $nullTotal) = @_;
+    my @array = @{$arrayRef};
+    for (my $i=0;$i<$nullTotal;$i++) {
         push(@array, 'NA');
     }
     return @array;
 }
 
-sub bySampleName {
-    # comparison function for sorting samples in getSampleInfo
-    # if in plate_well_id format, sort by id; otherwise use standard sort
-    if ($a =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx &&
-        $b =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx) {
-        my @termsA = split /_/msx, $a;
-        my @termsB = split /_/msx, $b;
-        return $termsA[-1] cmp $termsB[-1];
-    } else {
-        return $a cmp $b;
-    }
-}
-
 sub dbExcludedSamples {
     # find list of excluded sample URIs from database
     # use to fill in empty lines for CSV file
-    my $dbfile = shift;
-    my $db = getDatabaseObject($dbfile);
+    my ($self, ) = @_;
     my @excluded;
-    my @samples = $db->sample->all;
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
     foreach my $sample (@samples) {
         if (!($sample->include)) {
             push @excluded, $sample->uri;
         }
     }
-    $db->disconnect();
+    $self->db->disconnect();
     return @excluded;
 }
 
 sub dbSampleInfo {
     # get general information on analysis run from pipeline database
     # return a hash indexed by sample
-    my $dbfile = shift;
-    my $db = getDatabaseObject($dbfile);
+    my ($self, ) = @_;
     my %sampleInfo;
-    my @runs = $db->piperun->all;
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @runs = $self->db->piperun->all;
     foreach my $run (@runs) {
         my @root;
         my @datasets = $run->datasets->all;
@@ -141,7 +155,7 @@ sub dbSampleInfo {
             }
         }
     }
-    $db->disconnect();
+    $self->db->disconnect();
     return %sampleInfo;
 }
 
@@ -161,8 +175,8 @@ sub duplicateSubsets {
     # Arguments: - Hash of hashes of pairwise similarities
     #            - Similarity threshold for duplicates
     # Return value: list of lists of samples in each subset
-    my %similarity = %{ shift() };
-    my $threshold = shift;
+    my ($self, $similarityRef, $threshold) = @_;
+    my %similarity = %{$similarityRef};
     my @samples = keys(%similarity);
     # if sample has no neighbours: simple, it is in a subset by itself
     # if sample does have neighbours: add to appropriate subset
@@ -189,7 +203,7 @@ sub evaluateThresholds {
     # apply thresholds, evaluate pass/fail status of each sample/metric pair
     # input a sample-major hash of metric values
     # return reference to a hash in 'qc_results.json' format (minus plate name and address for each sample)
-    my ($sampleResultsRef, $thresholdsRef) = @_;
+    my ($self, $sampleResultsRef, $thresholdsRef) = @_;
     my %results = %{$sampleResultsRef};
     my %thresholds = %{$thresholdsRef};
     my %evaluated = ();
@@ -200,7 +214,8 @@ sub evaluateThresholds {
                 croak "No thresholds defined for metric $metric: $!";
             }
             my $value = $result{$metric};
-            my $pass = metricPass($metric, $value, $thresholds{$metric});
+            my $pass = $self->metricPass($metric, $value,
+                                         $thresholds{$metric});
             my @terms = ($pass, );
             if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
                 push (@terms, @{$value});
@@ -217,26 +232,31 @@ sub evaluateThresholds {
 
 sub excludedSampleCsv {
     # generate CSV lines for samples excluded from pipeline DB
-    my @sampleNames = @{ shift() };
-    my %sampleInfo = %{ shift() };   # generic sample/dataset info
-    my %metrics = %{ shift() };
-    my %excluded = %{ shift() };
+    my ($self, $sampleNamesRef, $sampleInfoRef,
+        $metricsRef, $excludedRef) = @_;
+    my @sampleNames = @{$sampleNamesRef};
+    my %sampleInfo = %{$sampleInfoRef};   # generic sample/dataset info
+    my %metrics = %{$metricsRef};
+    my %excluded = %{$excludedRef};
     my @lines = ();
     foreach my $sample (@sampleNames) {
         if (!$excluded{$sample}) { next; }
         my @fields = @{$sampleInfo{$sample}};
         push(@fields, $sample);
         push(@fields, 'Excluded'); 
-        @fields = appendNull(\@fields, 3); # null plate, well, sample pass
+        @fields = $self->appendNull(\@fields, 3); # null plate, well, pass
         foreach my $name (@METRIC_NAMES) {
             if (!$metrics{$name}) {
                 next;
             } elsif ($name eq $GENDER_NAME) {
-                @fields = appendNull(\@fields, 4); # pass/fail, metric triple
+                # pass/fail, metric triple
+                @fields = $self->appendNull(\@fields, 4);
             } elsif ($name eq $ID_NAME) {
-                @fields = appendNull(\@fields, 3); # pass/fail, metric double
+                # pass/fail, metric double
+                @fields = $self->appendNull(\@fields, 3);
             } else {
-                @fields = appendNull(\@fields, 2); # pass/fail, metric
+                # pass/fail, metric
+                @fields = $self->appendNull(\@fields, 2);
             }
         }
         push(@lines, join(',', @fields));
@@ -247,29 +267,29 @@ sub excludedSampleCsv {
 sub findMetricResults {
     # find QC results in metric-major order, return a hash reference
     # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
-    my $inputDir = shift;
-    my @metricNames = @{ shift() };
+    my ($self, $inputDir, $metricNamesRef) = @_;
+    my @metricNames = @{$metricNamesRef};
     my %allResults;
     foreach my $name (@metricNames) {
         my $resultsRef;
         if ($name eq $CR_NAME) {
-            $resultsRef = resultsCallRate($inputDir);
+            $resultsRef = $self->resultsCallRate($inputDir);
         } elsif ($name eq $DUP_NAME) {
-            $resultsRef = resultsDuplicate($inputDir);
+            $resultsRef = $self->resultsDuplicate($inputDir);
         } elsif ($name eq $GENDER_NAME) {
-            $resultsRef = resultsGender($inputDir);
+            $resultsRef = $self->resultsGender($inputDir);
         } elsif ($name eq $HET_NAME) {
-            $resultsRef = resultsHet($inputDir);
+            $resultsRef = $self->resultsHet($inputDir);
         } elsif ($name eq $HMH_NAME) {
-            $resultsRef = resultsHighMafHet($inputDir);
+            $resultsRef = $self->resultsHighMafHet($inputDir);
         } elsif ($name eq $ID_NAME) {
-            $resultsRef = resultsIdentity($inputDir);
+            $resultsRef = $self->resultsIdentity($inputDir);
         } elsif ($name eq $LMH_NAME) {
-            $resultsRef = resultsLowMafHet($inputDir);
+            $resultsRef = $self->resultsLowMafHet($inputDir);
         } elsif ($name eq $MAG_NAME) {
-            $resultsRef = resultsMagnitude($inputDir);
+            $resultsRef = $self->resultsMagnitude($inputDir);
         } elsif ($name eq $XYD_NAME) {
-            $resultsRef = resultsXydiff($inputDir);
+            $resultsRef = $self->resultsXydiff($inputDir);
         } else {
             croak "Unknown metric name $name for results: $!";
         }
@@ -280,8 +300,9 @@ sub findMetricResults {
 
 sub findThresholds {
     # find threshold values, which may depend on mean/sd of metric values
-    my %metricResults = %{ shift() };
-    my %thresholdsConfig = %{ shift() };
+    my ($self, $metricResultsRef, $thresholdConfigRef) = @_;
+    my %metricResults = %{$metricResultsRef};
+    my %thresholdsConfig = %{$thresholdConfigRef};
     my %thresholds;
     my @names = keys(%metricResults);
     foreach my $metric (keys(%metricResults)) {
@@ -303,6 +324,7 @@ sub findThresholds {
 
 sub includedSampleCsv {
     # generate CSV lines for samples included in pipeline DB
+    my $self = shift; # TODO fix argument parsing
     my @sampleNames = @{ shift() };
     my %sampleInfo = %{ shift() };   # generic sample/dataset info
     my %passResult = %{ shift() }; # metric pass/fail status and values
@@ -346,7 +368,7 @@ sub includedSampleCsv {
 
 sub metricPass {
     # find pass/fail status for given metric, value, and threshold
-    my ($metric, $value, $threshold) = @_;
+    my ($self, $metric, $value, $threshold) = @_;
     my $pass = 0;
     if ($metric eq $CR_NAME || $metric eq $MAG_NAME) {
         if ($value >= $threshold) { $pass = 1; }
@@ -371,8 +393,8 @@ sub metricPass {
 
 sub passFailBySample {
     # evaluate results by metric and find overall pass/fail for each sample
-    my %results = %{ shift() };
-    my $crHetPath = shift(); # required to find duplicates pass/fail
+    my ($self, $resultsRef) = @_;
+    my %results = %{$resultsRef};
     my %passFail = ();
     foreach my $sample (keys(%results)) {
         my %result = %{$results{$sample}};
@@ -388,22 +410,55 @@ sub passFailBySample {
     return %passFail;
 }
 
+sub plateLocations {
+    my ($self,) = @_;
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
+    my %plateLocs;
+    $self->db->in_transaction(
+        sub {
+            foreach my $sample (@samples) {
+                my ($plate, $x, $y) = (0,0,0);
+                my $uri = $sample->uri;
+                if (!defined($uri)) {
+                    carp "Sample $sample has no uri!";
+                next;
+                } elsif ($sample->include == 0) {
+                    next; # excluded sample
+                }
+                # assume one well per sample
+                my $well = ($sample->wells->all)[0];
+                if (defined($well)) { 
+                    my $address = $well->address;
+                    my $label = $address->label1;
+                    $plate = $well->plate;
+                    my $plateName = $plate->ss_barcode;
+                    $plateLocs{$uri} = [$plateName, $label];
+                } else {
+                    $plateLocs{$uri} = [$UNKNOWN_PLATE, $UNKNOWN_ADDRESS];
+                }
+            }
+        });
+    $self->db->disconnect();
+    return %plateLocs;
+}
+
 sub processDuplicates {
     # pre-processing of duplicate metric with given threshold
     # partition samples into subsets; sample in subset with highest CR passes
     # want to write partitioning and pass/fail status to file
     # then read file for final metric/threshold collation
-    my $inputDir = shift;
-    my $threshold = shift;
+    my ($self, $inputDir, $threshold) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'duplicate'};
-    if (!(-e $inPath)) { 
+    if (!(-e $inPath)) {
         croak "Input path for duplicates \"$inPath\" does not exist: $!";
     }
-    my ($simRef, $maxRef) = readDuplicates($inPath);
-    my @subsets = duplicateSubsets($simRef, $threshold);
+    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
+    my @subsets = $self->duplicateSubsets($simRef, $threshold);
     my %max = %{$maxRef};
     # read call rates and find keep/discard status
-    my %cr = %{resultsCallRate($inputDir)};
+    my %cr = %{$self->resultsCallRate($inputDir)};
     my %results;
     foreach my $subsetRef (@subsets) {
         my $maxCR = 0;
@@ -432,10 +487,10 @@ sub processDuplicates {
 sub readDuplicates {
     # read pairwise similarities for duplicate check from gzipped file
     # also find maximum pairwise similarity for each sample
-    my $inPath = shift;
+    my ($self, $inPath) = @_;
     my (%similarity, %max);
     my $z = new IO::Uncompress::Gunzip $inPath ||
-    croak "gunzip failed: $GunzipError\n";
+        croak "gunzip failed: $GunzipError\n";
     my $firstLine = 1;
     while (<$z>) {
         if ($firstLine) { $firstLine = 0; next; } # skip headers
@@ -461,26 +516,27 @@ sub readDuplicates {
 }
 
 sub readMetricThresholds {
-    # exportable convenience method to read metric thresholds from JSON config
-    my $configPath = shift;
+    # convenience method to read metric thresholds from JSON config
+    # TODO does this still need to be exported?
+    my ($self, $configPath) = @_;
     my %config = %{decode_json(read_file($configPath))};
     my %thresholds = %{$config{'Metrics_thresholds'}};
     return \%thresholds;
 }
 
 sub resultsCallRate {
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'call_rate'};
-    if (!(-e $inPath)) { 
+    if (!(-e $inPath)) {
         croak "Input path for call rate \"$inPath\" does not exist: $!";
     }
     my $index = 1;
-    return resultsSpaceDelimited($inPath, $index);
+    return $self->resultsSpaceDelimited($inPath, $index);
 }
 
 sub resultsDuplicate {
     # read pre-processed values for duplicate metric
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'duplicate_subsets'};
     if (!(-e $inPath)) { 
         croak "Input path for duplicates \"$inPath\" does not exist: $!";
@@ -497,7 +553,7 @@ sub resultsGender {
     # read gender results from sample_xhet_gender.txt
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'gender'};
     if (!(-e $inPath)) { 
         croak "Input path for gender \"$inPath\" does not exist: $!";
@@ -512,22 +568,22 @@ sub resultsGender {
 }
 
 sub resultsHet {
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'heterozygosity'};
     if (!(-e $inPath)) { 
         croak "Input path for heterozygosity \"$inPath\" does not exist: $!";
     }
     my $index = 2;
-    return resultsSpaceDelimited($inPath, $index);
+    return $self->resultsSpaceDelimited($inPath, $index);
 }
 
 sub resultsHighMafHet {
-    my $inputDir = shift;
-    return resultsMafHet($inputDir, 1);
+    my ($self, $inputDir) = @_;
+    return $self->resultsMafHet($inputDir, 1);
 }
 
 sub resultsIdentity {
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
     my $resultsRef;
     if (-e $inPath) {
@@ -550,14 +606,13 @@ sub resultsIdentity {
 }
 
 sub resultsLowMafHet {
-    my $inputDir = shift;
-    return resultsMafHet($inputDir, 0);
+    my ($self, $inputDir) = @_;
+    return $self->resultsMafHet($inputDir, 0);
 }
 
 sub resultsMafHet {
     # read JSON file output by Plinktools het_by_maf.py
-    my $inputDir = shift;
-    my $high = shift;
+    my ($self, $inputDir, $high) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'het_by_maf'};
     if (!(-r $inPath)) {
         carp "Omitting MAF heterozygosity; cannot read input \"$inPath\": $!";
@@ -574,20 +629,20 @@ sub resultsMafHet {
 }
 
 sub resultsMagnitude {
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'magnitude'};
     if (!(-e $inPath)) {
         carp "Omitting magnitude; input \"$inPath\" does not exist: $!";
         return 0; # magnitude of intensity is optional
     }
     my $index = 1;
-    return resultsSpaceDelimited($inPath, $index);
+    return $self->resultsSpaceDelimited($inPath, $index);
 }
 
 sub resultsSpaceDelimited {
     # read metric results from a space-delimited file ()
-    my $inPath = shift;
-    my $index = shift;
+    # TODO use Text::CSV instead?
+    my ($self, $inPath, $index) = @_;
     my @data = readSampleData($inPath);
     my %results;
     foreach my $ref (@data) {
@@ -600,19 +655,20 @@ sub resultsSpaceDelimited {
 }
 
 sub resultsXydiff {
-    my $inputDir = shift;
+    my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'xydiff'};
     if (!(-e $inPath)) { 
         carp "Omitting xydiff; input \"$inPath\" does not exist: $!";
         return 0;
     }
     my $index = 1;
-    return resultsSpaceDelimited($inPath, $index);
+    return $self->resultsSpaceDelimited($inPath, $index);
 }
 
 sub transposeResults {
     # convert results from metric-major to sample-major ordering
-    my %metricResults = %{ shift() };
+    my ($self, $resultsRef) = @_;
+    my %metricResults = %{$resultsRef};
     my %sampleResults = ();
     foreach my $metric (keys(%metricResults)) {
         my %resultsBySample = %{$metricResults{$metric}};
@@ -626,24 +682,27 @@ sub transposeResults {
 
 sub updateDatabase {
     # update pipeline db with pass/fail of each sample
-    my $dbPath = shift;
-    my %samplePass = %{ shift() };
+    my ($self, $passRef) = @_;
+    my %samplePass = %{$passRef};
     # samples which were previously excluded should *remain* excluded
-    my $db = getDatabaseObject($dbPath); # uses default .ini path
-    my @samples = $db->sample->all;
-    $db->in_transaction(sub {
-                            foreach my $sample (@samples) {
-                                my $uri = $sample->uri;
-                                if (!($samplePass{$uri})) {
-                                    $sample->update({'include' => 0});
-                                }
-                            }
-                        });
-    $db->disconnect();
+
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
+    $self->db->in_transaction(sub {
+                                  foreach my $sample (@samples) {
+                                      my $uri = $sample->uri;
+                                      if (!($samplePass{$uri})) {
+                                          $sample->update({'include' => 0});
+                                      }
+                                  }
+                              });
+    $self->db->disconnect();
 }
 
 sub writeCsv {
     # write a .csv file summarizing metrics and pass/fail status
+    my $self = shift; # TODO fix argument parsing
     my $csvPath = shift;
     my %sampleInfo = %{ shift() }; # generic sample/dataset info
     my @excluded = @{ shift() };   # samples excluded in DB
@@ -652,17 +711,31 @@ sub writeCsv {
     my %excluded;
     foreach my $sample (@excluded) { $excluded{$sample} = 1; }
     my @lines = ();
+
     my @sampleNames = keys(%sampleInfo);
+    sub bySampleName {
+        # comparison function for sorting samples
+        # if in plate_well_id format, sort by id; otherwise use standard sort
+        if ($a =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx &&
+                $b =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx) {
+            my @termsA = split /_/msx, $a;
+            my @termsB = split /_/msx, $b;
+            return $termsA[-1] cmp $termsB[-1];
+        } else {
+            return $a cmp $b;
+        }
+    }
     @sampleNames = sort bySampleName @sampleNames;
+
     my ($linesRef, $metricsRef);
     # first pass; append lines for samples included in pipeline DB
-    ($linesRef, $metricsRef) = includedSampleCsv(\@sampleNames, \%sampleInfo,
-                                                 \%passResult, \%samplePass,
-                                                 \%excluded);
+    ($linesRef, $metricsRef) =
+        $self->includedSampleCsv(\@sampleNames, \%sampleInfo,
+                                 \%passResult, \%samplePass, \%excluded);
     push(@lines, @{$linesRef});
     # second pass; append dummy lines for excluded samples
-    $linesRef = excludedSampleCsv(\@sampleNames, \%sampleInfo,
-                                  $metricsRef, \%excluded);
+    $linesRef = $self->excludedSampleCsv(\@sampleNames, \%sampleInfo,
+                                         $metricsRef, \%excluded);
     push(@lines, @{$linesRef});
     my %metrics = %{$metricsRef};
     # use %metrics to construct appropriate CSV header
@@ -690,7 +763,7 @@ sub writeCsv {
 
 sub writeJson {
     # open a file, and write the given reference in JSON format
-    my ($outPath, $dataRef) = @_;
+    my ($self, $outPath, $dataRef) = @_;
     my $resultString = encode_json($dataRef);
     open my $out, ">", $outPath ||
         croak "Cannot open output path $outPath: $!";
@@ -702,12 +775,12 @@ sub writeJson {
 sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
-    my ($inputDir, $configPath, $thresholdPath, $dbPath, $iniPath,
+    my ($self, $inputDir, $configPath, $thresholdPath,
         $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef,
         $verbose) = @_;
     my (%config, %thresholdConfig, @metricNames);
     if ($verbose) { print STDERR "Started collating QC results.\n";    }
-    %thresholdConfig = %{readMetricThresholds($thresholdPath)};
+    %thresholdConfig = %{$self->readMetricThresholds($thresholdPath)};
     if ($metricsRef) {
         @metricNames = @{$metricsRef};
         foreach my $name (@metricNames) {
@@ -724,41 +797,53 @@ sub collate {
 
     # 0) reprocess duplicate results for given threshold (if any)
     if (defined($thresholdConfig{$DUP_NAME})) {
-        processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
+        $self->processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
     }
 
     # 1) find metric values (and write to file if required)
-    my $metricResultsRef = findMetricResults($inputDir, \@metricNames);
-    my $sampleResultsRef = transposeResults($metricResultsRef);
+    my $metricResultsRef = $self->findMetricResults($inputDir, \@metricNames);
+    my $sampleResultsRef = $self->transposeResults($metricResultsRef);
     if ($verbose) { print "Found metric values.\n"; }
-    if ($metricsJson) { writeJson($metricsJson, $sampleResultsRef);  }
+    if ($metricsJson) { $self->writeJson($metricsJson, $sampleResultsRef);  }
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
         # 2) apply filters to find pass/fail status
-        my %thresholds = findThresholds($metricResultsRef, \%thresholdConfig);
-        my $passResultRef = evaluateThresholds($sampleResultsRef,
-                                               \%thresholds);
+        my %thresholds = $self->findThresholds($metricResultsRef,
+                                               \%thresholdConfig);
+        my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
+                                                      \%thresholds);
         if ($verbose) { print "Evaluated pass/fail status.\n"; }
 
         # 3) add location info and write JSON status file
-        $passResultRef = addLocations($passResultRef, $dbPath, $iniPath);
-        writeJson($statusJson, $passResultRef);
+        $passResultRef = $self->addLocations($passResultRef);
+        $self->writeJson($statusJson, $passResultRef);
         if ($verbose) { print "Wrote status JSON file $statusJson.\n"; }
 
         # 4) write CSV (if required)
-        my %samplePass = passFailBySample($passResultRef);
-        if ($csvPath) { 
-            my %sampleInfo = dbSampleInfo($dbPath);
-            my @excluded = dbExcludedSamples($dbPath);
-            writeCsv($csvPath, \%sampleInfo, \@excluded, $passResultRef,
-                     \%samplePass);
+        my %samplePass = $self->passFailBySample($passResultRef);
+        if ($csvPath) {
+            my %sampleInfo = $self->dbSampleInfo();
+            my @excluded = $self->dbExcludedSamples();
+            $self->writeCsv($csvPath, \%sampleInfo, \@excluded,
+                            $passResultRef, \%samplePass);
             if ($verbose) { print "Wrote CSV $csvPath.\n"; }
         }
 
         # 5) exclude failing samples in pipeline DB (if required)
-        if ($exclude) { updateDatabase($dbPath, \%samplePass); }
-        if ($verbose) { print "Updated pipeline DB $dbPath.\n"; }
+        if ($exclude) { $self->updateDatabase(\%samplePass); }
+        if ($verbose) { print "Updated pipeline DB.\n"; }
     }
 }
+
+sub _build_db {
+    my ($self,) = @_;
+    my $db = WTSI::NPG::Genotyping::Database::Pipeline->new
+	(name    => 'pipeline',
+	 inifile => $self->ini_path,
+	 dbfile  => $self->db_path);
+    return $db;
+}
+
+no Moose;
 
 1;

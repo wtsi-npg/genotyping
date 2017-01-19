@@ -17,7 +17,7 @@ use base qw(WTSI::NPG::Test);
 use Test::More tests => 16;
 use Test::Exception;
 
-use WTSI::NPG::Genotyping::QC::Collation qw(collate);
+use WTSI::NPG::Genotyping::QC::Collation;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readSampleInclusion);
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -62,9 +62,13 @@ sub collation : Test(6) {
     my $exclude = 0;
     my $metricsRef = 0;
     my $verbose = 0;
-    collate($example_dir, $configPath, $thresholdPath, $dbPath, $iniPath,
-            $jsonResults, $jsonMetrics, $csvPath,
-            $exclude, $metricsRef, $verbose);
+    my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+        db_path  => $dbPath,
+        ini_path => $iniPath
+    );
+    $collator->collate($example_dir, $configPath, $thresholdPath,
+                       $jsonResults, $jsonMetrics, $csvPath,
+                       $exclude, $metricsRef, $verbose);
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));
     my $expected_metrics = decode_json(read_file($metricsExpected));

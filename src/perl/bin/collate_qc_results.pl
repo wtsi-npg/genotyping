@@ -14,13 +14,13 @@ use warnings;
 use Carp;
 use Cwd qw/abs_path/;
 use Getopt::Long;
-use WTSI::NPG::Genotyping::QC::Collation qw(collate);
+use WTSI::NPG::Genotyping::QC::Collation;
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
-my ($inputDir, $metricJson, $statusJson, $csv, $iniPath, $dbPath, $thresholds, 
-    $config, $exclude, $help, $verbose);
+my ($inputDir, $metricJson, $statusJson, $csv, $iniPath, $dbPath,
+    $thresholds, $config, $exclude, $help, $verbose);
 
 GetOptions("input=s"       => \$inputDir,
 	   "dbpath=s"      => \$dbPath,
@@ -70,9 +70,14 @@ elsif (!(-d $inputDir)) { croak "Input $inputDir does not exist or is not a dire
 elsif (!(-r $config)) { croak "Cannot read config path $config"; }
 elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $thresholds"; }
 
+my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+    db_path  => $dbPath,
+    ini_path => $iniPath
+);
+
 # assign 0 (ie. false) to the optional reference to a list of metric names
-collate($inputDir, $config, $thresholds, $dbPath, $iniPath, $statusJson, 
-	$metricJson, $csv, $exclude, 0, $verbose);
+$collator->collate($inputDir, $config, $thresholds, $statusJson,
+                   $metricJson, $csv, $exclude, 0, $verbose);
 
 __END__
 
