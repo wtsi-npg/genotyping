@@ -14,26 +14,55 @@ use warnings;
 use Carp;
 use Cwd qw/abs_path/;
 use Getopt::Long;
+use Log::Log4perl qw(:levels);
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::QC::Collation;
+use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 
-my ($inputDir, $metricJson, $statusJson, $csv, $iniPath, $dbPath,
-    $thresholds, $config, $exclude, $help, $verbose);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'collate_qc_results');
+my $log;
 
-GetOptions("input=s"       => \$inputDir,
-	   "dbpath=s"      => \$dbPath,
-	   "metrics=s"     => \$metricJson,
-	   "status=s"      => \$statusJson,
+my $config;
+my $csv;
+my $dbPath;
+my $debug;
+my $exclude;
+my $help;
+my $iniPath;
+my $inputDir;
+my $log4perl_config;
+my $metricJson;
+my $statusJson;
+my $thresholds;
+my $verbose;
+
+GetOptions("config=s"      => \$config,
 	   "csv=s"         => \$csv,
-	   "ini=s"         => \$iniPath,
-	   "config=s"      => \$config,
-	   "thresholds=s"  => \$thresholds,
+           "debug"         => \$debug,
 	   "exclude"       => \$exclude,
 	   "help"          => \$help,
+	   "ini=s"         => \$iniPath,
+           "input=s"       => \$inputDir,
+	   "dbpath=s"      => \$dbPath,
+           "logconf=s"     => \$log4perl_config,
+	   "metrics=s"     => \$metricJson,
+	   "status=s"      => \$statusJson,
+	   "thresholds=s"  => \$thresholds,
 	   "verbose"       => \$verbose,
-    );
+       );
+
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
+$log = Log::Log4perl->get_logger('main');
 
 my $defaultStatusJson = 'qc_results.json';
 
@@ -77,7 +106,7 @@ my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
 
 # assign 0 (ie. false) to the optional reference to a list of metric names
 $collator->collate($inputDir, $config, $thresholds, $statusJson,
-                   $metricJson, $csv, $exclude, 0, $verbose);
+                   $metricJson, $csv, $exclude, 0);
 
 __END__
 
