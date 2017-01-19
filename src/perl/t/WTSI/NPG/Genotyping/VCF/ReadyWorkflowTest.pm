@@ -398,9 +398,6 @@ sub test_result_finder : Test(9) {
               'Sequenom manifest contents OK');
 }
 
-######################################################################
-# under construction!
-
 sub test_workflow_script_gencall: Test(16) {
     setup_chromosome_json();
     my $f_config = setup_fluidigm();
@@ -494,9 +491,6 @@ sub test_workflow_script_gencall: Test(16) {
     is_deeply($params, $expected_params,
               "YML Gencall workflow params match expected values");
 }
-
-######################################################################
-
 
 sub test_workflow_script_illuminus: Test(16) {
     setup_chromosome_json();
