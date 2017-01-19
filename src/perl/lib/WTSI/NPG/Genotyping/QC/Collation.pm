@@ -9,7 +9,6 @@ package WTSI::NPG::Genotyping::QC::Collation;
 
 use strict;
 use warnings;
-use Carp;
 use File::Slurp qw(read_file);
 use IO::Uncompress::Gunzip qw($GunzipError); # for duplicate_full.txt.gz
 use JSON;
@@ -83,7 +82,7 @@ sub addLocations {
     foreach my $uri (keys %samples) {
         my %results = %{$samples{$uri}};
         my $locsRef = $plateLocs{$uri};
-        if (defined($locsRef)) { 
+        if (defined($locsRef)) {
             # samples with unknown location will have dummy values in hash
             my ($plate, $addressLabel) = @$locsRef;
             $results{'plate'} = $plate;
@@ -91,7 +90,8 @@ sub addLocations {
             $samples{$uri} = \%results;
         } else {
             # excluded sample has *no* location value
-            print STDERR "Excluded sample URI $uri is in QC metric data\n";
+            $self->logwarn('Excluded sample URI ', $uri,
+                           'is in QC metric data');
         }
     }
     return \%samples;
@@ -211,7 +211,8 @@ sub evaluateThresholds {
         my %result = %{$results{$sample}};
         foreach my $metric (keys(%result)) {
             if (!defined($thresholds{$metric})) {
-                croak "No thresholds defined for metric $metric: $!";
+                $self->logcroak("No thresholds defined for metric '",
+                                $metric, "'");
             }
             my $value = $result{$metric};
             my $pass = $self->metricPass($metric, $value,
@@ -291,7 +292,7 @@ sub findMetricResults {
         } elsif ($name eq $XYD_NAME) {
             $resultsRef = $self->resultsXydiff($inputDir);
         } else {
-            croak "Unknown metric name $name for results: $!";
+            $self->logcroak("Unknown metric name $name for results: $!");
         }
         if ($resultsRef) { $allResults{$name} = $resultsRef; }
     }
@@ -316,7 +317,8 @@ sub findThresholds {
         } elsif ($metric eq $CR_NAME || $metric eq $DUP_NAME || $metric eq $ID_NAME || $metric eq $GENDER_NAME || $metric eq $MAG_NAME ) {
             $thresholds{$metric} = $thresholdsConfig{$metric};
         } else {
-            croak "Unknown metric name $metric for thresholds: $!";
+            $self->logcroak("Unknown metric name '", $metric,
+                            "' for thresholds");
         }
     }
     return %thresholds;
@@ -386,7 +388,8 @@ sub metricPass {
         my ($probability, $concordance) = @{$value};
         if ($value eq 'NA' || $probability > $threshold) { $pass = 1; }
     } else {
-        croak "Unknown metric name: $!";
+        $self->logcroak("Unknown metric name '", $metric,
+                        "' for pass/fail evaluation");
     }
     return $pass;
 }
@@ -422,7 +425,7 @@ sub plateLocations {
                 my ($plate, $x, $y) = (0,0,0);
                 my $uri = $sample->uri;
                 if (!defined($uri)) {
-                    carp "Sample $sample has no uri!";
+                    $self->logwarn("Sample '$sample' has no uri!");
                 next;
                 } elsif ($sample->include == 0) {
                     next; # excluded sample
@@ -452,7 +455,8 @@ sub processDuplicates {
     my ($self, $inputDir, $threshold) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'duplicate'};
     if (!(-e $inPath)) {
-        croak "Input path for duplicates \"$inPath\" does not exist: $!";
+        $self->logcroak("Input path for duplicates '",
+                        $inPath, "' does not exist");
     }
     my ($simRef, $maxRef) = $self->readDuplicates($inPath);
     my @subsets = $self->duplicateSubsets($simRef, $threshold);
@@ -479,9 +483,11 @@ sub processDuplicates {
     $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
     $output{$DUPLICATE_RESULTS_KEY} = \%results;
     my $outPath = $inputDir.'/'.$FILENAMES{'duplicate_subsets'};
-    open my $out, ">", $outPath || croak "Cannot open output '$outPath'";
+    open my $out, ">", $outPath ||
+        $self->logcroak("Cannot open output '$outPath'");
     print $out to_json(\%output);
-    close $out || croak "Cannot close output '$outPath'";
+    close $out ||
+        $self->logcroak("Cannot close output '$outPath'");
 }
 
 sub readDuplicates {
@@ -490,7 +496,7 @@ sub readDuplicates {
     my ($self, $inPath) = @_;
     my (%similarity, %max);
     my $z = new IO::Uncompress::Gunzip $inPath ||
-        croak "gunzip failed: $GunzipError\n";
+        $self->logcroak("gunzip failed: $GunzipError");
     my $firstLine = 1;
     while (<$z>) {
         if ($firstLine) { $firstLine = 0; next; } # skip headers
@@ -517,7 +523,6 @@ sub readDuplicates {
 
 sub readMetricThresholds {
     # convenience method to read metric thresholds from JSON config
-    # TODO does this still need to be exported?
     my ($self, $configPath) = @_;
     my %config = %{decode_json(read_file($configPath))};
     my %thresholds = %{$config{'Metrics_thresholds'}};
@@ -528,7 +533,8 @@ sub resultsCallRate {
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'call_rate'};
     if (!(-e $inPath)) {
-        croak "Input path for call rate \"$inPath\" does not exist: $!";
+        $self->logcroak("Input path for call rate '",
+                        $inPath, "' does not exist");
     }
     my $index = 1;
     return $self->resultsSpaceDelimited($inPath, $index);
@@ -539,11 +545,13 @@ sub resultsDuplicate {
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'duplicate_subsets'};
     if (!(-e $inPath)) { 
-        croak "Input path for duplicates \"$inPath\" does not exist: $!";
+        $self->logcroak("Input path for duplicates '",
+                        $inPath, "' does not exist");
     }
-    open my $in, "<", $inPath || croak "Cannot open input '$inPath'";
+    open my $in, "<", $inPath ||
+        $self->logcroak("Cannot open input '$inPath'");
     my $input = <$in>;
-    close $in || croak "Cannot close input '$inPath'";
+    close $in || $self->logcroak("Cannot close input '$inPath'");
     my %duplicateData = %{ from_json($input) };
     my $resultsRef = $duplicateData{$DUPLICATE_RESULTS_KEY};
     return $resultsRef;
@@ -555,8 +563,9 @@ sub resultsGender {
     # $threshold not used
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'gender'};
-    if (!(-e $inPath)) { 
-        croak "Input path for gender \"$inPath\" does not exist: $!";
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for gender '",
+                        $inPath, "' does not exist");
     }
     my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
     my %results;
@@ -570,8 +579,9 @@ sub resultsGender {
 sub resultsHet {
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'heterozygosity'};
-    if (!(-e $inPath)) { 
-        croak "Input path for heterozygosity \"$inPath\" does not exist: $!";
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for heterozygosity '",
+                        $inPath, "' does not exist");
     }
     my $index = 2;
     return $self->resultsSpaceDelimited($inPath, $index);
@@ -599,8 +609,8 @@ sub resultsIdentity {
         }
         $resultsRef = \%results;
     } else {
-        carp "Omitting identity metric; expected identity JSON path '".
-            $inPath."' does not exist";
+        $self->info("Omitting identity metric; expected identity JSON path '",
+                    $inPath, "' does not exist");
     }
     return $resultsRef;
 }
@@ -615,7 +625,8 @@ sub resultsMafHet {
     my ($self, $inputDir, $high) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'het_by_maf'};
     if (!(-r $inPath)) {
-        carp "Omitting MAF heterozygosity; cannot read input \"$inPath\": $!";
+        $self->info("Omitting MAF heterozygosity; cannot read input '",
+                    $inPath, "'");
         return 0;
     }
     my %data = %{decode_json(read_file($inPath))};
@@ -632,7 +643,8 @@ sub resultsMagnitude {
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'magnitude'};
     if (!(-e $inPath)) {
-        carp "Omitting magnitude; input \"$inPath\" does not exist: $!";
+        $self->info("Omitting magnitude; input '", $inPath,
+                    "' does not exist");
         return 0; # magnitude of intensity is optional
     }
     my $index = 1;
@@ -658,7 +670,8 @@ sub resultsXydiff {
     my ($self, $inputDir) = @_;
     my $inPath = $inputDir.'/'.$FILENAMES{'xydiff'};
     if (!(-e $inPath)) { 
-        carp "Omitting xydiff; input \"$inPath\" does not exist: $!";
+        $self->info("Omitting xydiff; input '", $inPath,
+                    "' does not exist");
         return 0;
     }
     my $index = 1;
@@ -756,9 +769,10 @@ sub writeCsv {
     }
     unshift(@lines, join(',', @headers));
     # write results to file
-    open my $out, ">", $csvPath || croak "Cannot open output $csvPath: $!";
+    open my $out, ">", $csvPath ||
+        $self->logcroak("Cannot open output '$csvPath'");
     foreach my $line (@lines) { print $out $line."\n"; }
-    close $out || croak "Cannot close output $csvPath: $!";
+    close $out || $self->logcroak("Cannot close output '$csvPath'");
 }
 
 sub writeJson {
@@ -766,9 +780,9 @@ sub writeJson {
     my ($self, $outPath, $dataRef) = @_;
     my $resultString = encode_json($dataRef);
     open my $out, ">", $outPath ||
-        croak "Cannot open output path $outPath: $!";
+        $self->logcroak("Cannot open output path '$outPath'");
     print $out $resultString;
-    close($out) || croak "Cannot close output path $outPath: $!";;
+    close($out) || $self->logcroak("Cannot close output path '$outPath'");
     return 1;
 }
 
@@ -776,16 +790,15 @@ sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
     my ($self, $inputDir, $configPath, $thresholdPath,
-        $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef,
-        $verbose) = @_;
+        $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef) = @_;
     my (%config, %thresholdConfig, @metricNames);
-    if ($verbose) { print STDERR "Started collating QC results.\n";    }
+    $self->debug("Started collating QC results for input $inputDir");
     %thresholdConfig = %{$self->readMetricThresholds($thresholdPath)};
     if ($metricsRef) {
         @metricNames = @{$metricsRef};
         foreach my $name (@metricNames) {
             if (!defined($thresholdConfig{$name})) {
-                croak "No threshold defined for metric $name: $!";
+                $self->logcroak("No threshold defined for metric '$name'");
             }
         }
     }
@@ -803,7 +816,7 @@ sub collate {
     # 1) find metric values (and write to file if required)
     my $metricResultsRef = $self->findMetricResults($inputDir, \@metricNames);
     my $sampleResultsRef = $self->transposeResults($metricResultsRef);
-    if ($verbose) { print "Found metric values.\n"; }
+    $self->debug("Found metric values.");
     if ($metricsJson) { $self->writeJson($metricsJson, $sampleResultsRef);  }
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
@@ -812,12 +825,12 @@ sub collate {
                                                \%thresholdConfig);
         my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
                                                       \%thresholds);
-        if ($verbose) { print "Evaluated pass/fail status.\n"; }
+        $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
         $passResultRef = $self->addLocations($passResultRef);
         $self->writeJson($statusJson, $passResultRef);
-        if ($verbose) { print "Wrote status JSON file $statusJson.\n"; }
+        $self->debug("Wrote status JSON file $statusJson.");
 
         # 4) write CSV (if required)
         my %samplePass = $self->passFailBySample($passResultRef);
@@ -826,12 +839,12 @@ sub collate {
             my @excluded = $self->dbExcludedSamples();
             $self->writeCsv($csvPath, \%sampleInfo, \@excluded,
                             $passResultRef, \%samplePass);
-            if ($verbose) { print "Wrote CSV $csvPath.\n"; }
+            $self->debug("Wrote CSV $csvPath.");
         }
 
         # 5) exclude failing samples in pipeline DB (if required)
         if ($exclude) { $self->updateDatabase(\%samplePass); }
-        if ($verbose) { print "Updated pipeline DB.\n"; }
+        $self->debug("Updated pipeline DB.");
     }
 }
 
