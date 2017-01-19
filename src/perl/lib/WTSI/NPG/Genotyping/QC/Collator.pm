@@ -1,5 +1,5 @@
 
-package WTSI::NPG::Genotyping::QC::Collation;
+package WTSI::NPG::Genotyping::QC::Collator;
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
 # February 2014

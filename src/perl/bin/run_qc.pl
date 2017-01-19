@@ -16,7 +16,7 @@ use Pod::Usage;
 
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
-use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
+use WTSI::NPG::Genotyping::QC::Collator;
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
@@ -329,7 +329,7 @@ sub run_qc {
     my $statusJson = $outDir."/qc_results.json";
     my $metricJson = "";
     # first pass -- standard thresholds, no DB update
-    my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
         db_path  => $dbPath,
         ini_path => $iniPath
     );

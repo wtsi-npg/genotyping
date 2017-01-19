@@ -124,7 +124,7 @@ lib/WTSI/NPG/Genotyping/Infinium/Publisher.pm
 lib/WTSI/NPG/Genotyping/Infinium/ResultSet.pm
 lib/WTSI/NPG/Genotyping/Infinium/SampleQuery.pm
 lib/WTSI/NPG/Genotyping/Plink.pm
-lib/WTSI/NPG/Genotyping/QC/Collation.pm
+lib/WTSI/NPG/Genotyping/QC/Collator.pm
 lib/WTSI/NPG/Genotyping/QC/GenderCheck.pm
 lib/WTSI/NPG/Genotyping/QC/GenderCheckDatabase.pm
 lib/WTSI/NPG/Genotyping/QC/MetricScatterplots.pm
@@ -173,7 +173,7 @@ t/bayesian_identity.t
 t/bayesian_identity_sample.t
 t/bayesian_identity_simulator.t
 t/call.t
-t/collation.t
+t/collator.t
 t/collector.t
 t/collector/collect_files/a/10.txt
 t/collector/collect_files/a/x/1.txt
@@ -718,7 +718,7 @@ t/WTSI/NPG/Genotyping/Infinium/InfiniumDataObjectTest.pm
 t/WTSI/NPG/Genotyping/Infinium/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Infinium/SampleQueryTest.pm
-t/WTSI/NPG/Genotyping/QC/CollationTest.pm
+t/WTSI/NPG/Genotyping/QC/CollatorTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SimulatorTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/CheckTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SampleMetricTest.pm

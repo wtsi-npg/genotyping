@@ -1,6 +1,6 @@
 use utf8;
 
-package WTSI::NPG::Genotyping::QC::CollationTest;
+package WTSI::NPG::Genotyping::QC::CollatorTest;
 
 use strict;
 use warnings;
@@ -17,14 +17,14 @@ use base qw(WTSI::NPG::Test);
 use Test::More tests => 16;
 use Test::Exception;
 
-use WTSI::NPG::Genotyping::QC::Collation;
+use WTSI::NPG::Genotyping::QC::Collator;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readSampleInclusion);
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 our $log = Log::Log4perl->get_logger();
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::QC::Collation'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::QC::Collator'); }
 
 my $temp_dir;
 my $dbName = 'small_test.db';
@@ -43,7 +43,7 @@ my $csvExpected = catfile($example_dir, 'qc_results.csv');
 my $expectedCsvContents;
 
 sub make_fixture : Test(setup) {
-    $temp_dir = tempdir("CollationTest_XXXXXX", CLEANUP => 1);
+    $temp_dir = tempdir("CollatorTest_XXXXXX", CLEANUP => 1);
     open my $fh, "<", $csvExpected || $log->logcroak("Cannot open CSV '",
                                                      $csvExpected, "'");
     my $csv = Text::CSV->new();
@@ -52,7 +52,7 @@ sub make_fixture : Test(setup) {
 }
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::QC::Collation');
+  require_ok('WTSI::NPG::Genotyping::QC::Collator');
 }
 
 sub collation : Test(6) {
@@ -62,7 +62,7 @@ sub collation : Test(6) {
     my $exclude = 0;
     my $metricsRef = 0;
     my $verbose = 0;
-    my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
         db_path  => $dbPath,
         ini_path => $iniPath
     );

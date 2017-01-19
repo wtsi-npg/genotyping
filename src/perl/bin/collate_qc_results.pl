@@ -16,7 +16,7 @@ use Cwd qw/abs_path/;
 use Getopt::Long;
 use Log::Log4perl qw(:levels);
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
-use WTSI::NPG::Genotyping::QC::Collation;
+use WTSI::NPG::Genotyping::QC::Collator;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
@@ -99,7 +99,7 @@ elsif (!(-d $inputDir)) { croak "Input $inputDir does not exist or is not a dire
 elsif (!(-r $config)) { croak "Cannot read config path $config"; }
 elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $thresholds"; }
 
-my $collator = WTSI::NPG::Genotyping::QC::Collation->new(
+my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
     db_path  => $dbPath,
     ini_path => $iniPath
 );
