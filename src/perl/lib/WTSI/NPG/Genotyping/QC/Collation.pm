@@ -19,7 +19,6 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getDatabaseObject
                                                readQCMetricInputs
                                                readSampleData);
 use Exporter;
-
 our @ISA = qw/Exporter/;
 our @EXPORT_OK = qw/collate readMetricThresholds/;
 
@@ -543,9 +542,10 @@ sub resultsIdentity {
             $results{$name} = [$identity, $concordance];
         }
         $resultsRef = \%results;
+    } else {
+        carp "Omitting identity metric; expected identity JSON path '".
+            $inPath."' does not exist");
     }
-    # if no JSON file, return an empty result
-    # TODO Use log4perl to record a debug/info message here
     return $resultsRef;
 }
 
