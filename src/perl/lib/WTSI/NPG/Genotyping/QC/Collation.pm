@@ -544,7 +544,7 @@ sub resultsIdentity {
         $resultsRef = \%results;
     } else {
         carp "Omitting identity metric; expected identity JSON path '".
-            $inPath."' does not exist");
+            $inPath."' does not exist";
     }
     return $resultsRef;
 }
