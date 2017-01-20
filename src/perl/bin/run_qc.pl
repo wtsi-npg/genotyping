@@ -374,8 +374,8 @@ sub run_qc {
 	# update DB unless the --include option is in effect
 	$csvPath = $outDir."/filter_results.csv";
 	$statusJson = $outDir."/filter_results.json";
-	collate($outDir, $configPath, $filter, $dbPath, $iniPath,
-		$statusJson, $metricJson, $csvPath, $exclude);
+	$collator->collate($outDir, $configPath, $filter, $statusJson,
+                           $metricJson, $csvPath, $exclude);
     }
     ## create 'supplementary' directory and move files
     cleanup($outDir);
