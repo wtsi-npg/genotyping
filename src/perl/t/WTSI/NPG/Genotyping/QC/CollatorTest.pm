@@ -60,15 +60,14 @@ sub collation : Test(6) {
     my $jsonMetrics = catfile($temp_dir, 'qc_metrics.json');
     my $csvPath = catfile($temp_dir, 'qc_results.csv');
     my $exclude = 0;
-    my $metricsRef = 0;
-    my $verbose = 0;
     my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
-        db_path  => $dbPath,
-        ini_path => $iniPath
+        db_path     => $dbPath,
+        ini_path    => $iniPath,
+        config_path => $configPath,
+        filter_path => $thresholdPath
     );
-    $collator->collate($example_dir, $configPath, $thresholdPath,
-                       $jsonResults, $jsonMetrics, $csvPath,
-                       $exclude, $metricsRef, $verbose);
+    $collator->collate($example_dir, $jsonResults, $jsonMetrics, $csvPath,
+                       $exclude);
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));
     my $expected_metrics = decode_json(read_file($metricsExpected));

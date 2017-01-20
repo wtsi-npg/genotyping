@@ -101,12 +101,12 @@ elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $t
 
 my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
     db_path  => $dbPath,
-    ini_path => $iniPath
+    ini_path => $iniPath,
+    config_path => $config,
+    filter_path => $thresholds,
 );
 
-# assign 0 (ie. false) to the optional reference to a list of metric names
-$collator->collate($inputDir, $config, $thresholds, $statusJson,
-                   $metricJson, $csv, $exclude, 0);
+$collator->collate($inputDir, $statusJson, $metricJson, $csv, $exclude);
 
 __END__
 

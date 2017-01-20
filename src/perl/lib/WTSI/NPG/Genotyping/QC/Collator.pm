@@ -19,11 +19,8 @@ use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getDatabaseObject
                                                meanSd
                                                readQCMetricInputs
                                                readSampleData);
-use Data::Dumper; # FIXME
 
-#use Exporter;
-#our @ISA = qw/Exporter/;
-#our @EXPORT_OK = qw/collate readMetricThresholds/;
+use Data::Dumper; # FIXME
 
 our $VERSION = '';
 
@@ -47,7 +44,6 @@ our $DUPLICATE_SUBSETS_KEY = 'SUBSETS';
 our $DUPLICATE_RESULTS_KEY = 'RESULTS';
 our $UNKNOWN_PLATE = "Unknown_plate";
 our $UNKNOWN_ADDRESS = "Unknown_address";
-our %FILENAMES; # hash for names of input files
 
 # Collate QC results from various output files into a single data structure,
 # write JSON and CSV output files and update pipeline SQLite DB if required.
@@ -66,12 +62,52 @@ has 'ini_path' =>
    required   => 1,
    default    => $ENV{HOME} . "/.npg/genotyping.ini" );
 
+has 'config_path' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   required   => 1,
+   documentation => 'Path to a JSON file with required parameters.'
+);
+
+has 'filter_path' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   documentation => 'Path to a JSON file with parameters to determine '.
+       'sample exclusion. Optional, overrides values in config_path.'
+);
+
 has 'db'  =>
   (is         => 'ro',
    isa        => 'WTSI::NPG::Genotyping::Database::Pipeline',
    lazy       => 1,
+   init_arg => undef,
    builder    => '_build_db');
 
+has 'threshold_parameters' =>
+  (is         => 'ro',
+   isa        => 'HashRef',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_threshold_parameters',
+   documentation => 'Parameters to determine pass/fail thresholds for '.
+       'each metric. The actual threshold values may vary; for example, '.
+       'some thresholds are defined in terms of standard deviations '.
+       'from the mean.'
+);
+
+has 'metrics' =>
+  (is         => 'ro',
+   isa        => 'ArrayRef',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_metrics');
+
+has 'filenames' =>
+  (is         => 'ro',
+   isa        => 'HashRef',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_filenames');
 
 sub addLocations {
     # add plate/well locations to a hash indexed by sample
@@ -268,10 +304,9 @@ sub excludedSampleCsv {
 sub findMetricResults {
     # find QC results in metric-major order, return a hash reference
     # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
-    my ($self, $inputDir, $metricNamesRef) = @_;
-    my @metricNames = @{$metricNamesRef};
+    my ($self, $inputDir) = @_;
     my %allResults;
-    foreach my $name (@metricNames) {
+    foreach my $name (@{$self->metrics}) {
         my $resultsRef;
         if ($name eq $CR_NAME) {
             $resultsRef = $self->resultsCallRate($inputDir);
@@ -301,9 +336,8 @@ sub findMetricResults {
 
 sub findThresholds {
     # find threshold values, which may depend on mean/sd of metric values
-    my ($self, $metricResultsRef, $thresholdConfigRef) = @_;
+    my ($self, $metricResultsRef) = @_;
     my %metricResults = %{$metricResultsRef};
-    my %thresholdsConfig = %{$thresholdConfigRef};
     my %thresholds;
     my @names = keys(%metricResults);
     foreach my $metric (keys(%metricResults)) {
@@ -311,17 +345,17 @@ sub findThresholds {
             # find mean/sd for thresholds
             my %resultsBySample = %{$metricResults{$metric}};
             my ($mean, $sd) = meanSd(values(%resultsBySample));
-            my $min = $mean - ($thresholdsConfig{$metric}*$sd);
-            my $max = $mean + ($thresholdsConfig{$metric}*$sd);
+            my $min = $mean - ($self->threshold_parameters->{$metric}*$sd);
+            my $max = $mean + ($self->threshold_parameters->{$metric}*$sd);
             $thresholds{$metric} = [$min, $max];
         } elsif ($metric eq $CR_NAME || $metric eq $DUP_NAME || $metric eq $ID_NAME || $metric eq $GENDER_NAME || $metric eq $MAG_NAME ) {
-            $thresholds{$metric} = $thresholdsConfig{$metric};
+            $thresholds{$metric} = $self->threshold_parameters->{$metric};
         } else {
             $self->logcroak("Unknown metric name '", $metric,
                             "' for thresholds");
         }
     }
-    return %thresholds;
+    return \%thresholds;
 }
 
 sub includedSampleCsv {
@@ -453,7 +487,7 @@ sub processDuplicates {
     # want to write partitioning and pass/fail status to file
     # then read file for final metric/threshold collation
     my ($self, $inputDir, $threshold) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'duplicate'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'duplicate'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for duplicates '",
                         $inPath, "' does not exist");
@@ -482,7 +516,7 @@ sub processDuplicates {
     my %output;
     $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
     $output{$DUPLICATE_RESULTS_KEY} = \%results;
-    my $outPath = $inputDir.'/'.$FILENAMES{'duplicate_subsets'};
+    my $outPath = $inputDir.'/'.$self->filenames->{'duplicate_subsets'};
     open my $out, ">", $outPath ||
         $self->logcroak("Cannot open output '$outPath'");
     print $out to_json(\%output);
@@ -531,7 +565,7 @@ sub readMetricThresholds {
 
 sub resultsCallRate {
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'call_rate'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'call_rate'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for call rate '",
                         $inPath, "' does not exist");
@@ -543,7 +577,7 @@ sub resultsCallRate {
 sub resultsDuplicate {
     # read pre-processed values for duplicate metric
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'duplicate_subsets'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'duplicate_subsets'};
     if (!(-e $inPath)) { 
         $self->logcroak("Input path for duplicates '",
                         $inPath, "' does not exist");
@@ -562,7 +596,7 @@ sub resultsGender {
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'gender'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'gender'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for gender '",
                         $inPath, "' does not exist");
@@ -578,7 +612,7 @@ sub resultsGender {
 
 sub resultsHet {
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'heterozygosity'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'heterozygosity'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for heterozygosity '",
                         $inPath, "' does not exist");
@@ -594,7 +628,7 @@ sub resultsHighMafHet {
 
 sub resultsIdentity {
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'identity'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'identity'};
     my $resultsRef;
     if (-e $inPath) {
         # read identity results from JSON file
@@ -623,7 +657,7 @@ sub resultsLowMafHet {
 sub resultsMafHet {
     # read JSON file output by Plinktools het_by_maf.py
     my ($self, $inputDir, $high) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'het_by_maf'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'het_by_maf'};
     if (!(-r $inPath)) {
         $self->info("Omitting MAF heterozygosity; cannot read input '",
                     $inPath, "'");
@@ -641,7 +675,7 @@ sub resultsMafHet {
 
 sub resultsMagnitude {
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'magnitude'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'magnitude'};
     if (!(-e $inPath)) {
         $self->info("Omitting magnitude; input '", $inPath,
                     "' does not exist");
@@ -668,7 +702,7 @@ sub resultsSpaceDelimited {
 
 sub resultsXydiff {
     my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$FILENAMES{'xydiff'};
+    my $inPath = $inputDir.'/'.$self->filenames->{'xydiff'};
     if (!(-e $inPath)) { 
         $self->info("Omitting xydiff; input '", $inPath,
                     "' does not exist");
@@ -778,42 +812,27 @@ sub writeJson {
 sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
-    my ($self, $inputDir, $configPath, $thresholdPath,
-        $statusJson, $metricsJson, $csvPath, $exclude, $metricsRef) = @_;
-    my (%config, %thresholdConfig, @metricNames);
+    my ($self, $inputDir, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
+    my (%config, %thresholdConfig);
     $self->debug("Started collating QC results for input $inputDir");
-    %thresholdConfig = %{$self->readMetricThresholds($thresholdPath)};
-    if ($metricsRef) {
-        @metricNames = @{$metricsRef};
-        foreach my $name (@metricNames) {
-            if (!defined($thresholdConfig{$name})) {
-                $self->logcroak("No threshold defined for metric '$name'");
-            }
-        }
-    }
-    else {
-        @metricNames = keys(%thresholdConfig);
-    }
-    %config = %{decode_json(read_file($configPath))};
-    %FILENAMES = %{$config{'collation_names'}};
 
     # 0) reprocess duplicate results for given threshold (if any)
-    if (defined($thresholdConfig{$DUP_NAME})) {
-        $self->processDuplicates($inputDir, $thresholdConfig{$DUP_NAME});
+    my $duplicate_param = $self->threshold_parameters->{$DUP_NAME};
+    if (defined $duplicate_param) {
+        $self->processDuplicates($inputDir, $duplicate_param);
     }
 
     # 1) find metric values (and write to file if required)
-    my $metricResultsRef = $self->findMetricResults($inputDir, \@metricNames);
+    my $metricResultsRef = $self->findMetricResults($inputDir);
     my $sampleResultsRef = $self->transposeResults($metricResultsRef);
     $self->debug("Found metric values.");
     if ($metricsJson) { $self->writeJson($metricsJson, $sampleResultsRef);  }
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
         # 2) apply filters to find pass/fail status
-        my %thresholds = $self->findThresholds($metricResultsRef,
-                                               \%thresholdConfig);
+        my $thresholds = $self->findThresholds($metricResultsRef);
         my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
-                                                      \%thresholds);
+                                                      $thresholds);
         $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
@@ -844,6 +863,33 @@ sub _build_db {
 	 inifile => $self->ini_path,
 	 dbfile  => $self->db_path);
     return $db;
+}
+
+sub _build_filenames {
+    my ($self,) = @_;
+    my $config = decode_json(read_file($self->config_path));
+    return $config->{'collation_names'};
+}
+
+
+sub _build_metrics {
+    my ($self,) = @_;
+    my @metrics = keys %{$self->threshold_parameters};
+    @metrics = sort @metrics;
+    return \@metrics;
+}
+
+sub _build_threshold_parameters {
+    my ($self,) = @_;
+    my %thresholds;
+    my $input_path;
+    if (defined($self->filter_path)) {
+        $input_path = $self->filter_path;
+    } else {
+        $input_path = $self->config_path;
+    }
+    my $config = decode_json(read_file($input_path));
+    return $config->{'Metrics_thresholds'};
 }
 
 sub _getBySampleName {
