@@ -63,11 +63,11 @@ sub collation : Test(6) {
     my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
         db_path     => $dbPath,
         ini_path    => $iniPath,
+        input_dir   => $example_dir,
         config_path => $configPath,
         filter_path => $thresholdPath
     );
-    $collator->collate($example_dir, $jsonResults, $jsonMetrics, $csvPath,
-                       $exclude);
+    $collator->collate($jsonResults, $jsonMetrics, $csvPath, $exclude);
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));
     my $expected_metrics = decode_json(read_file($metricsExpected));

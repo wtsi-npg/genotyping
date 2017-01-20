@@ -330,8 +330,9 @@ sub run_qc {
     my $metricJson = "";
     # first pass -- standard thresholds, no DB update
     my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
-        db_path  => $dbPath,
-        ini_path => $iniPath
+        db_path   => $dbPath,
+        ini_path  => $iniPath,
+        input_dir => $outDir,
     );
     my $thresholds = $collator->readMetricThresholds($configPath);
     my @allMetricNames = keys(%{$thresholds});
@@ -341,8 +342,7 @@ sub run_qc {
 	    push(@metricNames, $metric);
 	}
     }
-    $collator->collate($outDir, $configPath, $configPath, $statusJson,
-                       $metricJson, $csvPath, 0, \@metricNames);
+    $collator->collate($statusJson, $metricJson, $csvPath);
     ### plot generation ###
     @cmds = ();
     my $dbopt = "--dbpath=$dbPath ";
@@ -374,8 +374,7 @@ sub run_qc {
 	# update DB unless the --include option is in effect
 	$csvPath = $outDir."/filter_results.csv";
 	$statusJson = $outDir."/filter_results.json";
-	$collator->collate($outDir, $configPath, $filter, $statusJson,
-                           $metricJson, $csvPath, $exclude);
+	$collator->collate($statusJson, $metricJson, $csvPath, $exclude);
     }
     ## create 'supplementary' directory and move files
     cleanup($outDir);

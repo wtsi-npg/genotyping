@@ -62,6 +62,11 @@ has 'ini_path' =>
    required   => 1,
    default    => $ENV{HOME} . "/.npg/genotyping.ini" );
 
+has 'input_dir' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   required   => 1, );
+
 has 'config_path' =>
   (is         => 'ro',
    isa        => 'Str',
@@ -74,6 +79,18 @@ has 'filter_path' =>
    isa        => 'Str',
    documentation => 'Path to a JSON file with parameters to determine '.
        'sample exclusion. Optional, overrides values in config_path.'
+);
+
+has 'duplicate_subsets_path' =>
+  (is         => 'ro',
+   isa        => 'Str',
+   lazy       => 1,
+   default    => sub {
+       my ($self,) = @_; 
+       return $self->input_dir.'/'.$self->filenames->{'duplicate_subsets'};
+   },
+   documentation => 'Path for output of sample subsets from the '.
+       'duplicate check.'
 );
 
 has 'db'  =>
@@ -211,9 +228,10 @@ sub duplicateSubsets {
     # Arguments: - Hash of hashes of pairwise similarities
     #            - Similarity threshold for duplicates
     # Return value: list of lists of samples in each subset
-    my ($self, $similarityRef, $threshold) = @_;
+    my ($self, $similarityRef) = @_;
     my %similarity = %{$similarityRef};
     my @samples = keys(%similarity);
+    my $threshold = $self->threshold_parameters->{$DUP_NAME};
     # if sample has no neighbours: simple, it is in a subset by itself
     # if sample does have neighbours: add to appropriate subset
     my @subsets;
@@ -304,28 +322,28 @@ sub excludedSampleCsv {
 sub findMetricResults {
     # find QC results in metric-major order, return a hash reference
     # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
-    my ($self, $inputDir) = @_;
+    my ($self,) = @_;
     my %allResults;
     foreach my $name (@{$self->metrics}) {
         my $resultsRef;
         if ($name eq $CR_NAME) {
-            $resultsRef = $self->resultsCallRate($inputDir);
+            $resultsRef = $self->resultsCallRate();
         } elsif ($name eq $DUP_NAME) {
-            $resultsRef = $self->resultsDuplicate($inputDir);
+            $resultsRef = $self->resultsDuplicate();
         } elsif ($name eq $GENDER_NAME) {
-            $resultsRef = $self->resultsGender($inputDir);
+            $resultsRef = $self->resultsGender();
         } elsif ($name eq $HET_NAME) {
-            $resultsRef = $self->resultsHet($inputDir);
+            $resultsRef = $self->resultsHet();
         } elsif ($name eq $HMH_NAME) {
-            $resultsRef = $self->resultsHighMafHet($inputDir);
+            $resultsRef = $self->resultsHighMafHet();
         } elsif ($name eq $ID_NAME) {
-            $resultsRef = $self->resultsIdentity($inputDir);
+            $resultsRef = $self->resultsIdentity();
         } elsif ($name eq $LMH_NAME) {
-            $resultsRef = $self->resultsLowMafHet($inputDir);
+            $resultsRef = $self->resultsLowMafHet();
         } elsif ($name eq $MAG_NAME) {
-            $resultsRef = $self->resultsMagnitude($inputDir);
+            $resultsRef = $self->resultsMagnitude();
         } elsif ($name eq $XYD_NAME) {
-            $resultsRef = $self->resultsXydiff($inputDir);
+            $resultsRef = $self->resultsXydiff();
         } else {
             $self->logcroak("Unknown metric name $name for results: $!");
         }
@@ -486,8 +504,8 @@ sub processDuplicates {
     # partition samples into subsets; sample in subset with highest CR passes
     # want to write partitioning and pass/fail status to file
     # then read file for final metric/threshold collation
-    my ($self, $inputDir, $threshold) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'duplicate'};
+    my ($self, $threshold) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for duplicates '",
                         $inPath, "' does not exist");
@@ -496,7 +514,7 @@ sub processDuplicates {
     my @subsets = $self->duplicateSubsets($simRef, $threshold);
     my %max = %{$maxRef};
     # read call rates and find keep/discard status
-    my %cr = %{$self->resultsCallRate($inputDir)};
+    my %cr = %{$self->resultsCallRate()};
     my %results;
     foreach my $subsetRef (@subsets) {
         my $maxCR = 0;
@@ -516,7 +534,7 @@ sub processDuplicates {
     my %output;
     $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
     $output{$DUPLICATE_RESULTS_KEY} = \%results;
-    my $outPath = $inputDir.'/'.$self->filenames->{'duplicate_subsets'};
+    my $outPath = $self->duplicate_subsets_path;
     open my $out, ">", $outPath ||
         $self->logcroak("Cannot open output '$outPath'");
     print $out to_json(\%output);
@@ -564,8 +582,8 @@ sub readMetricThresholds {
 }
 
 sub resultsCallRate {
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'call_rate'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'call_rate'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for call rate '",
                         $inPath, "' does not exist");
@@ -575,28 +593,55 @@ sub resultsCallRate {
 }
 
 sub resultsDuplicate {
-    # read pre-processed values for duplicate metric
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'duplicate_subsets'};
-    if (!(-e $inPath)) { 
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
+    if (!(-e $inPath)) {
         $self->logcroak("Input path for duplicates '",
                         $inPath, "' does not exist");
     }
-    open my $in, "<", $inPath ||
-        $self->logcroak("Cannot open input '$inPath'");
-    my $input = <$in>;
-    close $in || $self->logcroak("Cannot close input '$inPath'");
-    my %duplicateData = %{ from_json($input) };
-    my $resultsRef = $duplicateData{$DUPLICATE_RESULTS_KEY};
-    return $resultsRef;
+    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
+    my @subsets = $self->duplicateSubsets($simRef);
+    my %max = %{$maxRef};
+    # read call rates and find keep/discard status
+    my %cr = %{$self->resultsCallRate()};
+    my %results;
+    foreach my $subsetRef (@subsets) {
+        my $maxCR = 0;
+        my @subset = @{$subsetRef};
+        # first pass -- find highest CR
+        foreach my $sample (@subset) {
+            if ($cr{$sample} > $maxCR) { $maxCR = $cr{$sample}; }
+        }
+        # second pass -- record sample status
+        # may keep more than one sample if there is a tie for greatest CR
+        foreach my $sample (@subset) {
+            my $keep = 0;
+            if ($cr{$sample} eq $maxCR) { $keep = 1; }
+            $results{$sample} = [$max{$sample}, $keep];
+        }
+    }
+    if (defined $self->duplicate_subsets_path) {
+        my %output;
+        $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
+        $output{$DUPLICATE_RESULTS_KEY} = \%results;
+        open my $out, ">", $self->duplicate_subsets_path ||
+            $self->logcroak("Cannot open output '",
+                            self->duplicate_subsets_path, "'");
+        print $out to_json(\%output);
+        close $out ||
+            $self->logcroak("Cannot close output '",
+                            self->duplicate_subsets_path, "'");
+
+    }
+    return \%results;
 }
 
 sub resultsGender {
     # read gender results from sample_xhet_gender.txt
     # 'metric value' is concatenation of inferred, supplied gender codes
     # $threshold not used
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'gender'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'gender'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for gender '",
                         $inPath, "' does not exist");
@@ -611,8 +656,8 @@ sub resultsGender {
 }
 
 sub resultsHet {
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'heterozygosity'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'heterozygosity'};
     if (!(-e $inPath)) {
         $self->logcroak("Input path for heterozygosity '",
                         $inPath, "' does not exist");
@@ -622,13 +667,13 @@ sub resultsHet {
 }
 
 sub resultsHighMafHet {
-    my ($self, $inputDir) = @_;
-    return $self->resultsMafHet($inputDir, 1);
+    my ($self, ) = @_;
+    return $self->resultsMafHet(1);
 }
 
 sub resultsIdentity {
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'identity'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'identity'};
     my $resultsRef;
     if (-e $inPath) {
         # read identity results from JSON file
@@ -650,14 +695,14 @@ sub resultsIdentity {
 }
 
 sub resultsLowMafHet {
-    my ($self, $inputDir) = @_;
-    return $self->resultsMafHet($inputDir, 0);
+    my ($self, ) = @_;
+    return $self->resultsMafHet(0);
 }
 
 sub resultsMafHet {
     # read JSON file output by Plinktools het_by_maf.py
-    my ($self, $inputDir, $high) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'het_by_maf'};
+    my ($self, $high) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'het_by_maf'};
     if (!(-r $inPath)) {
         $self->info("Omitting MAF heterozygosity; cannot read input '",
                     $inPath, "'");
@@ -674,8 +719,8 @@ sub resultsMafHet {
 }
 
 sub resultsMagnitude {
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'magnitude'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'magnitude'};
     if (!(-e $inPath)) {
         $self->info("Omitting magnitude; input '", $inPath,
                     "' does not exist");
@@ -701,8 +746,8 @@ sub resultsSpaceDelimited {
 }
 
 sub resultsXydiff {
-    my ($self, $inputDir) = @_;
-    my $inPath = $inputDir.'/'.$self->filenames->{'xydiff'};
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'xydiff'};
     if (!(-e $inPath)) { 
         $self->info("Omitting xydiff; input '", $inPath,
                     "' does not exist");
@@ -751,10 +796,12 @@ sub writeCsv {
     # write a .csv file summarizing metrics and pass/fail status
     my $self = shift; # TODO fix argument parsing
     my $csvPath = shift;
-    my %sampleInfo = %{ shift() }; # generic sample/dataset info
-    my @excluded = @{ shift() };   # samples excluded in DB
     my %passResult = %{ shift() }; # metric pass/fail status and values
     my %samplePass = %{ shift() }; # overall pass/fail by sample
+
+
+    my %sampleInfo = $self->dbSampleInfo();     # generic sample/dataset info
+    my @excluded =  $self->dbExcludedSamples(); # samples excluded in DB
     my %excluded;
     foreach my $sample (@excluded) { $excluded{$sample} = 1; }
     my @lines = ();
@@ -812,18 +859,18 @@ sub writeJson {
 sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
-    my ($self, $inputDir, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
+    my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
     my (%config, %thresholdConfig);
-    $self->debug("Started collating QC results for input $inputDir");
+    $self->debug("Started collating QC results for input ", $self->input_dir);
 
     # 0) reprocess duplicate results for given threshold (if any)
     my $duplicate_param = $self->threshold_parameters->{$DUP_NAME};
     if (defined $duplicate_param) {
-        $self->processDuplicates($inputDir, $duplicate_param);
+        $self->processDuplicates($duplicate_param);
     }
 
     # 1) find metric values (and write to file if required)
-    my $metricResultsRef = $self->findMetricResults($inputDir);
+    my $metricResultsRef = $self->findMetricResults();
     my $sampleResultsRef = $self->transposeResults($metricResultsRef);
     $self->debug("Found metric values.");
     if ($metricsJson) { $self->writeJson($metricsJson, $sampleResultsRef);  }
@@ -843,10 +890,7 @@ sub collate {
         # 4) write CSV (if required)
         my %samplePass = $self->passFailBySample($passResultRef);
         if ($csvPath) {
-            my %sampleInfo = $self->dbSampleInfo();
-            my @excluded = $self->dbExcludedSamples();
-            $self->writeCsv($csvPath, \%sampleInfo, \@excluded,
-                            $passResultRef, \%samplePass);
+            $self->writeCsv($csvPath, $passResultRef, \%samplePass);
             $self->debug("Wrote CSV $csvPath.");
         }
 

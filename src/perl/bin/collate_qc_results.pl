@@ -100,13 +100,14 @@ elsif (!(-r $config)) { croak "Cannot read config path $config"; }
 elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $thresholds"; }
 
 my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
-    db_path  => $dbPath,
-    ini_path => $iniPath,
+    db_path     => $dbPath,
+    ini_path    => $iniPath,
+    input_dir   => $inputDir,
     config_path => $config,
     filter_path => $thresholds,
 );
 
-$collator->collate($inputDir, $statusJson, $metricJson, $csv, $exclude);
+$collator->collate($statusJson, $metricJson, $csv, $exclude);
 
 __END__
 
