@@ -51,6 +51,8 @@ our $UNKNOWN_ADDRESS = "Unknown_address";
 # Get additional information for .csv fields from pipeline DB:
 # run,project,data_supplier,snpset,supplier_name,rowcol,beadchip_number,sample,include,plate,well,pass
 
+# attributes supplied as init_args
+
 has 'db_path' =>
   (is         => 'ro',
    isa        => 'Str',
@@ -81,6 +83,8 @@ has 'filter_path' =>
        'sample exclusion. Optional, overrides values in config_path.'
 );
 
+# other attributes, not in init_args
+
 has 'duplicate_subsets_path' =>
   (is         => 'ro',
    isa        => 'Str',
@@ -90,7 +94,8 @@ has 'duplicate_subsets_path' =>
        return $self->input_dir.'/'.$self->filenames->{'duplicate_subsets'};
    },
    documentation => 'Path for output of sample subsets from the '.
-       'duplicate check.'
+       'duplicate check. If a false value (0 or "") is given, output '.
+       'is omitted.'
 );
 
 has 'db'  =>
@@ -577,7 +582,7 @@ sub resultsDuplicate {
             $results{$sample} = [$max{$sample}, $keep];
         }
     }
-    if (defined $self->duplicate_subsets_path) {
+    if ($self->duplicate_subsets_path) {
         my %output;
         $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
         $output{$DUPLICATE_RESULTS_KEY} = \%results;
