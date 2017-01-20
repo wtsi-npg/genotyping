@@ -499,49 +499,6 @@ sub plateLocations {
     return %plateLocs;
 }
 
-sub processDuplicates {
-    # pre-processing of duplicate metric with given threshold
-    # partition samples into subsets; sample in subset with highest CR passes
-    # want to write partitioning and pass/fail status to file
-    # then read file for final metric/threshold collation
-    my ($self, $threshold) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for duplicates '",
-                        $inPath, "' does not exist");
-    }
-    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
-    my @subsets = $self->duplicateSubsets($simRef, $threshold);
-    my %max = %{$maxRef};
-    # read call rates and find keep/discard status
-    my %cr = %{$self->resultsCallRate()};
-    my %results;
-    foreach my $subsetRef (@subsets) {
-        my $maxCR = 0;
-        my @subset = @{$subsetRef};
-        # first pass -- find highest CR
-        foreach my $sample (@subset) {
-            if ($cr{$sample} > $maxCR) { $maxCR = $cr{$sample}; }
-        }
-        # second pass -- record sample status
-        # may keep more than one sample if there is a tie for greatest CR
-        foreach my $sample (@subset) {
-            my $keep = 0;
-            if ($cr{$sample} eq $maxCR) { $keep = 1; }
-            $results{$sample} = [$max{$sample}, $keep];
-        }
-    }
-    my %output;
-    $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
-    $output{$DUPLICATE_RESULTS_KEY} = \%results;
-    my $outPath = $self->duplicate_subsets_path;
-    open my $out, ">", $outPath ||
-        $self->logcroak("Cannot open output '$outPath'");
-    print $out to_json(\%output);
-    close $out ||
-        $self->logcroak("Cannot close output '$outPath'");
-}
-
 sub readDuplicates {
     # read pairwise similarities for duplicate check from gzipped file
     # also find maximum pairwise similarity for each sample
@@ -862,12 +819,6 @@ sub collate {
     my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
     my (%config, %thresholdConfig);
     $self->debug("Started collating QC results for input ", $self->input_dir);
-
-    # 0) reprocess duplicate results for given threshold (if any)
-    my $duplicate_param = $self->threshold_parameters->{$DUP_NAME};
-    if (defined $duplicate_param) {
-        $self->processDuplicates($duplicate_param);
-    }
 
     # 1) find metric values (and write to file if required)
     my $metricResultsRef = $self->findMetricResults();
