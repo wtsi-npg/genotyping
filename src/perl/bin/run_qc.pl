@@ -329,11 +329,13 @@ sub run_qc {
     my $statusJson = $outDir."/qc_results.json";
     my $metricJson = "";
     # first pass -- standard thresholds, no DB update
-    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
-        db_path   => $dbPath,
-        ini_path  => $iniPath,
-        input_dir => $outDir,
-    );
+    my %args = (db_path   => $dbPath,
+                ini_path  => $iniPath,
+                input_dir => $outDir,
+                config_path => $configPath,
+            );
+    if ($filter) { $args{'filter_path'} = $filter; }
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(%args);
     my $thresholds = $collator->readMetricThresholds($configPath);
     my @allMetricNames = keys(%{$thresholds});
     my @metricNames = ();
