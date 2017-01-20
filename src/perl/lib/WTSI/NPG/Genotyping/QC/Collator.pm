@@ -72,23 +72,6 @@ has 'db'  =>
    lazy       => 1,
    builder    => '_build_db');
 
-sub _getBySampleName {
-    my ($self,) = @_;
-    # need a coderef to sort sample identifiers in writeCsv
-    # wrapped in its own object method to satisfy Moose syntax & PerlCritic
-    return sub {
-        # comparison function for sorting samples
-        # if in plate_well_id format, sort by id; otherwise use standard sort
-        if ($a =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx &&
-                $b =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx) {
-            my @termsA = split /_/msx, $a;
-            my @termsB = split /_/msx, $b;
-            return $termsA[-1] cmp $termsB[-1];
-        } else {
-            return $a cmp $b;
-        }
-    }
-}
 
 sub addLocations {
     # add plate/well locations to a hash indexed by sample
@@ -861,6 +844,24 @@ sub _build_db {
 	 inifile => $self->ini_path,
 	 dbfile  => $self->db_path);
     return $db;
+}
+
+sub _getBySampleName {
+    my ($self,) = @_;
+    # need a coderef to sort sample identifiers in writeCsv
+    # wrapped in its own object method to satisfy Moose syntax & PerlCritic
+    return sub {
+        # comparison function for sorting samples
+        # if in plate_well_id format, sort by id; otherwise use standard sort
+        if ($a =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx &&
+                $b =~ m{[[:alnum:]]+_[[:alnum:]]+_[[:alnum:]]+}msx) {
+            my @termsA = split /_/msx, $a;
+            my @termsB = split /_/msx, $b;
+            return $termsA[-1] cmp $termsB[-1];
+        } else {
+            return $a cmp $b;
+        }
+    }
 }
 
 no Moose;
