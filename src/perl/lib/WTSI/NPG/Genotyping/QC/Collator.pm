@@ -474,14 +474,43 @@ sub _transpose_results {
     return \%sampleResults;
 }
 
+sub writeJson {
+    # open a file, and write the given reference in JSON format
+    my ($self, $outPath, $dataRef) = @_;
+    my $resultString = encode_json($dataRef);
+    open my $out, ">", $outPath ||
+        $self->logcroak("Cannot open output path '$outPath'");
+    print $out $resultString;
+    close($out) || $self->logcroak("Cannot close output path '$outPath'");
+    return 1;
+}
+
+
+sub excludeFailedSamples {
+    # if any samples have failed QC, set their 'include' value to False
+    # samples which have not failed QC are unaffected
+    my ($self, ) = @_;
+    my %samplePass = %{$self->pass_fail_summary};
+    # samples which were previously excluded should *remain* excluded
+
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
+    $self->db->in_transaction(sub {
+                                  foreach my $sample (@samples) {
+                                      my $uri = $sample->uri;
+                                      if (!($samplePass{$uri})) {
+                                          $sample->update({'include' => 0});
+                                      }
+                                  }
+                              });
+    $self->db->disconnect();
+}
+
 sub writeCsv {
-    # write a .csv file summarizing metrics and pass/fail status
-    my $self = shift; # TODO fix argument parsing
-    my $csvPath = shift;
-    my %passResult = %{ shift() }; # metric pass/fail status and values
-    my %samplePass = %{ shift() }; # overall pass/fail by sample
-
-
+    my ($self, $outPath) = @_;
+    my %passResult = %{$self->addLocations($self->pass_fail_details)};
+    my %samplePass = %{$self->pass_fail_summary};
     my %sampleInfo = $self->dbSampleInfo();     # generic sample/dataset info
     my @excluded =  $self->dbExcludedSamples(); # samples excluded in DB
     my %excluded;
@@ -521,59 +550,24 @@ sub writeCsv {
     }
     unshift(@lines, join(',', @headers));
     # write results to file
-    open my $out, ">", $csvPath ||
-        $self->logcroak("Cannot open output '$csvPath'");
-    foreach my $line (@lines) { print $out $line."\n"; }
-    close $out || $self->logcroak("Cannot close output '$csvPath'");
-}
-
-sub writeJson {
-    # open a file, and write the given reference in JSON format
-    my ($self, $outPath, $dataRef) = @_;
-    my $resultString = encode_json($dataRef);
     open my $out, ">", $outPath ||
-        $self->logcroak("Cannot open output path '$outPath'");
-    print $out $resultString;
-    close($out) || $self->logcroak("Cannot close output path '$outPath'");
-    return 1;
-}
-
-
-sub updateDatabase {
-
-   my ($self, $passRef) = @_;
-    my %samplePass = %{$passRef};
-    # samples which were previously excluded should *remain* excluded
-
-    $self->db->connect(RaiseError => 1,
-                       on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @samples = $self->db->sample->all;
-    $self->db->in_transaction(sub {
-                                  foreach my $sample (@samples) {
-                                      my $uri = $sample->uri;
-                                      if (!($samplePass{$uri})) {
-                                          $sample->update({'include' => 0});
-                                      }
-                                  }
-                              });
-    $self->db->disconnect();
+        $self->logcroak("Cannot open output '$outPath'");
+    foreach my $line (@lines) { print $out $line."\n"; }
+    close $out || $self->logcroak("Cannot close output '$outPath'");
 
 }
 
-# sub writeCsv {
+sub writeMetricJson {
+    my ($self, $outPath) = @_;
+    my $sampleResultsRef = $self->_transpose_results($self->metric_results);
+    $self->writeJson($outPath, $sampleResultsRef);
+}
 
-# }
-
-# sub writeMetricJson {
-
-# }
-
-
-# sub writeStatusJson {
-#     my ($self, $outPath) = @_;
-
-# }
-
+sub writeStatusJson {
+    my ($self, $outPath) = @_;
+    my $passResultRef = $self->addLocations($self->pass_fail_details);
+    $self->writeJson($outPath, $passResultRef);
+}
 
 sub collate {
     # main method to collate results and write outputs
@@ -590,7 +584,7 @@ sub collate {
     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
     $self->debug("Found metric values.");
     if ($metricsJson) {
-        $self->writeJson($metricsJson, $sampleResultsRef);
+        $self->writeMetricJson($metricsJson);
     }
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
@@ -598,20 +592,18 @@ sub collate {
         $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
-        my $passResultRef = $self->addLocations($self->pass_fail_details);
-        $self->writeJson($statusJson, $passResultRef);
+        #my $passResultRef = $self->addLocations($self->pass_fail_details);
+        $self->writeStatusJson($statusJson);
         $self->debug("Wrote status JSON file $statusJson.");
 
         # 4) write CSV (if required)
-        #my %samplePass = $self->passFailBySample($passResultRef);
         if ($csvPath) {
-            $self->writeCsv($csvPath, $passResultRef,
-                            $self->pass_fail_summary);
+            $self->writeCsv($csvPath);
             $self->debug("Wrote CSV $csvPath.");
         }
 
         # 5) exclude failing samples in pipeline DB (if required)
-        if ($exclude) { $self->updateDatabase($self->pass_fail_summary); }
+        if ($exclude) { $self->excludeFailedSamples(); }
         $self->debug("Updated pipeline DB.");
     }
 }
