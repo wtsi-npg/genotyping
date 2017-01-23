@@ -2,7 +2,7 @@
 package WTSI::NPG::Genotyping::QC::Collator;
 
 # Author:  Iain Bancarz, ib5@sanger.ac.uk
-# February 2014
+# February 2014; substantially refactored, January 2017
 
 # Collate QC result outputs into a single JSON summary file
 # Apply thresholds to find pass/fail status
@@ -297,38 +297,6 @@ sub duplicateSubsets {
     return @subsets;
 }
 
-# sub evaluateThresholds {
-#     # apply thresholds, evaluate pass/fail status of each sample/metric pair
-#     # input a sample-major hash of metric values
-#     # return reference to a hash in 'qc_results.json' format (minus plate name and address for each sample)
-#     my ($self, $sampleResultsRef, $thresholdsRef) = @_;
-#     my %results = %{$sampleResultsRef};
-#     my %thresholds = %{$thresholdsRef};
-#     my %evaluated = ();
-#     foreach my $sample (keys(%results)) {
-#         my %result = %{$results{$sample}};
-#         foreach my $metric (keys(%result)) {
-#             if (!defined($thresholds{$metric})) {
-#                 $self->logcroak("No thresholds defined for metric '",
-#                                 $metric, "'");
-#             }
-#             my $value = $result{$metric};
-#             my $pass = $self->metricPass($metric, $value,
-#                                          $thresholds{$metric});
-#             my @terms = ($pass, );
-#             if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
-#                 push (@terms, @{$value});
-#             } elsif ($metric eq $DUP_NAME) {
-#                 push (@terms, @{$value}[0]);
-#             } else {
-#                 push(@terms, $value);
-#             }
-#             $evaluated{$sample}{$metric} = \@terms;
-#         }
-#     }
-#     return \%evaluated;
-# }
-
 sub excludedSampleCsv {
     # generate CSV lines for samples excluded from pipeline DB
     my ($self, $sampleNamesRef, $sampleInfoRef,
@@ -406,32 +374,6 @@ sub includedSampleCsv {
     }
     return (\@lines, \%metrics);
 }
-
-# sub metricPass {
-#     # find pass/fail status for given metric, value, and threshold
-#     my ($self, $metric, $value, $threshold) = @_;
-#     my $pass = 0;
-#     if ($metric eq $CR_NAME || $metric eq $MAG_NAME) {
-#         if ($value >= $threshold) { $pass = 1; }
-#     } elsif ($metric eq $DUP_NAME) {
-#         my ($similarity, $keep) = @{$value};
-#         if ($similarity < $threshold || $keep) { $pass = 1; }
-#     } elsif ($metric eq $GENDER_NAME) {
-#         my ($xhet, $inferred, $supplied) = @{$value};
-#         if ($inferred==$supplied) { $pass = 1; }
-#     } elsif ($metric eq $HET_NAME || $metric eq $LMH_NAME || 
-#                  $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
-#         my ($min, $max) = @{$threshold};
-#         if ($value >= $min && $value <= $max) { $pass = 1; }
-#     } elsif ($metric eq $ID_NAME) {
-#         my ($probability, $concordance) = @{$value};
-#         if ($value eq 'NA' || $probability > $threshold) { $pass = 1; }
-#     } else {
-#         $self->logcroak("Unknown metric name '", $metric,
-#                         "' for pass/fail evaluation");
-#     }
-#     return $pass;
-# }
 
 sub passFailBySample {
     # evaluate results by metric and find overall pass/fail for each sample
@@ -531,26 +473,6 @@ sub _transpose_results {
     }
     return \%sampleResults;
 }
-
-# sub updateDatabaseOLD {
-#     # update pipeline db with pass/fail of each sample
-#     my ($self, $passRef) = @_;
-#     my %samplePass = %{$passRef};
-#     # samples which were previously excluded should *remain* excluded
-
-#     $self->db->connect(RaiseError => 1,
-#                        on_connect_do => 'PRAGMA foreign_keys = ON');
-#     my @samples = $self->db->sample->all;
-#     $self->db->in_transaction(sub {
-#                                   foreach my $sample (@samples) {
-#                                       my $uri = $sample->uri;
-#                                       if (!($samplePass{$uri})) {
-#                                           $sample->update({'include' => 0});
-#                                       }
-#                                   }
-#                               });
-#     $self->db->disconnect();
-# }
 
 sub writeCsv {
     # write a .csv file summarizing metrics and pass/fail status
@@ -665,7 +587,6 @@ sub collate {
     $self->debug("Started collating QC results for input ", $self->input_dir);
 
     # 1) find metric values (and write to file if required)
-    #my $metricResultsRef = $self->findMetricResults();
     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
     $self->debug("Found metric values.");
     if ($metricsJson) {
@@ -674,9 +595,6 @@ sub collate {
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
         # 2) apply filters to find pass/fail status
-        #my $thresholds = $self->findThresholds($metricResultsRef);
-        #my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
-        #                                              $thresholds);
         $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
