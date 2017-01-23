@@ -535,14 +535,6 @@ sub readDuplicates {
     return (\%similarity, \%max);
 }
 
-sub readMetricThresholds {
-    # convenience method to read metric thresholds from JSON config
-    my ($self, $configPath) = @_;
-    my %config = %{decode_json(read_file($configPath))};
-    my %thresholds = %{$config{'Metrics_thresholds'}};
-    return \%thresholds;
-}
-
 sub resultsCallRate {
     my ($self, ) = @_;
     my $inPath = $self->input_dir.'/'.$self->filenames->{'call_rate'};
@@ -822,7 +814,6 @@ sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
     my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
-    my (%config, %thresholdConfig);
     $self->debug("Started collating QC results for input ", $self->input_dir);
 
     # 1) find metric values (and write to file if required)
