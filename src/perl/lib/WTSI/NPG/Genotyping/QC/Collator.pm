@@ -745,7 +745,7 @@ sub _results_call_rate {
                         $inPath, "' does not exist");
     }
     my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
+    return $self->resultsTabDelimited($inPath, $index);
 }
 
 sub _results_duplicate {
@@ -819,7 +819,7 @@ sub _results_het {
                         $inPath, "' does not exist");
     }
     my $index = 2;
-    return $self->resultsSpaceDelimited($inPath, $index);
+    return $self->resultsTabDelimited($inPath, $index);
 }
 
 sub _results_high_maf_het {
@@ -883,7 +883,7 @@ sub _results_magnitude {
         return 0; # magnitude of intensity is optional
     }
     my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
+    return $self->resultsTabDelimited($inPath, $index);
 }
 
 sub _transpose_results {
@@ -901,8 +901,8 @@ sub _transpose_results {
     return \%sampleResults;
 }
 
-sub resultsSpaceDelimited {
-    # read metric results from a space-delimited file
+sub resultsTabDelimited {
+    # read metric results from a tab-delimited file
     # omit any line starting with #
     my ($self, $inPath, $index) = @_;
     my @raw_lines = read_file($inPath);
@@ -943,7 +943,7 @@ sub _results_xydiff {
         return 0;
     }
     my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
+    return $self->resultsTabDelimited($inPath, $index);
 }
 
 
