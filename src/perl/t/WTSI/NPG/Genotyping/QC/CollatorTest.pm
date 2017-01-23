@@ -32,7 +32,6 @@ my $data_dir = "$Bin/qc_test_data/";
 my $example_dir = catfile($data_dir, 'output_examples');
 
 my $configPath = catfile($data_dir, 'config_test.json');
-my $thresholdPath = $configPath;
 my $dbPath = catfile($data_dir, 'small_test.db');
 my $iniPath =  $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -64,8 +63,7 @@ sub collation : Test(6) {
         db_path     => $dbPath,
         ini_path    => $iniPath,
         input_dir   => $example_dir,
-        config_path => $configPath,
-        filter_path => $thresholdPath
+        config_path => $configPath
     );
     $collator->collate($jsonResults, $jsonMetrics, $csvPath, $exclude);
     ok(-e $jsonMetrics, "JSON metrics path exists");
