@@ -38,7 +38,6 @@ my $inputDir;
 my $log4perl_config;
 my $metricJson;
 my $statusJson;
-my $thresholds;
 my $verbose;
 
 GetOptions("config=s"      => \$config,
@@ -52,7 +51,6 @@ GetOptions("config=s"      => \$config,
            "logconf=s"     => \$log4perl_config,
 	   "metrics=s"     => \$metricJson,
 	   "status=s"      => \$statusJson,
-	   "thresholds=s"  => \$thresholds,
 	   "verbose"       => \$verbose,
        );
 
@@ -76,7 +74,6 @@ Options:
 --csv               Path for CSV output. Optional.
 --metrics           Path for JSON output of metric values, without pass/fail status. Optional.
 --config            Path to JSON file containing general configuration, including input filenames. Required.
---thresholds        Path to JSON file containing thresholds to determine pass/fail status for each sample. Optional; defaults to value of --config.
 --exclude           Flag failed samples for exclusion in pipeline DB file.
 --verbose           Print progress information to STDERR
 --help              Print this help text and exit
@@ -87,7 +84,6 @@ Options:
 $inputDir ||= '.';
 $statusJson ||= $defaultStatusJson;
 $iniPath ||= $DEFAULT_INI;
-$thresholds ||= $config;
 $exclude ||= 0;
 
 # validate command-line arguments
@@ -97,14 +93,12 @@ $dbPath = abs_path($dbPath); # required for pipeline DB object creation
 if (!(-r $dbPath)) { croak "Cannot read pipeline database path $dbPath"; }
 elsif (!(-d $inputDir)) { croak "Input $inputDir does not exist or is not a directory"; }
 elsif (!(-r $config)) { croak "Cannot read config path $config"; }
-elsif ($thresholds && !(-r $thresholds)) { croak "Cannot read thresholds path $thresholds"; }
 
 my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
     db_path     => $dbPath,
     ini_path    => $iniPath,
     input_dir   => $inputDir,
     config_path => $config,
-    filter_path => $thresholds,
 );
 
 $collator->collate($statusJson, $metricJson, $csv, $exclude);
