@@ -13,12 +13,9 @@ use File::Slurp qw(read_file);
 use IO::Uncompress::Gunzip qw($GunzipError); # for duplicate_full.txt.gz
 use JSON;
 use Moose;
+use Text::CSV;
 use WTSI::NPG::Genotyping::Database::Pipeline;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(getDatabaseObject
-                                               getPlateLocationsFromPath
-                                               meanSd
-                                               readQCMetricInputs
-                                               readSampleData);
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(meanSd);
 
 use Data::Dumper; # FIXME
 
@@ -368,25 +365,6 @@ sub includedSampleCsv {
     return (\@lines, \%metrics);
 }
 
-sub passFailBySample {
-    # evaluate results by metric and find overall pass/fail for each sample
-    my ($self, $resultsRef) = @_;
-    my %results = %{$resultsRef};
-    my %passFail = ();
-    foreach my $sample (keys(%results)) {
-        my %result = %{$results{$sample}};
-        my $samplePass = 1;
-        foreach my $metric (@METRIC_NAMES) {
-            if (!defined($result{$metric})) { next; }
-            my @values = @{$result{$metric}};
-            my $pass = shift @values;
-            if (!$pass) { $samplePass = 0; last; }
-        }
-        $passFail{$sample} = $samplePass;
-    }
-    return %passFail;
-}
-
 sub plateLocations {
     my ($self,) = @_;
     $self->db->connect(RaiseError => 1,
@@ -450,21 +428,6 @@ sub readDuplicates {
         $max{$sample_i} = $maxSim;
     }
     return (\%similarity, \%max);
-}
-
-sub _transpose_results {
-    # convert results from metric-major to sample-major ordering
-    my ($self, $resultsRef) = @_;
-    my %metricResults = %{$resultsRef};
-    my %sampleResults = ();
-    foreach my $metric (keys(%metricResults)) {
-        my %resultsBySample = %{$metricResults{$metric}};
-        foreach my $sample (keys(%resultsBySample)) {
-            my $resultRef = $resultsBySample{$sample};
-            $sampleResults{$sample}{$metric} = $resultRef;
-        }
-    }
-    return \%sampleResults;
 }
 
 sub writeJson {
@@ -923,16 +886,49 @@ sub _results_magnitude {
     return $self->resultsSpaceDelimited($inPath, $index);
 }
 
+sub _transpose_results {
+    # convert results from metric-major to sample-major ordering
+    my ($self, $resultsRef) = @_;
+    my %metricResults = %{$resultsRef};
+    my %sampleResults = ();
+    foreach my $metric (keys(%metricResults)) {
+        my %resultsBySample = %{$metricResults{$metric}};
+        foreach my $sample (keys(%resultsBySample)) {
+            my $resultRef = $resultsBySample{$sample};
+            $sampleResults{$sample}{$metric} = $resultRef;
+        }
+    }
+    return \%sampleResults;
+}
+
 sub resultsSpaceDelimited {
-    # read metric results from a space-delimited file ()
-    # TODO use Text::CSV instead?
+    # read metric results from a space-delimited file
+    # omit any line starting with #
     my ($self, $inPath, $index) = @_;
-    my @data = readSampleData($inPath);
+    my @raw_lines = read_file($inPath);
+    my @lines = grep(!/^[#]/msx, @raw_lines); # remove comments/headers
+    my $csv = Text::CSV->new(
+        { binary   => 1,
+          sep_char => "\t",
+      }
+    );
     my %results;
-    foreach my $ref (@data) {
-        my @fields = @{$ref};
+    foreach my $line (@lines) {
+        my $status = $csv->parse($line);
+        if (! defined $status) {
+            $self->logcroak("Unable to parse space-delimited input line: '",
+                            $line, "'");
+        }
+        my @fields = $csv->fields();
         my $uri = $fields[0];
+        if (! defined $uri) {
+            $self->logcroak("Unable to find URI from input '", $line, "'");
+        }
         my $metric = $fields[$index];
+        if (! defined $metric) {
+            $self->logcroak("Unable to find field index ", $index,
+                            " for line '", $line, "'");
+        }
         $results{$uri} = $metric;
     }
     return \%results;
