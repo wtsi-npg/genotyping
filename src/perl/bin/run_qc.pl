@@ -336,14 +336,6 @@ sub run_qc {
             );
     if ($filter) { $args{'filter_path'} = $filter; }
     my $collator = WTSI::NPG::Genotyping::QC::Collator->new(%args);
-    my $thresholds = $collator->readMetricThresholds($configPath);
-    my @allMetricNames = keys(%{$thresholds});
-    my @metricNames = ();
-    foreach my $metric (@allMetricNames) {
-	if ($intensity || ($metric ne 'magnitude' && $metric ne 'xydiff')) {
-	    push(@metricNames, $metric);
-	}
-    }
     $collator->collate($statusJson, $metricJson, $csvPath);
     ### plot generation ###
     @cmds = ();
