@@ -85,6 +85,13 @@ has 'filter_path' =>
 
 # other attributes, not in init_args
 
+has 'db'  =>
+  (is         => 'ro',
+   isa        => 'WTSI::NPG::Genotyping::Database::Pipeline',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_db');
+
 has 'duplicate_subsets_path' =>
   (is         => 'ro',
    isa        => 'Str',
@@ -98,24 +105,12 @@ has 'duplicate_subsets_path' =>
        'is omitted.'
 );
 
-has 'db'  =>
-  (is         => 'ro',
-   isa        => 'WTSI::NPG::Genotyping::Database::Pipeline',
-   lazy       => 1,
-   init_arg => undef,
-   builder    => '_build_db');
-
-has 'threshold_parameters' =>
+has 'filenames' =>
   (is         => 'ro',
    isa        => 'HashRef',
    lazy       => 1,
    init_arg => undef,
-   builder    => '_build_threshold_parameters',
-   documentation => 'Parameters to determine pass/fail thresholds for '.
-       'each metric. The actual threshold values may vary; for example, '.
-       'some thresholds are defined in terms of standard deviations '.
-       'from the mean.'
-);
+   builder    => '_build_filenames');
 
 has 'metrics' =>
   (is         => 'ro',
@@ -124,12 +119,56 @@ has 'metrics' =>
    init_arg => undef,
    builder    => '_build_metrics');
 
-has 'filenames' =>
+has 'metric_results' =>
+  (is         => 'ro',
+   #isa        => 'HashRef[ArrayRef]', # TODO store ArrayRef for all metrics
+   isa        => 'HashRef',
+   lazy       => 1,
+   init_arg   => undef,
+   builder    => '_build_metric_results',
+   documentation => 'For each metric, generate an ArrayRef with one or '.
+       'more values to represent the metric outcome.'
+);
+
+has 'pass_fail_details' =>
+  (is         => 'ro',
+   isa        => 'HashRef[HashRef]',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_pass_fail_details',
+   documentation => 'Pass/fail status for each sample/metric combination, '.
+       'indexed by sample and metric',
+);
+
+has 'pass_fail_summary' =>
+  (is         => 'ro',
+   isa        => 'HashRef[Bool]',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_pass_fail_summary',
+   documentation => 'Overall pass/fail status for each sample'
+);
+
+has 'thresholds' =>
   (is         => 'ro',
    isa        => 'HashRef',
    lazy       => 1,
    init_arg => undef,
-   builder    => '_build_filenames');
+   builder    => '_build_thresholds',
+   documentation => 'Actual thresholds to determine pass/fail status, '.
+       'which may depend on metric values (eg. if defined in terms of '.
+       'standard deviations from the mean).');
+
+has 'threshold_parameters' =>
+  (is         => 'ro',
+   isa        => 'HashRef',
+   lazy       => 1,
+   init_arg => undef,
+   builder    => '_build_threshold_parameters',
+   documentation => 'Parameters to determine pass/fail thresholds for '.
+       'each metric.'
+);
+
 
 sub addLocations {
     # add plate/well locations to a hash indexed by sample
@@ -258,37 +297,37 @@ sub duplicateSubsets {
     return @subsets;
 }
 
-sub evaluateThresholds {
-    # apply thresholds, evaluate pass/fail status of each sample/metric pair
-    # input a sample-major hash of metric values
-    # return reference to a hash in 'qc_results.json' format (minus plate name and address for each sample)
-    my ($self, $sampleResultsRef, $thresholdsRef) = @_;
-    my %results = %{$sampleResultsRef};
-    my %thresholds = %{$thresholdsRef};
-    my %evaluated = ();
-    foreach my $sample (keys(%results)) {
-        my %result = %{$results{$sample}};
-        foreach my $metric (keys(%result)) {
-            if (!defined($thresholds{$metric})) {
-                $self->logcroak("No thresholds defined for metric '",
-                                $metric, "'");
-            }
-            my $value = $result{$metric};
-            my $pass = $self->metricPass($metric, $value,
-                                         $thresholds{$metric});
-            my @terms = ($pass, );
-            if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
-                push (@terms, @{$value});
-            } elsif ($metric eq $DUP_NAME) {
-                push (@terms, @{$value}[0]);
-            } else {
-                push(@terms, $value);
-            }
-            $evaluated{$sample}{$metric} = \@terms;
-        }
-    }
-    return \%evaluated;
-}
+# sub evaluateThresholds {
+#     # apply thresholds, evaluate pass/fail status of each sample/metric pair
+#     # input a sample-major hash of metric values
+#     # return reference to a hash in 'qc_results.json' format (minus plate name and address for each sample)
+#     my ($self, $sampleResultsRef, $thresholdsRef) = @_;
+#     my %results = %{$sampleResultsRef};
+#     my %thresholds = %{$thresholdsRef};
+#     my %evaluated = ();
+#     foreach my $sample (keys(%results)) {
+#         my %result = %{$results{$sample}};
+#         foreach my $metric (keys(%result)) {
+#             if (!defined($thresholds{$metric})) {
+#                 $self->logcroak("No thresholds defined for metric '",
+#                                 $metric, "'");
+#             }
+#             my $value = $result{$metric};
+#             my $pass = $self->metricPass($metric, $value,
+#                                          $thresholds{$metric});
+#             my @terms = ($pass, );
+#             if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
+#                 push (@terms, @{$value});
+#             } elsif ($metric eq $DUP_NAME) {
+#                 push (@terms, @{$value}[0]);
+#             } else {
+#                 push(@terms, $value);
+#             }
+#             $evaluated{$sample}{$metric} = \@terms;
+#         }
+#     }
+#     return \%evaluated;
+# }
 
 sub excludedSampleCsv {
     # generate CSV lines for samples excluded from pipeline DB
@@ -322,63 +361,6 @@ sub excludedSampleCsv {
         push(@lines, join(',', @fields));
     }
     return \@lines;
-}
-
-sub findMetricResults {
-    # find QC results in metric-major order, return a hash reference
-    # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
-    my ($self,) = @_;
-    my %allResults;
-    foreach my $name (@{$self->metrics}) {
-        my $resultsRef;
-        if ($name eq $CR_NAME) {
-            $resultsRef = $self->resultsCallRate();
-        } elsif ($name eq $DUP_NAME) {
-            $resultsRef = $self->resultsDuplicate();
-        } elsif ($name eq $GENDER_NAME) {
-            $resultsRef = $self->resultsGender();
-        } elsif ($name eq $HET_NAME) {
-            $resultsRef = $self->resultsHet();
-        } elsif ($name eq $HMH_NAME) {
-            $resultsRef = $self->resultsHighMafHet();
-        } elsif ($name eq $ID_NAME) {
-            $resultsRef = $self->resultsIdentity();
-        } elsif ($name eq $LMH_NAME) {
-            $resultsRef = $self->resultsLowMafHet();
-        } elsif ($name eq $MAG_NAME) {
-            $resultsRef = $self->resultsMagnitude();
-        } elsif ($name eq $XYD_NAME) {
-            $resultsRef = $self->resultsXydiff();
-        } else {
-            $self->logcroak("Unknown metric name $name for results: $!");
-        }
-        if ($resultsRef) { $allResults{$name} = $resultsRef; }
-    }
-    return \%allResults;
-}
-
-sub findThresholds {
-    # find threshold values, which may depend on mean/sd of metric values
-    my ($self, $metricResultsRef) = @_;
-    my %metricResults = %{$metricResultsRef};
-    my %thresholds;
-    my @names = keys(%metricResults);
-    foreach my $metric (keys(%metricResults)) {
-        if ($metric eq $HET_NAME || $metric eq $LMH_NAME || $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
-            # find mean/sd for thresholds
-            my %resultsBySample = %{$metricResults{$metric}};
-            my ($mean, $sd) = meanSd(values(%resultsBySample));
-            my $min = $mean - ($self->threshold_parameters->{$metric}*$sd);
-            my $max = $mean + ($self->threshold_parameters->{$metric}*$sd);
-            $thresholds{$metric} = [$min, $max];
-        } elsif ($metric eq $CR_NAME || $metric eq $DUP_NAME || $metric eq $ID_NAME || $metric eq $GENDER_NAME || $metric eq $MAG_NAME ) {
-            $thresholds{$metric} = $self->threshold_parameters->{$metric};
-        } else {
-            $self->logcroak("Unknown metric name '", $metric,
-                            "' for thresholds");
-        }
-    }
-    return \%thresholds;
 }
 
 sub includedSampleCsv {
@@ -425,31 +407,31 @@ sub includedSampleCsv {
     return (\@lines, \%metrics);
 }
 
-sub metricPass {
-    # find pass/fail status for given metric, value, and threshold
-    my ($self, $metric, $value, $threshold) = @_;
-    my $pass = 0;
-    if ($metric eq $CR_NAME || $metric eq $MAG_NAME) {
-        if ($value >= $threshold) { $pass = 1; }
-    } elsif ($metric eq $DUP_NAME) {
-        my ($similarity, $keep) = @{$value};
-        if ($similarity < $threshold || $keep) { $pass = 1; }
-    } elsif ($metric eq $GENDER_NAME) {
-        my ($xhet, $inferred, $supplied) = @{$value};
-        if ($inferred==$supplied) { $pass = 1; }
-    } elsif ($metric eq $HET_NAME || $metric eq $LMH_NAME || 
-                 $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
-        my ($min, $max) = @{$threshold};
-        if ($value >= $min && $value <= $max) { $pass = 1; }
-    } elsif ($metric eq $ID_NAME) {
-        my ($probability, $concordance) = @{$value};
-        if ($value eq 'NA' || $probability > $threshold) { $pass = 1; }
-    } else {
-        $self->logcroak("Unknown metric name '", $metric,
-                        "' for pass/fail evaluation");
-    }
-    return $pass;
-}
+# sub metricPass {
+#     # find pass/fail status for given metric, value, and threshold
+#     my ($self, $metric, $value, $threshold) = @_;
+#     my $pass = 0;
+#     if ($metric eq $CR_NAME || $metric eq $MAG_NAME) {
+#         if ($value >= $threshold) { $pass = 1; }
+#     } elsif ($metric eq $DUP_NAME) {
+#         my ($similarity, $keep) = @{$value};
+#         if ($similarity < $threshold || $keep) { $pass = 1; }
+#     } elsif ($metric eq $GENDER_NAME) {
+#         my ($xhet, $inferred, $supplied) = @{$value};
+#         if ($inferred==$supplied) { $pass = 1; }
+#     } elsif ($metric eq $HET_NAME || $metric eq $LMH_NAME || 
+#                  $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
+#         my ($min, $max) = @{$threshold};
+#         if ($value >= $min && $value <= $max) { $pass = 1; }
+#     } elsif ($metric eq $ID_NAME) {
+#         my ($probability, $concordance) = @{$value};
+#         if ($value eq 'NA' || $probability > $threshold) { $pass = 1; }
+#     } else {
+#         $self->logcroak("Unknown metric name '", $metric,
+#                         "' for pass/fail evaluation");
+#     }
+#     return $pass;
+# }
 
 sub passFailBySample {
     # evaluate results by metric and find overall pass/fail for each sample
@@ -535,183 +517,7 @@ sub readDuplicates {
     return (\%similarity, \%max);
 }
 
-sub resultsCallRate {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'call_rate'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for call rate '",
-                        $inPath, "' does not exist");
-    }
-    my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
-}
-
-sub resultsDuplicate {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for duplicates '",
-                        $inPath, "' does not exist");
-    }
-    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
-    my @subsets = $self->duplicateSubsets($simRef);
-    my %max = %{$maxRef};
-    # read call rates and find keep/discard status
-    my %cr = %{$self->resultsCallRate()};
-    my %results;
-    foreach my $subsetRef (@subsets) {
-        my $maxCR = 0;
-        my @subset = @{$subsetRef};
-        # first pass -- find highest CR
-        foreach my $sample (@subset) {
-            if ($cr{$sample} > $maxCR) { $maxCR = $cr{$sample}; }
-        }
-        # second pass -- record sample status
-        # may keep more than one sample if there is a tie for greatest CR
-        foreach my $sample (@subset) {
-            my $keep = 0;
-            if ($cr{$sample} eq $maxCR) { $keep = 1; }
-            $results{$sample} = [$max{$sample}, $keep];
-        }
-    }
-    if ($self->duplicate_subsets_path) {
-        my %output;
-        $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
-        $output{$DUPLICATE_RESULTS_KEY} = \%results;
-        open my $out, ">", $self->duplicate_subsets_path ||
-            $self->logcroak("Cannot open output '",
-                            self->duplicate_subsets_path, "'");
-        print $out to_json(\%output);
-        close $out ||
-            $self->logcroak("Cannot close output '",
-                            self->duplicate_subsets_path, "'");
-
-    }
-    return \%results;
-}
-
-sub resultsGender {
-    # read gender results from sample_xhet_gender.txt
-    # 'metric value' is concatenation of inferred, supplied gender codes
-    # $threshold not used
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'gender'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for gender '",
-                        $inPath, "' does not exist");
-    }
-    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
-    my %results;
-    foreach my $ref (@data) {
-        my ($sample, $xhet, $inferred, $supplied) = @$ref;
-        $results{$sample} = [$xhet, $inferred, $supplied];
-    }
-    return \%results;
-}
-
-sub resultsHet {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'heterozygosity'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for heterozygosity '",
-                        $inPath, "' does not exist");
-    }
-    my $index = 2;
-    return $self->resultsSpaceDelimited($inPath, $index);
-}
-
-sub resultsHighMafHet {
-    my ($self, ) = @_;
-    return $self->resultsMafHet(1);
-}
-
-sub resultsIdentity {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'identity'};
-    my $resultsRef;
-    if (-e $inPath) {
-        # read identity results from JSON file
-        my %data = %{decode_json(read_file($inPath))};
-        my @sample_results = @{$data{'identity'}};
-        my %results;
-        foreach my $result (@sample_results) {
-            my $name = $result->{'sample_name'};
-            my $concordance = $result->{'concordance'};
-            my $identity = $result->{'identity'};
-            $results{$name} = [$identity, $concordance];
-        }
-        $resultsRef = \%results;
-    } else {
-        $self->info("Omitting identity metric; expected identity JSON path '",
-                    $inPath, "' does not exist");
-    }
-    return $resultsRef;
-}
-
-sub resultsLowMafHet {
-    my ($self, ) = @_;
-    return $self->resultsMafHet(0);
-}
-
-sub resultsMafHet {
-    # read JSON file output by Plinktools het_by_maf.py
-    my ($self, $high) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'het_by_maf'};
-    if (!(-r $inPath)) {
-        $self->info("Omitting MAF heterozygosity; cannot read input '",
-                    $inPath, "'");
-        return 0;
-    }
-    my %data = %{decode_json(read_file($inPath))};
-    my %results;
-    foreach my $sample (keys(%data)) {
-        # TODO modify output format of het_by_maf.py
-        if ($high) { $results{$sample} = $data{$sample}{'high_maf_het'}[1]; }
-        else { $results{$sample} = $data{$sample}{'low_maf_het'}[1]; }
-    }
-    return \%results;
-}
-
-sub resultsMagnitude {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'magnitude'};
-    if (!(-e $inPath)) {
-        $self->info("Omitting magnitude; input '", $inPath,
-                    "' does not exist");
-        return 0; # magnitude of intensity is optional
-    }
-    my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
-}
-
-sub resultsSpaceDelimited {
-    # read metric results from a space-delimited file ()
-    # TODO use Text::CSV instead?
-    my ($self, $inPath, $index) = @_;
-    my @data = readSampleData($inPath);
-    my %results;
-    foreach my $ref (@data) {
-        my @fields = @{$ref};
-        my $uri = $fields[0];
-        my $metric = $fields[$index];
-        $results{$uri} = $metric;
-    }
-    return \%results;
-}
-
-sub resultsXydiff {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'xydiff'};
-    if (!(-e $inPath)) { 
-        $self->info("Omitting xydiff; input '", $inPath,
-                    "' does not exist");
-        return 0;
-    }
-    my $index = 1;
-    return $self->resultsSpaceDelimited($inPath, $index);
-}
-
-sub transposeResults {
+sub _transpose_results {
     # convert results from metric-major to sample-major ordering
     my ($self, $resultsRef) = @_;
     my %metricResults = %{$resultsRef};
@@ -726,25 +532,25 @@ sub transposeResults {
     return \%sampleResults;
 }
 
-sub updateDatabase {
-    # update pipeline db with pass/fail of each sample
-    my ($self, $passRef) = @_;
-    my %samplePass = %{$passRef};
-    # samples which were previously excluded should *remain* excluded
+# sub updateDatabaseOLD {
+#     # update pipeline db with pass/fail of each sample
+#     my ($self, $passRef) = @_;
+#     my %samplePass = %{$passRef};
+#     # samples which were previously excluded should *remain* excluded
 
-    $self->db->connect(RaiseError => 1,
-                       on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @samples = $self->db->sample->all;
-    $self->db->in_transaction(sub {
-                                  foreach my $sample (@samples) {
-                                      my $uri = $sample->uri;
-                                      if (!($samplePass{$uri})) {
-                                          $sample->update({'include' => 0});
-                                      }
-                                  }
-                              });
-    $self->db->disconnect();
-}
+#     $self->db->connect(RaiseError => 1,
+#                        on_connect_do => 'PRAGMA foreign_keys = ON');
+#     my @samples = $self->db->sample->all;
+#     $self->db->in_transaction(sub {
+#                                   foreach my $sample (@samples) {
+#                                       my $uri = $sample->uri;
+#                                       if (!($samplePass{$uri})) {
+#                                           $sample->update({'include' => 0});
+#                                       }
+#                                   }
+#                               });
+#     $self->db->disconnect();
+# }
 
 sub writeCsv {
     # write a .csv file summarizing metrics and pass/fail status
@@ -810,39 +616,84 @@ sub writeJson {
     return 1;
 }
 
+
+sub updateDatabase {
+
+   my ($self, $passRef) = @_;
+    my %samplePass = %{$passRef};
+    # samples which were previously excluded should *remain* excluded
+
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
+    $self->db->in_transaction(sub {
+                                  foreach my $sample (@samples) {
+                                      my $uri = $sample->uri;
+                                      if (!($samplePass{$uri})) {
+                                          $sample->update({'include' => 0});
+                                      }
+                                  }
+                              });
+    $self->db->disconnect();
+
+}
+
+# sub writeCsv {
+
+# }
+
+# sub writeMetricJson {
+
+# }
+
+
+# sub writeStatusJson {
+#     my ($self, $outPath) = @_;
+
+# }
+
+
 sub collate {
     # main method to collate results and write outputs
     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
+
+    # TODO Supply only one config file (instead of separate config/filter files). Separate methods to write JSON, write CSV, and exclude samples from DB.
+
+    # TODO new attributes: metric values, thresholds, sample pass/fail
+
     my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
     $self->debug("Started collating QC results for input ", $self->input_dir);
 
     # 1) find metric values (and write to file if required)
-    my $metricResultsRef = $self->findMetricResults();
-    my $sampleResultsRef = $self->transposeResults($metricResultsRef);
+    #my $metricResultsRef = $self->findMetricResults();
+    my $sampleResultsRef = $self->_transpose_results($self->metric_results);
     $self->debug("Found metric values.");
-    if ($metricsJson) { $self->writeJson($metricsJson, $sampleResultsRef);  }
+    if ($metricsJson) {
+        $self->writeJson($metricsJson, $sampleResultsRef);
+    }
     if ($statusJson || $csvPath || $exclude) {
         # if output options require evaluation of thresholds
         # 2) apply filters to find pass/fail status
-        my $thresholds = $self->findThresholds($metricResultsRef);
-        my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
-                                                      $thresholds);
+        #my $thresholds = $self->findThresholds($metricResultsRef);
+        #my $passResultRef = $self->evaluateThresholds($sampleResultsRef,
+        #                                              $thresholds);
         $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
-        $passResultRef = $self->addLocations($passResultRef);
+        my $passResultRef = $self->addLocations($self->pass_fail_details);
         $self->writeJson($statusJson, $passResultRef);
         $self->debug("Wrote status JSON file $statusJson.");
 
         # 4) write CSV (if required)
-        my %samplePass = $self->passFailBySample($passResultRef);
+        #my %samplePass = $self->passFailBySample($passResultRef);
         if ($csvPath) {
-            $self->writeCsv($csvPath, $passResultRef, \%samplePass);
+            $self->writeCsv($csvPath, $passResultRef,
+                            $self->pass_fail_summary);
             $self->debug("Wrote CSV $csvPath.");
         }
 
         # 5) exclude failing samples in pipeline DB (if required)
-        if ($exclude) { $self->updateDatabase(\%samplePass); }
+        if ($exclude) { $self->updateDatabase($self->pass_fail_summary); }
         $self->debug("Updated pipeline DB.");
     }
 }
@@ -862,12 +713,110 @@ sub _build_filenames {
     return $config->{'collation_names'};
 }
 
-
 sub _build_metrics {
     my ($self,) = @_;
     my @metrics = keys %{$self->threshold_parameters};
     @metrics = sort @metrics;
     return \@metrics;
+}
+
+sub _build_metric_results {
+    # find QC results in metric-major order, return a hash reference
+    # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
+    my ($self,) = @_;
+    my %allResults;
+    foreach my $name (@{$self->metrics}) {
+        my $resultsRef;
+        if ($name eq $CR_NAME) {
+            $resultsRef = $self->_results_call_rate();
+        } elsif ($name eq $DUP_NAME) {
+            $resultsRef = $self->_results_duplicate();
+        } elsif ($name eq $GENDER_NAME) {
+            $resultsRef = $self->_results_gender();
+        } elsif ($name eq $HET_NAME) {
+            $resultsRef = $self->_results_het();
+        } elsif ($name eq $HMH_NAME) {
+            $resultsRef = $self->_results_high_maf_het();
+        } elsif ($name eq $ID_NAME) {
+            $resultsRef = $self->_results_identity();
+        } elsif ($name eq $LMH_NAME) {
+            $resultsRef = $self->_results_low_maf_het();
+        } elsif ($name eq $MAG_NAME) {
+            $resultsRef = $self->_results_magnitude();
+        } elsif ($name eq $XYD_NAME) {
+            $resultsRef = $self->_results_xydiff();
+        } else {
+            $self->logcroak("Unknown metric name $name for results: $!");
+        }
+        if ($resultsRef) { $allResults{$name} = $resultsRef; }
+    }
+    return \%allResults;
+}
+
+sub _build_pass_fail_details {
+    my ($self, ) = @_;
+    my $results = $self->_transpose_results($self->metric_results);
+    my %evaluated = ();
+    foreach my $sample (keys(%{$results})) {
+        foreach my $metric (keys(%{$results->{$sample}})) {
+            my $value = $results->{$sample}->{$metric};
+            my $threshold = $self->thresholds->{$metric};
+            if (!defined($threshold)) {
+                $self->logcroak("No threshold defined for metric '",
+                                $metric, "'");
+            }
+            my $pass = 0;
+            if ($metric eq $CR_NAME || $metric eq $MAG_NAME) {
+                if ($value >= $threshold) { $pass = 1; }
+            } elsif ($metric eq $DUP_NAME) {
+                my ($similarity, $keep) = @{$value};
+                if ($similarity < $threshold || $keep) { $pass = 1; }
+            } elsif ($metric eq $GENDER_NAME) {
+                my ($xhet, $inferred, $supplied) = @{$value};
+                if ($inferred==$supplied) { $pass = 1; }
+            } elsif ($metric eq $HET_NAME || $metric eq $LMH_NAME || 
+                         $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
+                my ($min, $max) = @{$threshold};
+                if ($value >= $min && $value <= $max) { $pass = 1; }
+            } elsif ($metric eq $ID_NAME) {
+                my ($probability, $concordance) = @{$value};
+                if ($value eq 'NA' || $probability > $threshold) {
+                    $pass = 1;
+                }
+            } else {
+                $self->logcroak("Unknown metric name '", $metric,
+                                "' for pass/fail evaluation");
+            }
+            my @terms = ($pass, );
+            if ($metric eq $GENDER_NAME || $metric eq $ID_NAME) {
+                push (@terms, @{$value});
+            } elsif ($metric eq $DUP_NAME) {
+                push (@terms, @{$value}[0]);
+            } else {
+                push(@terms, $value);
+            }
+            $evaluated{$sample}{$metric} = \@terms;
+        }
+    }
+    return \%evaluated;
+}
+
+sub _build_pass_fail_summary {
+    my ($self,) = @_;
+    my %results = %{$self->pass_fail_details};
+    my %passFail = ();
+    foreach my $sample (keys(%results)) {
+        my %result = %{$results{$sample}};
+        my $samplePass = 1;
+        foreach my $metric (@METRIC_NAMES) {
+            if (!defined($result{$metric})) { next; }
+            my @values = @{$result{$metric}};
+            my $pass = shift @values;
+            if (!$pass) { $samplePass = 0; last; }
+        }
+        $passFail{$sample} = $samplePass;
+    }
+    return \%passFail;
 }
 
 sub _build_threshold_parameters {
@@ -881,6 +830,34 @@ sub _build_threshold_parameters {
     }
     my $config = decode_json(read_file($input_path));
     return $config->{'Metrics_thresholds'};
+}
+
+sub _build_thresholds {
+    # find threshold values, which may depend on mean/sd of metric values
+    my ($self, ) = @_;
+    my %metricResults = %{$self->metric_results};
+    my %thresholds;
+    my @names = keys(%metricResults);
+    foreach my $metric (keys(%metricResults)) {
+        if ($metric eq $HET_NAME || $metric eq $LMH_NAME ||
+                $metric eq $HMH_NAME || $metric eq $XYD_NAME) {
+            # find mean/sd for thresholds
+            my %resultsBySample = %{$metricResults{$metric}};
+            my ($mean, $sd) = meanSd(values(%resultsBySample));
+            my $min = $mean - ($self->threshold_parameters->{$metric}*$sd);
+            my $max = $mean + ($self->threshold_parameters->{$metric}*$sd);
+            $thresholds{$metric} = [$min, $max];
+        } elsif ($metric eq $CR_NAME || $metric eq $DUP_NAME ||
+                     $metric eq $ID_NAME || $metric eq $GENDER_NAME ||
+                     $metric eq $MAG_NAME ) {
+            $thresholds{$metric} = $self->threshold_parameters->{$metric};
+        } else {
+            $self->logcroak("Unknown metric name '", $metric,
+                            "' for thresholds");
+        }
+    }
+    return \%thresholds;
+
 }
 
 sub _getBySampleName {
@@ -900,6 +877,183 @@ sub _getBySampleName {
         }
     }
 }
+
+sub _results_call_rate {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'call_rate'};
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for call rate '",
+                        $inPath, "' does not exist");
+    }
+    my $index = 1;
+    return $self->resultsSpaceDelimited($inPath, $index);
+}
+
+sub _results_duplicate {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for duplicates '",
+                        $inPath, "' does not exist");
+    }
+    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
+    my @subsets = $self->duplicateSubsets($simRef);
+    my %max = %{$maxRef};
+    # read call rates and find keep/discard status
+    my %cr = %{$self->_results_call_rate()};
+    my %results;
+    foreach my $subsetRef (@subsets) {
+        my $maxCR = 0;
+        my @subset = @{$subsetRef};
+        # first pass -- find highest CR
+        foreach my $sample (@subset) {
+            if ($cr{$sample} > $maxCR) { $maxCR = $cr{$sample}; }
+        }
+        # second pass -- record sample status
+        # may keep more than one sample if there is a tie for greatest CR
+        foreach my $sample (@subset) {
+            my $keep = 0;
+            if ($cr{$sample} eq $maxCR) { $keep = 1; }
+            $results{$sample} = [$max{$sample}, $keep];
+        }
+    }
+    if ($self->duplicate_subsets_path) {
+        my %output;
+        $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
+        $output{$DUPLICATE_RESULTS_KEY} = \%results;
+        open my $out, ">", $self->duplicate_subsets_path ||
+            $self->logcroak("Cannot open output '",
+                            self->duplicate_subsets_path, "'");
+        print $out to_json(\%output);
+        close $out ||
+            $self->logcroak("Cannot close output '",
+                            self->duplicate_subsets_path, "'");
+
+    }
+    return \%results;
+}
+
+sub _results_gender {
+    # read gender results from sample_xhet_gender.txt
+    # 'metric value' is concatenation of inferred, supplied gender codes
+    # $threshold not used
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'gender'};
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for gender '",
+                        $inPath, "' does not exist");
+    }
+    my @data = WTSI::NPG::Genotyping::QC::QCPlotShared::readSampleData($inPath, 1); # skip header on line 0
+    my %results;
+    foreach my $ref (@data) {
+        my ($sample, $xhet, $inferred, $supplied) = @$ref;
+        $results{$sample} = [$xhet, $inferred, $supplied];
+    }
+    return \%results;
+}
+
+sub _results_het {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'heterozygosity'};
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for heterozygosity '",
+                        $inPath, "' does not exist");
+    }
+    my $index = 2;
+    return $self->resultsSpaceDelimited($inPath, $index);
+}
+
+sub _results_high_maf_het {
+    my ($self, ) = @_;
+    return $self->resultsMafHet(1);
+}
+
+sub _results_identity {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'identity'};
+    my $resultsRef;
+    if (-e $inPath) {
+        # read identity results from JSON file
+        my %data = %{decode_json(read_file($inPath))};
+        my @sample_results = @{$data{'identity'}};
+        my %results;
+        foreach my $result (@sample_results) {
+            my $name = $result->{'sample_name'};
+            my $concordance = $result->{'concordance'};
+            my $identity = $result->{'identity'};
+            $results{$name} = [$identity, $concordance];
+        }
+        $resultsRef = \%results;
+    } else {
+        $self->info("Omitting identity metric; expected identity JSON path '",
+                    $inPath, "' does not exist");
+    }
+    return $resultsRef;
+}
+
+sub _results_low_maf_het {
+    my ($self, ) = @_;
+    return $self->resultsMafHet(0);
+}
+
+sub _results_maf_het {
+    # read JSON file output by Plinktools het_by_maf.py
+    my ($self, $high) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'het_by_maf'};
+    if (!(-r $inPath)) {
+        $self->info("Omitting MAF heterozygosity; cannot read input '",
+                    $inPath, "'");
+        return 0;
+    }
+    my %data = %{decode_json(read_file($inPath))};
+    my %results;
+    foreach my $sample (keys(%data)) {
+        # TODO modify output format of het_by_maf.py
+        if ($high) { $results{$sample} = $data{$sample}{'high_maf_het'}[1]; }
+        else { $results{$sample} = $data{$sample}{'low_maf_het'}[1]; }
+    }
+    return \%results;
+}
+
+sub _results_magnitude {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'magnitude'};
+    if (!(-e $inPath)) {
+        $self->info("Omitting magnitude; input '", $inPath,
+                    "' does not exist");
+        return 0; # magnitude of intensity is optional
+    }
+    my $index = 1;
+    return $self->resultsSpaceDelimited($inPath, $index);
+}
+
+sub resultsSpaceDelimited {
+    # read metric results from a space-delimited file ()
+    # TODO use Text::CSV instead?
+    my ($self, $inPath, $index) = @_;
+    my @data = readSampleData($inPath);
+    my %results;
+    foreach my $ref (@data) {
+        my @fields = @{$ref};
+        my $uri = $fields[0];
+        my $metric = $fields[$index];
+        $results{$uri} = $metric;
+    }
+    return \%results;
+}
+
+sub _results_xydiff {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'xydiff'};
+    if (!(-e $inPath)) { 
+        $self->info("Omitting xydiff; input '", $inPath,
+                    "' does not exist");
+        return 0;
+    }
+    my $index = 1;
+    return $self->resultsSpaceDelimited($inPath, $index);
+}
+
 
 no Moose;
 
