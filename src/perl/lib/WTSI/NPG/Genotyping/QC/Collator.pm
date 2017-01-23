@@ -76,13 +76,6 @@ has 'config_path' =>
    documentation => 'Path to a JSON file with required parameters.'
 );
 
-has 'filter_path' =>
-  (is         => 'ro',
-   isa        => 'Str',
-   documentation => 'Path to a JSON file with parameters to determine '.
-       'sample exclusion. Optional, overrides values in config_path.'
-);
-
 # other attributes, not in init_args
 
 has 'db'  =>
@@ -731,14 +724,7 @@ sub _build_pass_fail_summary {
 
 sub _build_threshold_parameters {
     my ($self,) = @_;
-    my %thresholds;
-    my $input_path;
-    if (defined($self->filter_path)) {
-        $input_path = $self->filter_path;
-    } else {
-        $input_path = $self->config_path;
-    }
-    my $config = decode_json(read_file($input_path));
+    my $config = decode_json(read_file($self->config_path));
     return $config->{'Metrics_thresholds'};
 }
 
