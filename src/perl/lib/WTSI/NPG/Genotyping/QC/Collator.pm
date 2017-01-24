@@ -34,8 +34,6 @@ our $MAG_NAME = 'magnitude';
 our $LMH_NAME = 'low_maf_het';
 our $HMH_NAME = 'high_maf_het';
 # standard order for metric names
-our @METRIC_NAMES = ($ID_NAME, $DUP_NAME, $GENDER_NAME, $CR_NAME, 
-             $HET_NAME, $LMH_NAME, $HMH_NAME, $MAG_NAME, $XYD_NAME);
 our @GENDERS = ('Unknown', 'Male', 'Female', 'Not_Available');
 our $DUPLICATE_SUBSETS_KEY = 'SUBSETS';
 our $DUPLICATE_RESULTS_KEY = 'RESULTS';
@@ -102,12 +100,12 @@ has 'filenames' =>
    init_arg => undef,
    builder    => '_build_filenames');
 
-has 'metrics' =>
+has 'metric_names' =>
   (is         => 'ro',
    isa        => 'ArrayRef',
    lazy       => 1,
    init_arg => undef,
-   builder    => '_build_metrics');
+   builder    => '_build_metric_names');
 
 has 'metric_results' =>
   (is         => 'ro',
@@ -302,7 +300,7 @@ sub excludedSampleCsv {
         push(@fields, $sample);
         push(@fields, 'Excluded'); 
         @fields = $self->appendNull(\@fields, 3); # null plate, well, pass
-        foreach my $name (@METRIC_NAMES) {
+        foreach my $name (@{$self->metric_names}) {
             if (!$metrics{$name}) {
                 next;
             } elsif ($name eq $GENDER_NAME) {
@@ -343,7 +341,7 @@ sub includedSampleCsv {
         if ($samplePass{$sample}) { push(@fields, 'Pass'); }
         else { push(@fields, 'Fail'); }
         # now add relevant metric values
-        foreach my $metric (@METRIC_NAMES) {
+        foreach my $metric (@{$self->metric_names}) {
             if (!defined($result{$metric})) { next; }
             $metrics{$metric} = 1;
             my @metricResult = @{$result{$metric}}; # pass/fail, value(s)
@@ -491,7 +489,7 @@ sub writeCsv {
     # use %metrics to construct appropriate CSV header
     my @headers = qw/run project data_supplier snpset rowcol beadchip_number
                      supplier_name cohort sample include plate well pass/;
-    foreach my $name (@METRIC_NAMES) {
+    foreach my $name (@{$self->metric_names}) {
         my @suffixes;
         if (!$metrics{$name}) {
             next;
@@ -579,10 +577,17 @@ sub _build_filenames {
     return $config->{'collation_names'};
 }
 
-sub _build_metrics {
+sub _build_metric_names {
     my ($self,) = @_;
-    my @metrics = keys %{$self->threshold_parameters};
-    @metrics = sort @metrics;
+    my @metrics;
+    my @ordered_metrics = ($ID_NAME, $DUP_NAME, $GENDER_NAME, $CR_NAME,
+                           $HET_NAME, $LMH_NAME, $HMH_NAME, $MAG_NAME,
+                           $XYD_NAME);
+    foreach my $metric (@ordered_metrics) {
+        if (defined $self->threshold_parameters->{$metric}) {
+            push @metrics, $metric;
+        }
+    }
     return \@metrics;
 }
 
@@ -591,7 +596,7 @@ sub _build_metric_results {
     # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
     my ($self,) = @_;
     my %allResults;
-    foreach my $name (@{$self->metrics}) {
+    foreach my $name (@{$self->metric_names}) {
         my $resultsRef;
         if ($name eq $CR_NAME) {
             $resultsRef = $self->_results_call_rate();
@@ -674,7 +679,7 @@ sub _build_pass_fail_summary {
     foreach my $sample (keys(%results)) {
         my %result = %{$results{$sample}};
         my $samplePass = 1;
-        foreach my $metric (@METRIC_NAMES) {
+        foreach my $metric (@{$self->metric_names}) {
             if (!defined($result{$metric})) { next; }
             my @values = @{$result{$metric}};
             my $pass = shift @values;
@@ -737,6 +742,39 @@ sub _getBySampleName {
     }
 }
 
+sub _read_tab_delimited_column {
+    # read metric results from a tab-delimited file
+    # omit any line starting with #
+    my ($self, $inPath, $index) = @_;
+    my @raw_lines = read_file($inPath);
+    my @lines = grep(!/^[#]/msx, @raw_lines); # remove comments/headers
+    my $csv = Text::CSV->new(
+        { binary   => 1,
+          sep_char => "\t",
+      }
+    );
+    my %results;
+    foreach my $line (@lines) {
+        my $status = $csv->parse($line);
+        if (! defined $status) {
+            $self->logcroak("Unable to parse tab-delimited input line: '",
+                            $line, "'");
+        }
+        my @fields = $csv->fields();
+        my $uri = $fields[0];
+        if (! defined $uri) {
+            $self->logcroak("Unable to find URI from input '", $line, "'");
+        }
+        my $metric = $fields[$index];
+        if (! defined $metric) {
+            $self->logcroak("Unable to find field index ", $index,
+                            " for line '", $line, "'");
+        }
+        $results{$uri} = $metric;
+    }
+    return \%results;
+}
+
 sub _results_call_rate {
     my ($self, ) = @_;
     my $inPath = $self->input_dir.'/'.$self->filenames->{'call_rate'};
@@ -745,7 +783,7 @@ sub _results_call_rate {
                         $inPath, "' does not exist");
     }
     my $index = 1;
-    return $self->resultsTabDelimited($inPath, $index);
+    return $self->_read_tab_delimited_column($inPath, $index);
 }
 
 sub _results_duplicate {
@@ -819,7 +857,7 @@ sub _results_het {
                         $inPath, "' does not exist");
     }
     my $index = 2;
-    return $self->resultsTabDelimited($inPath, $index);
+    return $self->_read_tab_delimited_column($inPath, $index);
 }
 
 sub _results_high_maf_het {
@@ -883,7 +921,19 @@ sub _results_magnitude {
         return 0; # magnitude of intensity is optional
     }
     my $index = 1;
-    return $self->resultsTabDelimited($inPath, $index);
+    return $self->_read_tab_delimited_column($inPath, $index);
+}
+
+sub _results_xydiff {
+    my ($self, ) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'xydiff'};
+    if (!(-e $inPath)) { 
+        $self->info("Omitting xydiff; input '", $inPath,
+                    "' does not exist");
+        return 0;
+    }
+    my $index = 1;
+    return $self->_read_tab_delimited_column($inPath, $index);
 }
 
 sub _transpose_results {
@@ -901,50 +951,6 @@ sub _transpose_results {
     return \%sampleResults;
 }
 
-sub resultsTabDelimited {
-    # read metric results from a tab-delimited file
-    # omit any line starting with #
-    my ($self, $inPath, $index) = @_;
-    my @raw_lines = read_file($inPath);
-    my @lines = grep(!/^[#]/msx, @raw_lines); # remove comments/headers
-    my $csv = Text::CSV->new(
-        { binary   => 1,
-          sep_char => "\t",
-      }
-    );
-    my %results;
-    foreach my $line (@lines) {
-        my $status = $csv->parse($line);
-        if (! defined $status) {
-            $self->logcroak("Unable to parse space-delimited input line: '",
-                            $line, "'");
-        }
-        my @fields = $csv->fields();
-        my $uri = $fields[0];
-        if (! defined $uri) {
-            $self->logcroak("Unable to find URI from input '", $line, "'");
-        }
-        my $metric = $fields[$index];
-        if (! defined $metric) {
-            $self->logcroak("Unable to find field index ", $index,
-                            " for line '", $line, "'");
-        }
-        $results{$uri} = $metric;
-    }
-    return \%results;
-}
-
-sub _results_xydiff {
-    my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'xydiff'};
-    if (!(-e $inPath)) { 
-        $self->info("Omitting xydiff; input '", $inPath,
-                    "' does not exist");
-        return 0;
-    }
-    my $index = 1;
-    return $self->resultsTabDelimited($inPath, $index);
-}
 
 
 no Moose;
