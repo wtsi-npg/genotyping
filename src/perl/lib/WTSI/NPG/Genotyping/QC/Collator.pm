@@ -158,92 +158,6 @@ has 'threshold_parameters' =>
 );
 
 
-sub addLocations {
-    # add plate/well locations to a hash indexed by sample
-    my ($self, $samplesRef) = @_;
-    my %samples = %{$samplesRef};
-    my ($dbPath, $iniPath) = @_;
-    my %plateLocs = $self->plateLocations();
-    foreach my $uri (keys %samples) {
-        my %results = %{$samples{$uri}};
-        my $locsRef = $plateLocs{$uri};
-        if (defined($locsRef)) {
-            # samples with unknown location will have dummy values in hash
-            my ($plate, $addressLabel) = @$locsRef;
-            $results{'plate'} = $plate;
-            $results{'address'} = $addressLabel;
-            $samples{$uri} = \%results;
-        } else {
-            # excluded sample has *no* location value
-            $self->logwarn('Excluded sample URI ', $uri,
-                           'is in QC metric data');
-        }
-    }
-    return \%samples;
-}
-
-sub appendNull {
-    # append 'NA' values to given list
-    my ($self, $arrayRef, $nullTotal) = @_;
-    my @array = @{$arrayRef};
-    for (my $i=0;$i<$nullTotal;$i++) {
-        push(@array, 'NA');
-    }
-    return @array;
-}
-
-sub dbExcludedSamples {
-    # find list of excluded sample URIs from database
-    # use to fill in empty lines for CSV file
-    my ($self, ) = @_;
-    my @excluded;
-    $self->db->connect(RaiseError => 1,
-                       on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @samples = $self->db->sample->all;
-    foreach my $sample (@samples) {
-        if (!($sample->include)) {
-            push @excluded, $sample->uri;
-        }
-    }
-    $self->db->disconnect();
-    return @excluded;
-}
-
-sub dbSampleInfo {
-    # get general information on analysis run from pipeline database
-    # return a hash indexed by sample
-    my ($self, ) = @_;
-    my %sampleInfo;
-    $self->db->connect(RaiseError => 1,
-                       on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @runs = $self->db->piperun->all;
-    foreach my $run (@runs) {
-        my @root;
-        my @datasets = $run->datasets->all;
-        foreach my $dataset (@datasets) {
-            my @samples = $dataset->samples->all;
-            @root = ($run->name, $dataset->if_project,
-                     $dataset->datasupplier->name,
-                     $dataset->snpset->name);
-            # query for rowcol, supplier name, chip no.
-            foreach my $sample (@samples) {
-                my @info = (
-                    $sample->rowcol,
-                    $sample->beadchip,
-                    $sample->supplier_name,
-                    $sample->cohort);
-                foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
-                    if ($info[$i] eq "") { $info[$i] = "NA"; }
-                }
-                unshift(@info, @root);
-                $sampleInfo{$sample->uri} = \@info;
-            }
-        }
-    }
-    $self->db->disconnect();
-    return %sampleInfo;
-}
-
 sub duplicateSubsets {
     # Find *connected subsets* of the duplicate pairs:
     # if A<->B and B<->C then A~B, B~C and A~C
@@ -299,19 +213,19 @@ sub excludedSampleCsv {
         my @fields = @{$sampleInfo{$sample}};
         push(@fields, $sample);
         push(@fields, 'Excluded'); 
-        @fields = $self->appendNull(\@fields, 3); # null plate, well, pass
+        @fields = $self->_append_null(\@fields, 3); # null plate, well, pass
         foreach my $name (@{$self->metric_names}) {
             if (!$metrics{$name}) {
                 next;
             } elsif ($name eq $GENDER_NAME) {
                 # pass/fail, metric triple
-                @fields = $self->appendNull(\@fields, 4);
+                @fields = $self->_append_null(\@fields, 4);
             } elsif ($name eq $ID_NAME) {
                 # pass/fail, metric double
-                @fields = $self->appendNull(\@fields, 3);
+                @fields = $self->_append_null(\@fields, 3);
             } else {
                 # pass/fail, metric
-                @fields = $self->appendNull(\@fields, 2);
+                @fields = $self->_append_null(\@fields, 2);
             }
         }
         push(@lines, join(',', @fields));
@@ -363,40 +277,6 @@ sub includedSampleCsv {
     return (\@lines, \%metrics);
 }
 
-sub plateLocations {
-    my ($self,) = @_;
-    $self->db->connect(RaiseError => 1,
-                       on_connect_do => 'PRAGMA foreign_keys = ON');
-    my @samples = $self->db->sample->all;
-    my %plateLocs;
-    $self->db->in_transaction(
-        sub {
-            foreach my $sample (@samples) {
-                my ($plate, $x, $y) = (0,0,0);
-                my $uri = $sample->uri;
-                if (!defined($uri)) {
-                    $self->logwarn("Sample '$sample' has no uri!");
-                next;
-                } elsif ($sample->include == 0) {
-                    next; # excluded sample
-                }
-                # assume one well per sample
-                my $well = ($sample->wells->all)[0];
-                if (defined($well)) { 
-                    my $address = $well->address;
-                    my $label = $address->label1;
-                    $plate = $well->plate;
-                    my $plateName = $plate->ss_barcode;
-                    $plateLocs{$uri} = [$plateName, $label];
-                } else {
-                    $plateLocs{$uri} = [$UNKNOWN_PLATE, $UNKNOWN_ADDRESS];
-                }
-            }
-        });
-    $self->db->disconnect();
-    return %plateLocs;
-}
-
 sub readDuplicates {
     # read pairwise similarities for duplicate check from gzipped file
     # also find maximum pairwise similarity for each sample
@@ -428,16 +308,6 @@ sub readDuplicates {
     return (\%similarity, \%max);
 }
 
-sub writeJson {
-    # open a file, and write the given reference in JSON format
-    my ($self, $outPath, $dataRef) = @_;
-    my $resultString = encode_json($dataRef);
-    open my $out, ">", $outPath ||
-        $self->logcroak("Cannot open output path '$outPath'");
-    print $out $resultString;
-    close($out) || $self->logcroak("Cannot close output path '$outPath'");
-    return 1;
-}
 
 
 sub excludeFailedSamples {
@@ -463,10 +333,10 @@ sub excludeFailedSamples {
 
 sub writeCsv {
     my ($self, $outPath) = @_;
-    my %passResult = %{$self->addLocations($self->pass_fail_details)};
+    my %passResult = %{$self->_add_locations($self->pass_fail_details)};
     my %samplePass = %{$self->pass_fail_summary};
-    my %sampleInfo = $self->dbSampleInfo();     # generic sample/dataset info
-    my @excluded =  $self->dbExcludedSamples(); # samples excluded in DB
+    my %sampleInfo = $self->_db_sample_info();  # generic sample/dataset info
+    my @excluded =  $self->_db_excluded_samples(); # samples excluded in DB
     my %excluded;
     foreach my $sample (@excluded) { $excluded{$sample} = 1; }
     my @lines = ();
@@ -514,13 +384,13 @@ sub writeCsv {
 sub writeMetricJson {
     my ($self, $outPath) = @_;
     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
-    $self->writeJson($outPath, $sampleResultsRef);
+    $self->_write_json($outPath, $sampleResultsRef);
 }
 
 sub writeStatusJson {
     my ($self, $outPath) = @_;
-    my $passResultRef = $self->addLocations($self->pass_fail_details);
-    $self->writeJson($outPath, $passResultRef);
+    my $passResultRef = $self->_add_locations($self->pass_fail_details);
+    $self->_write_json($outPath, $passResultRef);
 }
 
 sub collate {
@@ -546,7 +416,7 @@ sub collate {
         $self->debug("Evaluated pass/fail status.");
 
         # 3) add location info and write JSON status file
-        #my $passResultRef = $self->addLocations($self->pass_fail_details);
+        #my $passResultRef = $self->_add_locations($self->pass_fail_details);
         $self->writeStatusJson($statusJson);
         $self->debug("Wrote status JSON file $statusJson.");
 
@@ -560,6 +430,65 @@ sub collate {
         if ($exclude) { $self->excludeFailedSamples(); }
         $self->debug("Updated pipeline DB.");
     }
+}
+
+sub _add_locations {
+    # add plate/well locations to a hash indexed by sample
+    my ($self, $samplesRef) = @_;
+    my %samples = %{$samplesRef};
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my %plateLocs;
+    $self->db->in_transaction(
+        sub {
+            foreach my $sample ($self->db->sample->all) {
+                my ($plate, $x, $y) = (0,0,0);
+                my $uri = $sample->uri;
+                if (!defined($uri)) {
+                    $self->logwarn("Sample '$sample' has no uri!");
+                next;
+                } elsif ($sample->include == 0) {
+                    next; # excluded sample
+                }
+                # assume one well per sample
+                my $well = ($sample->wells->all)[0];
+                if (defined($well)) { 
+                    my $address = $well->address;
+                    my $label = $address->label1;
+                    $plate = $well->plate;
+                    my $plateName = $plate->ss_barcode;
+                    $plateLocs{$uri} = [$plateName, $label];
+                } else {
+                    $plateLocs{$uri} = [$UNKNOWN_PLATE, $UNKNOWN_ADDRESS];
+                }
+            }
+        });
+    $self->db->disconnect();
+    foreach my $uri (keys %samples) {
+        my %results = %{$samples{$uri}};
+        if (defined($plateLocs{$uri})) {
+            # samples with unknown location will have dummy values in hash
+            my ($plate, $addressLabel) = @{$plateLocs{$uri}};
+            $results{'plate'} = $plateLocs{$uri}->[0];
+            $results{'address'} = $plateLocs{$uri}->[1];
+            $samples{$uri} = \%results;
+        } else {
+            # excluded sample has *no* location value
+            $self->logwarn('Excluded sample URI ', $uri,
+                           'is in QC metric data');
+        }
+    }
+    return \%samples;
+}
+
+sub _append_null {
+    # append 'NA' values to given list
+    my ($self, $arrayRef, $nullTotal) = @_;
+    my @array = @{$arrayRef};
+    for (my $i=0;$i<$nullTotal;$i++) {
+        push(@array, 'NA');
+    }
+    return @array;
 }
 
 sub _build_db {
@@ -724,6 +653,58 @@ sub _build_thresholds {
 
 }
 
+sub _db_excluded_samples {
+    # find list of excluded sample URIs from database
+    # use to fill in empty lines for CSV file
+    my ($self, ) = @_;
+    my @excluded;
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @samples = $self->db->sample->all;
+    foreach my $sample (@samples) {
+        if (!($sample->include)) {
+            push @excluded, $sample->uri;
+        }
+    }
+    $self->db->disconnect();
+    return @excluded;
+}
+
+sub _db_sample_info {
+    # get general information on analysis run from pipeline database
+    # return a hash indexed by sample
+    my ($self, ) = @_;
+    my %sampleInfo;
+    $self->db->connect(RaiseError => 1,
+                       on_connect_do => 'PRAGMA foreign_keys = ON');
+    my @runs = $self->db->piperun->all;
+    foreach my $run (@runs) {
+        my @root;
+        my @datasets = $run->datasets->all;
+        foreach my $dataset (@datasets) {
+            my @samples = $dataset->samples->all;
+            @root = ($run->name, $dataset->if_project,
+                     $dataset->datasupplier->name,
+                     $dataset->snpset->name);
+            # query for rowcol, supplier name, chip no.
+            foreach my $sample (@samples) {
+                my @info = (
+                    $sample->rowcol,
+                    $sample->beadchip,
+                    $sample->supplier_name,
+                    $sample->cohort);
+                foreach (my $i=0;$i<@info;$i++) { # set null values to "NA"
+                    if ($info[$i] eq "") { $info[$i] = "NA"; }
+                }
+                unshift(@info, @root);
+                $sampleInfo{$sample->uri} = \@info;
+            }
+        }
+    }
+    $self->db->disconnect();
+    return %sampleInfo;
+}
+
 sub _getBySampleName {
     my ($self,) = @_;
     # need a coderef to sort sample identifiers in writeCsv
@@ -745,6 +726,9 @@ sub _getBySampleName {
 sub _read_tab_delimited_column {
     # read metric results from a tab-delimited file
     # omit any line starting with #
+    # '$index' argument denotes the column with the desired metric values
+    # assume first field in each line is the sample URI
+    # return a hash of metric values indexed by sample URI
     my ($self, $inPath, $index) = @_;
     my @raw_lines = read_file($inPath);
     my @lines = grep(!/^[#]/msx, @raw_lines); # remove comments/headers
@@ -949,6 +933,17 @@ sub _transpose_results {
         }
     }
     return \%sampleResults;
+}
+
+sub _write_json {
+    # convenience method to write the given reference in JSON format
+    my ($self, $outPath, $dataRef) = @_;
+    my $resultString = encode_json($dataRef);
+    open my $out, ">", $outPath ||
+        $self->logcroak("Cannot open output path '$outPath'");
+    print $out $resultString;
+    close($out) || $self->logcroak("Cannot close output path '$outPath'");
+    return 1;
 }
 
 
