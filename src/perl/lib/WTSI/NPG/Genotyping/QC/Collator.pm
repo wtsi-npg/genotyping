@@ -77,20 +77,28 @@ has 'db'  =>
   (is         => 'ro',
    isa        => 'WTSI::NPG::Genotyping::Database::Pipeline',
    lazy       => 1,
-   init_arg => undef,
+   init_arg   => undef,
    builder    => '_build_db');
 
-has 'duplicate_subsets_path' =>
+has 'duplicate_similarity' =>
   (is         => 'ro',
-   isa        => 'Str',
+   isa        => 'HashRef[HashRef]',
    lazy       => 1,
-   default    => sub {
-       my ($self,) = @_; 
-       return $self->input_dir.'/'.$self->filenames->{'duplicate_subsets'};
-   },
-   documentation => 'Path for output of sample subsets from the '.
-       'duplicate check. If a false value (0 or "") is given, output '.
-       'is omitted.'
+   builder    => '_build_duplicate_similarity',
+   documentation => 'Subsets of samples with mutual similarity above a '.
+       'given threshold. The subset member with the highest call rate '.
+       'passes the duplicate check; others fail.'
+);
+
+has 'duplicate_subsets' =>
+  (is         => 'ro',
+   isa        => 'ArrayRef[ArrayRef]',
+   lazy       => 1,
+   init_arg   => undef,
+   builder    => '_build_duplicate_subsets',
+   documentation => 'Subsets of samples with mutual similarity above a '.
+       'given threshold. The subset member with the highest call rate '.
+       'passes the duplicate check; others fail.'
 );
 
 has 'filenames' =>
@@ -156,48 +164,6 @@ has 'threshold_parameters' =>
    documentation => 'Parameters to determine pass/fail thresholds for '.
        'each metric.'
 );
-
-
-sub duplicateSubsets {
-    # Find *connected subsets* of the duplicate pairs:
-    # if A<->B and B<->C then A~B, B~C and A~C
-    # where <-> denotes similarity on snp panel greater than some threshold,
-    # and ~ denotes membership of a connected subset (equivalence class).
-    #
-    # The member of a connected subset with the highest call rate is kept;
-    # others are flagged as QC failures. This is a "quick and dirty"
-    # substitute for applying a clustering algorithm to find subsets with
-    # high mutual similarity. It should give acceptable results, but for
-    # very high duplicate rates, it will fail *more* samples than
-    # a clustering algorithm would.
-    #
-    # Arguments: - Hash of hashes of pairwise similarities
-    #            - Similarity threshold for duplicates
-    # Return value: list of lists of samples in each subset
-    my ($self, $similarityRef) = @_;
-    my %similarity = %{$similarityRef};
-    my @samples = keys(%similarity);
-    my $threshold = $self->threshold_parameters->{$DUP_NAME};
-    # if sample has no neighbours: simple, it is in a subset by itself
-    # if sample does have neighbours: add to appropriate subset
-    my @subsets;
-    foreach my $sample_i (@samples) {
-        my $added = 0;
-        SUBSET: for (my $i=0;$i<@subsets;$i++) {
-            my @subset = @{$subsets[$i]};
-            foreach my $sample_j (@subset) {
-                if ($similarity{$sample_i}{$sample_j} >= $threshold) {
-                    push(@subset, $sample_i);
-                    $subsets[$i] = [ @subset ];
-                    $added = 1;
-                    last SUBSET;
-                }
-            }
-        }
-        unless ($added) { push(@subsets, [$sample_i]); }
-    }
-    return @subsets;
-}
 
 sub excludedSampleCsv {
     # generate CSV lines for samples excluded from pipeline DB
@@ -277,39 +243,6 @@ sub includedSampleCsv {
     return (\@lines, \%metrics);
 }
 
-sub readDuplicates {
-    # read pairwise similarities for duplicate check from gzipped file
-    # also find maximum pairwise similarity for each sample
-    my ($self, $inPath) = @_;
-    my (%similarity, %max);
-    my $z = new IO::Uncompress::Gunzip $inPath ||
-        $self->logcroak("gunzip failed: $GunzipError");
-    my $firstLine = 1;
-    while (<$z>) {
-        if ($firstLine) { $firstLine = 0; next; } # skip headers
-        chomp;
-        my @words = split;
-        my @samples = ($words[1], $words[2]);
-        my $sim = $words[3]; # similarity on SNP panel
-        $similarity{$samples[0]}{$samples[1]} = $sim;
-        $similarity{$samples[1]}{$samples[0]} = $sim;
-    }
-    $z->close();
-    # find max pairwise similarity for each sample
-    foreach my $sample_i (keys(%similarity)) {
-        my $maxSim = 0;
-        foreach my $sample_j (keys(%similarity)) {
-            if ($sample_i eq $sample_j) { next; }
-            my $sim = $similarity{$sample_i}{$sample_j};
-            if ($sim > $maxSim) { $maxSim = $sim; }
-        }
-        $max{$sample_i} = $maxSim;
-    }
-    return (\%similarity, \%max);
-}
-
-
-
 sub excludeFailedSamples {
     # if any samples have failed QC, set their 'include' value to False
     # samples which have not failed QC are unaffected
@@ -379,6 +312,19 @@ sub writeCsv {
     foreach my $line (@lines) { print $out $line."\n"; }
     close $out || $self->logcroak("Cannot close output '$outPath'");
 
+}
+
+sub writeDuplicateResults {
+    my ($self, $outPath) = @_;
+    my %output;
+    $output{$DUPLICATE_SUBSETS_KEY} = $self->duplicate_subsets;
+    my $results = $self->metric_results->{$DUP_NAME};
+    $output{$DUPLICATE_RESULTS_KEY} = $results;
+    open my $out, ">", $outPath ||
+        $self->logcroak("Cannot open output '", $outPath, "'");
+    print $out to_json(\%output);
+    close $out ||
+        $self->logcroak("Cannot close output '", $outPath, "'");
 }
 
 sub writeMetricJson {
@@ -498,6 +444,71 @@ sub _build_db {
 	 inifile => $self->ini_path,
 	 dbfile  => $self->db_path);
     return $db;
+}
+
+sub _build_duplicate_similarity {
+    my ($self,) = @_;
+    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
+    if (!(-e $inPath)) {
+        $self->logcroak("Input path for duplicates '",
+                        $inPath, "' does not exist");
+    }
+    my %similarity;
+    my $z = new IO::Uncompress::Gunzip $inPath ||
+        $self->logcroak("gunzip failed: $GunzipError");
+    my $firstLine = 1;
+    while (<$z>) {
+        if ($firstLine) { $firstLine = 0; next; } # skip headers
+        chomp;
+        my @words = split;
+        my @samples = ($words[1], $words[2]);
+        my $sim = $words[3]; # similarity on SNP panel
+        $similarity{$samples[0]}{$samples[1]} = $sim;
+        $similarity{$samples[1]}{$samples[0]} = $sim;
+    }
+    $z->close();
+    return \%similarity;
+}
+
+sub _build_duplicate_subsets {
+    # Find *connected subsets* of the duplicate pairs:
+    # if A<->B and B<->C then A~B, B~C and A~C
+    # where <-> denotes similarity on snp panel greater than some threshold,
+    # and ~ denotes membership of a connected subset (equivalence class).
+    #
+    # The member of a connected subset with the highest call rate is kept;
+    # others are flagged as QC failures. This is a "quick and dirty"
+    # substitute for applying a clustering algorithm to find subsets with
+    # high mutual similarity. It should give acceptable results, but for
+    # very high duplicate rates, it will fail *more* samples than
+    # a clustering algorithm would.
+    #
+    # Arguments: - Hash of hashes of pairwise similarities
+    #            - Similarity threshold for duplicates
+    # Return value: list of lists of samples in each subset
+    my ($self,) = @_;
+    my %similarity = %{$self->duplicate_similarity};
+    my @samples = keys(%similarity);
+    my $threshold = $self->threshold_parameters->{$DUP_NAME};
+    # if sample has no neighbours: simple, it is in a subset by itself
+    # if sample does have neighbours: add to appropriate subset
+    my @subsets;
+    foreach my $sample_i (@samples) {
+        my $added = 0;
+        SUBSET: for (my $i=0;$i<@subsets;$i++) {
+            my @subset = @{$subsets[$i]};
+            foreach my $sample_j (@subset) {
+                if ($similarity{$sample_i}{$sample_j} >= $threshold) {
+                    push(@subset, $sample_i);
+                    $subsets[$i] = [ @subset ];
+                    $added = 1;
+                    last SUBSET;
+                }
+            }
+        }
+        unless ($added) { push(@subsets, [$sample_i]); }
+    }
+    return \@subsets;
 }
 
 sub _build_filenames {
@@ -772,18 +783,21 @@ sub _results_call_rate {
 
 sub _results_duplicate {
     my ($self, ) = @_;
-    my $inPath = $self->input_dir.'/'.$self->filenames->{'duplicate'};
-    if (!(-e $inPath)) {
-        $self->logcroak("Input path for duplicates '",
-                        $inPath, "' does not exist");
+    my %similarity = %{$self->duplicate_similarity};
+    my %max;
+    foreach my $sample_i (keys(%similarity)) {
+        my $maxSim = 0;
+        foreach my $sample_j (keys(%similarity)) {
+            if ($sample_i eq $sample_j) { next; }
+            my $sim = $similarity{$sample_i}{$sample_j};
+            if ($sim > $maxSim) { $maxSim = $sim; }
+        }
+        $max{$sample_i} = $maxSim;
     }
-    my ($simRef, $maxRef) = $self->readDuplicates($inPath);
-    my @subsets = $self->duplicateSubsets($simRef);
-    my %max = %{$maxRef};
     # read call rates and find keep/discard status
     my %cr = %{$self->_results_call_rate()};
     my %results;
-    foreach my $subsetRef (@subsets) {
+    foreach my $subsetRef (@{$self->duplicate_subsets}) {
         my $maxCR = 0;
         my @subset = @{$subsetRef};
         # first pass -- find highest CR
@@ -797,19 +811,6 @@ sub _results_duplicate {
             if ($cr{$sample} eq $maxCR) { $keep = 1; }
             $results{$sample} = [$max{$sample}, $keep];
         }
-    }
-    if ($self->duplicate_subsets_path) {
-        my %output;
-        $output{$DUPLICATE_SUBSETS_KEY} = \@subsets;
-        $output{$DUPLICATE_RESULTS_KEY} = \%results;
-        open my $out, ">", $self->duplicate_subsets_path ||
-            $self->logcroak("Cannot open output '",
-                            self->duplicate_subsets_path, "'");
-        print $out to_json(\%output);
-        close $out ||
-            $self->logcroak("Cannot close output '",
-                            self->duplicate_subsets_path, "'");
-
     }
     return \%results;
 }
