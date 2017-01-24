@@ -165,84 +165,6 @@ has 'threshold_parameters' =>
        'each metric.'
 );
 
-sub excludedSampleCsv {
-    # generate CSV lines for samples excluded from pipeline DB
-    my ($self, $sampleNamesRef, $sampleInfoRef,
-        $metricsRef, $excludedRef) = @_;
-    my @sampleNames = @{$sampleNamesRef};
-    my %sampleInfo = %{$sampleInfoRef};   # generic sample/dataset info
-    my %metrics = %{$metricsRef};
-    my %excluded = %{$excludedRef};
-    my @lines = ();
-    foreach my $sample (@sampleNames) {
-        if (!$excluded{$sample}) { next; }
-        my @fields = @{$sampleInfo{$sample}};
-        push(@fields, $sample);
-        push(@fields, 'Excluded'); 
-        @fields = $self->_append_null(\@fields, 3); # null plate, well, pass
-        foreach my $name (@{$self->metric_names}) {
-            if (!$metrics{$name}) {
-                next;
-            } elsif ($name eq $GENDER_NAME) {
-                # pass/fail, metric triple
-                @fields = $self->_append_null(\@fields, 4);
-            } elsif ($name eq $ID_NAME) {
-                # pass/fail, metric double
-                @fields = $self->_append_null(\@fields, 3);
-            } else {
-                # pass/fail, metric
-                @fields = $self->_append_null(\@fields, 2);
-            }
-        }
-        push(@lines, join(',', @fields));
-    }
-    return \@lines;
-}
-
-sub includedSampleCsv {
-    # generate CSV lines for samples included in pipeline DB
-    my $self = shift; # TODO fix argument parsing
-    my @sampleNames = @{ shift() };
-    my %sampleInfo = %{ shift() };   # generic sample/dataset info
-    my %passResult = %{ shift() }; # metric pass/fail status and values
-    my %samplePass = %{ shift() }; # overall pass/fail by sample
-    my %excluded = %{ shift() };
-    my %metrics;
-    my @lines = ();
-    foreach my $sample (@sampleNames) {
-        if ($excluded{$sample}) { next; }
-        my @fields = @{$sampleInfo{$sample}}; # start with general info
-        my %result = %{$passResult{$sample}};
-        # first obtain: sample include plate well pass
-        push(@fields, $sample);
-        push(@fields, 'Included');
-        push(@fields, $result{'plate'});
-        push(@fields, $result{'address'}); # aka well
-        if ($samplePass{$sample}) { push(@fields, 'Pass'); }
-        else { push(@fields, 'Fail'); }
-        # now add relevant metric values
-        foreach my $metric (@{$self->metric_names}) {
-            if (!defined($result{$metric})) { next; }
-            $metrics{$metric} = 1;
-            my @metricResult = @{$result{$metric}}; # pass/fail, value(s)
-            if ($metricResult[0]) { $metricResult[0] = 'Pass'; }
-            else { $metricResult[0] = 'Fail'; }
-            if ($metric eq $GENDER_NAME) { # use human-readable gender names
-                $metricResult[2] = $GENDERS[$metricResult[2]];
-                # 'supplied' Plink gender may be -9 or other arbitrary number
-                my $totalCodes = scalar @GENDERS;
-                if ($metricResult[3] < 0 || $metricResult[3] >= $totalCodes){
-                    $metricResult[3] = $totalCodes - 1; # 'not available'
-                }
-                $metricResult[3] = $GENDERS[$metricResult[3]];
-            }
-            push (@fields, @metricResult);
-        }
-        push(@lines, join(',', @fields));
-    }
-    return (\@lines, \%metrics);
-}
-
 sub excludeFailedSamples {
     # if any samples have failed QC, set their 'include' value to False
     # samples which have not failed QC are unaffected
@@ -281,12 +203,12 @@ sub writeCsv {
     my ($linesRef, $metricsRef);
     # first pass; append lines for samples included in pipeline DB
     ($linesRef, $metricsRef) =
-        $self->includedSampleCsv(\@sampleNames, \%sampleInfo,
-                                 \%passResult, \%samplePass, \%excluded);
+        $self->_included_sample_csv(\@sampleNames, \%sampleInfo,
+                                    \%passResult, \%samplePass, \%excluded);
     push(@lines, @{$linesRef});
     # second pass; append dummy lines for excluded samples
-    $linesRef = $self->excludedSampleCsv(\@sampleNames, \%sampleInfo,
-                                         $metricsRef, \%excluded);
+    $linesRef = $self->_excluded_sample_csv(\@sampleNames, \%sampleInfo,
+                                            $metricsRef, \%excluded);
     push(@lines, @{$linesRef});
     my %metrics = %{$metricsRef};
     # use %metrics to construct appropriate CSV header
@@ -333,7 +255,7 @@ sub writeMetricJson {
     $self->_write_json($outPath, $sampleResultsRef);
 }
 
-sub writeStatusJson {
+sub writePassFailJson {
     my ($self, $outPath) = @_;
     my $passResultRef = $self->_add_locations($self->pass_fail_details);
     $self->_write_json($outPath, $passResultRef);
@@ -363,7 +285,7 @@ sub collate {
 
         # 3) add location info and write JSON status file
         #my $passResultRef = $self->_add_locations($self->pass_fail_details);
-        $self->writeStatusJson($statusJson);
+        $self->writePassFailJson($statusJson);
         $self->debug("Wrote status JSON file $statusJson.");
 
         # 4) write CSV (if required)
@@ -716,6 +638,40 @@ sub _db_sample_info {
     return %sampleInfo;
 }
 
+sub _excluded_sample_csv {
+    # generate CSV lines for samples excluded from pipeline DB
+    my ($self, $sampleNamesRef, $sampleInfoRef,
+        $metricsRef, $excludedRef) = @_;
+    my @sampleNames = @{$sampleNamesRef};
+    my %sampleInfo = %{$sampleInfoRef};   # generic sample/dataset info
+    my %metrics = %{$metricsRef};
+    my %excluded = %{$excludedRef};
+    my @lines = ();
+    foreach my $sample (@sampleNames) {
+        if (!$excluded{$sample}) { next; }
+        my @fields = @{$sampleInfo{$sample}};
+        push(@fields, $sample);
+        push(@fields, 'Excluded'); 
+        @fields = $self->_append_null(\@fields, 3); # null plate, well, pass
+        foreach my $name (@{$self->metric_names}) {
+            if (!$metrics{$name}) {
+                next;
+            } elsif ($name eq $GENDER_NAME) {
+                # pass/fail, metric triple
+                @fields = $self->_append_null(\@fields, 4);
+            } elsif ($name eq $ID_NAME) {
+                # pass/fail, metric double
+                @fields = $self->_append_null(\@fields, 3);
+            } else {
+                # pass/fail, metric
+                @fields = $self->_append_null(\@fields, 2);
+            }
+        }
+        push(@lines, join(',', @fields));
+    }
+    return \@lines;
+}
+
 sub _getBySampleName {
     my ($self,) = @_;
     # need a coderef to sort sample identifiers in writeCsv
@@ -732,6 +688,50 @@ sub _getBySampleName {
             return $a cmp $b;
         }
     }
+}
+
+sub _included_sample_csv {
+    # generate CSV lines for samples included in pipeline DB
+    my $self = shift; # TODO fix argument parsing
+    my @sampleNames = @{ shift() };
+    my %sampleInfo = %{ shift() };   # generic sample/dataset info
+    my %passResult = %{ shift() }; # metric pass/fail status and values
+    my %samplePass = %{ shift() }; # overall pass/fail by sample
+    my %excluded = %{ shift() };
+    my %metrics;
+    my @lines = ();
+    foreach my $sample (@sampleNames) {
+        if ($excluded{$sample}) { next; }
+        my @fields = @{$sampleInfo{$sample}}; # start with general info
+        my %result = %{$passResult{$sample}};
+        # first obtain: sample include plate well pass
+        push(@fields, $sample);
+        push(@fields, 'Included');
+        push(@fields, $result{'plate'});
+        push(@fields, $result{'address'}); # aka well
+        if ($samplePass{$sample}) { push(@fields, 'Pass'); }
+        else { push(@fields, 'Fail'); }
+        # now add relevant metric values
+        foreach my $metric (@{$self->metric_names}) {
+            if (!defined($result{$metric})) { next; }
+            $metrics{$metric} = 1;
+            my @metricResult = @{$result{$metric}}; # pass/fail, value(s)
+            if ($metricResult[0]) { $metricResult[0] = 'Pass'; }
+            else { $metricResult[0] = 'Fail'; }
+            if ($metric eq $GENDER_NAME) { # use human-readable gender names
+                $metricResult[2] = $GENDERS[$metricResult[2]];
+                # 'supplied' Plink gender may be -9 or other arbitrary number
+                my $totalCodes = scalar @GENDERS;
+                if ($metricResult[3] < 0 || $metricResult[3] >= $totalCodes){
+                    $metricResult[3] = $totalCodes - 1; # 'not available'
+                }
+                $metricResult[3] = $GENDERS[$metricResult[3]];
+            }
+            push (@fields, @metricResult);
+        }
+        push(@lines, join(',', @fields));
+    }
+    return (\@lines, \%metrics);
 }
 
 sub _read_tab_delimited_column {
