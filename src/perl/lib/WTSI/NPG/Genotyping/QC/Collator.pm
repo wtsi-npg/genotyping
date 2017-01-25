@@ -279,45 +279,6 @@ sub writePassFailJson {
     return 1;
 }
 
-# sub collate {
-#     # main method to collate results and write outputs
-#     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
-
-#     # TODO Supply only one config file (instead of separate config/filter files). Separate methods to write JSON, write CSV, and exclude samples from DB.
-
-#     # TODO new attributes: metric values, thresholds, sample pass/fail
-
-#     my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
-#     $self->debug("Started collating QC results for input ", $self->input_dir);
-
-#     # 1) find metric values (and write to file if required)
-#     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
-#     $self->debug("Found metric values.");
-#     if ($metricsJson) {
-#         $self->writeMetricJson($metricsJson);
-#     }
-#     if ($statusJson || $csvPath || $exclude) {
-#         # if output options require evaluation of thresholds
-#         # 2) apply filters to find pass/fail status
-#         $self->debug("Evaluated pass/fail status.");
-
-#         # 3) add location info and write JSON status file
-#         #my $passResultRef = $self->_add_locations($self->pass_fail_details);
-#         $self->writePassFailJson($statusJson);
-#         $self->debug("Wrote status JSON file $statusJson.");
-
-#         # 4) write CSV (if required)
-#         if ($csvPath) {
-#             $self->writeCsv($csvPath);
-#             $self->debug("Wrote CSV $csvPath.");
-#         }
-
-#         # 5) exclude failing samples in pipeline DB (if required)
-#         if ($exclude) { $self->excludeFailedSamples(); }
-#         $self->debug("Updated pipeline DB.");
-#     }
-# }
-
 sub _add_locations {
     # add plate/well locations to a hash indexed by sample
     my ($self, $samplesRef) = @_;
