@@ -110,13 +110,13 @@ has 'metric_names' =>
 
 has 'metric_results' =>
   (is         => 'ro',
-   #isa        => 'HashRef[ArrayRef]', # TODO store ArrayRef for all metrics
    isa        => 'HashRef',
    lazy       => 1,
    init_arg   => undef,
    builder    => '_build_metric_results',
-   documentation => 'For each metric, generate an ArrayRef with one or '.
-       'more values to represent the metric outcome.'
+   documentation => 'For each metric, record a string (for a single '.
+                    'value) or ArrayRef (for multiple values) to '.
+                    'represent the metric outcome.'
 );
 
 has 'pass_fail_details' =>
@@ -158,6 +158,22 @@ has 'threshold_parameters' =>
        'each metric.'
 );
 
+
+=head2 excludeFailedSamples
+
+  Arg [1]    : None
+  Example    : $collator->excludeFailedSamples();
+  Description: Update the pipeline database attribute. If any samples have
+               failed QC, set their 'include' value to false.
+
+               Samples which have not failed QC are unaffected. Therefore,
+               samples which were excluded before this function was called
+               will remain excluded, regardless of their QC status.
+
+  Returntype : Result of database disconnection
+
+=cut
+
 sub excludeFailedSamples {
     # if any samples have failed QC, set their 'include' value to False
     # samples which have not failed QC are unaffected
@@ -177,6 +193,18 @@ sub excludeFailedSamples {
     $self->db->disconnect();
 }
 
+
+=head2 hasDuplicatesThreshold
+
+  Arg [1]    : None
+  Example    : $collator->hasDuplicatesThreshold();
+  Description: Return true if a threshold is defined for the duplicates
+               metric, false otherwise. Used for checking if it is valid
+               to call the writeDuplicates() function.
+  Returntype : Boolean
+
+=cut
+
 sub hasDuplicatesThreshold {
     # check if a threshold is defined for the duplicate metric
     my ($self, ) = @_;
@@ -186,6 +214,19 @@ sub hasDuplicatesThreshold {
         return 0;
     }
 }
+
+
+=head2 writeCsv
+
+  Arg [1]    : [Str] Output path
+  Example    : $collator->writeCsv($csvPath);
+  Description: Write a summary of QC outcomes, including plate/well
+               location and pass/fail status for each sample and metric,
+               in CSV format to the given path. Returns true on a successful
+               exit.
+  Returntype : Boolean
+
+=cut
 
 sub writeCsv {
     my ($self, $outPath) = @_;
@@ -237,6 +278,19 @@ sub writeCsv {
     return 1;
 }
 
+
+=head2 writeDuplicates
+
+  Arg [1]    : [Str] Output path
+  Example    : $collator->writeMetricJson($outPath);
+  Description: Write details of the duplicate metric to the given path in
+               JSON format. Returns true on a successful exit. Output
+               includes highly-similar sample subsets used to determine
+               sample pass/fail status. Returns true on successful exit.
+  Returntype : Boolean
+
+=cut
+
 sub writeDuplicates {
     my ($self, $outPath) = @_;
     my %output;
@@ -258,6 +312,16 @@ sub writeDuplicates {
     }
 }
 
+
+=head2 writeMetricJson
+
+  Arg [1]    : [Str] Output path
+  Example    : $collator->writeMetricJson($outPath);
+  Description: 
+  Returntype : Boolean
+
+=cut
+
 sub writeMetricJson {
     my ($self, $outPath) = @_;
     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
@@ -265,12 +329,29 @@ sub writeMetricJson {
     return 1;
 }
 
+
+=head2 writePassFailJson
+
+  Arg [1]    : [Str] Output path
+  Example    : $collator->writePassFailJson($outPath);
+  Description: Write a summary of QC outcomes, including plate/well
+               location and pass/fail status for each sample and metric,
+               in JSON format to the given path. Returns true on a successful
+               exit. Output is used by downstream programs to generate QC
+               plots/reports.
+  Returntype : Boolean
+
+=cut
+
 sub writePassFailJson {
     my ($self, $outPath) = @_;
     my $passResultRef = $self->_add_locations($self->pass_fail_details);
     $self->_write_json($outPath, $passResultRef);
     return 1;
 }
+
+####################################################################
+### private methods ###
 
 sub _add_locations {
     # add plate/well locations to a hash indexed by sample
@@ -674,12 +755,13 @@ sub _getBySampleName {
 
 sub _included_sample_csv {
     # generate CSV lines for samples included in pipeline DB
-    my $self = shift; # TODO fix argument parsing
-    my @sampleNames = @{ shift() };
-    my %sampleInfo = %{ shift() };   # generic sample/dataset info
-    my %passResult = %{ shift() }; # metric pass/fail status and values
-    my %samplePass = %{ shift() }; # overall pass/fail by sample
-    my %excluded = %{ shift() };
+    my ($self, $sampleNamesRef, $sampleInfoRef, $passFailDetail,
+        $passFailSummary, $excluded) = @_;
+    my @sampleNames = @{ $sampleNamesRef };
+    my %sampleInfo = %{ $sampleInfoRef };   # generic sample/dataset info
+    my %passResult = %{ $passFailDetail }; # metric pass/fail status
+    my %samplePass = %{ $passFailSummary }; # overall pass/fail by sample
+    my %excluded = %{ $excluded };
     my %metrics;
     my @lines = ();
     foreach my $sample (@sampleNames) {
