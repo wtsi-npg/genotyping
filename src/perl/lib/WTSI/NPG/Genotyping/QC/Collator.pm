@@ -244,7 +244,7 @@ sub writeCsv {
     return 1;
 }
 
-sub writeDuplicateResults {
+sub writeDuplicates {
     my ($self, $outPath) = @_;
     my %output;
     if ($self->hasDuplicatesThreshold()) {

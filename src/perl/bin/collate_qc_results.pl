@@ -114,7 +114,7 @@ if (defined $csv) {
     $collator->writeCsv($csv);
 }
 if (defined $duplicates) {
-    $collator->writeDuplicateResults($duplicates);
+    $collator->writeDuplicates($duplicates);
 }
 if ($exclude) {
     $collator->excludeFailedSamples();
