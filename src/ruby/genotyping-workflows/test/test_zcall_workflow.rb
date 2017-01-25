@@ -101,7 +101,6 @@ class TestWorkflowZCall < Test::Unit::TestCase
     log = 'percolate.log'
 
     pipe_ini = File.join(data_path, 'genotyping.ini')
-    fconfig = File.join(data_path, 'zcall_test_prefilter.json')
     vcf = File.join(external_data, 'sequenom_abvc.vcf')
     plex_0 = File.join(external_data, 'W30467_snp_set_info_GRCh37.tsv')
     plex_1 = File.join(external_data, 'qc_fluidigm_snp_info_GRCh37.tsv')
@@ -116,7 +115,6 @@ class TestWorkflowZCall < Test::Unit::TestCase
       args_hash = {:manifest => manifest,
                    :plex_manifest => [plex_0, plex_1],
                    :config => pipe_ini,
-                   :filterconfig => fconfig,
                    :gender_method => 'Supplied',
                    :chunk_size => 10000,
                    :memory => 2048,
@@ -137,7 +135,6 @@ class TestWorkflowZCall < Test::Unit::TestCase
       args_hash = {:manifest => manifest,
                    :plex_manifest => [ ],
                    :config => pipe_ini,
-                   :filterconfig => fconfig,
                    :gender_method => 'Supplied',
                    :chunk_size => 10000,
                    :memory => 2048,
