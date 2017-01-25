@@ -184,6 +184,16 @@ sub excludeFailedSamples {
     $self->db->disconnect();
 }
 
+sub hasDuplicatesThreshold {
+    # check if a threshold is defined for the duplicate metric
+    my ($self, ) = @_;
+    if (defined $self->thresholds->{$DUP_NAME}) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 sub writeCsv {
     my ($self, $outPath) = @_;
     my %passResult = %{$self->_add_locations($self->pass_fail_details)};
@@ -237,15 +247,22 @@ sub writeCsv {
 sub writeDuplicateResults {
     my ($self, $outPath) = @_;
     my %output;
-    $output{$DUPLICATE_SUBSETS_KEY} = $self->duplicate_subsets;
-    my $results = $self->metric_results->{$DUP_NAME};
-    $output{$DUPLICATE_RESULTS_KEY} = $results;
-    open my $out, ">", $outPath ||
-        $self->logcroak("Cannot open output '", $outPath, "'");
-    print $out to_json(\%output);
-    close $out ||
-        $self->logcroak("Cannot close output '", $outPath, "'");
-    return 1;
+    if ($self->hasDuplicatesThreshold()) {
+        $output{$DUPLICATE_SUBSETS_KEY} = $self->duplicate_subsets;
+        my $results = $self->metric_results->{$DUP_NAME};
+        $output{$DUPLICATE_RESULTS_KEY} = $results;
+
+        open my $out, ">", $outPath ||
+            $self->logcroak("Cannot open output '", $outPath, "'");
+        print $out to_json(\%output);
+        close $out ||
+            $self->logcroak("Cannot close output '", $outPath, "'");
+        return 1;
+    } else {
+        $self->logwarn('No duplicate threshold defined; omitting ',
+                       'duplicate output');
+        return 0;
+    }
 }
 
 sub writeMetricJson {
