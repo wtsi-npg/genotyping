@@ -327,16 +327,19 @@ sub run_qc {
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
     my $statusJson = $outDir."/qc_results.json";
-    my $metricJson = "";
+    my $duplicates = $outDir."/duplicate_results.json";
     # first pass -- standard thresholds, no DB update
-    my %args = (db_path   => $dbPath,
-                ini_path  => $iniPath,
-                input_dir => $outDir,
-                config_path => $configPath,
-            );
-    if ($filter) { $args{'filter_path'} = $filter; }
-    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(%args);
-    $collator->collate($statusJson, $metricJson, $csvPath);
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+        db_path   => $dbPath,
+        ini_path  => $iniPath,
+        input_dir => $outDir,
+        config_path => $configPath
+    );
+    $collator->writePassFailJson($statusJson);
+    $collator->writeCsv($csvPath);
+    if ($collator->hasDuplicatesThreshold()) {
+        $collator->writeDuplicates($duplicates);
+    }
     ### plot generation ###
     @cmds = ();
     my $dbopt = "--dbpath=$dbPath ";
@@ -366,9 +369,23 @@ sub run_qc {
     if ($filter) {
 	# second pass -- evaluate filter metrics/thresholds
 	# update DB unless the --include option is in effect
-	$csvPath = $outDir."/filter_results.csv";
+        my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+            db_path   => $dbPath,
+            ini_path  => $iniPath,
+            input_dir => $outDir,
+            config_path => $filter
+        );
 	$statusJson = $outDir."/filter_results.json";
-	$collator->collate($statusJson, $metricJson, $csvPath, $exclude);
+	$csvPath = $outDir."/filter_results.csv";
+        $duplicates = $outDir."/filter_duplicates.json";
+        $collator->writePassFailJson($statusJson);
+        $collator->writeCsv($csvPath);
+        if ($collator->hasDuplicatesThreshold()) {
+            $collator->writeDuplicates($duplicates);
+        }
+        if ($exclude) {
+            $collator->excludeFailedSamples();
+        }
     }
     ## create 'supplementary' directory and move files
     cleanup($outDir);
