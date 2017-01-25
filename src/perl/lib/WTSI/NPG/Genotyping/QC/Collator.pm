@@ -721,7 +721,7 @@ sub _read_tab_delimited_column {
     # return a hash of metric values indexed by sample URI
     my ($self, $inPath, $index) = @_;
     my @raw_lines = read_file($inPath);
-    my @lines = grep(!/^[#]/msx, @raw_lines); # remove comments/headers
+    my @lines = grep { !/^[#]/msx } @raw_lines; # remove comments/headers
     my $csv = Text::CSV->new(
         { binary   => 1,
           sep_char => "\t",
