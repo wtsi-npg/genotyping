@@ -4,16 +4,21 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
-Unreleased
-----------
+Release 1.14.0: 2017-01-27
+--------------------------
 
 Added:
 - Gencall workflow:
   - Writes Plink data and runs QC for Gencall only
   - New option in ready_workflow.pl
 - Replace old identity metric with new Bayesian version, which will:
-    - Appear in main QC output and plots
-    - Contribute to sample pass/fail status
+   - Appear in main QC output and plots
+   - Contribute to sample pass/fail status
+
+Changed:
+- Extensive refactoring of Collation.pm, to make it more maintainable
+and support Log4Perl. Module renamed Collator.pm and changed into a
+Moose class.
 
 Fixed:
 - Check for allowed combination of plex manifests and VCF files in
