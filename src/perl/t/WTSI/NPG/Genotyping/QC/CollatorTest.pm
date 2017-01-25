@@ -14,7 +14,7 @@ use JSON;
 use Text::CSV;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 16;
+use Test::More tests => 19;
 use Test::Exception;
 
 use WTSI::NPG::Genotyping::QC::Collator;
@@ -54,7 +54,7 @@ sub require : Test(1) {
   require_ok('WTSI::NPG::Genotyping::QC::Collator');
 }
 
-sub collation : Test(6) {
+sub collation : Test(9) {
     my $jsonResults = catfile($temp_dir, 'qc_results.json');
     my $jsonMetrics = catfile($temp_dir, 'qc_metrics.json');
     my $csvPath = catfile($temp_dir, 'qc_results.csv');
@@ -65,17 +65,22 @@ sub collation : Test(6) {
         input_dir   => $example_dir,
         config_path => $configPath
     );
-    $collator->collate($jsonResults, $jsonMetrics, $csvPath, $exclude);
+    #$collator->collate($jsonResults, $jsonMetrics, $csvPath, $exclude);
+    ok($collator->writeMetricJson($jsonMetrics), 'Write metrics JSON');
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));
     my $expected_metrics = decode_json(read_file($metricsExpected));
     is_deeply($got_metrics, $expected_metrics,
               "JSON metrics data equivalent to expected");
+
+    ok($collator->writePassFailJson($jsonResults), 'Write results JSON');
     ok(-e $jsonResults, "JSON results path exists");
     my $got_results = decode_json(read_file($jsonResults));
     my $expected_results = decode_json(read_file($resultsExpected));
     is_deeply($got_results, $expected_results,
               "JSON results data equivalent to expected");
+
+    ok($collator->writeCsv($csvPath), 'Write CSV');
     ok(-e $csvPath, "CSV results path exists");
     open my $fh, "<", $csvPath || $log->logcroak("Cannot open CSV '",
                                                  $csvPath, "'");

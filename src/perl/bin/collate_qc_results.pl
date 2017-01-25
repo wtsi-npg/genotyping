@@ -31,6 +31,7 @@ my $config;
 my $csv;
 my $dbPath;
 my $debug;
+my $duplicates;
 my $exclude;
 my $help;
 my $iniPath;
@@ -43,6 +44,7 @@ my $verbose;
 GetOptions("config=s"      => \$config,
 	   "csv=s"         => \$csv,
            "debug"         => \$debug,
+           "duplicates=s"  => \$duplicates,
 	   "exclude"       => \$exclude,
 	   "help"          => \$help,
 	   "ini=s"         => \$iniPath,
@@ -70,6 +72,7 @@ Options:
 --input             Directory containing input files. Defaults to current working directory.
 --status            Path for JSON output of metric values and pass/fail status. Defaults to $defaultStatusJson in current working directory.
 --dbpath            Path to pipeline SQLite database file. Required.
+--duplicates        Path for JSON output of duplicate metric details. Optional; if absent, file will not be written.
 --ini               Path to .ini file for SQLite database. Optional, defaults to $DEFAULT_INI.
 --csv               Path for CSV output. Optional.
 --metrics           Path for JSON output of metric values, without pass/fail status. Optional.
@@ -101,7 +104,22 @@ my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
     config_path => $config,
 );
 
-$collator->collate($statusJson, $metricJson, $csv, $exclude);
+if (defined $metricJson) {
+    $collator->writeMetricJson($metricJson);
+}
+if (defined $statusJson) {
+    $collator->writePassFailJson($statusJson);
+}
+if (defined $csv) {
+    $collator->writeCsv($csv);
+}
+if (defined $duplicates) {
+    $collator->writeDuplicateResults($duplicates);
+}
+if ($exclude) {
+    $collator->excludeFailedSamples();
+}
+
 
 __END__
 
@@ -119,7 +137,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2014, 2015, 2016 Genome Research Limited.
+Copyright (C) 2014, 2015, 2016, 2017 Genome Research Limited.
 All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify

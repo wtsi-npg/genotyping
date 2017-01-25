@@ -170,8 +170,6 @@ sub excludeFailedSamples {
     # samples which have not failed QC are unaffected
     my ($self, ) = @_;
     my %samplePass = %{$self->pass_fail_summary};
-    # samples which were previously excluded should *remain* excluded
-
     $self->db->connect(RaiseError => 1,
                        on_connect_do => 'PRAGMA foreign_keys = ON');
     my @samples = $self->db->sample->all;
@@ -233,7 +231,7 @@ sub writeCsv {
         $self->logcroak("Cannot open output '$outPath'");
     foreach my $line (@lines) { print $out $line."\n"; }
     close $out || $self->logcroak("Cannot close output '$outPath'");
-
+    return 1;
 }
 
 sub writeDuplicateResults {
@@ -247,58 +245,61 @@ sub writeDuplicateResults {
     print $out to_json(\%output);
     close $out ||
         $self->logcroak("Cannot close output '", $outPath, "'");
+    return 1;
 }
 
 sub writeMetricJson {
     my ($self, $outPath) = @_;
     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
     $self->_write_json($outPath, $sampleResultsRef);
+    return 1;
 }
 
 sub writePassFailJson {
     my ($self, $outPath) = @_;
     my $passResultRef = $self->_add_locations($self->pass_fail_details);
     $self->_write_json($outPath, $passResultRef);
+    return 1;
 }
 
-sub collate {
-    # main method to collate results and write outputs
-    # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
+# sub collate {
+#     # main method to collate results and write outputs
+#     # $metricsRef is an optional reference to an array of metric names; use to specify a subset of metrics for evaluation
 
-    # TODO Supply only one config file (instead of separate config/filter files). Separate methods to write JSON, write CSV, and exclude samples from DB.
+#     # TODO Supply only one config file (instead of separate config/filter files). Separate methods to write JSON, write CSV, and exclude samples from DB.
 
-    # TODO new attributes: metric values, thresholds, sample pass/fail
+#     # TODO new attributes: metric values, thresholds, sample pass/fail
 
-    my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
-    $self->debug("Started collating QC results for input ", $self->input_dir);
+#     my ($self, $statusJson, $metricsJson, $csvPath, $exclude) = @_;
+#     $self->debug("Started collating QC results for input ", $self->input_dir);
 
-    # 1) find metric values (and write to file if required)
-    my $sampleResultsRef = $self->_transpose_results($self->metric_results);
-    $self->debug("Found metric values.");
-    if ($metricsJson) {
-        $self->writeMetricJson($metricsJson);
-    }
-    if ($statusJson || $csvPath || $exclude) {
-        # if output options require evaluation of thresholds
-        # 2) apply filters to find pass/fail status
-        $self->debug("Evaluated pass/fail status.");
+#     # 1) find metric values (and write to file if required)
+#     my $sampleResultsRef = $self->_transpose_results($self->metric_results);
+#     $self->debug("Found metric values.");
+#     if ($metricsJson) {
+#         $self->writeMetricJson($metricsJson);
+#     }
+#     if ($statusJson || $csvPath || $exclude) {
+#         # if output options require evaluation of thresholds
+#         # 2) apply filters to find pass/fail status
+#         $self->debug("Evaluated pass/fail status.");
 
-        # 3) add location info and write JSON status file
-        #my $passResultRef = $self->_add_locations($self->pass_fail_details);
-        $self->writePassFailJson($statusJson);
-        $self->debug("Wrote status JSON file $statusJson.");
+#         # 3) add location info and write JSON status file
+#         #my $passResultRef = $self->_add_locations($self->pass_fail_details);
+#         $self->writePassFailJson($statusJson);
+#         $self->debug("Wrote status JSON file $statusJson.");
 
-        # 4) write CSV (if required)
-        if ($csvPath) {
-            $self->writeCsv($csvPath);
-            $self->debug("Wrote CSV $csvPath.");
-        }
+#         # 4) write CSV (if required)
+#         if ($csvPath) {
+#             $self->writeCsv($csvPath);
+#             $self->debug("Wrote CSV $csvPath.");
+#         }
 
-        # 5) exclude failing samples in pipeline DB (if required)
-        if ($exclude) { $self->excludeFailedSamples(); }
-        $self->debug("Updated pipeline DB.");
-    }
-}
+#         # 5) exclude failing samples in pipeline DB (if required)
+#         if ($exclude) { $self->excludeFailedSamples(); }
+#         $self->debug("Updated pipeline DB.");
+#     }
+# }
 
 sub _add_locations {
     # add plate/well locations to a hash indexed by sample
