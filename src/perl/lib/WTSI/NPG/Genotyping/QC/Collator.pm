@@ -17,8 +17,6 @@ use Text::CSV;
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(meanSd);
 
-use Data::Dumper; # FIXME
-
 our $VERSION = '';
 
 with 'WTSI::DNAP::Utilities::Loggable';
@@ -33,20 +31,14 @@ our $XYD_NAME = 'xydiff';
 our $MAG_NAME = 'magnitude';
 our $LMH_NAME = 'low_maf_het';
 our $HMH_NAME = 'high_maf_het';
-# standard order for metric names
 our @GENDERS = ('Unknown', 'Male', 'Female', 'Not_Available');
 our $DUPLICATE_SUBSETS_KEY = 'SUBSETS';
 our $DUPLICATE_RESULTS_KEY = 'RESULTS';
 our $UNKNOWN_PLATE = "Unknown_plate";
 our $UNKNOWN_ADDRESS = "Unknown_address";
 
-# Collate QC results from various output files into a single data structure,
-# write JSON and CSV output files and update pipeline SQLite DB if required.
-
-# Get additional information for .csv fields from pipeline DB:
-# run,project,data_supplier,snpset,supplier_name,rowcol,beadchip_number,sample,include,plate,well,pass
-
-# attributes supplied as init_args
+######################################################################
+### attributes supplied as init_args ###
 
 has 'db_path' =>
   (is         => 'ro',
@@ -71,7 +63,8 @@ has 'config_path' =>
    documentation => 'Path to a JSON file with required parameters.'
 );
 
-# other attributes, not in init_args
+######################################################################
+### attributes not in init_args ###
 
 has 'db'  =>
   (is         => 'ro',
@@ -415,7 +408,12 @@ sub _build_duplicate_subsets {
 sub _build_filenames {
     my ($self,) = @_;
     my $config = decode_json(read_file($self->config_path));
-    return $config->{'collation_names'};
+    my $names = $config->{'collation_names'};
+    if (! defined $names) {
+        $self->logcroak("No collation_names entry in QC config file '",
+                        $self->config_path, "'");
+    }
+    return $names;
 }
 
 sub _build_metric_names {
@@ -534,7 +532,12 @@ sub _build_pass_fail_summary {
 sub _build_threshold_parameters {
     my ($self,) = @_;
     my $config = decode_json(read_file($self->config_path));
-    return $config->{'Metrics_thresholds'};
+    my $thresholds = $config->{'Metrics_thresholds'};
+    if (! defined $thresholds) {
+        $self->logcroak("No Metrics_thresholds entry in QC config file '",
+                        $self->config_path, "'");
+    }
+    return $thresholds;
 }
 
 sub _build_thresholds {
@@ -826,7 +829,7 @@ sub _results_het {
 
 sub _results_high_maf_het {
     my ($self, ) = @_;
-    return $self->resultsMafHet(1);
+    return $self->_results_maf_het(1);
 }
 
 sub _results_identity {
@@ -854,7 +857,7 @@ sub _results_identity {
 
 sub _results_low_maf_het {
     my ($self, ) = @_;
-    return $self->resultsMafHet(0);
+    return $self->_results_maf_het(0);
 }
 
 sub _results_maf_het {
@@ -931,3 +934,52 @@ sub _write_json {
 no Moose;
 
 1;
+
+
+__END__
+
+=head1 NAME
+
+WTSI::NPG::Genotyping::QC::Collator - Class to collate QC metric outputs
+
+=head1 SYNOPSIS
+
+my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+    db_path     => $dbPath,
+    ini_path    => $iniPath,
+    input_dir   => $inputDir,
+    config_path => $config,
+);
+
+=head1 DESCRIPTION
+
+
+Collate QC metric outputs from the WTSI genotyping pipeline, and perform
+operations on the data. Operations include combining duplicate and call
+rate data to evaluate the duplicate metric; assessment of pass/fail status
+of samples; exclusion of failed samples in the pipeline SQLite database; and
+output of QC result summaries in JSON or CSV format.
+
+The JSON format output is used by downstream software to create QC plots
+and reports.
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2014, 2015, 2016, 2017 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
