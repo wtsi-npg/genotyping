@@ -4,7 +4,7 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
-Release 1.14.0: 2017-01-27
+Release 1.14.0: 2017-01-30
 --------------------------
 
 Added:
