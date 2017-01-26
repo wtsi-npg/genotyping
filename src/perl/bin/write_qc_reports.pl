@@ -80,7 +80,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+Copyright (C) 2012, 2013, 2014, 2015, 2016, 2017 Genome Research Limited.
 All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
