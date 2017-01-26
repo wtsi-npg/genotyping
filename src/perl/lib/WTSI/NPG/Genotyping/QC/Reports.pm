@@ -180,10 +180,8 @@ sub latexResultNotes {
 
 sub latexSectionResults {
     my ($config, $qcDir, $resultPath) = @_;
-    # my ($config, $qcDir, $resultPath, $identityPath) = @_; # old version
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
-    #push @lines, textForIdentity($identityPath); # FIXME update or delete?
     push @lines, "\\subsection{Tables}\n\n";
     my @titles = ("Pass/fail summary",
                   "Key to metric abbreviations",
@@ -194,12 +192,12 @@ sub latexSectionResults {
     my @centre = (0,0,1,1);
     for (my $i=0;$i<@refs;$i++) {
         push @lines, "\\subsubsection*{".$titles[$i]."}\n";
-        foreach my $table (latexTables($refs[$i], $headers[$i], $centre[$i])) { 
-            push @lines, $table."\n"; 
+        foreach my $table (latexTables($refs[$i], $headers[$i], $centre[$i])) {
+            push @lines, $table."\n";
         }
         if ($i>0) {
             push @lines, "\\clearpage\n\n"; # flush table buffer to output
-            push @lines, "\\pagebreak\n\n"; 
+            push @lines, "\\pagebreak\n\n";
         }
     }
     push @lines, latexResultNotes();
@@ -368,24 +366,6 @@ sub textForDatasets {
     }
     push(@text, "\\end{itemize}\n");
     return @text;
-}
-
-sub textForIdentity {
-    ### FIXME Omitted from output 2017-01-05: Update or remove?
-
-    # text for subsection to describe status of identity metric
-    my $idResultsPath = shift;
-    my %results = %{readJson($idResultsPath)};
-    my $idCheck = $results{'identity_check_run'}; # was identity check run?
-    my $minSnps = $results{'min_snps'};
-    my $commonSnps = $results{'common_snps'}; # Illumina/Sequenom shared SNPs
-    my $text = "\\subsection{Identity Metric}\n\n\\begin{itemize}\n \\item Minimum number of SNPs for identity check = $minSnps\n\\item Common SNPs between input and QC plex = $commonSnps\n";
-    if ($idCheck) {
-	$text.= "\\item Identity check run successfully.\n\\end{itemize}\n\n";
-    } else {
-	$text.= "\\item \\textbf{Identity check omitted.} All samples pass with respect to identity; scatterplot not created.\n\\end{itemize}\n\n";
-    }
-    return $text;
 }
 
 sub textForMetrics {
