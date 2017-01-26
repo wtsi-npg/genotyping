@@ -1,14 +1,5 @@
 #! /software/bin/perl
 
-# Author:  Iain Bancarz, ib5@sanger.ac.uk
-# February 2014
-
-# Collate QC metric files and merge into a single JSON file
-# Optionally:
-# * Apply thresholds and evaluate pass/fail status
-# * Exclude failed samples in pipeline SQLite database
-# Metrics appear in various formats in the QC directory
-
 use strict;
 use warnings;
 use Carp;
@@ -129,7 +120,8 @@ collate_qc_results
 
 =head1 DESCRIPTION
 
-Collate genotyping QC results into a single JSON file
+Collate genotyping QC results into a single object. Can write JSON and
+CSV output, and exclude failed samples from the pipeline database.
 
 =head1 AUTHOR
 
