@@ -107,6 +107,13 @@ sub run {
     my @vcf;
     my @plexManifests;
     if ($vcf && $plexManifests) {
+        if (!$sampleJson) {
+            $log->logcroak("--vcf and --plex-manifests arguments must be ",
+                           "accompanied by a --sample-json argument");
+        } elsif (! -e $sampleJson) {
+            $log->logcroak("--sample-json path '", $sampleJson,
+                           "' does not exist");
+        }
         @vcf = split(/,/msx, $vcf);
         foreach my $vcf_path (@vcf) {
             unless (-e $vcf_path) {
@@ -132,6 +139,7 @@ sub run {
         $log->logcroak("--plex-manifests argument must be accompanied by a",
                        " --vcf argument");
     }
+
     ### run QC
     run_qc($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
            $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig,
@@ -282,18 +290,6 @@ sub run_qc {
                   );
         my $idCmd = $ID_EXECUTABLE.' '.join(' ', @idArgs);
         push @cmds, $idCmd;
-    } else {
-        if (! defined $plexManifest) {
-            $log->info('Plex manifest undefined for Bayesian identity');
-        }
-        if (! defined $vcf) {
-            $log->info('VCF undefined for Bayesian identity');
-        }
-        if (! defined $sampleJson) {
-            $log->info('Sample JSON undefined for Bayesian identity');
-        }
-        $log->info('Inputs not available for Bayesian identity; ',
-                   'metric will be omitted');
     }
     my @genderArgs = ('--input', $plinkPrefix,
                       '--output-dir', $outDir,
