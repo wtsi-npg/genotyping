@@ -1,7 +1,6 @@
 bin/archive_fluidigm_genotypes.pl
 bin/check_duplicates_bed.pl
 bin/check_identity_bayesian.pl
-bin/check_identity_simple.pl
 bin/check_xhet_gender.pl
 bin/collate_qc_results.pl
 bin/create_test_database.pl
@@ -128,7 +127,6 @@ lib/WTSI/NPG/Genotyping/Plink.pm
 lib/WTSI/NPG/Genotyping/QC/Collation.pm
 lib/WTSI/NPG/Genotyping/QC/GenderCheck.pm
 lib/WTSI/NPG/Genotyping/QC/GenderCheckDatabase.pm
-lib/WTSI/NPG/Genotyping/QC/Identity.pm
 lib/WTSI/NPG/Genotyping/QC/MetricScatterplots.pm
 lib/WTSI/NPG/Genotyping/QC/PlinkIO.pm
 lib/WTSI/NPG/Genotyping/QC/QCPlotShared.pm
@@ -387,7 +385,6 @@ t/gender/input_xhet_large.txt
 t/gender_marker.t
 t/gender_marker_call.t
 t/gender_standalone.t
-t/identity.t
 t/illuminus.t
 t/illuminus/example.json
 t/illuminus/example_all.iln
@@ -722,7 +719,6 @@ t/WTSI/NPG/Genotyping/Infinium/PublisherTest.pm
 t/WTSI/NPG/Genotyping/Infinium/ResultSetTest.pm
 t/WTSI/NPG/Genotyping/Infinium/SampleQueryTest.pm
 t/WTSI/NPG/Genotyping/QC/CollationTest.pm
-t/WTSI/NPG/Genotyping/QC/IdentityTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SimulatorTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/CheckTest.pm
 t/WTSI/NPG/Genotyping/QC/BayesianIdentity/SampleMetricTest.pm

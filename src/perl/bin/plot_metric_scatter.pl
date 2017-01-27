@@ -21,8 +21,8 @@ our $VERSION = '';
 Log::Log4perl->easy_init($ERROR);
 my $log = Log::Log4perl->get_logger();
 
-my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath, 
-    $resultpath, $maxBatch, $noIntensity);
+my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath,
+    $resultpath, $maxBatch);
 
 GetOptions("qcdir=s"    => \$qcDir,
            "outdir=s"   => \$outDir,
@@ -32,7 +32,6 @@ GetOptions("qcdir=s"    => \$qcDir,
            "gender=s"   => \$gender,
            "inipath=s"  => \$inipath,
            "resultpath=s"  => \$resultpath,
-           "no-intensity"  => \$noIntensity,
            "max"        => \$maxBatch,
            "h|help"     => \$help);
 
@@ -52,7 +51,6 @@ Options:
 --gender=PATH       Path to .txt file with gender thresholds
 --qcdir=PATH        Directory for QC input
 --outdir=PATH       Directory for output; defaults to qcdir
---no-intensity      Omit intensity metric (normalized signal magnitude)
 --max               Maximum number of samples on any one plot
 --help              Print this help text and exit
 Unspecified options will receive default values.
@@ -73,8 +71,8 @@ foreach my $path (@paths) {
     if (!(-r $path)) { croak("Cannot read path '", $path, "'"); }
 }
 
-runAllMetrics($qcDir, $outDir, $config, $gender, $dbpath, $inipath, 
-              $resultpath, $maxBatch, $noIntensity);
+runAllMetrics($qcDir, $outDir, $config, $gender, $dbpath, $inipath,
+              $resultpath, $maxBatch);
 
 
 __END__

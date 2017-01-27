@@ -10,6 +10,8 @@ use File::Find;
 use File::stat;
 use Log::Log4perl;
 
+use WTSI::DNAP::Utilities::Runnable;
+
 use base 'Exporter';
 our @EXPORT_OK = qw(common_stem
                     md5sum

@@ -51,10 +51,10 @@ GEM_ARRAY=($GEM_PATH)
 unset IFS
 GEM_BIN=${GEM_ARRAY[0]}/bin
 if [ ! -e $GEM_BIN ]; then
-    echo "Expected Ruby script directory '$GEM_BIN' does not exist" 1&>2
+    echo "Expected Ruby script directory '$GEM_BIN' does not exist" 1>&2
     exit 1
 elif  [ ! -d $GEM_BIN ]; then
-    echo "Expected Ruby script directory '$GEM_BIN' is not a directory" 1&>2
+    echo "Expected Ruby script directory '$GEM_BIN' is not a directory" 1>&2
     exit 1
 fi
 export PATH=$GEM_BIN:$PATH
