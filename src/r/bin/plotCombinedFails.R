@@ -34,7 +34,7 @@ make.plot(experiment, combined.counts, combined.causes, total, 'png', pngPath)
 
 # Author: Iain Bancarz <ib5@sanger.ac.uk>
 
-# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+# Copyright (c) 2012, 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by the
