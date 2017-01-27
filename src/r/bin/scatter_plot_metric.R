@@ -120,7 +120,7 @@ ylab.name <- function(metricName) {
   } else if (metricName=='duplicate') {
     ylab.name <- "maximum similarity on test panel"
   } else if (metricName=='identity') {
-    ylab.name <- "identity with QC plex results"
+    ylab.name <- "probability of identity with QC plex results"
   } else if (metricName=='magnitude') {
     ylab.name <- "normalised magnitude of intensity"
   } else {
@@ -186,7 +186,7 @@ plot.pdf(index, metric, pass, pn, pb, metricName, metricMean,
 
 # Author: Iain Bancarz <ib5@sanger.ac.uk>
 
-# Copyright (c) 2012, 2016 Genome Research Limited. All Rights Reserved.
+# Copyright (c) 2012, 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by the

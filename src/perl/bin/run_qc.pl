@@ -26,6 +26,7 @@ use WTSI::NPG::Utilities qw(user_session_log);
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $CR_STATS_EXECUTABLE = "snp_af_sample_cr_bed";
+our $ID_EXECUTABLE= "check_identity_bayesian.pl";
 our $MAF_HET_EXECUTABLE = "het_by_maf.py";
 
 my $uid = `whoami`;
@@ -107,6 +108,13 @@ sub run {
     my @vcf;
     my @plexManifests;
     if ($vcf && $plexManifests) {
+        if (!$sampleJson) {
+            $log->logcroak("--vcf and --plex-manifests arguments must be ",
+                           "accompanied by a --sample-json argument");
+        } elsif (! -e $sampleJson) {
+            $log->logcroak("--sample-json path '", $sampleJson,
+                           "' does not exist");
+        }
         @vcf = split(/,/msx, $vcf);
         foreach my $vcf_path (@vcf) {
             unless (-e $vcf_path) {
@@ -132,6 +140,7 @@ sub run {
         $log->logcroak("--plex-manifests argument must be accompanied by a",
                        " --vcf argument");
     }
+
     ### run QC
     run_qc($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
            $runName, $outDir, $title, $texIntroPath, $mafHet, $filterConfig,
@@ -255,52 +264,40 @@ sub verifyAbsPath {
     return $path;
 }
 
-sub run_qc_wip {
-  # run the work-in-progess refactored QC in parallel with the old one
-  my ($plinkPrefix, $outDir, $plexManifestRef, $vcfRef, $sampleJson) = @_;
-  $outDir = $outDir."/qc_wip";
-  mkdir($outDir);
-  my $script = "check_identity_bayesian.pl";
-  my $jsonPath = $outDir."/identity_wip.json";
-  my $csvPath = $outDir."/identity_wip.csv";
-  my $vcf = join(',', @{$vcfRef});
-  my $plexManifest = join(',', @{$plexManifestRef});
-  my @args = ("--json=$jsonPath",
-              "--csv=$csvPath",
-	      "--plink=$plinkPrefix",
-	      "--plex=$plexManifest",
-              "--sample_json=$sampleJson",
-              "--vcf=$vcf"
-	     );
-  my $cmd = $script." ".join(" ", @args);
-  my $result = system($cmd);
-  if ($result!=0) {
-    $log->logcroak("Command finished with non-zero exit status: '",
-                   $cmd, "'");
-  }
-
-}
-
 sub run_qc {
     my ($plinkPrefix, $simPath, $dbPath, $iniPath, $configPath,
         $runName, $outDir, $title, $texIntroPath, $mafHet, $filter,
         $exclude, $plexManifest, $vcf, $sampleJson) = @_;
-    if ($plexManifest && $vcf && $sampleJson) {
-        run_qc_wip($plinkPrefix, $outDir, $plexManifest, $vcf, $sampleJson);
-    }
-    write_version_log($outDir);
-    my %fileNames = readQCFileNames($configPath);
-    ### input file generation ###
-    my @cmds = ("$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plinkPrefix",
-		"$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix",
-	);
-    my $genderCmd = "$Bin/check_xhet_gender.pl --input=$plinkPrefix --output-dir=$outDir";
-    if (!defined($runName)) {
+    if (! defined $runName) {
       $log->logcroak("Must supply pipeline run name for database ",
                      "gender update");
     }
+    write_version_log($outDir);
+    my %fileNames = readQCFileNames($configPath);
+    ### generate commands to produce QC metrics ###
+    # TODO use WTSI::DNAP::Utilities::Runnable for more robust execution?
+    my @cmds;
+    my $crCmd = "$CR_STATS_EXECUTABLE -r $outDir/snp_cr_af.txt ".
+        "-s $outDir/sample_cr_het.txt $plinkPrefix";
+    my $dupCmd = "$Bin/check_duplicates_bed.pl  --dir $outDir $plinkPrefix";
+    push @cmds, $crCmd, $dupCmd;
+    if (defined $plexManifest && defined $vcf && defined $sampleJson) {
+        my @idArgs = ('--json', $outDir.'/'.$fileNames{'id_json'},
+                      '--csv', $outDir.'/'.$fileNames{'id_csv'},
+                      '--plink', $plinkPrefix,
+                      '--plex', join(',', @{$plexManifest}),
+                      '--vcf', join(',', @{$vcf}),
+                      '--sample_json', $sampleJson,
+                  );
+        my $idCmd = $ID_EXECUTABLE.' '.join(' ', @idArgs);
+        push @cmds, $idCmd;
+    }
+    my @genderArgs = ('--input', $plinkPrefix,
+                      '--output-dir', $outDir,
+                  );
+    my $genderCmd = "$Bin/check_xhet_gender.pl ".join(' ', @genderArgs);
     $genderCmd.=" --dbfile=".$dbPath." --run=".$runName;
-    push(@cmds, $genderCmd);
+    push @cmds, $genderCmd;
     if ($mafHet) {
 	my $mhout = $outDir.'/'.$fileNames{'het_by_maf'};
 	push(@cmds, "$MAF_HET_EXECUTABLE --in $plinkPrefix --out $mhout");
@@ -316,25 +313,13 @@ sub run_qc {
 	# using previously calculated metric values
 	$intensity = 1;
     }
-    my $dbopt = "--dbpath=$dbPath "; 
-    ### run QC data generation commands ###
+    ### run QC metric commands ###
     foreach my $cmd (@cmds) {
         my $result = system($cmd);
         if ($result!=0) {
           $log->logcroak("Command finished with non-zero exit status: '",
                          $cmd, "'");
         }
-    }
-    ### run identity check ###
-    WTSI::NPG::Genotyping::QC::Identity->new(
-        db_path => $dbPath,
-        ini_path => $iniPath,
-        output_dir => $outDir,
-        plink_path => $plinkPrefix,
-    )->run_identity_check();
-    my $idJson = $outDir.'/'.$fileNames{'id_json'};
-    if (!(-e $idJson)) {
-      $log->logcroak("Identity JSON file '", $idJson, "' does not exist");
     }
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
@@ -348,15 +333,13 @@ sub run_qc {
 	    push(@metricNames, $metric);
 	}
     }
-    collate($outDir, $configPath, $configPath, $dbPath, $iniPath, 
+    collate($outDir, $configPath, $configPath, $dbPath, $iniPath,
 	    $statusJson, $metricJson, $csvPath, 0, \@metricNames);
     ### plot generation ###
     @cmds = ();
-    if ($dbopt) { 
-        my $cmd = "$Bin/plot_metric_scatter.pl $dbopt --inipath=$iniPath --config=$configPath --outdir=$outDir --qcdir=$outDir";
-        if (!$simPath) { $cmd = $cmd." --no-intensity "; }
-        push(@cmds, $cmd); 
-    }
+    my $dbopt = "--dbpath=$dbPath ";
+    my $cmd = "$Bin/plot_metric_scatter.pl $dbopt --inipath=$iniPath --config=$configPath --outdir=$outDir --qcdir=$outDir";
+    push(@cmds, $cmd);
     push(@cmds, getPlateHeatmapCommands($dbopt, $iniPath, $outDir, $title,
                                         $intensity, \%fileNames));
     my @densityTerms = ('cat', $outDir.'/'.$fileNames{'sample_cr_het'}, '|',
@@ -375,7 +358,7 @@ sub run_qc {
     ### create PDF report
     my $texPath = $outDir."/pipeline_summary.tex";
     my $genderThresholdPath = $outDir."/sample_xhet_gender_thresholds.txt";
-    createReports($texPath, $statusJson, $idJson, $configPath, $dbPath,
+    createReports($texPath, $statusJson, $configPath, $dbPath,
                   $genderThresholdPath, $outDir, $texIntroPath);
     ### exclude failed samples from pipeline DB
     if ($filter) {
@@ -469,7 +452,7 @@ once when multiple callers are used on the same dataset.
 =item 2.
 
 The --plex-manifest and --vcf options, with appropriate arguments,
-are required to run the alternate identity check. If both these
+are required for the identity check metric. If both these
 options are not specified, the check will be omitted. Arguments to both
 options are comma-separated lists of file paths; the individual paths may
 not contain commas. The order of paths is not significant.

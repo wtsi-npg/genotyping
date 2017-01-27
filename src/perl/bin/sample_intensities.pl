@@ -9,8 +9,10 @@ use strict;
 use Carp;
 use Getopt::Long;
 use JSON;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
+use WTSI::NPG::Utilities qw(user_session_log);
 
 use WTSI::DNAP::Utilities::IO qw(maybe_stdout);
 use WTSI::NPG::Genotyping::Database::Pipeline;
@@ -20,7 +22,9 @@ our $WTSI_NAMESPACE = 'wtsi';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $ID_REGEX = qr/^[\w.-]{4,}$/msx;
 
-Log::Log4perl->easy_init($ERROR);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'sample_intensities');
 
 run() unless caller();
 
@@ -28,21 +32,33 @@ sub run {
   my $all;
   my $config;
   my $dbfile;
+  my $debug;
   my $gender_method;
+  my $log4perl_config;
   my $output;
   my $run_name;
+  my $verbose;
 
   GetOptions('all'             => \$all,
              'config=s'        => \$config,
+             'debug'           => \$debug,
              'dbfile=s'        => \$dbfile,
              'gender_method=s' => \$gender_method,
              'help'            => sub { pod2usage(-verbose => 2,
                                                   -exitval => 0) },
+             'logconf=s'       => \$log4perl_config,
              'output=s'        => \$output,
-             'run=s'           => \$run_name);
+             'run=s'           => \$run_name,
+             'verbose'         => \$verbose,);
 
   $config ||= $DEFAULT_INI;
   $gender_method ||= 'Supplied';
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
   my $log = Log::Log4perl->get_logger('main');
 
   unless ($run_name) {
@@ -54,7 +70,7 @@ sub run {
   if ($dbfile) {
     push @initargs, (dbfile => $dbfile);
   }
-
+  $log->debug("Connecting to SQLite database file '$dbfile'");
   my $pipedb = WTSI::NPG::Genotyping::Database::Pipeline->new
     (@initargs)->connect
        (RaiseError    => 1,
@@ -77,6 +93,8 @@ sub run {
                                               {join => [{dataset => 'piperun'},
                                                         {results => 'method'}],
                                                order_by => 'me.id_sample'})) {
+
+    $log->debug("Processing sample ID: ", $sample->sanger_sample_id);
     my $gender = $pipedb->gender->find
       ({'sample.id_sample' => $sample->id_sample,
         'method.name'      => $gender_method},
@@ -93,10 +111,12 @@ sub run {
                     gender_code      => $gender_code,
                     gender_method    => $gender_method};
   }
+  $log->info("Found data for ", scalar @samples, " samples");
 
   my $fh = maybe_stdout($output);
   print $fh to_json(\@samples, {utf8 => 1, pretty => 1});
   close($fh) || $log->logcroak("Cannot close output");
+  $log->info("Wrote sample JSON data to ", $output);
 
   return;
 }

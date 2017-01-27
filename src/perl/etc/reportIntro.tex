@@ -21,7 +21,7 @@ Each metric requires appropriate threshold criteria to include or exclude sample
 \subsubsection*{Metric descriptions}
 
 \begin{enumerate}
-\item \textbf{Identity:} In addition to Illumina genotyping, samples may be typed on an alternate platform such as Sequenom or Fluidigm. Identity of calls between platforms is checked.  The check requires a minimum number of sites to be shared between platforms (default is 8). If fewer than the minimum are available, the identity check is not applied and \emph{all} samples receive a pass. Otherwise, only samples for which concordance is greater than a chosen threshold will pass.
+\item \textbf{Identity:} In addition to Illumina genotyping, samples may be typed on an alternate platform such as Sequenom or Fluidigm. Probability that the Illumina and alternate calls represent the same sample is evaluated. If the probability of identity is above a chosen threshold, the sample receives a pass. For additional details, see the pipeline software documentation: \url{https://github.com/wtsi-npg/genotyping/blob/master/doc/bayesian_identity/bayesian_identity.pdf}
 
 See Section \ref{sec:metric-summary} for threshold values in this pipeline run.
 
