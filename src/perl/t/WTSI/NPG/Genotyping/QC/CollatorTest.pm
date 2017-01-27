@@ -65,7 +65,6 @@ sub collation : Test(9) {
         input_dir   => $example_dir,
         config_path => $configPath
     );
-    #$collator->collate($jsonResults, $jsonMetrics, $csvPath, $exclude);
     ok($collator->writeMetricJson($jsonMetrics), 'Write metrics JSON');
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));

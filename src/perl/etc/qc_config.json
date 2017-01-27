@@ -18,7 +18,6 @@
                       "xydiff":"xydiff.txt",
                       "identity":"identity_check.json",
                       "duplicate":"duplicate_full.txt.gz",
-                      "duplicate_subsets":"duplicate_subsets.json",  
                       "gender":"sample_xhet_gender.txt",
                       "magnitude":"magnitude.txt"},
   "short_names":{"heterozygosity":"H","call_rate":"C","xydiff":"X","identity":"I","duplicate":"D","gender":"G","magnitude":"M"},

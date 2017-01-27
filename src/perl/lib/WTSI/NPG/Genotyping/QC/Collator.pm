@@ -1103,10 +1103,9 @@ determined by call rate only for the Illuminus caller prefilter.
 =item
 
 B<collation_names:> A hash mapping input types to the names of input
-files, which are to be found in the given input directory. Some, but not
-all, input types correspond to the names of QC metrics (as some metrics
-require more than one input). If a metric is present in Metrics_thresholds,
-it must also have appropriate inputs in collation_names.
+files, which are to be found in the given input directory. Some files
+provide input to more than one metric. If a metric is present in
+Metrics_thresholds, it must also have appropriate input in collation_names.
 
 =back
 
