@@ -201,8 +201,6 @@ sub BUILD {
 =cut
 
 sub excludeFailedSamples {
-    # if any samples have failed QC, set their 'include' value to False
-    # samples which have not failed QC are unaffected
     my ($self, ) = @_;
     my %samplePass = %{$self->pass_fail_summary};
     $self->db->connect(RaiseError => 1,
@@ -250,6 +248,11 @@ sub hasDuplicatesThreshold {
                location and pass/fail status for each sample and metric,
                in CSV format to the given path. Returns true on a successful
                exit.
+
+               Writes metric values only for samples with a true value of
+               'include' in the SQLite database. Excluded samples are
+               instead output with dummy values.
+
   Returntype : Boolean
 
 =cut
@@ -551,7 +554,9 @@ sub _build_metric_names {
 
 sub _build_metric_results {
     # find QC results in metric-major order, return a hash reference
-    # "results" for gender, duplicate, and identity are complex! represent as lists. For other metrics, result is a single float. See methods in write_qc_status.pl
+    # "results" for gender, duplicate, and identity are represented as lists;
+    # others as a single float. See methods in
+    # WTSI::NPG::Genotyping::QC::Reports.
     my ($self,) = @_;
     my %allResults;
     foreach my $name (@{$self->metric_names}) {
