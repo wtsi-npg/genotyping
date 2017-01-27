@@ -120,7 +120,7 @@ ylab.name <- function(metricName) {
   } else if (metricName=='duplicate') {
     ylab.name <- "maximum similarity on test panel"
   } else if (metricName=='identity') {
-    ylab.name <- "identity with QC plex results"
+    ylab.name <- "probability of identity with QC plex results"
   } else if (metricName=='magnitude') {
     ylab.name <- "normalised magnitude of intensity"
   } else {
