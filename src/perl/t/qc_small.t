@@ -53,8 +53,6 @@ $outDir = tempdir("test_qc_components_XXXXXX", CLEANUP => 1);
 $status = system("$bin/check_identity_bayesian.pl --json $outDir/identity_check.json --csv $outDir/identity_check.csv --plex $plexManifest --plink $plink --vcf $vcf --sample_json $sampleJson");
 is($status, 0, "check_identity_bayesian.pl exit status");
 
-## 'Simple' identity check script is no longer in use; can be deleted?
-
 ## test call rate & heterozygosity computation
 my $crHetFinder = "snp_af_sample_cr_bed";
 $status = system("$crHetFinder -r $outDir/snp_cr_af.txt -s $outDir/sample_cr_het.txt $plink");
@@ -166,7 +164,7 @@ ok(-r $outDir.'/pipeline_summary.csv', "CSV summary found");
 ok(-r $outDir.'/pipeline_summary.pdf', "PDF summary found");
 
 
-## check that run_qc.pl dies with incorrect arguments for alternate ID check
+## check that run_qc.pl dies with incorrect arguments for identity check
 $outDir = tempdir("test_qc_script_XXXXXX", CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 my $cmd_base = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim --plink=$plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
@@ -180,13 +178,13 @@ isnt(system($cmd_base." --plex-manifests $plexManifest 2> /dev/null"), 0,
      'Non-zero exit for run_qc.pl with --plex-manifest but not --vcf');
 ok(!(-e $outDir.'/pipeline_summary.csv'), "CSV summary not found");
 
-## run_qc.pl again, without the arguments for alternate identity check
+## run_qc.pl again, without the arguments for identity check
 $outDir = tempdir("test_qc_script_XXXXXX", CLEANUP => 1);
 system("cp $dbfileMasterA $tempdir");
 $cmd = "$bin/run_qc.pl --output-dir=$outDir --dbpath=$dbfile --sim=$sim --plink=$plink --run=$piperun --inipath=$iniPath --mafhet --config=$config";
 
 is(system($cmd), 0,
-   "run_qc.pl bootstrap script exit status, no alternate identity check");
+   "run_qc.pl bootstrap script exit status, no identity check");
 
 ## test standalone report script
 print "\tTesting standalone report generation script.\n";
