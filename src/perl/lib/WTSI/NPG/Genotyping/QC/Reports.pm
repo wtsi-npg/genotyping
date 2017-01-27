@@ -32,9 +32,9 @@ our @METRIC_NAMES =  qw/identity duplicate gender call_rate heterozygosity
 
 sub createReports {
     # 'main' method to write text and PDF files
-    my ($texPath, $resultPath, $idPath, $config, $dbPath, $genderThresholdPath, $qcDir, $introPath, $qcName, $title, $author) = @_;
+    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath, $qcDir, $introPath, $qcName, $title, $author) = @_;
     $qcName ||= qcNameFromPath($qcDir);
-    writeSummaryLatex($texPath, $resultPath, $idPath, $config, $dbPath, 
+    writeSummaryLatex($texPath, $resultPath, $config, $dbPath,
                       $genderThresholdPath, $qcDir, $introPath,
                       $qcName, $title, $author);
     my $pdfOK = texToPdf($texPath);
@@ -121,13 +121,16 @@ sub latexFooter {
 sub latexHeader {
     my ($title, $author) = @_;
     my $date = strftime("%Y-%m-%d %H:%M", localtime(time()));
-    # formerly used graphicx, but all plots are now pdf
+    # formerly used graphicx, but all plots are now PDF
+    # hyperref package enables hyperlinks in PDF output
     my $header = '\documentclass{article} 
 \title{'.$title.'}
 \author{'.$author.'}
 \date{'.$date.'}
 
 \usepackage{pdfpages}
+
+\usepackage{hyperref}
 
 \renewcommand{\familydefault}{\sfdefault} % sans serif font
 
@@ -176,13 +179,12 @@ sub latexResultNotes {
 }
 
 sub latexSectionResults {
-    my ($config, $qcDir, $resultPath, $identityPath) = @_;
+    my ($config, $qcDir, $resultPath) = @_;
     my @lines = ();
     push @lines, "\\section{Results}\n\n";
-    push @lines, textForIdentity($identityPath);
     push @lines, "\\subsection{Tables}\n\n";
     my @titles = ("Pass/fail summary",
-                  "Key to metric abbreviations", 
+                  "Key to metric abbreviations",
                   "Total samples passing filters",
                   "Sample pass rates");
     my @refs = textForPlates($resultPath, $config);
@@ -190,12 +192,12 @@ sub latexSectionResults {
     my @centre = (0,0,1,1);
     for (my $i=0;$i<@refs;$i++) {
         push @lines, "\\subsubsection*{".$titles[$i]."}\n";
-        foreach my $table (latexTables($refs[$i], $headers[$i], $centre[$i])) { 
-            push @lines, $table."\n"; 
+        foreach my $table (latexTables($refs[$i], $headers[$i], $centre[$i])) {
+            push @lines, $table."\n";
         }
         if ($i>0) {
             push @lines, "\\clearpage\n\n"; # flush table buffer to output
-            push @lines, "\\pagebreak\n\n"; 
+            push @lines, "\\pagebreak\n\n";
         }
     }
     push @lines, latexResultNotes();
@@ -366,22 +368,6 @@ sub textForDatasets {
     return @text;
 }
 
-sub textForIdentity {
-    # text for subsection to describe status of identity metric
-    my $idResultsPath = shift;
-    my %results = %{readJson($idResultsPath)};
-    my $idCheck = $results{'identity_check_run'}; # was identity check run?
-    my $minSnps = $results{'min_snps'};
-    my $commonSnps = $results{'common_snps'}; # Illumina/Sequenom shared SNPs
-    my $text = "\\subsection{Identity Metric}\n\n\\begin{itemize}\n \\item Minimum number of SNPs for identity check = $minSnps\n\\item Common SNPs between input and QC plex = $commonSnps\n";
-    if ($idCheck) {
-	$text.= "\\item Identity check run successfully.\n\\end{itemize}\n\n";
-    } else {
-	$text.= "\\item \\textbf{Identity check omitted.} All samples pass with respect to identity; scatterplot not created.\n\\end{itemize}\n\n";
-    }
-    return $text;
-}
-
 sub textForMetrics {
     # text for metric threshold/description table
     my ($jsonPath, $mMax, $fMin) = @_;
@@ -520,7 +506,7 @@ sub texToPdf {
 
 sub writeSummaryLatex {
     # write .tex file for report
-    my ($texPath, $resultPath, $idPath, $config, $dbPath, $genderThresholdPath,
+    my ($texPath, $resultPath, $config, $dbPath, $genderThresholdPath,
         $qcDir, $introPath, $qcName, $title, $author) = @_;
     $texPath ||= "pipeline_summary.tex";
     $title ||= "Genotyping QC Report";
@@ -534,7 +520,7 @@ sub writeSummaryLatex {
     print $out latexSectionInput($qcName, $dbPath);
     print $out read_file($introPath); # new section = Preface
     print $out latexSectionMetrics($config, $genderThresholdPath);
-    print $out latexSectionResults($config, $qcDir, $resultPath, $idPath);
+    print $out latexSectionResults($config, $qcDir, $resultPath);
     print $out latexFooter();
     close $out || croak "Cannot close output path $texPath";
 }

@@ -9,7 +9,7 @@ use File::Temp qw(tempdir);
 use POSIX qw(ceil);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
  getPlateLocationsFromPath meanSd readMetricResultHash readQCMetricInputs
- readThresholds plateLabel);
+ readQCNameArray readThresholds plateLabel);
 use WTSI::NPG::Genotyping::QC::QCPlotTests qw(wrapCommand wrapPlotCommand);
 use Exporter;
 
@@ -99,6 +99,38 @@ sub metricMeanSd {
     else { return meanSd(@values); }
 }
 
+sub metricNames {
+    # arguments: paths to JSON results and config files
+    # find metrics in use for the given result set & check consistency
+    my ($resultsPath, $configPath) = @_;
+    my @allNames = readQCNameArray($configPath); # ensure consistent order
+    my %resultNames;
+    my %results = readMetricResultHash($resultsPath, $configPath);
+    my @samples = keys %results;
+    # arbitrarily choose a sample name to populate metric list
+    my $chosen = shift @samples;
+    foreach my $name (keys %{$results{$chosen}}) {
+        $resultNames{$name} = 1;
+    }
+    # now check other samples have the same set of metrics
+    foreach my $sample (keys %results) {
+        if ($sample eq $chosen) { next; }
+        my @sampleMetrics = keys %{$results{$sample}};
+        foreach my $name (@sampleMetrics) {
+            if (! defined $resultNames{$name}) {
+                croak("Inconsistent metric names for samples '", $sample,
+                      "' and '", $chosen, "'");
+            }
+        }
+    }
+    # keep members of the default name list which appear in the results
+    my @names;
+    foreach my $name (@allNames) {
+        if ($resultNames{$name}) { push @names, $name; }
+    }
+    return @names;
+}
+
 sub metricStatus {
     # did sample pass wrt all metrics other than the target?
     # code to record pass/fail status wrt this and other metrics
@@ -145,7 +177,7 @@ sub readThresholdsForMetric {
             if ($words[0] eq 'M_max') { $thresh1 = $words[1]; }
             elsif ($words[0] eq 'F_min') { $thresh2 = $words[1]; }
         }
-        close $in || croak "Cannot close gender file $gender";        
+        close $in || croak "Cannot close gender file $gender";
     } else {
         my %thresh = readThresholds($config);
         $thresh1 = $thresh{$metric};
@@ -276,9 +308,8 @@ sub runMetric {
 
 sub runAllMetrics {
     my ($qcDir, $outDir, $config, $gender, $dbPath, $iniPath, $resultPath,
-        $maxBatch, $noIntensity) = @_;
-    my @metrics = qw(call_rate duplicate heterozygosity identity gender);
-    if (!$noIntensity) { push(@metrics, qw/magnitude xydiff/); }
+        $maxBatch) = @_;
+    my @metrics = metricNames($resultPath, $config);
     foreach my $metric (@metrics) {
         runMetric($metric, $qcDir, $outDir, $config, $gender, $dbPath, 
                   $iniPath, $resultPath, $maxBatch);

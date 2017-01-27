@@ -19,7 +19,7 @@ my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";
 my $defaultPrefix = "pipeline_summary";
 
-my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath, $idPath,
+my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath,
     $dbPath, $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
 
 GetOptions("help"        => \$help,
@@ -59,10 +59,9 @@ if (!(-d $qcDir)) { croak "Path $qcDir is not a directory!"; }
 $configPath = defaultJsonConfig($iniPath);
 $texIntroPath = defaultTexIntroPath($iniPath);
 $resultPath = $qcDir."/qc_results.json";
-$idPath = $qcDir."/identity_check.json";
 $genderThresholdPath = $qcDir."/sample_xhet_gender_thresholds.txt";
 
-createReports($texPath, $resultPath, $idPath, $configPath, $dbPath, 
+createReports($texPath, $resultPath, $configPath, $dbPath,
               $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
 
 __END__
@@ -81,7 +80,7 @@ Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+Copyright (C) 2012, 2013, 2014, 2015, 2016, 2017 Genome Research Limited.
 All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify

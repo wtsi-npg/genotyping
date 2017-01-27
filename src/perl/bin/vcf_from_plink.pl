@@ -128,7 +128,8 @@ sub read_plink_calls {
     my ($pedPath, $plink_snps_ref) = @_;
     my @plink_snps = @{$plink_snps_ref};
     my @ped_lines = read_file($pedPath);
-    my $csv = Text::CSV->new({sep_char => " "});
+    my $csv = Text::CSV->new({sep_char => " ",
+                              binary   => 1 });
     my %calls_by_sample;
     foreach my $line (@ped_lines) {
         $csv->parse($line);
@@ -179,7 +180,8 @@ sub read_column {
     $sep_char ||= "\t";
     my @values;
     my @inLines = read_file($inPath);
-    my $csv = Text::CSV->new({sep_char => $sep_char});
+    my $csv = Text::CSV->new({sep_char => $sep_char,
+                              binary   => 1});
     foreach my $line (@inLines) {
         $csv->parse($line);
         my @fields = $csv->fields();
@@ -234,7 +236,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015, 2016 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -1,4 +1,7 @@
 {
+    "collation_names": {
+        "call_rate":"sample_cr_het.txt"
+    },
     "Metrics_thresholds": {
         "call_rate": 0.9
     },
