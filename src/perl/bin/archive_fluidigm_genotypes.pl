@@ -8,6 +8,7 @@ use Cwd qw/cwd/;
 use DateTime;
 use Getopt::Long;
 use Log::Log4perl qw(:levels);
+use Pod::Usage;
 use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Genotyping::Fluidigm::Archiver;
@@ -33,18 +34,20 @@ sub run {
     my $pigz_processes;
     my $verbose;
 
-    GetOptions('days-ago=i'       => \$days_ago,
-               'debug'            => \$debug,
-               'dry_run'          => \$dry_run,
-               'help'             => sub { pod2usage(-verbose => 2,
-                                                     -exitval => 0) },
-               'input_dir=s'      => \$input_dir,
-               'irods_root=s'     => \$irods_root,
-               'logconf=s'        => \$log4perl_config,
-               'output_dir=s'     => \$output_dir,
-               'output_prefix=s'  => \$output_prefix,
-               'pigz_processes=i' => \$pigz_processes,
-               'verbose'          => \$verbose);
+    GetOptions(
+        'days-ago|days_ago=i'             => \$days_ago,
+        'debug'                           => \$debug,
+        'dry-run|dry_run'                 => \$dry_run,
+        'help'                            => sub { pod2usage(-verbose => 2,
+                                                             -exitval => 0) },
+        'input-dir|input_dir=s'           => \$input_dir,
+        'irods-root|irods_root=s'         => \$irods_root,
+        'logconf=s'                       => \$log4perl_config,
+        'output-dir|output_dir=s'         => \$output_dir,
+        'output-prefix|output_prefix=s'   => \$output_prefix,
+        'pigz-processes|pigz_processes=i' => \$pigz_processes,
+        'verbose'                         => \$verbose
+    );
 
     unless ($irods_root) {
         pod2usage(-msg     => "An --irods-root argument is required\n",

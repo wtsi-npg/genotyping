@@ -59,7 +59,7 @@ use base qw(WTSI::NPG::Test);
 use Archive::Tar;
 use Cwd qw(abs_path);
 use File::Temp qw(tempdir);
-use Test::More tests => 8;
+use Test::More tests => 15;
 use Test::Exception;
 use WTSI::NPG::Database::WarehouseStub;
 use WTSI::NPG::iRODS;
@@ -114,6 +114,7 @@ sub make_fixture : Test(setup) {
          warehouse_db     => $whdb);
     $publisher->publish($irods_tmp_coll);
     $tmp = tempdir('FluidigmArchiverTest_XXXXXX', CLEANUP => 1);
+    $tmp = abs_path($tmp);
     $fluidigm_tmp = File::Spec->catfile($tmp, $fluidigm_directory_name);
     `cp -R $fluidigm_directory $tmp`;
 }
@@ -176,12 +177,12 @@ sub script : Test(3) {
     # reset mtime to an old date/time
     `find $fluidigm_tmp | xargs touch -d 2000-01-01`;
     my $script = './bin/archive_fluidigm_genotypes.pl';
+    my $output = "$tmp/fluidigm.txt";
     ok(system(join q{ }, "$script",
               "--input_dir $tmp",
               "--irods_root $irods_tmp_coll",
               "--output_dir $tmp",
-              "--debug",
-              "2>/tmp/fluidigm.txt",
+              "2> $output",
           ) == 0, "$script ran with zero exit status");
     my $archive_file =  $tmp."/fluidigm_2000-01.tar.gz";
     ok(-e $archive_file, 'Expected .tar.gz output exists');
@@ -189,4 +190,37 @@ sub script : Test(3) {
     $tar->read($archive_file);
     my @contents = $tar->list_files();
     is(scalar @contents, 6, 'Correct number of entries in .tar.gz archive');
+}
+
+sub script_dry_run : Test(7) {
+    # test the script in dry-run mode
+    # reset mtime to an old date/time
+    `find $fluidigm_tmp | xargs touch -d 2000-01-01`;
+    my $script = './bin/archive_fluidigm_genotypes.pl';
+    my $output = "$tmp/fluidigm.txt";
+    ok(system(join q{ }, "$script",
+              "--input_dir $tmp",
+              "--irods_root $irods_tmp_coll",
+              "--output_dir $tmp",
+              "--verbose",
+              "--dry_run",
+              "2> $output",
+          ) == 0, "$script ran in dry-run mode with zero exit status");
+    # check no archive has been written
+    my @archive_files = glob("$tmp/*.tar.gz");
+    is(scalar @archive_files, 0, 'No .tar.gz output in dry-run mode');
+    # check archivable files are still present
+    my $tmp_fluidigm_dir = "$tmp/$fluidigm_directory_name";
+    my @archivable_files = ("$tmp_fluidigm_dir/0123456789.csv", );
+    foreach my $name (qw/aramis.tif  athos.tif  porthos.tif/) {
+        push @archivable_files, "$tmp_fluidigm_dir/Data/$name";
+    }
+    foreach my $path (@archivable_files) {
+        ok(-e $path, "Archivable file $path exists after dry run");
+    }
+    # check for expected log output
+    my $msg = '"Dry-run mode: 1 inputs for archive path $archive_file"';
+    is(system("grep $msg $output"), 0, "Dry-run status OK in log output");
+
+
 }
