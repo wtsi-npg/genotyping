@@ -291,6 +291,7 @@ sub write_snpset_data {
   my $records_written = 0;
   my $csv = Text::CSV->new({eol              => "\n",
                             sep_char         => "\t",
+                            binary           => 1,
                             allow_whitespace => undef,
                             quote_char       => undef});
   $csv->column_names($self->column_names);
@@ -373,6 +374,7 @@ sub _parse_snps {
 
   my $csv = Text::CSV->new({eol              => "\n",
                             sep_char         => "\t",
+                            binary           => 1,
                             allow_whitespace => undef,
                             quote_char       => undef});
 

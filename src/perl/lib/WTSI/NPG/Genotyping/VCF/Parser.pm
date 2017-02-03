@@ -11,7 +11,10 @@ with 'WTSI::DNAP::Utilities::Loggable';
 has 'csv'         =>
    (is            => 'ro',
     isa           => 'Text::CSV',
-    default       => sub { return Text::CSV->new({sep_char => "\t"}); },
+    default       => sub {
+        return Text::CSV->new({sep_char => "\t",
+                               binary   => 1 });
+    },
     documentation => 'Object to parse tab-delimited input lines'
    );
 

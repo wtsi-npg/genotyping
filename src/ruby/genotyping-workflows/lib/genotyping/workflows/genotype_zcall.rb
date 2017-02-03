@@ -47,7 +47,6 @@ Arguments:
 
     config:        <path> of custom pipeline database .ini file. Optional.
     manifest:      <path> of the chip manifest file. Required.
-    plex_manifest: <path> of the qc plex manifest file. Required.
     egt:           <path> of the .EGT intensity cluster file. Required.
     chunk_size:    <integer> number of samples to analyse in a single 
                    job. Optional, defaults to 20.
@@ -102,16 +101,17 @@ Returns:
     def run(dbfile, run_name, work_dir, args = {})
       defaults = {}
       args = intern_keys(defaults.merge(args))
-      args = ensure_valid_args(args, :config, :manifest, :egt, :queue, 
-                               :memory, :select, :chunk_size, :fam_dummy,
-                               :zstart, :ztotal, :filterconfig, :nofilter, 
-                               :nosim, :vcf, :plex_manifest)
+      args = ensure_valid_args(args, :config, :manifest, :plex_manifest,
+                               :egt, :queue, :memory, :select, :chunk_size,
+                               :fam_dummy, :zstart, :ztotal,
+                               :filterconfig, :nofilter, 
+                               :nosim, :vcf)
 
       async_defaults = {:memory => 1024}
       async = lsf_args(args, async_defaults, :memory, :queue, :select)
 
       manifest_raw = args.delete(:manifest) 
-      plex_manifest = args.delete(:plex_manifest)
+      plex_manifest = args.delete(:plex_manifest) || Array.new()
       egt_file = args.delete(:egt) 
       chunk_size = args.delete(:chunk_size) || 10
       fam_dummy = args.delete(:fam_dummy) || -9
@@ -126,6 +126,12 @@ Returns:
       args.delete(:memory)
       args.delete(:queue)
       args.delete(:select)
+
+      if vcf.empty? and (not plex_manifest.empty?)
+        raise ArgumentError, "Plex manifest must be accompanied by VCF"
+      elsif (not vcf.empty?) and plex_manifest.empty?
+        raise ArgumentError, "VCF must be accompanied by plex manifest"
+      end
 
       ENV['PERL_INLINE_DIRECTORY'] = self.inline_dir
 
