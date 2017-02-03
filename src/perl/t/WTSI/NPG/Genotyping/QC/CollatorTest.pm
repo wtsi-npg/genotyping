@@ -1,6 +1,6 @@
 use utf8;
 
-package WTSI::NPG::Genotyping::QC::CollationTest;
+package WTSI::NPG::Genotyping::QC::CollatorTest;
 
 use strict;
 use warnings;
@@ -14,17 +14,17 @@ use JSON;
 use Text::CSV;
 
 use base qw(WTSI::NPG::Test);
-use Test::More tests => 16;
+use Test::More tests => 19;
 use Test::Exception;
 
-use WTSI::NPG::Genotyping::QC::Collation qw(collate);
+use WTSI::NPG::Genotyping::QC::Collator;
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(readSampleInclusion);
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
 
 our $log = Log::Log4perl->get_logger();
 
-BEGIN { use_ok('WTSI::NPG::Genotyping::QC::Collation'); }
+BEGIN { use_ok('WTSI::NPG::Genotyping::QC::Collator'); }
 
 my $temp_dir;
 my $dbName = 'small_test.db';
@@ -32,7 +32,6 @@ my $data_dir = "$Bin/qc_test_data/";
 my $example_dir = catfile($data_dir, 'output_examples');
 
 my $configPath = catfile($data_dir, 'config_test.json');
-my $thresholdPath = $configPath;
 my $dbPath = catfile($data_dir, 'small_test.db');
 my $iniPath =  $ENV{HOME} . "/.npg/genotyping.ini";
 
@@ -43,7 +42,7 @@ my $csvExpected = catfile($example_dir, 'qc_results.csv');
 my $expectedCsvContents;
 
 sub make_fixture : Test(setup) {
-    $temp_dir = tempdir("CollationTest_XXXXXX", CLEANUP => 1);
+    $temp_dir = tempdir("CollatorTest_XXXXXX", CLEANUP => 1);
     open my $fh, "<", $csvExpected || $log->logcroak("Cannot open CSV '",
                                                      $csvExpected, "'");
     my $csv = Text::CSV->new();
@@ -52,29 +51,35 @@ sub make_fixture : Test(setup) {
 }
 
 sub require : Test(1) {
-  require_ok('WTSI::NPG::Genotyping::QC::Collation');
+  require_ok('WTSI::NPG::Genotyping::QC::Collator');
 }
 
-sub collation : Test(6) {
+sub collation : Test(9) {
     my $jsonResults = catfile($temp_dir, 'qc_results.json');
     my $jsonMetrics = catfile($temp_dir, 'qc_metrics.json');
     my $csvPath = catfile($temp_dir, 'qc_results.csv');
     my $exclude = 0;
-    my $metricsRef = 0;
-    my $verbose = 0;
-    collate($example_dir, $configPath, $thresholdPath, $dbPath, $iniPath,
-            $jsonResults, $jsonMetrics, $csvPath,
-            $exclude, $metricsRef, $verbose);
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+        db_path     => $dbPath,
+        ini_path    => $iniPath,
+        input_dir   => $example_dir,
+        config_path => $configPath
+    );
+    ok($collator->writeMetricJson($jsonMetrics), 'Write metrics JSON');
     ok(-e $jsonMetrics, "JSON metrics path exists");
     my $got_metrics = decode_json(read_file($jsonMetrics));
     my $expected_metrics = decode_json(read_file($metricsExpected));
     is_deeply($got_metrics, $expected_metrics,
               "JSON metrics data equivalent to expected");
+
+    ok($collator->writePassFailJson($jsonResults), 'Write results JSON');
     ok(-e $jsonResults, "JSON results path exists");
     my $got_results = decode_json(read_file($jsonResults));
     my $expected_results = decode_json(read_file($resultsExpected));
     is_deeply($got_results, $expected_results,
               "JSON results data equivalent to expected");
+
+    ok($collator->writeCsv($csvPath), 'Write CSV');
     ok(-e $csvPath, "CSV results path exists");
     open my $fh, "<", $csvPath || $log->logcroak("Cannot open CSV '",
                                                  $csvPath, "'");

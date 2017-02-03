@@ -16,7 +16,7 @@ use Pod::Usage;
 
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Version qw(write_version_log);
-use WTSI::NPG::Genotyping::QC::Collation qw(collate readMetricThresholds);
+use WTSI::NPG::Genotyping::QC::Collator;
 use WTSI::NPG::Genotyping::QC::PlinkIO qw(checkPlinkBinaryInputs);
 use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultConfigDir defaultJsonConfig defaultTexIntroPath readQCFileNames);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports);
@@ -323,17 +323,19 @@ sub run_qc {
     ### collate inputs, write JSON and CSV ###
     my $csvPath = $outDir."/pipeline_summary.csv";
     my $statusJson = $outDir."/qc_results.json";
-    my $metricJson = "";
+    my $duplicates = $outDir."/duplicate_results.json";
     # first pass -- standard thresholds, no DB update
-    my @allMetricNames = keys(%{readMetricThresholds($configPath)});
-    my @metricNames = ();
-    foreach my $metric (@allMetricNames) {
-	if ($intensity || ($metric ne 'magnitude' && $metric ne 'xydiff')) {
-	    push(@metricNames, $metric);
-	}
+    my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+        db_path   => $dbPath,
+        ini_path  => $iniPath,
+        input_dir => $outDir,
+        config_path => $configPath
+    );
+    $collator->writePassFailJson($statusJson);
+    $collator->writeCsv($csvPath);
+    if ($collator->hasDuplicatesThreshold()) {
+        $collator->writeDuplicates($duplicates);
     }
-    collate($outDir, $configPath, $configPath, $dbPath, $iniPath,
-	    $statusJson, $metricJson, $csvPath, 0, \@metricNames);
     ### plot generation ###
     @cmds = ();
     my $dbopt = "--dbpath=$dbPath ";
@@ -363,10 +365,23 @@ sub run_qc {
     if ($filter) {
 	# second pass -- evaluate filter metrics/thresholds
 	# update DB unless the --include option is in effect
-	$csvPath = $outDir."/filter_results.csv";
+        my $collator = WTSI::NPG::Genotyping::QC::Collator->new(
+            db_path   => $dbPath,
+            ini_path  => $iniPath,
+            input_dir => $outDir,
+            config_path => $filter
+        );
 	$statusJson = $outDir."/filter_results.json";
-	collate($outDir, $configPath, $filter, $dbPath, $iniPath,
-		$statusJson, $metricJson, $csvPath, $exclude);
+	$csvPath = $outDir."/filter_results.csv";
+        $duplicates = $outDir."/filter_duplicates.json";
+        $collator->writePassFailJson($statusJson);
+        $collator->writeCsv($csvPath);
+        if ($collator->hasDuplicatesThreshold()) {
+            $collator->writeDuplicates($duplicates);
+        }
+        if ($exclude) {
+            $collator->excludeFailedSamples();
+        }
     }
     ## create 'supplementary' directory and move files
     cleanup($outDir);
@@ -524,7 +539,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Genome Research Limited.
 All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
