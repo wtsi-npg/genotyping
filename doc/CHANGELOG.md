@@ -4,22 +4,26 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
-Unreleased
-----------
-
-Added:
-- Replace old identity check with new Bayesian version in "main" QC output
-and plots
-
-Release 1.13.1: 2016-07-28
+Release 1.14.0: 2017-02-07
 --------------------------
 
+Added:
+- Gencall workflow:
+  - Writes Plink data and runs QC for Gencall only
+  - New option in ready_workflow.pl
+- Replace old identity metric with new Bayesian version, which will:
+   - Appear in main QC output and plots
+   - Contribute to sample pass/fail status
+
 Changed:
-- Made install.sh more transparent and portable.
-- Updated WTSI-DNAP-Utilities and perl-irods-wrap versions in install.sh.
+- Extensive refactoring of Collation.pm, to make it more maintainable
+and support Log4Perl. Module renamed Collator.pm and changed into a
+Moose class.
 
 Fixed:
-- Default LSF queue for Ruby workflows
+- Check for allowed combination of plex manifests and VCF files in
+workflow arguments (Issue #434) 
+- Create Text::CSV objects with binary flag enabled (Issue #406)
 
 
 Release 1.13.2: 2016-11-10
@@ -29,7 +33,7 @@ Changed:
 - Hotfix: Add cgp and ddd references to WTSI::NPG::Genotyping::QC::Identity
 
 
-Release 1.13.1: 2016-07-28
+Release 1.13.1: 2016-07-28 
 --------------------------
 
 Changed:
