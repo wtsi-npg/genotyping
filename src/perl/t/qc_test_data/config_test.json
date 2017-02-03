@@ -5,12 +5,10 @@
                   "duplicate":"duplicate_full.txt.gz",
                   "duplicate_subsets":"duplicate_subsets.json",  
                   "gender":"sample_xhet_gender.txt",
-                  "magnitude":"magnitude.txt",
-		  "het_by_maf":"small_test_maf_het.json"},
+                  "magnitude":"magnitude.txt"
+                  },
    "Metrics_thresholds" : {
       "heterozygosity" : 3,
-      "low_maf_het" : 3,
-      "high_maf_het" : 3,
       "gender" : "NA",
       "identity" : 0.9,
       "magnitude" : 0.9,
