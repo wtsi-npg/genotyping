@@ -365,17 +365,27 @@ sub write_plex_results {
             );
             my $manifest_dir = catfile($workdir, $PLEX_MANIFEST_SUBDIRECTORY);
             $plex_manifests = $finder->write_manifests($manifest_dir);
-            $log->info("Wrote plex manifests: ",
-                       join(', ', @{$plex_manifests}));
+            $log->info("Wrote plex manifests: (",
+                       join(', ', @{$plex_manifests}), ")");
             my $vcf_dir = catfile($workdir, $VCF_SUBDIRECTORY);
             $vcf = $finder->write_vcf($vcf_dir);
-            $log->info("Wrote VCF: ", join(', ', @{$vcf}));
+            $log->info("Wrote VCF: (", join(', ', @{$vcf}), ")");
         } catch {
             $log->logwarn("Unexpected error finding QC plex data in ",
-                          "iRODS; VCF and plex manifests not written; ",
-                          "run with --verbose for details");
+                          "iRODS; run with --verbose for details");
             $log->info("Caught PlexResultFinder error: $_");
         }
+    }
+    if (scalar @{$plex_manifests} != 0 && scalar @{$vcf} == 0) {
+        $log->info('Found plex manifests: (',
+                      join(', ', @{$plex_manifests}), ') but no VCF data; ',
+                      'omitting plex manifests from pipeline YML');
+        $plex_manifests = [];
+    } elsif (scalar @{$plex_manifests} == 0 && scalar @{$vcf} != 0) {
+        $log->info('Found VCF: (',
+                   join(', ', @{$vcf}), ') but no plex manifests; ',
+                   'omitting VCF from pipeline YML');
+        $vcf = [];
     }
     return ($plex_manifests, $vcf);
 }
