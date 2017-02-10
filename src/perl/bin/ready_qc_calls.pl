@@ -11,11 +11,11 @@ use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
 use List::AllUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
@@ -45,24 +45,6 @@ my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_qc_calls');
 
-my $embedded_conf = "
-   log4perl.logger.npg.ready_qc_calls = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
-
 run() unless caller();
 
 sub run {
@@ -90,21 +72,13 @@ sub run {
 
     $inifile ||= $DEFAULT_INI;
 
-    ### set up logging ###
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.vcf.qc');
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.vcf.qc');
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    my $log = Log::Log4perl->get_logger('main');
 
     ### validate command-line arguments ###
     my @config = split(/,/msx, $config);
@@ -156,8 +130,7 @@ sub run {
     try {
         my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
             sample_ids => \@sample_ids,
-            subscriber_config => \@config,
-            logger     => $log,
+            subscriber_config => \@config
         );
         my $plex_manifests = $finder->write_manifests($manifest_dir);
         $log->info("Wrote plex manifests: ", join(', ', @{$plex_manifests}));

@@ -13,10 +13,11 @@ use File::Spec::Functions qw(catfile);
 use File::Temp qw(tempdir);
 use Getopt::Long;
 use IO::ScalarArray;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use POSIX qw(mkfifo);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::DNAP::Utilities::IO qw(maybe_stdin  maybe_stdout);
 use WTSI::NPG::Genotyping qw(read_sample_json);
 use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
@@ -24,14 +25,21 @@ use WTSI::NPG::Genotyping::Illuminus qw(nullify_females
                                         update_it_columns
                                         write_gt_calls
                                         write_it_header);
+use WTSI::NPG::Utilities qw(user_session_log);
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'perl_illuminus_wrap');
+my $log;
+
 our $VERSION = '';
 
-Log::Log4perl->easy_init($ERROR);
-
 my $chromosome;
+my $debug;
 my $end;
 my $executable;
 my $input;
+my $log4perl_config;
 my $output;
 my $plink;
 my $samples;
@@ -40,9 +48,11 @@ my $verbose;
 my $whole_genome_amplified;
 
 GetOptions('chr=s'     => \$chromosome,
+           'debug'     => \$debug,
            'end=i'     => \$end,
            'help'      => sub { pod2usage(-verbose => 2, -exitval => 0) },
            'input=s'   => \$input,
+           'logconf=s' => \$log4perl_config,
            'output=s'  => \$output,
            'plink'     => \$plink,
            'samples=s' => \$samples,
@@ -75,6 +85,14 @@ if (defined $plink && !defined $output) {
             -exitval => 2);
 }
 
+my @log_levels;
+if ($debug) { push @log_levels, $DEBUG; }
+if ($verbose) { push @log_levels, $INFO; }
+log_init(config => $log4perl_config,
+         file   => $session_log,
+         levels => \@log_levels);
+$log = Log::Log4perl->get_logger('main');
+
 $chromosome = uc($chromosome);
 $executable = 'illuminus';
 
@@ -102,20 +120,18 @@ if ($whole_genome_amplified) {
 if ($plink) {
   push(@command, '-b', '-out', $output);
   # Maybe muffle Illuminus' STDOUT chatter
-  unless ($verbose) {
+  unless ($verbose || $debug) {
     push(@command, "> /dev/null");
   }
 
   my $command = join(" ", @command);
-  if ($verbose) {
-    print STDERR "Executing '$command'\n";
-  }
+  $log->info("Executing '", $command, "'");
 
   if ($chromosome eq 'Y') {
     nullify_females($input, $command, \@samples);
   }
   else {
-    system($command) == 0 or die "Failed to execute '$command'\n";
+    system($command) && $log->logcroak("Failed to execute '", $command, "'");
   }
 
   exit(0);
@@ -135,7 +151,7 @@ else {
 
   my $pid = fork();
   if (! defined $pid) {
-    die "Failed to fork: $!\n";
+    $log->logcroak("Failed to fork: $!");
   }
   elsif ($pid) {
     my @calls;
@@ -146,18 +162,20 @@ else {
     # interleave reads and make this a nice stream. We have to slurp all
     # of one, then the other.
     open(my $calls, '<', "$calls_fifo")
-      or die "Failed to open '$calls_fifo': $!\n";
+      or $log->logcroak("Failed to open FIFO '", $calls_fifo, "': $!");
     while (my $line = <$calls>) {
       push(@calls, $line);
     }
-    close($calls) or warn "Failed to close FIFO $calls_fifo: $!\n";
+    close($calls) or $log->logwarn("Failed to close FIFO '",
+                                   $calls_fifo, "': $!");
 
     open(my $probs, '<', "$probs_fifo")
-      or die "Failed to open '$probs_fifo': $!\n";
+      or $log->logcroak("Failed to open '", $probs_fifo, "': $!");
     while (my $line = <$probs>) {
       push(@probs, $line);
     }
-    close($probs) or warn "Failed to close FIFO $probs_fifo: $!\n";
+    close($probs) or $log->logwarn("Failed to close FIFO '",
+                                   $probs_fifo, "': $!");
 
     # write_gt_calls requires streams, so this is a shim to pretend that
     # we have such
@@ -171,20 +189,19 @@ else {
   }
   else {
     # Maybe muffle Illuminus' STDOUT chatter
-    unless ($verbose) {
+    unless ($verbose || $debug) {
       push(@command, "> /dev/null");
     }
 
     my $command = join(" ", @command);
-    if ($verbose) {
-      print STDERR "Executing '$command'\n";
-    }
+    $log->info("Executing '", $command, "'");
 
     if ($chromosome eq 'Y') {
       nullify_females($input, $command, \@samples, $verbose);
     }
     else {
-      system($command) == 0 or die "Failed to execute '$command'\n";
+      system($command) && $log->logcroak("Failed to execute '",
+                                         $command, "'");
     }
 
     exit;
@@ -213,7 +230,7 @@ sub write_gender_codes {
   my ($file, $chromosome, $samples) = @_;
 
   open(my $genders, '>', "$file")
-    or die "Failed to open '$file' for writing: $!\n";
+    or $log->logcroak("Failed to open '", $file, "' for writing: $!");
   foreach my $sample (@$samples) {
     my $code = 0;
     if ($chromosome =~ m{^M}msx) {
@@ -223,12 +240,14 @@ sub write_gender_codes {
     }
     unless (defined $code) {
       my $uri = $sample->{uri};
-      die "Failed to find a gender code for sample $uri in '$file'\n";
+      $log->logcroak("Failed to find a gender code for sample ", $uri,
+                     " in '", $file, "': $!");
     }
 
     print $genders "$code\n";
   }
-  close($genders) or warn "Failed to close gender code file '$file'\n";
+  close($genders) or $log->logwarn("Failed to close gender code file '",
+                                   $file, "': $!");
 
   return $file;
 }
@@ -236,7 +255,8 @@ sub write_gender_codes {
 sub make_fifo {
   my $filename = shift;
 
-  mkfifo($filename, '0400') or die "Failed to create FIFO '$filename': $!\n";
+  mkfifo($filename, '0400') or $log->logcroak("Failed to create FIFO '",
+                                              $filename, "': $!");
 
   return $filename;
 }
@@ -286,11 +306,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2012, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

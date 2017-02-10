@@ -7,28 +7,23 @@ package main;
 use strict;
 use warnings;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+
 use Pod::Usage;
 use Try::Tiny;
+use Log::Log4perl qw(:levels);
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Expression::InfiniumDataObject;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::Utilities qw(user_session_log);
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'update_expression_metadata');
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
-
-my $log;
 
 run() unless caller();
 
@@ -80,21 +75,13 @@ sub run {
     }
   }
 
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
@@ -102,7 +89,7 @@ sub run {
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
 
-  my $irods = WTSI::NPG::iRODS->new(logger => $log);
+  my $irods = WTSI::NPG::iRODS->new();
   my @gex_data;
 
   if ($stdio) {
@@ -192,11 +179,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

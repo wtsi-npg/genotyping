@@ -1,4 +1,4 @@
-package WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+package WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric;
 
 # class to do Bayesian identity computation for a single sample
 # Similar to older SampleIdentity class, but metrics are Bayesian probabilities, not simple match/mismatch rates
@@ -227,7 +227,7 @@ sub missing {
 
 =head2 swap_metric
 
-  Arg [1]    : WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian
+  Arg [1]    : WTSI::NPG::Genotyping::QC::BayesianIdentity::SampleMetric
 
   Example    : my $swap = $si->swap_metric($other_si)
   Description: Evaluate the swap metric on two sample identity objects,
@@ -331,7 +331,7 @@ sub to_csv {
             push @csv_fields, @callset_fields;
         }
     }
-    my $csv = Text::CSV->new();
+    my $csv = Text::CSV->new({ binary => 1 });
     $csv->combine(@csv_fields);
     return $csv->string;
 }

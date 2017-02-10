@@ -11,24 +11,20 @@ use DateTime;
 use File::Basename;
 use Getopt::Long;
 use List::AllUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Infinium::Publisher;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::Utilities qw(user_session_log);
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_infinium_genotypes');
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -90,23 +86,13 @@ sub run {
   $days     ||= $DEFAULT_DAYS;
   $days_ago ||= 0;
 
-  my $log;
-
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   my $now = DateTime->now;
   my $end;
@@ -123,15 +109,13 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError           => 1,
-                               mysql_enable_utf8    => 1,
-                               mysql_auto_reconnect => 1);
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
+                                  mysql_auto_reconnect => 1);
 
   my @files;
   if ($stdio) {
@@ -141,7 +125,8 @@ sub run {
     }
   }
   else {
-    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    my $irods = WTSI::NPG::iRODS->new();
+    $log->info("Finding files to publish in Infinium LIMS");
     @files = find_files_to_publish($ifdb, $begin, $end, $project, $irods,
                                    $publish_dest, $force, $log);
   }
@@ -154,22 +139,22 @@ sub run {
   }
   elsif ($project) {
     $log->info("Publishing to '$publish_dest' Infinium results in project ",
-               "'$project'");
+               "'$project', $total files in total");
   }
   else {
     $log->info("Publishing to '$publish_dest' Infinium results ",
-               "scanned between ", $begin->iso8601, " and ", $end->iso8601);
-
-    $log->debug("Publishing $total files");
+               "scanned between ", $begin->iso8601, " and ", $end->iso8601,
+               ", $total files in total");
   }
 
   my $publisher = WTSI::NPG::Genotyping::Infinium::Publisher->new
     (publication_time => $now,
      data_files       => \@files,
      infinium_db      => $ifdb,
-     ss_warehouse_db  => $ssdb,
-     logger           => $log);
+     ss_warehouse_db  => $ssdb);
   $publisher->publish($publish_dest);
+
+  $log->info("Finished publishing $total files");
 
   return 0;
 }
@@ -239,7 +224,7 @@ sub find_files_to_publish {
             }
             elsif ($num_matches == 1) {
               push @data_objects, @matches;
-              $log->info("Found a match for '$file' with MD5 '$md5'");
+              $log->debug("Found a match for '$file' with MD5 '$md5'");
             }
             else {
               push @data_objects, $matches[0];
@@ -254,8 +239,8 @@ sub find_files_to_publish {
       my $num_files        = scalar @candidate_files;
       my $num_data_objects = scalar @data_objects;
 
-      $log->info("Beadchip '$chip' section '$section' data objects published ",
-                 "previously: $num_data_objects/$num_files");
+      $log->debug("Beadchip '$chip' section '$section' data objects ",
+                  "published previously: $num_data_objects/$num_files");
 
       if ($num_data_objects < $num_files || $force) {
         push @to_publish, @candidate_files;
@@ -318,11 +303,12 @@ terminate the command line with the '-' option. In this mode, the
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2012-2013 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

@@ -130,9 +130,6 @@ use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Infinium;
 use WTSI::NPG::Genotyping::Infinium::Publisher;
 use WTSI::NPG::iRODS;
-use WTSI::NPG::Utilities qw(collect_files
-                            collect_dirs
-                            modified_between);
 
 my $config = $ENV{HOME} . "/.npg/genotyping.ini";
 

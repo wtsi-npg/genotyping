@@ -9,11 +9,11 @@ use warnings;
 use File::Slurp qw(read_file);
 use Getopt::Long;
 use JSON;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Text::CSV;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Call;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::VCF::DataRow;
@@ -25,28 +25,9 @@ use WTSI::NPG::Utilities qw(user_session_log);
 
 our $VERSION = '';
 
-
 my $uid = `whoami`;
 chomp($uid);
-my $session_log = user_session_log($uid, 'check_identity_bed_wip');
-
-my $embedded_conf = "
-   log4perl.logger.npg.genotyping.vcf_from_plink = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
+my $session_log = user_session_log($uid, 'vcf_from_plink');
 
 run() unless caller();
 
@@ -73,20 +54,13 @@ sub run {
         'verbose'           => \$verbose,
     );
 
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.vcf_from_plink');
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.vcf_from_plink');
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    my $log = Log::Log4perl->get_logger('main');
 
     unless ($contigs && $manifest && $plink && $vcf) {
         $log->logcroak("Missing required argument: Must supply --contigs, ",
@@ -154,7 +128,8 @@ sub read_plink_calls {
     my ($pedPath, $plink_snps_ref) = @_;
     my @plink_snps = @{$plink_snps_ref};
     my @ped_lines = read_file($pedPath);
-    my $csv = Text::CSV->new({sep_char => " "});
+    my $csv = Text::CSV->new({sep_char => " ",
+                              binary   => 1 });
     my %calls_by_sample;
     foreach my $line (@ped_lines) {
         $csv->parse($line);
@@ -205,7 +180,8 @@ sub read_column {
     $sep_char ||= "\t";
     my @values;
     my @inLines = read_file($inPath);
-    my $csv = Text::CSV->new({sep_char => $sep_char});
+    my $csv = Text::CSV->new({sep_char => $sep_char,
+                              binary   => 1});
     foreach my $line (@inLines) {
         $csv->parse($line);
         my @fields = $csv->fields();
@@ -260,7 +236,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

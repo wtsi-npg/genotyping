@@ -7,11 +7,11 @@ use Config::IniFiles;
 use File::Slurp qw (read_file);
 use Getopt::Long;
 use JSON;
-use Log::Log4perl;
-use Log::Log4perl::Level;
 use Pod::Usage;
+use Log::Log4perl qw(:levels);
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
-use WTSI::NPG::Genotyping::QC_wip::Check::Identity;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Check;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Genotyping::VCF::Slurper;
 use WTSI::NPG::iRODS;
@@ -23,24 +23,6 @@ our $VERSION = '';
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'check_identity_bed_wip');
-
-my $embedded_conf = "
-   log4perl.logger.npg.genotyping.qc.identity = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
 
 run() unless caller();
 
@@ -83,24 +65,17 @@ sub run {
         'verbose'           => \$verbose,
         'xer=f'             => \$expected_error_rate);
 
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    my $log = Log::Log4perl->get_logger('main');
 
     ### set up iRODS connection and make it use same logger as script ###
     my $irods = WTSI::NPG::iRODS->new;
-    $irods->logger($log);
+    $irods->logger();
 
     ### read equivalent calls probability by SNP from JSON, if given
     my $ecp;
@@ -119,6 +94,8 @@ sub run {
             $log->logcroak("Cannot read sample JSON path '$sample_json'");
         }
         my $sample_data = decode_json(read_file($sample_json));
+        $log->debug("Read sample JSON data for ", scalar @{$sample_data},
+                    " samples");
         # generate a hash mapping sanger sample ID to URI
         foreach my $sample (@{$sample_data}) {
             my $ssid = $sample->{'sanger_sample_id'};
@@ -190,8 +167,7 @@ sub run {
 
     ### create identity check object ###
     my %args = (plink_path         => $plink,
-                snpset             => $snpset,
-                logger             => $log);
+                snpset             => $snpset);
     if (defined($swap_threshold)) {$args{'swap_threshold'} = $swap_threshold;}
     if (defined($pass_threshold)) {$args{'pass_threshold'} = $pass_threshold;}
     if (defined($ecp)) { $args{'equivalent_calls_probability'} = $ecp;  }
@@ -203,7 +179,8 @@ sub run {
         $args{'expected_error_rate'} = $expected_error_rate;
     }
     $log->debug("Creating identity check object");
-    my $checker = WTSI::NPG::Genotyping::QC_wip::Check::Identity->new(%args);
+    my $checker =
+        WTSI::NPG::Genotyping::QC::BayesianIdentity::Check->new(%args);
 
     ### read QC plex calls from VCF file(s) ###
     my %qc_calls;
@@ -235,6 +212,8 @@ sub run {
             my $uri = $ssid_to_uri{$ssid};
             if ($uri) {
                 push @{$qc_calls{$uri}}, @{$vcf_calls{$ssid}};
+                $log->debug("Appending calls for URI '", $uri, "', SSID '",
+                            $ssid, "'");
             } else {
                 # samples in QC plex results do not necessarily appear in
                 # production, eg. sample exclusion in Illuminus/zCall
@@ -254,11 +233,11 @@ __END__
 
 =head1 NAME
 
-check_identity_bed_wip
+check_identity_bayesian
 
 =head1 SYNOPSIS
 
-check_identity_bed_wip --vcf <VCF file> --plink <path stem>
+check_identity_bayesian --vcf <VCF file> --plink <path stem>
 --sample_json <path > [--plex <path>] [--plex-irods <irods location>]
 [--pass-threshold <f>] [--swap_threshold <f>] [--help] [--verbose]
 
@@ -307,7 +286,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2015, 2016 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2015, 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

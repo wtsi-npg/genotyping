@@ -15,13 +15,13 @@ use File::Spec::Functions qw(catfile);
 use FindBin qw($Bin);
 use Getopt::Long;
 use JSON;
-use List::AllUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use List::AllUtils qw(none uniq);
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
 use YAML qw /DumpFile/;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Database::Pipeline;
 use WTSI::NPG::Genotyping::VCF::PlexResultFinder;
 use WTSI::NPG::Utilities qw(user_session_log);
@@ -31,8 +31,11 @@ our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $PERCOLATE_LOG_NAME = 'percolate.log';
 our $GENOTYPING_DB_NAME = 'genotyping.db';
+
+our $MODULE_GENCALL = 'Genotyping::Workflows::GenotypeGencall';
 our $MODULE_ILLUMINUS = 'Genotyping::Workflows::GenotypeIlluminus';
 our $MODULE_ZCALL = 'Genotyping::Workflows::GenotypeZCall';
+our $GENCALL = 'gencall';
 our $ILLUMINUS = 'illuminus';
 our $ZCALL = 'zcall';
 
@@ -49,23 +52,6 @@ our $PLEX_MANIFEST_SUBDIRECTORY = 'plex_manifests';
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_workflow');
-
-my $embedded_conf = "
-   log4perl.logger.npg.genotyping.ready_workflow = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
 my $log;
 
 run() unless caller();
@@ -119,57 +105,54 @@ sub run {
 	       'ztotal=i'        => \$ztotal,
 	);
 
-    ### set up logging ###
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.ready_workflow');
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.ready_workflow');
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    $log = Log::Log4perl->get_logger('main');
 
     ### process command-line arguments ###
+
+    # required arguments for all workflows
+    my %required_args = (
+        workdir  => $workdir,
+        run      => $run,
+        workflow => $workflow,
+        dbfile   => $dbfile,
+        manifest => $manifest
+    );
+    my @required_args = sort keys %required_args;
+    my @workflows = ($GENCALL, $ILLUMINUS, $ZCALL);
+    foreach my $name (@required_args) {
+        if (! defined $required_args{$name}) {
+            $log->logcroak("Argument --$name is required");
+        }
+        if ($name eq 'workflow') {
+            if (none { $_ eq $required_args{$name} } @workflows) {
+                $log->logcroak('--$name argument must be one of: ',
+                               join(', ', @workflows));
+            }
+        } elsif ($name eq 'dbfile' || $name eq 'manifest') {
+            if (! -e $required_args{$name}) {
+                $log->logcroak("Path argument to --$name does not exist: '",
+                               $required_args{$name}, "'");
+            }
+        }
+    }
+    $workdir = abs_path($workdir);
+    $log->info("Working directory absolute path is '", $workdir, "'");
+
+    # optional arguments for all workflows
+    $memory  ||= $DEFAULT_MEMORY;
+    $host    ||= $DEFAULT_HOST;
     $inifile ||= $DEFAULT_INI;
     if (! -e $inifile) {
         $log->logcroak("--inifile argument '", $inifile, "' does not exist");
     }
-    if ($workdir) {
-        $workdir = abs_path($workdir);
-        $log->info("Working directory absolute path is '", $workdir, "'");
-    } else {
-        $log->logcroak("--workdir argument is required");
-    }
-    if (!$run) {
-        $log->logcroak("--run argument is required");
-    }
-    if (!$dbfile) {
-        $log->logcroak("--dbfile argument is required");
-    } elsif (! -e $dbfile) {
-        $log->logcroak("--dbfile argument '", $dbfile, "' does not exist");
-    }
-    if (!$manifest) {
-        $log->logcroak("--manifest argument is required");
-    } elsif (! -e $manifest) {
-        $log->logcroak("--manifest argument '", $manifest,
-                       "' does not exist");
-    }
-    if (defined($no_filter)) { $no_filter = 'true'; } # Boolean value for Ruby
-    else { $no_filter = 'false'; }
-    if (!$workflow) {
-        $log->logcroak("--workflow argument is required");
-    } elsif (!($workflow eq $ILLUMINUS || $workflow eq $ZCALL)) {
-        $log->logcroak("Invalid workflow argument; must be '",
-                       $ILLUMINUS, "' or '", $ZCALL, "'");
-    }
-    if (defined($egt) && !(-e $egt)) {
-        $log->logcroak("--egt argument '", $egt, "' does not exist");
+    if (! defined $config_out) {
+        $config_out = workflow_config_path($workdir, $workflow, $local);
     }
     if (scalar @plex_config == 0) { # get defaults from perl/etc directory
         my $etc_dir = catfile($Bin, "..", "etc");
@@ -183,17 +166,49 @@ sub run {
                            "' does not exist");
         }
     }
-    $host ||= $DEFAULT_HOST;
-    # illuminus paralellizes by SNP, other callers by sample
-    if ($workflow eq 'illuminus') { $chunk_size ||= $DEFAULT_CHUNK_SIZE_SNP; }
-    else { $chunk_size ||= $DEFAULT_CHUNK_SIZE_SAMPLE; }
-    $memory ||= $DEFAULT_MEMORY;
 
-    # ensure $zstart, $ztotal are initialized before comparison
-    $zstart ||= $DEFAULT_ZSTART;
-    $ztotal ||= $DEFAULT_ZTOTAL;
-    if ($zstart <=0) { $log->logcroak("zstart must be > 0"); }
-    if ($ztotal <=0) { $log->logcroak("ztotal must be > 0"); }
+    # arguments for illuminus and zcall only
+    if (defined $no_filter) {
+        if ($workflow eq $GENCALL) {
+            $log->logcroak('--nofilter option is not compatible with the ',
+                           $GENCALL, 'workflow');
+        }
+        $no_filter = 'true';  # Boolean value for Ruby
+    } else {
+        $no_filter = 'false';
+    }
+    if (defined $chunk_size) {
+        if ($workflow eq $GENCALL) {
+            $log->logcroak('--chunk_size option is not compatible with the ',
+                           $GENCALL, 'workflow');
+        }
+    } elsif ($workflow eq $ILLUMINUS) {
+        $chunk_size = $DEFAULT_CHUNK_SIZE_SNP;
+    } else {
+        $chunk_size = $DEFAULT_CHUNK_SIZE_SAMPLE;
+    }
+
+    # arguments for zcall only
+    my $msg = " argument is only compatible with the $ZCALL workflow;".
+        " given workflow is '$workflow'";
+    if ($workflow eq $ZCALL) {
+        # check EGT & assign zstart/ztotal defaults
+        if (! defined $egt) {
+            $log->logcroak("--egt argument is required for $ZCALL workflow");
+        } elsif (! -e $egt) {
+            $log->logcroak("--egt argument '$egt' does not exist");
+        }
+        $zstart ||= $DEFAULT_ZSTART;
+        $ztotal ||= $DEFAULT_ZTOTAL;
+        if ($zstart <=0) { $log->logcroak("zstart must be > 0"); }
+        if ($ztotal <=0) { $log->logcroak("ztotal must be > 0"); }
+    } elsif (defined $egt) {
+        $log->logcroak('--egt', $msg);
+    } elsif (defined $zstart) {
+        $log->logcroak('--zstart', $msg);
+    } elsif (defined $ztotal) {
+        $log->logcroak('--ztotal', $msg);
+    }
 
     ### create and populate the working directory ###
     make_working_directory($workdir, $local);
@@ -212,34 +227,32 @@ sub run {
         }
     }
     ### generate the workflow config and write as YML ###
-    unless (defined($config_out)) {
-        $config_out = workflow_config_path($workdir, $workflow, $local);
-    }
     my %workflow_args = (
         'manifest'      => $manifest,
-        'chunk_size'    => $chunk_size,
         'memory'        => $memory,
-        'nofilter'      => $no_filter,
         'queue'         => $queue,
         'vcf'           => $vcf,
         'plex_manifest' => $plex_manifests,
     );
+
     my $workflow_module;
-    if ($workflow eq $ILLUMINUS) {
+    if ($workflow eq $GENCALL) {
+        $workflow_module = $MODULE_GENCALL;
+    } elsif ($workflow eq $ILLUMINUS) {
+        $workflow_args{'chunk_size'} = $chunk_size;
+        $workflow_args{'nofilter'} = $no_filter;
         $workflow_args{'gender_method'} = 'Supplied';
         $workflow_module = $MODULE_ILLUMINUS;
     } elsif ($workflow eq $ZCALL) {
         $workflow_module = $MODULE_ZCALL;
-        if (!($egt && $zstart && $ztotal)) {
-            $log->logcroak("Must specify EGT, zstart, and ztotal for ",
-                           "zcall workflow");
-        }
+        $workflow_args{'chunk_size'} = $chunk_size;
+        $workflow_args{'nofilter'} = $no_filter;
         $workflow_args{'egt'} = $egt;
         $workflow_args{'zstart'} = $zstart;
         $workflow_args{'ztotal'} = $ztotal;
     } else {
         $log->logcroak("Invalid workflow argument '", $workflow,
-                       "'; must be one of $ILLUMINUS, $ZCALL");
+                       "'; must be one of $GENCALL, $ILLUMINUS, $ZCALL");
     }
     my @args = ($dbfile, $run, $workdir, \%workflow_args);
     my %params = (
@@ -342,25 +355,37 @@ sub write_plex_results {
                  on_connect_do  => 'PRAGMA foreign_keys = ON');
         my @samples = $pipedb->sample->all;
         my @sample_ids = uniq map { $_->sanger_sample_id } @samples;
+        if (scalar @sample_ids == 0) {
+            $log->logwarn("No sample IDs found in pipeline SQLite DB");
+        }
         try {
             my $finder = WTSI::NPG::Genotyping::VCF::PlexResultFinder->new(
                 sample_ids => \@sample_ids,
-                logger     => $log,
                 subscriber_config => $plex_config,
             );
             my $manifest_dir = catfile($workdir, $PLEX_MANIFEST_SUBDIRECTORY);
             $plex_manifests = $finder->write_manifests($manifest_dir);
-            $log->info("Wrote plex manifests: ",
-                       join(', ', @{$plex_manifests}));
+            $log->info("Wrote plex manifests: (",
+                       join(', ', @{$plex_manifests}), ")");
             my $vcf_dir = catfile($workdir, $VCF_SUBDIRECTORY);
             $vcf = $finder->write_vcf($vcf_dir);
-            $log->info("Wrote VCF: ", join(', ', @{$vcf}));
+            $log->info("Wrote VCF: (", join(', ', @{$vcf}), ")");
         } catch {
             $log->logwarn("Unexpected error finding QC plex data in ",
-                          "iRODS; VCF and plex manifests not written; ",
-                          "run with --verbose for details");
+                          "iRODS; run with --verbose for details");
             $log->info("Caught PlexResultFinder error: $_");
         }
+    }
+    if (scalar @{$plex_manifests} != 0 && scalar @{$vcf} == 0) {
+        $log->info('Found plex manifests: (',
+                      join(', ', @{$plex_manifests}), ') but no VCF data; ',
+                      'omitting plex manifests from pipeline YML');
+        $plex_manifests = [];
+    } elsif (scalar @{$plex_manifests} == 0 && scalar @{$vcf} != 0) {
+        $log->info('Found VCF: (',
+                   join(', ', @{$vcf}), ') but no plex manifests; ',
+                   'omitting VCF from pipeline YML');
+        $vcf = [];
     }
     return ($plex_manifests, $vcf);
 }
@@ -515,7 +540,7 @@ Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2016 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2016, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

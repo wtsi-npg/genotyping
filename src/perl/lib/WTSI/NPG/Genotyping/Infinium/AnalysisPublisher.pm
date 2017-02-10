@@ -113,7 +113,7 @@ sub publish {
 
   unless (@project_titles) {
     $self->logcroak("The analysis database contained no data for run '",
-                    $self->run_name, "'")
+                    $self->run_name, "'");
   }
 
   my $analysis_coll;

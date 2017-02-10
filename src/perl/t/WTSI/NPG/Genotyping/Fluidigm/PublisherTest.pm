@@ -206,8 +206,13 @@ sub publish_sqscp_no_id : Test(19) {
      warehouse_db     => $whdb);
 
   my @addresses_to_publish = qw(S01);
-  my $num_published = $publisher->publish($irods_tmp_coll,
-                                          @addresses_to_publish);
+  my $num_published;
+  do {
+      local *STDERR;
+      open (STDERR, '>', '/dev/null'); # suppress warning output to STDERR
+      $num_published = $publisher->publish($irods_tmp_coll,
+                                           @addresses_to_publish);
+  };
   cmp_ok($num_published, '==', scalar @addresses_to_publish,
          "Number of chunks published");
 

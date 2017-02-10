@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use Carp;
-use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig 
+use WTSI::NPG::Genotyping::QC::QCPlotShared qw(defaultJsonConfig
                                                defaultTexIntroPath);
 use WTSI::NPG::Genotyping::QC::Reports qw(createReports qcNameFromPath);
 
@@ -19,7 +19,7 @@ my $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 my $defaultInput = ".";
 my $defaultPrefix = "pipeline_summary";
 
-my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath, $idPath,
+my ($help, $prefix, $texPath, $iniPath, $resultPath, $configPath,
     $dbPath, $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
 
 GetOptions("help"        => \$help,
@@ -32,8 +32,8 @@ GetOptions("help"        => \$help,
 if ($help) {
     print STDERR "Usage: $0 [ options ]
 Convenience script to regenerate the PDF report file.
-This script does not regenerate plots contained in the PDF report.  
-In order to regenerate plots, re-run the individual plotting scripts, 
+This script does not regenerate plots contained in the PDF report.
+In order to regenerate plots, re-run the individual plotting scripts,
 such as plot_scatter_metric.pl for metric scatterplots.
 Options:
 --input             Path to \"supplementary\" directory containing QC results.
@@ -59,8 +59,38 @@ if (!(-d $qcDir)) { croak "Path $qcDir is not a directory!"; }
 $configPath = defaultJsonConfig($iniPath);
 $texIntroPath = defaultTexIntroPath($iniPath);
 $resultPath = $qcDir."/qc_results.json";
-$idPath = $qcDir."/identity_check.json";
 $genderThresholdPath = $qcDir."/sample_xhet_gender_thresholds.txt";
 
-createReports($texPath, $resultPath, $idPath, $configPath, $dbPath, 
+createReports($texPath, $resultPath, $configPath, $dbPath,
               $genderThresholdPath, $qcDir, $texIntroPath, $qcName);
+
+__END__
+
+=head1 NAME
+
+write_qc_reports
+
+=head1 DESCRIPTION
+
+Generate genotyping QC summary reports
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2014, 2015, 2016, 2017 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

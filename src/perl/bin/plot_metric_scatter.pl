@@ -19,10 +19,10 @@ use WTSI::NPG::Genotyping::QC::MetricScatterplots qw(runAllMetrics);
 our $VERSION = '';
 
 Log::Log4perl->easy_init($ERROR);
-my $log = Log::Log4perl->get_logger("genotyping");
+my $log = Log::Log4perl->get_logger();
 
-my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath, 
-    $resultpath, $maxBatch, $noIntensity);
+my ($qcDir, $outDir, $title, $help, $config, $gender, $dbpath, $inipath,
+    $resultpath, $maxBatch);
 
 GetOptions("qcdir=s"    => \$qcDir,
            "outdir=s"   => \$outDir,
@@ -32,7 +32,6 @@ GetOptions("qcdir=s"    => \$qcDir,
            "gender=s"   => \$gender,
            "inipath=s"  => \$inipath,
            "resultpath=s"  => \$resultpath,
-           "no-intensity"  => \$noIntensity,
            "max"        => \$maxBatch,
            "h|help"     => \$help);
 
@@ -52,7 +51,6 @@ Options:
 --gender=PATH       Path to .txt file with gender thresholds
 --qcdir=PATH        Directory for QC input
 --outdir=PATH       Directory for output; defaults to qcdir
---no-intensity      Omit intensity metric (normalized signal magnitude)
 --max               Maximum number of samples on any one plot
 --help              Print this help text and exit
 Unspecified options will receive default values.
@@ -70,9 +68,40 @@ $config ||= defaultJsonConfig($inipath);
 
 my @paths = ($qcDir, $outDir, $dbpath, $inipath, $resultpath, $config);
 foreach my $path (@paths) {
-    if (!(-r $path)) { croak "Cannot read path $path"; }
+    if (!(-r $path)) { croak("Cannot read path '", $path, "'"); }
 }
 
-runAllMetrics($qcDir, $outDir, $config, $gender, $dbpath, $inipath, 
-              $resultpath, $maxBatch, $noIntensity);
+runAllMetrics($qcDir, $outDir, $config, $gender, $dbpath, $inipath,
+              $resultpath, $maxBatch);
 
+
+__END__
+
+=head1 NAME
+
+plot_metric_scatter
+
+=head1 DESCRIPTION
+
+Create scatterplots of QC metrics using R
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2015, 2017 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

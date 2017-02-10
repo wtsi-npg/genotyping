@@ -1,4 +1,14 @@
 {
+    "collation_names": {
+        "heterozygosity":"sample_cr_het.txt",
+        "het_by_maf":"het_by_maf.json",
+        "call_rate":"sample_cr_het.txt",
+        "xydiff":"xydiff.txt",
+        "identity":"identity_check.json",
+        "duplicate":"duplicate_full.txt.gz",
+        "duplicate_subsets":"duplicate_subsets.json",  
+        "gender":"sample_xhet_gender.txt",
+        "magnitude":"magnitude.txt"},
     "Metrics_thresholds": {
         "call_rate": 0.98,
         "duplicate": 0.98,

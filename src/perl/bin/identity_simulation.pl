@@ -9,13 +9,12 @@ use strict;
 
 use FindBin qw($Bin);
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Genotyping::Call;
-use WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator;
-use WTSI::NPG::Genotyping::QC_wip::Check::SampleIdentityBayesian;
+use WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator;
 use WTSI::NPG::Genotyping::SNPSet;
 use WTSI::NPG::Utilities qw(user_session_log);
 
@@ -30,25 +29,7 @@ our $VERSION = '';
 
 my $uid = `whoami`;
 chomp($uid);
-my $session_log = user_session_log($uid, 'check_identity_bed_wip');
-
-my $embedded_conf = "
-   log4perl.logger.npg.genotyping.qc.identity = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
-my $log;
+my $session_log = user_session_log($uid, 'identity_simulation');
 
 run() unless caller();
 
@@ -87,20 +68,13 @@ sub run {
         'total=i'           => \$total,
         'verbose'           => \$verbose);
 
-    if ($log4perl_config) {
-        Log::Log4perl::init($log4perl_config);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
-    }
-    else {
-        Log::Log4perl::init(\$embedded_conf);
-        $log = Log::Log4perl->get_logger('npg.genotyping.qc.identity');
-        if ($verbose) {
-            $log->level($INFO);
-        }
-        elsif ($debug) {
-            $log->level($DEBUG);
-        }
-    }
+    my @log_levels;
+    if ($debug) { push @log_levels, $DEBUG; }
+    if ($verbose) { push @log_levels, $INFO; }
+    log_init(config => $log4perl_config,
+             file   => $session_log,
+             levels => \@log_levels);
+    my $log = Log::Log4perl->get_logger('main');
 
     my $data_path = $Bin.'/../t/qc/check/identity';
     $snpset_file ||= "$data_path/W30467_snp_set_info_1000Genomes.tsv";
@@ -108,10 +82,9 @@ sub run {
 
     my $calls = generate_calls($snpset);
 
-    my $idsim = WTSI::NPG::Genotyping::QC_wip::Check::IdentitySimulator->new(
+    my $idsim = WTSI::NPG::Genotyping::QC::BayesianIdentity::Simulator->new(
         calls  => $calls,
-        snpset => $snpset,
-        logger => $log,
+        snpset => $snpset
     );
 
     my $results;

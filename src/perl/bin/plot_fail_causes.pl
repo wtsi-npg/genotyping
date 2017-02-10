@@ -165,19 +165,19 @@ sub writeFailCounts {
         };
     }
     open my $out, ">", $failText ||
-      die "Cannot open output file $failText: $!\n";
+        croak("Cannot open output file '", $failText, "': $!");
     my @metrics = sort(keys(%singleFails));
     foreach my $metric (@metrics) {
         print $out $metric."\t".$singleFails{$metric}."\n";
     }
-    close $out;
+    close $out || croak("Cannot close output file '", $failText, "'");
     my @failCombos = sort(keys(%combinedFails));
     open $out, ">", $comboText ||
-      die "Cannot open output file $failText: $!\n";
+        croak("Cannot open output file '", $comboText, "': $!");
     foreach my $combo (@failCombos) {
         print $out $combo."\t".$combinedFails{$combo}."\n";
     }
-    close $out;
+    close $out || croak("Cannot close output file '", $comboText, "': $!");
     return @failedSamples;
 }
 
@@ -191,7 +191,8 @@ sub writeFailedCrHet {
     my @header = qw(sample cr het);
     my @keys = qw(duplicate gender identity magnitude);
     push(@header, @keys);
-    open my $out, ">", $outPath || die "Cannot open output path $outPath: $!\n";
+    open my $out, ">", $outPath || croak("Cannot open output path '",
+                                         $outPath, "': $!");
     print $out join("\t", @header)."\n";
     foreach my $fieldsRef (@data) {
         my @fields = splice(@$fieldsRef, 0, 3);
@@ -208,7 +209,7 @@ sub writeFailedCrHet {
         }
         print $out join("\t", @fields)."\n";
     }
-    close $out;
+    close $out || croak("Cannot close output path '", $outPath, "': $!");
     return 1;
 }
 
@@ -217,7 +218,7 @@ sub run {
     my ($inputPath, $qcConfigPath, $outputsRef, $title, $crHetPath) = @_;
     my %qcResults = WTSI::NPG::Genotyping::QC::QCPlotShared::readMetricResultHash($inputPath, $qcConfigPath);
     unless (containsFailedSample(\%qcResults)) {
-	print STDERR "No samples failed QC thresholds; omitting failure plots.\n";
+	carp("No samples failed QC thresholds; omitting failure plots.");
 	return 1;
     }
     my ($failText, $comboText, $causeText, $comboPdf, $causePdf, 
@@ -239,7 +240,7 @@ sub run {
     @args = ("plotCombinedFails.R", $comboText, $title, $comboPdf);
     @outputs = ($comboPng,);
     $ok = WTSI::NPG::Genotyping::QC::QCPlotTests::wrapPlotCommand(\@args, \@outputs);
-    unless ($ok) { confess "Error for combined failure barplot: $!"; }    
+    unless ($ok) { confess "Error for combined failure barplot: $!"; }
     my %thresholds =  WTSI::NPG::Genotyping::QC::QCPlotShared::readThresholds($qcConfigPath);
     my ($hetMean, $hetSd) = findHetMeanSd($crHetPath);
     my $hetMaxDist = $hetSd * $thresholds{'heterozygosity'};
@@ -253,3 +254,35 @@ sub run {
 my $allPlotsOK = run($inPath, $configPath, \@outputPaths, $title, $crHetPath);
 if ($allPlotsOK) { exit(0); }
 else { exit(1); }
+
+
+__END__
+
+=head1 NAME
+
+plot_fail_causes
+
+=head1 DESCRIPTION
+
+Plot causes of genotyping QC failure using R
+
+=head1 AUTHOR
+
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited.
+All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Perl Artistic License or the GNU General
+Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

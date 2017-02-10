@@ -6,9 +6,11 @@ package main;
 
 use strict;
 use warnings;
+use Carp;
 use Getopt::Long;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
+use WTSI::DNAP::Utilities::ConfigureLogger qw/log_init/;
 
 use WTSI::NPG::Utilities::DelimitedFiles qw(read_fon
                                             find_column_indices
@@ -17,29 +19,37 @@ use WTSI::NPG::Utilities::DelimitedFiles qw(read_fon
 use WTSI::NPG::Genotyping::Illuminus qw(read_gt_column_names
                                         filter_gt_columns);
 
-our $VERSION = '';
+use WTSI::NPG::Utilities qw(user_session_log);
 
-Log::Log4perl->easy_init($ERROR);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'filter_illuminus_output');
+
+our $VERSION = '';
 
 run() unless caller();
 
 sub run {
   my $columns;
+  my $debug;
   my $gt_input;
   my $gt_output;
+  my $log4perl_config;
   my $operation;
   my $pr_input;
   my $pr_output;
   my $verbose;
 
-  GetOptions('columns=s' => \$columns,
-             'gt-input=s' => \$gt_input,
+  GetOptions('columns=s'   => \$columns,
+             'debug'       => \$debug,
+             'gt-input=s'  => \$gt_input,
              'gt-output=s' => \$gt_output,
-             'help' => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'help'        => sub { pod2usage(-verbose => 2, -exitval => 0) },
+             'logconf=s'   => \$log4perl_config,
              'operation=s' => \$operation,
-             'pr-input=s' => \$pr_input,
+             'pr-input=s'  => \$pr_input,
              'pr-output=s' => \$pr_output,
-             'verbose' => \$verbose);
+             'verbose'     => \$verbose);
 
   unless ($gt_input) {
     pod2usage(-msg => "A --gt-input argument is required\n",
@@ -62,6 +72,14 @@ sub run {
               -exitval => 2);
   }
 
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
+
   my $gt_offset = 1; # 1 leading column in genotype files
   my $pr_offset = 3; # 3 leading columns in probability files
 
@@ -81,18 +99,21 @@ sub run {
   }
 
   open(my $col, '<', "$columns")
-    or die "Failed to open column file '$columns' for reading: $!\n";
+    or $log->logcroak("Failed to open column file '", $columns,
+                      "' for reading: $!");
   my $column_names = read_fon($col);
-  close($col) or warn "Failed to close column file '$columns'\n";
+  close($col) or $log->logwarn("Failed to close column file '",
+                               $columns, "': $!");
 
   open(my $gti, '<', "$gt_input")
-    or die "Failed to open genotype file '$gt_input' for reading: $!\n";
+    or $log->logcroak("Failed to open genotype file '", $gt_input,
+                      "' for reading: $!");
   open(my $gto, '>', "$gt_output")
-    or die "Failed to open genotype file '$gt_output' for writing: $!\n";
+    or $log->logcroak("Failed to open genotype file '", $gt_output,
+                      "' for writing: $!");
 
   my $headers = read_gt_column_names($gti);
   my $cols_to_use = find_column_indices($column_names, $headers);
-  my $num_cols = scalar @$cols_to_use;
 
   print $gto $gt_separator,
     join($gt_separator, filter_columns($headers, $cols_to_use, $operation)), "\n";
@@ -100,31 +121,37 @@ sub run {
   my $num_genotypes =
     filter_gt_columns($gti, $gto, $gt_separator, $gt_offset, $gt_col_group,
                       $cols_to_use, $operation);
-  close($gto) or warn "Failed to close genotype file '$gt_output'\n";
-  close($gti) or warn "Failed to close genotype file '$gt_input'\n";
+
+  close($gto) or $log->logwarn("Failed to close genotype file '",
+                               $gt_output, "': $!");
+  close($gti) or $log->logwarn("Failed to close genotype file '",
+                               $gt_input, "': $!");
 
   open(my $pri, '<', "$pr_input")
-    or die "Failed to open probability file '$pr_input' for reading: $!\n";
+    or $log->logcroak("Failed to open probability file '",
+                      $pr_input, "' for reading: $!");
   open(my $pro, '>', ">pr_output")
-    or die "Failed to open probability file '$pr_output' for writing: $!\n";
+    or $log->logcroak("Failed to open probability file '",
+                      $pr_output, "' for writing: $!");
 
   my $num_probs =
     filter_gt_columns($pri, $pro, $pr_separator, $pr_offset, $pr_col_group,
                       $cols_to_use, $operation);
-  close($pro) or warn "Failed to close probability file '$pr_output'\n";
-  close($pri) or warn "Failed to close probability file '$pr_input'\n";
+  close($pro) or $log->logwarn("Failed to close probability file '",
+                               $pr_output, "': $!");
+  close($pri) or $log->logwarn("Failed to close probability file '",
+                               $pr_input, "': $!");
 
   unless ($num_genotypes == $num_probs) {
-    die "Number of SNP genotype records ($num_genotypes) in '$gt_input' " .
-      "was not equal to the number of SNP probability records ($num_probs) " .
-        "in '$pr_input'\n";
+      $log->logcroak("Number of SNP genotype records (", $num_genotypes,
+                     ") in '", $gt_input, "' was not equal to the number ",
+                     "of SNP probability records (", $num_probs,
+                     ") in '", $pr_input, "'");
   }
 
-  if ($verbose) {
-    my $verb = $operation . "d";
-    my $num_cols = scalar @$cols_to_use;
-    print STDERR "$verb $num_cols columns from $num_genotypes records\n";
-  }
+  my $verb = $operation . "d";
+  my $num_cols = scalar @$cols_to_use;
+  $log->info("$verb $num_cols columns from $num_genotypes records");
 
   return;
 }
@@ -173,11 +200,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2011, 2012, 2015 Genome Research Limited. All Rights
+Copyright (C) 2011, 2012, 2015, 2016 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify

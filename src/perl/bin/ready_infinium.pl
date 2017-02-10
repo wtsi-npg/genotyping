@@ -9,10 +9,10 @@ use strict;
 use Config::IniFiles;
 use Getopt::Long;
 use List::AllUtils qw(any uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping;
 use WTSI::NPG::Genotyping::Database::Pipeline;
@@ -52,23 +52,6 @@ our $DEFAULT_DATA_PATH      = '/seq/fluidigm';
 my $uid = `whoami`;
 chomp($uid);
 my $session_log = user_session_log($uid, 'ready_infinium');
-
-my $embedded_conf = "
-   log4perl.logger.npg.irods.publish = ERROR, A1, A2
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-
-   log4perl.appender.A2           = Log::Log4perl::Appender::File
-   log4perl.appender.A2.filename  = $session_log
-   log4perl.appender.A2.utf8      = 1
-   log4perl.appender.A2.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A2.layout.ConversionPattern = %d %p %m %n
-   log4perl.appender.A2.syswrite  = 1
-";
-
 my $log;
 
 run() unless caller();
@@ -133,21 +116,13 @@ sub run {
     pod2usage(-msg => "Invalid namespace '$namespace'\n", -exitval => 2);
   }
 
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  $log = Log::Log4perl->get_logger('main');
 
   unless (-e $dbfile) {
       $log->logcroak("SQLite database file '$dbfile' does not exist");
@@ -189,15 +164,13 @@ sub run {
 
   my $ifdb = WTSI::NPG::Genotyping::Database::Infinium->new
     (name    => 'infinium',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name    => 'sequencescape_warehouse',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError           => 1,
-                               mysql_enable_utf8    => 1,
-                               mysql_auto_reconnect => 1);
+     inifile => $config)->connect(RaiseError           => 1,
+                                  mysql_enable_utf8    => 1,
+                                  mysql_auto_reconnect => 1);
 
   my @chip_designs = @{$ifdb->find_project_chip_design($project_title)};
   unless (@chip_designs) {
@@ -426,8 +399,7 @@ sub run {
 
                my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
                    (name    => 'snp',
-                    inifile => $config,
-                    logger  => $log)->connect(RaiseError => 1);
+                    inifile => $config)->connect(RaiseError => 1);
 
                $inserted = insert_sequenom_calls($pipedb, $snpdb,
                                                  \@samples, $qc_plex);
@@ -436,7 +408,7 @@ sub run {
                my $irods = WTSI::NPG::iRODS->new;
                $inserted = insert_fluidigm_calls($pipedb, $irods,
                                                  \@samples, $qc_plex,
-                                                 $reference_path, $log);
+                                                 $reference_path);
            } else {
                $log->logcroak("Unexpected QC platform '$qc_platform'");
            }
@@ -466,7 +438,7 @@ sub validate_snpset {
 
 sub insert_fluidigm_calls {
   # returns the number of samples for which calls were inserted
-  my ($pipedb, $irods, $samples, $qc_plex, $reference_path, $log) = @_;
+  my ($pipedb, $irods, $samples, $qc_plex, $reference_path) = @_;
 
   my $method = $pipedb->method->find({name => 'Fluidigm'});
   $method or $log->logcroak("The genotyping method 'Fluidigm' is ",
@@ -483,8 +455,7 @@ sub insert_fluidigm_calls {
      data_path      => $DEFAULT_DATA_PATH,
      reference_path => $reference_path,
      reference_name => $reference_name,
-     snpset_name    => $snpset->name,
-     logger         => $log);
+     snpset_name    => $snpset->name);
   my ($resultsets, $vcf_meta) =
       $subscriber->get_assay_resultsets_and_vcf_metadata(\@sample_ids);
 
@@ -668,11 +639,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2012, 2013, 2014, 2015 Genome Research Limited. All
+Copyright (C) 2012, 2013, 2014, 2015, 2016 Genome Research Limited. All
 Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify

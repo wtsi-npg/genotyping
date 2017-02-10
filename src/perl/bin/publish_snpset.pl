@@ -7,13 +7,19 @@ use warnings;
 use Cwd qw(abs_path);
 use DateTime;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Moose;
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Genotyping::SNPSetPublisher;
+use WTSI::NPG::Utilities qw(user_session_log);
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_snpset');
+
 
 our $VERSION = '';
 
@@ -73,23 +79,13 @@ sub run {
               -exitval => 2);
   }
 
-  my $log;
-
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   my $irods = WTSI::NPG::iRODS->new;
   $irods->logger($log);
@@ -103,8 +99,7 @@ sub run {
      publication_time => DateTime->now,
      reference_names  => \@references,
      snpset_name      => $snpset,
-     snpset_platform  => $platform,
-     logger           => $log);
+     snpset_platform  => $platform);
 
   my $rods_path = $publisher->publish($publish_dest);
 
@@ -148,11 +143,11 @@ timestamp, MD5 sum etc.) the following are added:
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (c) 2014 Genome Research Limited. All Rights Reserved.
+Copyright (c) 2014, 2015, 2016 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General

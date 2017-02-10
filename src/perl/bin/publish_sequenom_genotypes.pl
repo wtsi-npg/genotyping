@@ -9,23 +9,19 @@ use warnings;
 use DateTime;
 use Getopt::Long;
 use List::AllUtils qw(uniq);
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Database::Warehouse;
 use WTSI::NPG::Genotyping::Database::Sequenom;
 use WTSI::NPG::Genotyping::Database::SNP;
 use WTSI::NPG::Genotyping::Sequenom::Publisher;
+use WTSI::NPG::Utilities qw(user_session_log);
 
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_sequenom_genotypes');
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
@@ -75,23 +71,13 @@ sub run {
   $days     ||= $DEFAULT_DAYS;
   $days_ago ||= 0;
 
-  my $log;
-
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   my $now = DateTime->now;
   my $end;
@@ -108,13 +94,11 @@ sub run {
 
   my $sqdb = WTSI::NPG::Genotyping::Database::Sequenom->new
     (name    => 'mspec2',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $snpdb = WTSI::NPG::Genotyping::Database::SNP->new
     (name    => 'snp',
-     inifile => $config,
-     logger  => $log)->connect(RaiseError => 1);
+     inifile => $config)->connect(RaiseError => 1);
 
   my $ssdb = WTSI::NPG::Database::Warehouse->new
     (name   => 'sequencescape_warehouse',
@@ -130,7 +114,7 @@ sub run {
     }
   }
   else {
-    my $irods = WTSI::NPG::iRODS->new(logger => $log);
+    my $irods = WTSI::NPG::iRODS->new();
     @plate_names = find_plates_to_publish($sqdb, $begin, $end, $irods,
                                           $publish_dest, $force, $log);
   }
@@ -158,8 +142,7 @@ sub run {
        plate_name       => $plate_name,
        sequenom_db      => $sqdb,
        snp_db           => $snpdb,
-       ss_warehouse_db  => $ssdb,
-       logger           => $log);
+       ss_warehouse_db  => $ssdb);
 
     $publisher->publish($publish_dest);
     $published++;

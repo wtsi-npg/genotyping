@@ -44,6 +44,7 @@ require 'genotyping/tasks/quality_control'
 require 'genotyping/tasks/simtools'
 require 'genotyping/tasks/zcall'
 
+require 'genotyping/workflows/genotype_gencall'
 require 'genotyping/workflows/genotype_illuminus'
 require 'genotyping/workflows/genotype_zcall'
-require 'genotyping/workflows/identity_qc'
+

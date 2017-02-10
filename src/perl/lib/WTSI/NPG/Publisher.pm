@@ -91,10 +91,10 @@ sub publish_file {
 
   if (@existing) {
     my $existing_obj = WTSI::NPG::iRODS::DataObject->new($irods, $existing[0]);
-    $self->warn("While publishing '", $target_obj->str, "' identified by ",
-                $meta_str, " found existing sample data: '",
-                $existing_obj->str, "' identified by ",
-                $existing_obj->meta_str);
+    $self->debug("While publishing '", $target_obj->str, "' identified by ",
+                 $meta_str, " found existing sample data: '",
+                 $existing_obj->str, "' identified by ",
+                 $existing_obj->meta_str);
 
     # Tidy existing file checksum before proceeding
     $self->_ensure_checksum($existing_obj);
@@ -107,11 +107,12 @@ sub publish_file {
       if ($md5 eq $existing_md5) {
         $self->info("Skipping publication of '", $target_obj->str,
                     "' because existing object '", $existing_obj->str,
-                    "' exists with the same checksum");
+                    "' exists with the same checksum '", $md5, "'");
       }
       else {
         $self->info("Republishing '", $existing_obj->str, "' in situ ",
-                    "because the checksum is changed");
+                    "because the checksum is changed from ",
+                    "'$existing_md5' to '$md5'");
 
         $irods->replace_object($file, $existing_obj->str);
         foreach my $avu ($target_obj->find_in_metadata('md5')) {
@@ -127,16 +128,17 @@ sub publish_file {
       if ($md5 eq $existing_md5) {
         $self->info("Moving existing object '", $existing_obj->str,
                     "' to new location '", $target_obj->str,
-                    "' without changing its content because the checksum ",
-                    "is unchanged");
+                    "' without changing its content because the checksum '",
+                    $md5, "' is unchanged");
         # The following moves any metadata too
         $irods->move_object($existing_obj->str, $target_obj->str);
       }
       else {
-        $self->info("Moving '", $existing_obj->str, ' to ',
+        $self->info("Moving existing object '", $existing_obj->str,
+                    "' to new location '",
                     $target_obj->str, "' and republishing over it ",
                     "because the checksum is changed from ",
-                    "'$existing_md5' to '$md5'");
+                    "'", $existing_md5, "' to '", $md5, "'");
         # The following moves any metadata too
         $irods->move_object($existing_obj->str, $target_obj->str);
 
@@ -154,7 +156,17 @@ sub publish_file {
   }
   else {
     $self->info("Publishing new object '$target'");
-    $irods->add_object($file, $target_obj->str);
+
+    # This used to use just 'add_object' in order to trigger an error
+    # if an aun-annotated file were already there. However, a file may
+    # be present due to iRODS failures, which triggers an unnecessary
+    # error. Now we use 'replace_object', which forces an overwrite.
+    if ($target_obj->is_present) {
+      $irods->replace_object($file, $target_obj->str);
+    }
+    else {
+      $irods->add_object($file, $target_obj->str);
+    }
 
     my $creator_uri = $self->affiliation_uri;
     my $publisher_uri = $self->accountee_uri;

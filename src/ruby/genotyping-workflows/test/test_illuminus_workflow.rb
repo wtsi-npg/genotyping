@@ -46,29 +46,28 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
     manifest = manifest_path
     name = 'test_genotype_illuminus'
 
+    run_name = 'run1'
+    pipe_ini = File.join(data_path, 'genotyping.ini')
+    fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
+    vcf = File.join(external_data, 'sequenom_abvc.vcf')
+    plex_0 = File.join(external_data, 'W30467_snp_set_info_GRCh37.tsv')
+    plex_1 = File.join(external_data, 'qc_fluidigm_snp_info_GRCh37.tsv')
+    # plex_1 not needed for workflow, but tests handling multiple plex args
+
     run_test_if((lambda { illuminus_available? && manifest } and method(:plinktools_diff_available?)), "Skipping #{name}") do
+
       work_dir = make_work_dir(name, data_path)
       dbfile = File.join(work_dir, name + '.db')
-      run_name = 'run1'
-      pipe_ini = File.join(data_path, 'genotyping.ini')
-
       FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile)
-      fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
-      vcf = File.join(external_data, 'sequenom_abvc.vcf')
-      plex_0 = File.join(external_data, 'W30467_snp_set_info_GRCh37.tsv')
-      plex_1 = File.join(external_data, 'qc_fluidigm_snp_info_GRCh37.tsv')
-      # plex_1 not needed for workflow, but tests handling multiple plex args
-
       args_hash = {:manifest => manifest,
-                   :plex_manifest => plex_path,
+                   :plex_manifest => [plex_0, plex_1],
                    :config => pipe_ini,
                    :filterconfig => fconfig,
                    :gender_method => 'Supplied',
                    :chunk_size => 10000,
                    :memory => 2048,
                    :queue => 'yesterday',
-                   :vcf => [vcf, ],
-                   :plex_manifest => [plex_0, plex_1]
+                   :vcf => [vcf, ]
       }
       args = [dbfile, run_name, work_dir, args_hash]
       timeout = 1400
@@ -76,7 +75,6 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
       result = test_workflow(name, Genotyping::Workflows::GenotypeIlluminus,
                              timeout, work_dir, log, args)
       assert(result)
-
       plink_name = run_name+'.illuminus'
       stem = File.join(work_dir, plink_name)
       master = File.join(external_data, plink_name)
@@ -85,10 +83,69 @@ class TestIlluminusWorkflow < Test::Unit::TestCase
                                  :log_dir => work_dir})
       assert(equiv)
       Percolate.log.close
-
       remove_work_dir(work_dir) if (result and equiv)
     end
   end
 
+  def test_genotype_illuminus_invalid_args
+    external_data = ENV['GENOTYPE_TEST_DATA']
+    manifest = manifest_path
+    name = 'test_genotype_illuminus_invalid_args'
+    timeout = 1400
+    run_name = 'run1'
+    log = 'percolate.log'
 
+    pipe_ini = File.join(data_path, 'genotyping.ini')
+    fconfig = File.join(data_path, 'illuminus_test_prefilter.json')
+    vcf = File.join(external_data, 'sequenom_abvc.vcf')
+    plex_0 = File.join(external_data, 'W30467_snp_set_info_GRCh37.tsv')
+    plex_1 = File.join(external_data, 'qc_fluidigm_snp_info_GRCh37.tsv')
+    # plex_1 not needed for workflow, but tests handling multiple plex args
+
+    run_test_if((lambda { illuminus_available? && manifest }), "Skipping #{name}") do
+
+      ### invalid arguments: plex manifest without VCF
+      work_dir1 = make_work_dir(name+'.1', data_path)
+      dbfile1 = File.join(work_dir1, name + '.db')
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile1)
+      args_hash = {:manifest => manifest,
+                   :plex_manifest => [plex_0, plex_1],
+                   :config => pipe_ini,
+                   :filterconfig => fconfig,
+                   :gender_method => 'Supplied',
+                   :chunk_size => 10000,
+                   :memory => 2048,
+                   :queue => 'yesterday',
+                   :vcf => [ ]
+      }
+      args = [dbfile1, run_name, work_dir1, args_hash]
+      result1 = test_workflow(name,Genotyping::Workflows::GenotypeIlluminus,
+                              timeout, work_dir1, log, args)
+      assert(result1 == false)
+      Percolate.log.close
+      remove_work_dir(work_dir1) if result1 == false
+
+      ### invalid arguments: VCF without plex manifest
+      work_dir2 = make_work_dir(name+'.2', data_path)
+      dbfile2 = File.join(work_dir2, name + '.db')
+      FileUtils.copy(File.join(external_data, 'genotyping.db'), dbfile2)
+      args_hash = {:manifest => manifest,
+                   :plex_manifest => [ ],
+                   :config => pipe_ini,
+                   :filterconfig => fconfig,
+                   :gender_method => 'Supplied',
+                   :chunk_size => 10000,
+                   :memory => 2048,
+                   :queue => 'yesterday',
+                   :vcf => [ vcf, ]
+      }
+      args = [dbfile2, run_name, work_dir2, args_hash]
+      result2 = test_workflow(name,Genotyping::Workflows::GenotypeIlluminus,
+                              timeout, work_dir2, log, args)
+      assert(result2 == false)
+      Percolate.log.close
+      remove_work_dir(work_dir2) if result2 == false
+
+    end
+  end
 end

@@ -7,32 +7,26 @@ use warnings;
 use Cwd qw(abs_path);
 use DateTime;
 use Getopt::Long;
-use Log::Log4perl;
-use Log::Log4perl::Level;
+use Log::Log4perl qw(:levels);
 use Pod::Usage;
 use Try::Tiny;
+use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 
 use WTSI::NPG::Database::MLWarehouse;
 use WTSI::NPG::Genotyping::Fluidigm::ExportFile;
 use WTSI::NPG::Genotyping::Fluidigm::Publisher;
 use WTSI::NPG::Genotyping::Fluidigm::ResultSet;
-use WTSI::NPG::Utilities qw(collect_files
-                            collect_dirs
-                            modified_between);
-
-my $embedded_conf = q(
-   log4perl.logger.npg.irods.publish = ERROR, A1
-
-   log4perl.appender.A1           = Log::Log4perl::Appender::Screen
-   log4perl.appender.A1.utf8      = 1
-   log4perl.appender.A1.layout    = Log::Log4perl::Layout::PatternLayout
-   log4perl.appender.A1.layout.ConversionPattern = %d %p %m %n
-);
+use WTSI::NPG::Utilities qw(user_session_log);
+use WTSI::NPG::Utilities::Collector;
 
 our $VERSION = '';
 our $DEFAULT_INI = $ENV{HOME} . "/.npg/genotyping.ini";
 our $DEFAULT_DAYS = 7;
 our $DEFAULT_REFERENCE_PATH = '/seq/fluidigm/multiplexes';
+
+my $uid = `whoami`;
+chomp($uid);
+my $session_log = user_session_log($uid, 'publish_fluidigm_genotypes');
 
 run() unless caller();
 sub run {
@@ -73,23 +67,13 @@ sub run {
   $days_ago       ||= 0;
   $reference_path ||= $DEFAULT_REFERENCE_PATH;;
 
-  my $log;
-
-  if ($log4perl_config) {
-    Log::Log4perl::init($log4perl_config);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-  }
-  else {
-    Log::Log4perl::init(\$embedded_conf);
-    $log = Log::Log4perl->get_logger('npg.irods.publish');
-
-    if ($verbose) {
-      $log->level($INFO);
-    }
-    elsif ($debug) {
-      $log->level($DEBUG);
-    }
-  }
+  my @log_levels;
+  if ($debug) { push @log_levels, $DEBUG; }
+  if ($verbose) { push @log_levels, $INFO; }
+  log_init(config => $log4perl_config,
+           file   => $session_log,
+           levels => \@log_levels);
+  my $log = Log::Log4perl->get_logger('main');
 
   my $whdb = WTSI::NPG::Database::MLWarehouse->new
     (name    => 'multi_lims_warehouse',
@@ -106,21 +90,22 @@ sub run {
   else {
     $end = $now;
   }
-
   my $begin = DateTime->from_epoch
     (epoch => $end->epoch)->subtract(days => $days);
 
-  my $dir_test = modified_between($begin->epoch, $end->epoch);
-  my $dir_regex = qr{^\d{10}$}msxi;
   my $source_dir = abs_path($source);
-  my $relative_depth = 2;
-
   $log->info("Publishing from '$source_dir' to '$publish_dest' Fluidigm ",
              "results finished between ",
              $begin->iso8601, " and ", $end->iso8601);
   $log->info("Using reference path '$reference_path'");
 
-  my @dirs = collect_dirs($source_dir, $dir_test, $relative_depth, $dir_regex);
+  my $collector = WTSI::NPG::Utilities::Collector->new(
+      root  => $source_dir,
+      depth => 2,
+      regex => qr{^\d{10}$}msxi,
+  );
+  my @dirs = $collector->collect_dirs_modified_between($begin->epoch,
+                                                       $end->epoch);
   my $total = scalar @dirs;
   my $num_published = 0;
 
@@ -136,8 +121,7 @@ sub run {
          resultset        => $resultset,
          reference_path   => $reference_path,
          warehouse_db     => $whdb,
-         logger           => $log);
-      $publisher->irods->logger($log);
+         );
 
       $publisher->publish($publish_dest);
       $num_published++;
@@ -145,7 +129,7 @@ sub run {
       $log->error("Failed to publish '$dir': ", $_);
     };
 
-    $log->debug("Published '$dir': $num_published of $total");
+    $log->info("Published '$dir': $num_published of $total");
   }
 }
 
@@ -193,11 +177,11 @@ None
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2013, 2014, 2015 Genome Research Limited. All Rights
+Copyright (C) 2013, 2014, 2015, 2016 Genome Research Limited. All Rights
 Reserved.
 
 This program is free software: you can redistribute it and/or modify
