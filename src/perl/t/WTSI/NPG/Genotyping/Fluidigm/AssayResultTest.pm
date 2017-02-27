@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use File::Spec;
-use Test::More tests => 402;
+use Test::More tests => 407;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -243,6 +243,91 @@ sub is_call : Test(5) {
       y_intensity    => 0.1,
       str            => '')->is_call, 'Is not call 3');
 }
+
+sub is_template : Test(5) {
+
+    # AssayResult is a template assay iff not empty and not control
+    ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_template_assay, 'Is template assay 1');
+
+    # Empty AssayResult is not a template assay
+    ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => '[ Empty ]',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_template_assay, 'Is template assay 2');
+
+    # Control AssayResult is not a template assay
+    ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => '',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'NTC',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_template_assay, 'Is template assay 3');
+
+    # AssayResult is a template assay *and* a call
+    ok(WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'XY',
+      converted_call => 'G:T',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_template_call, 'Is template call 1');
+
+    # AssayResult is a template assay *and not* a call
+    ok(!WTSI::NPG::Genotyping::Fluidigm::AssayResult->new
+     (assay          => 'S01-A01',
+      snp_assayed    => 'rs0123456',
+      x_allele       => 'G',
+      y_allele       => 'T',
+      sample_name    => 'ABC0123456789',
+      type           => 'Unknown',
+      auto           => 'XY',
+      confidence     => 0.1,
+      final          => 'No Call',
+      converted_call => 'No Call',
+      x_intensity    => 0.1,
+      y_intensity    => 0.1,
+      str            => '')->is_template_call, 'Is template call 2');
+
+}
+
 
 sub is_valid : Test(4) {
   # Evaluate whether a result is valid. See is_call. 'No Call' and 'invalid'
