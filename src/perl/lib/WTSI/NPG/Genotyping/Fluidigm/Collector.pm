@@ -3,7 +3,8 @@ use utf8;
 package WTSI::NPG::Genotyping::Fluidigm::Collector;
 
 use DateTime;
-use File::Temp qw/tempdir/;
+use File::Temp;
+use File::Spec;
 use WTSI::NPG::iRODS;
 use WTSI::NPG::Utilities qw/md5sum/;
 
@@ -162,7 +163,8 @@ sub irods_publication_ok {
 
 sub _get_md5_by_address {
     my ($self, $export_file) = @_;
-    my $tmpdir = tempdir("fluidigm_samples_XXXXXX", CLEANUP => 1);
+    my $tmpdir = File::Temp->newdir("fluidigm_samples_XXXXXX",
+                                    dir => File::Spec->tmpdir() );
     my %md5_by_address;
     foreach my $address (@{$export_file->addresses}) {
         my $filename = $export_file->fluidigm_filename($address);
@@ -170,8 +172,9 @@ sub _get_md5_by_address {
         my $records = $export_file->write_assay_result_data($address, $file);
         my $md5 = md5sum($file);
         $md5_by_address{$address} = $md5;
-        $self->debug("Wrote $records records for address $address into ",
-                     "temp file '", $file, "', with md5 '", $md5, "'");
+        $self->debug("Wrote ", $records, " records for address ",
+                     $address, " into temp file ", $file,
+                     ", with md5 ", $md5);
     }
     return %md5_by_address;
 }
