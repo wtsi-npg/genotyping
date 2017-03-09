@@ -11,7 +11,6 @@ use File::Spec::Functions qw(tmpdir);
 use Getopt::Long;
 use Log::Log4perl qw(:levels);
 use Pod::Usage;
-use Try::Tiny;
 
 use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
@@ -115,19 +114,7 @@ sub run {
     }
     $log->info("Received ", scalar @fluidigm_data,
                " Fluidigm data object paths");
-    # Get Fluidigm data objects
-    my @fluidigm_data_objects;
-    foreach my $obj_path (@fluidigm_data) {
-        try {
-            my $fdo = WTSI::NPG::Genotyping::Fluidigm::AssayDataObject->new
-                ($irods, $obj_path);
-            push @fluidigm_data_objects, $fdo;
 
-        } catch {
-            $log->logcroak("Unable to create Fluidigm DataObject from ",
-                           "iRODS path '", $obj_path, "'");
-        };
-    }
     # Find output filehandle
     my $fh;
     my $temp;
@@ -149,7 +136,7 @@ sub run {
     }
     # Write updated QC results
     my %args = (
-        data_objects => \@fluidigm_data_objects,
+        data_object_paths => \@fluidigm_data,
     );
     if (defined $old_csv) { $args{'csv_path'} = $old_csv; }
     my $qc = WTSI::NPG::Genotyping::Fluidigm::QC->new(\%args);

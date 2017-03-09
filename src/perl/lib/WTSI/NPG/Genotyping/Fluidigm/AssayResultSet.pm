@@ -259,7 +259,9 @@ sub filter_on_confidence {
 
   Example    : $summary_fields = $result->summary_fields();
   Description: Return an ArrayRef containing summary values. Call rate is
-               rounded to 4 decimal places for subsequent output.
+               rounded to 4 decimal places for subsequent output. The
+               string 'NA' denotes an empty sample ID, which may occur
+               for an empty well.
   Returntype : ArrayRef
 
 =cut
@@ -267,8 +269,10 @@ sub filter_on_confidence {
 sub summary_fields {
   my ($self) = @_;
 
+  my $id_string = $self->canonical_sample_id() || 'NA';
+
   my @fields = (
-    $self->canonical_sample_id(),
+    $id_string,
     sprintf("%.4f", $self->call_rate),
     $self->size(),
     $self->total_calls,
