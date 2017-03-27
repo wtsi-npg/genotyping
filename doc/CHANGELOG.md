@@ -4,6 +4,16 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
+Release 1.14.1: 2017-03-28
+--------------------------
+
+Added:
+- Fluidigm QC:
+  - Compute QC metrics and write in CSV format
+  - Can update an existing CSV file
+  - Command-line script qc_fluidigm.pl
+
+
 Release 1.14.0: 2017-02-07
 --------------------------
 
