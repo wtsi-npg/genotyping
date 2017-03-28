@@ -12,7 +12,9 @@ Added:
   - Compute QC metrics and write in CSV format
   - Can update an existing CSV file
   - Command-line script qc_fluidigm.pl
-
+- Fluidigm archiver:
+  - Compress Fluidigm data into .tar.gz archive files
+  - Script archive_fluidigm_genotypes.pl
 
 Release 1.14.0: 2017-02-07
 --------------------------
