@@ -119,6 +119,42 @@ sub is_call {
           $self->converted_call ne $NO_CALL);
 }
 
+=head2 is_template_assay
+
+  Arg [1]    : None
+
+  Example    : $result->is_template
+  Description: Return True if is_empty and is_control are both false, ie.
+               the assay contains an experimental sample (also known as a
+               template).
+
+  Returntype : Bool
+
+=cut
+
+sub is_template_assay {
+ my ($self) = @_;
+
+ return !($self->is_empty() || $self->is_control());
+}
+
+=head2 is_template_call
+
+  Arg [1]    : None
+
+  Example    : $result->is_template_call
+  Description: Return True if is_template and is_call are both true.
+
+  Returntype : Bool
+
+=cut
+
+sub is_template_call {
+ my ($self) = @_;
+
+ return $self->is_template_assay() && $self->is_call();
+}
+
 =head2 is_valid
 
   Arg [1]    : None

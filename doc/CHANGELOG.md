@@ -4,6 +4,18 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
+Release 1.14.1: 2017-03-28
+--------------------------
+
+Added:
+- Fluidigm QC:
+  - Compute QC metrics and write in CSV format
+  - Can update an existing CSV file
+  - Command-line script qc_fluidigm.pl
+- Fluidigm archiver:
+  - Compress Fluidigm data into .tar.gz archive files
+  - Script archive_fluidigm_genotypes.pl
+
 Release 1.14.0: 2017-02-07
 --------------------------
 
@@ -42,76 +54,6 @@ Changed:
 
 Fixed:
 - Default LSF queue for Ruby workflows
-
-
-Release 1.13.0: 2016-06-20
---------------------------
-
-Added:
-- install.sh script to install pipeline and its Perl dependencies
-- Documentation for Bayesian identity check
-
-Changed:
-- Modified ready_workflow.pl to better align with user SOP
-- Use try/catch to handle unexpected errors in retrieving QC plex results
-from iRODS
-- Updated reference genome for Sequenom iRODS query
-- Update perl-irods-wrap dependency to 2.4.0; removes unhelpful warning
-messages to STDERR. This in turn requires baton version >= 0.16.4.
-
-Removed:
-- Script publish_infinium_file_list.pl; superseded by other publish scripts
-
-
-Release 1.12.1: 2016-05-13
---------------------------
-
-Fixed:
-- Support repeat scans from Infinium database
-
-
-Release 1.13.2: 2016-11-10
---------------------------
-
-Changed:
-- Hotfix: Add cgp and ddd references to WTSI::NPG::Genotyping::QC::Identity
-
-
-Release 1.13.1: 2016-07-28
---------------------------
-
-Changed:
-- Made install.sh more transparent and portable.
-- Updated WTSI-DNAP-Utilities and perl-irods-wrap versions in install.sh.
-
-Fixed:
-- Default LSF queue for Ruby workflows
-
-
-Release 1.13.0: 2016-06-20
---------------------------
-
-Added:
-- install.sh script to install pipeline and its Perl dependencies
-- Documentation for Bayesian identity check
-
-Changed:
-- Modified ready_workflow.pl to better align with user SOP
-- Use try/catch to handle unexpected errors in retrieving QC plex results
-from iRODS
-- Updated reference genome for Sequenom iRODS query
-- Update perl-irods-wrap dependency to 2.4.0; removes unhelpful warning
-messages to STDERR. This in turn requires baton version >= 0.16.4.
-
-Removed:
-- Script publish_infinium_file_list.pl; superseded by other publish scripts
-
-
-Release 1.12.1: 2016-05-13
---------------------------
-
-Fixed:
-- Support repeat scans from Infinium database
 
 
 Release 1.13.0: 2016-06-20

@@ -8,7 +8,7 @@ use warnings;
 
 use base qw(WTSI::NPG::Test);
 use File::Spec;
-use Test::More tests => 68;
+use Test::More tests => 70;
 use Test::Exception;
 
 Log::Log4perl::init('./etc/log4perl_tests.conf');
@@ -94,6 +94,19 @@ sub constructor : Test(5) {
 
 sub size : Test(1) {
   cmp_ok($resultset->size, '==', 96, 'Expected size');
+}
+
+sub string : Test(1) {
+  cmp_ok($resultset->summary_string(),
+         'eq',
+         'ABC0123456789,1.0000,96,96,70,70,96,26,26',
+         'Expected CSV string');
+}
+
+sub summary_fields : Test(1) {
+  my $expected_fields =
+      ['ABC0123456789', '1.0000', 96, 96, 70, 70, 96, 26, 26];
+  is_deeply($resultset->summary_fields, $expected_fields, 'Expected summary');
 }
 
 sub assay_results : Test(3) {

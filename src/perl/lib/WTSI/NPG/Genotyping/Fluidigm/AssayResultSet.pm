@@ -24,6 +24,73 @@ has 'assay_results' =>
    builder  => '_build_assay_results',
    lazy     => 1);
 
+has 'call_rate' =>
+  (is       => 'ro',
+   isa      => 'Num',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_call_rate',
+   documentation => 'QC metric, defined as total_template_calls / '.
+       'total_template_assays. Measures the call rate excluding control '.
+       'and empty assays.',
+);
+
+has 'total_calls' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_calls',
+   documentation => 'Number of assay results for which is_call is True',
+);
+
+has 'total_controls' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_controls',
+   documentation => 'Number of assay results for which is_control is True',
+);
+
+has 'total_empty' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_empty',
+   documentation => 'Number of assay results for which is_empty is True',
+);
+
+has 'total_template_assay_calls' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_template_assay_calls',
+   documentation => 'Number of assay results for which '.
+       'is_template_call is True',
+);
+
+has 'total_template_assays' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_template_assays',
+   documentation => 'Number of assay results for which '.
+       'is_template_assay is True',
+);
+
+has 'total_valid' =>
+  (is       => 'ro',
+   isa      => 'Int',
+   init_arg => undef,
+   lazy     => 1,
+   builder  => '_build_total_valid',
+   documentation => 'Number of assay results for which is_valid is True',
+);
+
 around BUILDARGS => sub {
   my ($orig, $class, @args) = @_;
 
@@ -185,6 +252,62 @@ sub filter_on_confidence {
   return \@filtered_results;
 }
 
+
+=head2 summary_fields
+
+  Arg [1]    : None
+
+  Example    : $summary_fields = $result->summary_fields();
+  Description: Return an ArrayRef containing summary values. Call rate is
+               rounded to 4 decimal places for subsequent output. The
+               string 'NA' denotes an empty sample ID, which may occur
+               for an empty well.
+  Returntype : ArrayRef
+
+=cut
+
+sub summary_fields {
+  my ($self) = @_;
+
+  my $id_string = $self->canonical_sample_id() || 'NA';
+
+  my @fields = (
+    $id_string,
+    sprintf("%.4f", $self->call_rate),
+    $self->size(),
+    $self->total_calls,
+    $self->total_controls,
+    $self->total_empty,
+    $self->total_valid,
+    $self->total_template_assays,
+    $self->total_template_assay_calls,
+  );
+  return \@fields;
+}
+
+=head2 summary_string
+
+  Arg [1]    : None
+
+  Example    : $summary_string = $result->summary_string();
+  Description: Return a comma-separated string containing summary values,
+               same as those returned by summary_fields().
+  Returntype : Str
+
+=cut
+
+sub summary_string {
+  my ($self) = @_;
+  my $csv = Text::CSV->new ({ binary => 1 });
+  $csv->combine(@{$self->summary_fields()});
+  my $string = $csv->string();
+  if (! defined $string) {
+    $self->logconfess("Unable to generate CSV string from input '",
+                      $csv->error_input, "'");
+  }
+  return $string;
+}
+
 sub _build_assay_results {
   my ($self) = @_;
 
@@ -206,6 +329,57 @@ sub _build_assay_results {
   close $fh or $self->logwarn("Failed to close a string handle");
 
   return $records;
+}
+
+sub _build_call_rate {
+  my ($self,) = @_;
+  my $call_rate = 0;
+  if ($self->total_template_assays != 0) {
+    $call_rate =
+        $self->total_template_assay_calls / $self->total_template_assays;
+  }
+  return $call_rate;
+}
+
+sub _build_total_calls {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_call');
+}
+
+sub _build_total_controls {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_control');
+}
+
+sub _build_total_empty {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_empty');
+}
+
+sub _build_total_template_assay_calls {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_template_call');
+}
+
+sub _build_total_template_assays {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_template_assay');
+}
+
+sub _build_total_valid {
+  my ($self,) = @_;
+  return $self->_count_matching_assays('is_valid');
+}
+
+sub _count_matching_assays {
+  # method to count AssayResults which return True for a given object method
+  # eg. count instances of is_empty, is_call, is_invalid
+  my ($self, $sub_boolean) = @_;
+  my $count = 0;
+  foreach my $ar (@{$self->assay_results}) {
+    if ($ar->$sub_boolean()) { $count++; }
+  }
+  return $count;
 }
 
 sub _parse_assay_results {
@@ -275,6 +449,7 @@ sub _parse_assay_results {
   return \@records;
 }
 
+
 __PACKAGE__->meta->make_immutable;
 
 no Moose;
@@ -294,11 +469,11 @@ for a number of SNPs.
 
 =head1 AUTHOR
 
-Keith James <kdj@sanger.ac.uk>
+Keith James <kdj@sanger.ac.uk>, Iain Bancarz <ib5@sanger.ac.uk>
 
 =head1 COPYRIGHT AND DISCLAIMER
 
-Copyright (C) 2014, 2015 Genome Research Limited. All Rights Reserved.
+Copyright (C) 2014, 2015, 2017 Genome Research Limited. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the Perl Artistic License or the GNU General
