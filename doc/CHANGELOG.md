@@ -4,6 +4,12 @@ Change log for WTSI genotyping pipeline
 
 Latest version is hosted at: https://github.com/wtsi-npg/genotyping
 
+Release 1.14.2: 2017-03-31
+--------------------------
+
+Added:
+- Fluidigm QC script has option to publish results to iRODS
+
 Release 1.14.1: 2017-03-28
 --------------------------
 
