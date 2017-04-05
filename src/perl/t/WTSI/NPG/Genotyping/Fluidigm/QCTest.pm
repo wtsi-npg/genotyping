@@ -10,7 +10,7 @@ use File::Copy qw/copy/;
 use File::Slurp qw/read_file/;
 use File::Temp qw/tempdir/;
 use Set::Scalar;
-use Test::More tests => 17;
+use Test::More tests => 19;
 use Test::Exception;
 use Text::CSV;
 
@@ -129,6 +129,18 @@ sub script_metaquery : Test(2) {
     ok(system($cmd)==0, "Script with --in-place and metaquery exits OK");
     my $msg = 'Script in-place CSV output matches expected values';
     _validate_csv_output("$tmp/$csv_name", $msg);
+}
+
+sub script_publish : Test(2) {
+    my $irods = WTSI::NPG::iRODS->new;
+    my $publish_dest = $irods_tmp_coll.'/qc_output';
+    my $cmd = "$script --query-path $irods_tmp_coll ".
+        "--publish-dest $publish_dest ".
+        "--old-csv $tmp/$csv_name --in-place --logconf $logconf --debug";
+    $log->info("Running command '$cmd'");
+    ok(system($cmd)==0, "Script with --publish-dest exits OK");
+    my $obj_path = $publish_dest.'/'.$csv_name;
+    ok($irods->is_object($obj_path), 'QC output published to '.$obj_path);
 }
 
 sub script_update : Test(2) {

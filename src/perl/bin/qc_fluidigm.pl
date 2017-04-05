@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use Cwd qw(abs_path);
+use DateTime;
 use File::Copy qw(cp);
 use File::Temp qw(tempfile);
 use File::Spec::Functions qw(tmpdir);
@@ -16,6 +17,7 @@ use WTSI::DNAP::Utilities::ConfigureLogger qw(log_init);
 use WTSI::NPG::Genotyping::Fluidigm::AssayDataObject;
 use WTSI::NPG::Genotyping::Fluidigm::QC;
 use WTSI::NPG::iRODS;
+use WTSI::NPG::SimplePublisher;
 use WTSI::NPG::Utilities qw(user_session_log);
 
 my $uid = `whoami`;
@@ -32,6 +34,7 @@ sub run {
     my $log4perl_config;
     my $new_csv;
     my $old_csv;
+    my $publish_dest;
     my $query_path;
     my $verbose;
     my @filter_key;
@@ -47,6 +50,7 @@ sub run {
                'logconf=s'      => \$log4perl_config,
                'new-csv=s'      => \$new_csv,
                'old-csv=s'      => \$old_csv,
+               'publish-dest=s' => \$publish_dest,
                'query-path=s'   => \$query_path,
                'verbose'        => \$verbose,
                ''               => \$stdio); # Permits trailing '-' for STDIN
@@ -86,6 +90,11 @@ sub run {
         } else {
             $new_csv = $old_csv;
         }
+    }
+    if ($publish_dest && ! $new_csv) {
+        pod2usage(-msg => "Must specify --new-csv or --in-place for ".
+                      "publication of output to iRODS",
+                  -exitval => 2);
     }
     # set up logging
     my @log_levels;
@@ -143,6 +152,14 @@ sub run {
     $qc->write_csv($fh);
     if (defined $new_csv) {
         close $fh || $log->logcroak("Cannot close CSV output");
+        if (defined $publish_dest) {
+            my $publisher = WTSI::NPG::SimplePublisher->new(irods => $irods);
+            my $published = $publisher->publish_file($new_csv,
+                                                     [],
+                                                     $publish_dest,
+                                                     DateTime->now);
+            $log->info('Published Fluidigm QC output to iRODS: ', $published);
+        }
     }
     if (defined $temp) {
         my $cp_ok = cp($temp, $new_csv);
@@ -177,6 +194,9 @@ Options:
                  to STDOUT.
   --old-csv      Path of a CSV file from which to read existing QC records.
                  Optional.
+  --publish-dest An iRODS collection for publication of the CSV output file.
+                 Optional; if not given, output is not published to iRODS.
+                 Not valid if output is being written to STDOUT.
   --query-path   An iRODS path to query for Fluidigm DataObjects. Required,
                  unless iRODS paths are supplied on STDIN using the '-'
                  option.
