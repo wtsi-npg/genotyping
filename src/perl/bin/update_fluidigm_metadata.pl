@@ -82,7 +82,7 @@ sub run {
   my $log = Log::Log4perl->get_logger('main');
 
   my $ssdb = WTSI::NPG::Database::MLWarehouse->new
-    (name   => 'sequencescape_warehouse',
+    (name   => 'multi_lims_warehouse',
      inifile =>  $config)->connect(RaiseError           => 1,
                                    mysql_enable_utf8    => 1,
                                    mysql_auto_reconnect => 1);
