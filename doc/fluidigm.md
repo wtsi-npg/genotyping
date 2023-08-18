@@ -19,7 +19,7 @@ through the Illumina pipeline.
 2. Samples are processed in the laboratory on a Fluidigm EP1 instrument, in batches.
 3. Result data are written to an NFS filesystem, one directory per batch.
 4. NPG run a `cron` job daily which:
-   1. Locates aany batches of data added to the NFS filesystem in the last 7 days.
+   1. Locates any batches of data added to the NFS filesystem in the last 7 days.
    2. For each batch of data, splits the output into several files, one per sample.
    3. Publishes these per-sample files to iRODS and annotates them with "primary"
       metadata.
@@ -39,5 +39,5 @@ through the Illumina pipeline.
   [publish_fluidigm_genotypes.pl](https://github.com/wtsi-npg/genotyping/blob/master/src/perl/bin/publish_fluidigm_genotypes.pl).  
 
 - The publishing script is idempotent which, combined with a daily run capturing
-  the past 7 days of data, means that temporary services interruptions are handled
+  the past 7 days of data, means that temporary service interruptions are handled
   without additional tracking, but with the overhead of some repeated work.
