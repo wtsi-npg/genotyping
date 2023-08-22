@@ -27,6 +27,9 @@ through the Illumina pipeline.
       them with "secondary" metadata and sets data access permissions.
 5. NPG run regular cron jobs which update "secondary" metadata to reflect any
    subsequent changes in the ML warehouse.
+6. Fluidigm results in iRODS are periodically extracted, aggregated and fed back
+   into the [NPG QC](https://github.com/wtsi-npg/npg_qc) process (see
+   the `./bin/gtck_*.sh` scripts in that repository).
 
 ## Implementation details
 
