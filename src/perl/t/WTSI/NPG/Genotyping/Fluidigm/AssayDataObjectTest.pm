@@ -66,7 +66,8 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS->new;
+  my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
+                                    strict_baton_version => 0);
   $irods_tmp_coll = $irods->add_collection("FluidigmAssayDataObjectTest.$pid");
   $irods->put_collection($data_path, $irods_tmp_coll);
 
@@ -80,6 +81,12 @@ sub make_fixture : Test(setup) {
   $irods->add_object_avu($irods_path, 'study_id',             '10');
   $irods->add_object_avu($irods_path, 'sample_consent',       '1');
   $irods->add_object_avu($irods_path, 'sample_supplier_name', 'zzzzzzzzzz');
+
+
+  # Ideally all iRODS groups that are needed for the test should be created
+  # at this point and then deleted on exit. As it is, the following iRODS
+  # group should be present in test iRODS server before this test is run:
+  # ss_0, ss_10, ss_100.
 
   # Add some ss_ group permissions to be removed
   $irods->set_object_permissions('read', 'ss_10',  $irods_path);
