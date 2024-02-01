@@ -1,0 +1,185 @@
+name: "Unit tests"
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }} # Experimental builds may fail
+
+    defaults:
+      run:
+        shell: bash -l -e -o pipefail {0}
+
+    env:
+      SINGULARITY_VERSION: "4.1.0"
+      PERL_CACHE: ~/perl5 # Perlbrew and CPAN modules installed here, cached
+      NPG_LIB: ~/perl5npg # NPG modules installed here, not cached
+      WSI_NPG_GITHUB_URL: https://github.com/wtsi-npg
+      WSI_NPG_BUILD_BRANCH: ${{ github.base_ref || github.ref }}
+
+    strategy:
+      matrix:
+        include:
+          - perl: "5.22.4"
+            irods: "4.2.7"
+            client_image: "ghcr.io/wtsi-npg/ub-16.04-irods-clients-4.2.7:latest"
+            server_image: "ghcr.io/wtsi-npg/ub-16.04-irods-4.2.7:latest"
+            experimental: false
+
+    services:
+      irods-server:
+        image: ${{ matrix.server_image }}
+        ports:
+          - "1247:1247"
+          - "20000-20199:20000-20199"
+        options: >-
+          --health-cmd "nc -z -v localhost 1247"
+          --health-start-period 30s
+          --health-interval 10s
+          --health-timeout 20s
+          --health-retries 6
+
+    steps:
+      - name: "Set environmental variables based on other environmental variables"
+        run: |
+          echo "SINGULARITY_CACHEDIR=$HOME/.singularity-cache" >> $GITHUB_ENV
+          # '~' in SINGULARITY_CACHEDIR value (from say a env: section in this YAML) is not expanded by
+          # singularity so that paths used are misleading/unclear
+
+      - uses: actions/checkout@v4
+
+      - name: "Install Singularity"
+        run: |
+          pkg="singularity-ce_${SINGULARITY_VERSION}-$(lsb_release -sc)_amd64.deb"
+          curl -sSL -O "https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/$pkg"
+          curl -sSL -O "https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/sha256sums"
+          grep "$os_release" sha256sums | sha256sum
+          sudo apt-get install -q -y "./$pkg"
+        
+          # Enable DBus for this user, so that rootless cgroups works and we can create
+          # Singularity service instances. See https://github.com/containers/podman/issues/5443
+          systemctl --user enable --now dbus.socket
+          echo DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" >> $GITHUB_ENV
+
+      - name: "Cache Singularity images"
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SINGULARITY_CACHEDIR }}
+          key: ${{ runner.os }}-singularity
+
+      - name: "Install iRODS client wrappers"
+        env:
+          DOCKER_IMAGE: ${{ matrix.client_image }}
+        run: |
+          # Use -s option for the wrappers to enable re-usable service instances
+          # Install is to HOME rather than workspace to avoid clashes with repo e.g. in bin/
+          singularity exec docker://$DOCKER_IMAGE singularity-wrapper -s -p $HOME/.local install
+          echo $HOME/.local/bin >> $GITHUB_PATH
+
+      - name: "Configure iRODS clients"
+        env:
+          DOCKER_IMAGE: ${{ matrix.client_image }}
+        run: |
+          mkdir -p "$HOME/.irods"
+          cat <<'EOF' > "$HOME/.irods/irods_environment.json"
+          {
+           "irods_host": "localhost",
+           "irods_port": 1247,
+           "irods_user_name": "irods",
+           "irods_zone_name": "testZone",
+           "irods_home": "/testZone/home/irods",
+           "irods_default_resource": "replResc",
+           "irods_default_hash_scheme": "MD5"
+          }
+          EOF
+
+          echo "irods" | script -q -c "iinit" /dev/null
+          ienv
+          ils
+          ilsresc
+
+          baton-do --version
+
+      - name: "Install OS dependencies"
+        run: |
+          sudo apt-get update
+          # https://github.com/actions/runner-images/issues/2139
+          sudo apt-get remove -y nginx libgd3
+          sudo apt-get install -y libgd-dev uuid-dev libgd-text-perl
+
+      - name: "Cache Perl"
+        id: cache-perl
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PERL_CACHE }}
+          key: ${{ runner.os }}-${{ matrix.perl }}-perl
+
+      - name: "Install Perlbrew"
+        if: steps.cache-perl.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://install.perlbrew.pl -o perlbrew.sh
+          sha256sum -c .github/workflows/perlbrew.sha256
+          export PERLBREW_ROOT=${{ env.PERL_CACHE }}
+          sh perlbrew.sh
+
+          source ${{ env.PERL_CACHE }}/etc/bashrc
+          perlbrew available
+          perlbrew install --notest perl-${{ matrix.perl }}
+          perlbrew use perl-${{ matrix.perl }}
+          perlbrew install-cpanm
+
+      - name: "Initialize Perlbrew"
+        run: |
+          echo "source ${{ env.PERL_CACHE }}/etc/bashrc" >> "$HOME/.bash_profile"
+
+      - name: "Install Perl dependencies"
+        run: |
+          cpanm --local-lib=${{ env.PERL_CACHE }} local::lib
+          eval $(perl -I ${{ env.PERL_CACHE }}/lib/perl5/ -Mlocal::lib="$NPG_LIB")
+          eval $(perl -I ${{ env.PERL_CACHE }}/lib/perl5/ -Mlocal::lib)
+          
+          cpanm --quiet --notest Module::Build
+          cpanm --quiet --notest Alien::Tidyp
+          
+          ./scripts/install_wsi_dependencies.sh "$NPG_LIB" \
+             perl-dnap-utilities \
+             perl-irods-wrap \
+             ml_warehouse \
+             npg_tracking
+          
+          cd src/perl
+          cpanm --installdeps --notest .
+
+      - name: "Log install failure"
+        if: ${{ failure() }}
+        run: |
+          find ~/.cpanm/work -cmin -1 -name '*.log' -exec tail -n20  {} \;
+
+      - name: "Run tests"
+        run: |
+          eval $(perl -I ${{ env.PERL_CACHE }}/lib/perl5/ -Mlocal::lib)
+          eval $(perl -I ${{ env.PERL_CACHE }}/lib/perl5/ -Mlocal::lib="$NPG_LIB")
+          export PERL5LIB="$PWD:$PERL5LIB"
+          
+          cd src/perl
+          perl BuildFluidigm.PL
+          
+          # These tests were typically run in an environment with some resources
+          # already set up, so we need to create them here
+          
+          mkdir -p "$HOME/.npg"
+          cat <<EOF >"$HOME/.npg/genotyping.ini"
+          [ml_warehouse]
+  
+          [SQSCP]
+          EOF
+          
+          igroupadmin mkgroup ss_0
+          igroupadmin mkgroup ss_10
+          igroupadmin mkgroup ss_100
+          
+          export TEST_AUTHOR=1
+          export WTSI_NPG_iRODS_Test_irodsEnvFile=NONE
+          export WTSI_NPG_iRODS_Test_IRODS_ENVIRONMENT_FILE="$HOME/.irods/irods_environment.json"
+          ./BuildFluidigm test
