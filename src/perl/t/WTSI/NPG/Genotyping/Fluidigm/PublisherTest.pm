@@ -78,7 +78,8 @@ my $irods_tmp_coll;
 my $pid = $$;
 
 sub make_fixture : Test(setup) {
-  my $irods = WTSI::NPG::iRODS->new;
+  my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
+                                    strict_baton_version => 0);
 
   $irods_tmp_coll = "FluidigmPublisherTest.$pid";
   $irods->add_collection($irods_tmp_coll);

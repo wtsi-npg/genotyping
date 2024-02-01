@@ -4,7 +4,7 @@ use warnings;
 
 # These paths are propagated to @INC in the build script. The 't'
 # directory is added because the Test::Class tests are there.
-use lib qw(. t);
+use lib qw(. t lib);
 
 use WTSI::DNAP::Utilities::Build;
 use BuildFluidigm;
