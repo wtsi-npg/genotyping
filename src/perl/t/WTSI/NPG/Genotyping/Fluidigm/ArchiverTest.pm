@@ -88,7 +88,8 @@ my $pid = $$;
 
 sub make_fixture : Test(setup) {
     # create a Fluidigm resultset and publish to temp iRODS collection
-    my $irods = WTSI::NPG::iRODS->new;
+    my $irods = WTSI::NPG::iRODS->new(environment          => \%ENV,
+                                      strict_baton_version => 0);
     $irods_tmp_coll = "FluidigmPublisherTest.$pid";
     $irods->add_collection($irods_tmp_coll);
     $irods->add_object("$data_path/$snpset_file",
