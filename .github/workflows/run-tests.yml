@@ -26,6 +26,18 @@ jobs:
             client_image: "ghcr.io/wtsi-npg/ub-16.04-irods-clients-4.2.7:latest"
             server_image: "ghcr.io/wtsi-npg/ub-16.04-irods-4.2.7:latest"
             experimental: false
+          # iRODS 4.3.3 clients on Ubuntu 22.04
+          - perl: "5.22.4"
+            irods: "4.3.3"
+            client_image: "ghcr.io/wtsi-npg/ub-22.04-irods-clients-4.3.3:latest"
+            server_image: "ghcr.io/wtsi-npg/ub-22.04-irods-4.3.3:latest"
+            experimental: false
+          # iRODS 4.3.4 clients on Ubuntu 22.04
+          - perl: "5.22.4"
+            irods: "4.3.4"
+            client_image: "ghcr.io/wtsi-npg/ub-22.04-irods-clients-4.3.4:latest"
+            server_image: "ghcr.io/wtsi-npg/ub-22.04-irods-4.3.4:latest"
+            experimental: false
 
     services:
       irods-server:
