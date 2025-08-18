@@ -59,7 +59,7 @@ jobs:
           # '~' in SINGULARITY_CACHEDIR value (from say a env: section in this YAML) is not expanded by
           # singularity so that paths used are misleading/unclear
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: "Install Singularity"
         run: |
