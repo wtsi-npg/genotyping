@@ -75,7 +75,7 @@ jobs:
           echo DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" >> $GITHUB_ENV
 
       - name: "Cache Singularity images"
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.SINGULARITY_CACHEDIR }}
           key: ${{ runner.os }}-singularity
@@ -122,7 +122,7 @@ jobs:
 
       - name: "Cache Perl"
         id: cache-perl
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.PERL_CACHE }}
           key: ${{ runner.os }}-${{ matrix.perl }}-perl
