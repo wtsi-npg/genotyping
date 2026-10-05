@@ -28,7 +28,7 @@ jobs:
             experimental: true
           - perl: "5.38.3"
             irods: "4.2.7-engineering"
-            client_image: "ghcr.io/wtsi-npg/ub-16.04-irods-clients-4.2.7:latest"
+            client_image: "ghcr.io/wtsi-npg/ub-16.04-irods-clients-4.2.7-engineering:latest"
             server_image: "ghcr.io/wtsi-npg/ub-16.04-irods-4.2.7-engineering:latest"
             experimental: false
           - perl: "5.38.3"
